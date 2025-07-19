@@ -18,7 +18,6 @@ add_subdirectory(src/scanner)
 add_library(mxvm SHARED
     src/mxvm.cpp
 )
-
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -26,3 +25,15 @@ target_include_directories(mxvm PUBLIC
 target_link_libraries(mxvm PUBLIC scanner)
 
 add_subdirectory(src/vm)
+
+include(GNUInstallDirs)
+install(TARGETS mxvm
+    EXPORT mxvmTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
