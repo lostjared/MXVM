@@ -35,17 +35,17 @@ Args proc_args(int argc, char **argv) {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
                 case 'o':
-                args.output_file = arg.arg_value;
+                    args.output_file = arg.arg_value;
                 break;
                 case 'a':
                 case 128:
-                if(arg.arg_value == "translate") {
-                    args.action = vm_action::translate;
-                } else if(arg.arg_value == "interpret") {
-                    args.action = vm_action::interpret;
-                } else {
-                    throw mx::ArgException<std::string>("Error invalid action value");
-                }
+                    if(arg.arg_value == "translate") {
+                        args.action = vm_action::translate;
+                    } else if(arg.arg_value == "interpret") {
+                        args.action = vm_action::interpret;
+                    } else {
+                        throw mx::ArgException<std::string>("Error invalid action value");
+                    }
                 break;
                 case 't':
                 case 129:
@@ -53,7 +53,7 @@ Args proc_args(int argc, char **argv) {
                 break;
                 default:
                 case '-':
-                args.source_file = arg.arg_value;
+                    args.source_file = arg.arg_value;
                 break;
             }
         }
