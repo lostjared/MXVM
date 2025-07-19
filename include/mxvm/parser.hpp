@@ -5,6 +5,7 @@
 #include<string>
 #include<cstdint>
 #include"scanner/scanner.hpp"
+#include"scanner/exception.hpp"
 
 namespace mxvm {
 

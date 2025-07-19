@@ -24,6 +24,10 @@ namespace mxvm {
     }
 
     void Parser::parse() {
-        
+        for(uint64_t i = 0; i < scanner.size(); ++i) {
+            auto t = this->operator[](i);
+            if(t.getTokenValue() != "\n")
+            t.print(std::cout);
+        }
     }
 }

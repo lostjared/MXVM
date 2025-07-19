@@ -1,6 +1,8 @@
 #include<mxvm/mxvm.hpp>
 #include"argz.hpp"
 #include<iostream>
+#include<fstream>
+#include<sstream>
 #include<string>
 #include<string_view>
 
@@ -102,6 +104,21 @@ void translate_x64_linux(std::string_view input, std::string_view output) {
 }
 
 void action_interpret(std::string_view input) {
-
+    try {
+        std::string input_file(input);
+        std::fstream file;
+        file.open(input_file, std::ios::in);
+        if(!file.is_open()) {
+            throw mx::Exception("Error could not open file: " + input_file);
+        }
+        std::ostringstream stream;
+        stream << file.rdbuf();
+        file.close();
+        mxvm::Parser parser(stream.str());
+        parser.scan();
+        parser.parse();
+    } catch(mx::Exception &e) {
+        std::cerr << "Runtime Error: "<< e.what() << "\n";
+    }
 }
 
