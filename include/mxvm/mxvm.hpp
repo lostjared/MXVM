@@ -4,9 +4,6 @@
 #include<iostream>
 #include<string>
 
-namespace mxvm {
 
-
-}
 
 #endif

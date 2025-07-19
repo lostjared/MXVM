@@ -1,5 +1,4 @@
 /* 
-    MXDBG - Debugger with AI 
     coded by Jared Bruni (jaredbruni@protonmail.com)
     https://lostsidedead.biz
 */
@@ -8,7 +7,8 @@
 #include<iostream>
 #include<string>
 #include<unordered_map>
-#include"mxdbg/scanner.hpp"
+#include"scanner/scanner.hpp"
+#include"scanner/exception.hpp"
 
  namespace expr_parser {
         
