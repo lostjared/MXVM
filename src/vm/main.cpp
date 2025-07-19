@@ -17,6 +17,7 @@ struct Args {
 void process_arguments(Args *args);
 void action_translate(std::string_view input, std::string_view output, vm_target &target);
 void action_interpret(std::string_view input);
+void translate_x64_linux(std::string_view input, std::string_view output);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -89,9 +90,18 @@ void process_arguments(Args *args) {
 }
 
 void action_translate(std::string_view input, std::string_view output, vm_target &target) {
+    switch(target) {
+        case vm_target::x86_64_linux:
+            translate_x64_linux(input, output);
+        break;
+    }
+}
+
+void translate_x64_linux(std::string_view input, std::string_view output) {
 
 }
 
 void action_interpret(std::string_view input) {
 
 }
+
