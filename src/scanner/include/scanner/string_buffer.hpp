@@ -1,5 +1,4 @@
 /* 
-    MXDBG - Debugger with AI 
     coded by Jared Bruni (jaredbruni@protonmail.com)
     https://lostsidedead.biz
 */
@@ -19,75 +18,36 @@ namespace scan {
         template<typename Ch = char, typename String = std::basic_string<Ch, std::char_traits<Ch>>>
         class StringBuffer {
         public:
-            using ch_type = Ch;
+            using ch_type    = Ch;
             using string_type = String;
-
-            StringBuffer(const string_type &buf, const std::string &filename = "unknown")
-                : buffer_{buf + " \n"}, index{0}, currentLine(1), currentColumn(1), currentFile(filename) {}
-
-            StringBuffer(const StringBuffer<Ch, String> &sb)
-                : buffer_{sb.buffer_}, index{0}, currentLine(sb.currentLine), currentColumn(sb.currentColumn), currentFile(sb.currentFile) {}
-
-            StringBuffer(StringBuffer<Ch, String> &&sb)
-                : buffer_{std::move(sb.buffer_)}, index{0}, currentLine(sb.currentLine), currentColumn(sb.currentColumn), currentFile(std::move(sb.currentFile)) {}
-
-            StringBuffer<Ch, String> &operator=(const StringBuffer<Ch, String> &sb);                                      
-            StringBuffer<Ch, String> &operator=(StringBuffer<Ch, String> &&b);
-            StringBuffer<Ch, String> &operator=(const String &b);
-
+            StringBuffer(const string_type &buf, const std::string &filename = "unknown");
             std::optional<ch_type> getch();
             std::optional<ch_type> curch();
             std::optional<ch_type> peekch(int num = 1);
             std::optional<ch_type> prevch();
             std::optional<ch_type> forward_step(int num = 1);
             std::optional<ch_type> backward_step(int num = 1);
-
-            std::pair<uint64_t, uint64_t> cur_line();  
-            std::string cur_file() const { return currentFile; } 
-
+            std::pair<uint64_t, uint64_t> cur_line();
+            std::string cur_file() const;
             void process_line_directive(uint64_t newLine, const std::string &newFile);
-
-            bool eof(uint64_t pos);
+            bool eof(uint64_t pos = 0);
             void reset(uint64_t pos = 0);
 
-        
         private:
             string_type buffer_;
-            uint64_t index{};
-        public:
-            uint64_t currentLine;
-            uint64_t currentColumn;
+            uint64_t    index;
+            uint64_t    currentLine;
+            uint64_t    currentColumn;
             std::string currentFile;
         };
 
         template<typename Ch, typename String>
-        StringBuffer<Ch, String> &StringBuffer<Ch, String>::operator=(const StringBuffer<Ch, String> &sb) {
-            buffer_ = sb.buffer_;
-            index = sb.index;
-            currentLine = sb.currentLine;
-            currentColumn = sb.currentColumn;
-            currentFile = sb.currentFile;
-            return *this;
-        }
-
-        template<typename Ch, typename String>
-        StringBuffer<Ch, String> &StringBuffer<Ch, String>::operator=(StringBuffer<Ch, String> &&b) {
-            buffer_ = std::move(b.buffer_);
-            index = b.index;
-            currentLine = b.currentLine;
-            currentColumn = b.currentColumn;
-            currentFile = std::move(b.currentFile);
-            return *this;
-        }
-
-        template<typename Ch, typename String>
-        StringBuffer<Ch, String> &StringBuffer<Ch, String>::operator=(const String &buf) {
-            buffer_ = buf;
-            index = 0;
-            currentLine = 1;
-            currentColumn = 1;
-            return *this;
-        }
+        StringBuffer<Ch, String>::StringBuffer(const string_type &buf,
+                                                const std::string &filename)
+            : buffer_{buf + " \n"}, index{0},
+              currentLine{1}, currentColumn{1},
+              currentFile{filename}
+        {}
 
         template<typename Ch, typename String>
         std::optional<Ch> StringBuffer<Ch, String>::getch() {
@@ -136,23 +96,30 @@ namespace scan {
 
         template<typename Ch, typename String>
         std::optional<Ch> StringBuffer<Ch, String>::backward_step(int num) {
-            if (static_cast<int>(index) >= num) {
+            if (static_cast<int64_t>(index) >= num) {
                 index -= num;
                 return buffer_[index];
             }
             return std::nullopt;
         }
 
-        
         template<typename Ch, typename String>
         std::pair<uint64_t, uint64_t> StringBuffer<Ch, String>::cur_line() {
-            return std::make_pair(currentLine, currentColumn);
+            uint64_t line = (currentColumn == 1 && index > 0) ? currentLine - 1 : currentLine;
+            uint64_t col  = (currentColumn > 1 ? currentColumn - 1 : 1);
+            return std::make_pair(line, col);
         }
 
         template<typename Ch, typename String>
-        void StringBuffer<Ch, String>::process_line_directive(uint64_t newLine, const std::string &newFile) {
+        std::string StringBuffer<Ch, String>::cur_file() const {
+            return currentFile;
+        }
+
+        template<typename Ch, typename String>
+        void StringBuffer<Ch, String>::process_line_directive(uint64_t newLine,
+                                                                const std::string &newFile) {
             currentLine = newLine;
-            currentColumn = 1; 
+            currentColumn = 1;
             currentFile = newFile;
         }
 
@@ -169,7 +136,6 @@ namespace scan {
         }
     }   
  
-
     namespace token {
       
         using types::CharType;
@@ -263,11 +229,14 @@ namespace scan {
             void set_pos(const std::pair<uint64_t, uint64_t> &p);
             void set_filename(const std::string &filename) { this->filename = filename; }
             std::string get_filename() const { return this->filename; }
+            uint64_t getLine() const { return line-1; }
+            uint64_t getCol() const { return col;}
         private:
             types::TokenType type;
             string_type value;
-            uint64_t line, col;
+            uint64_t line = 1, col = 1;
             std::string filename;
+            
         };
         
         template<typename Ch, typename String>

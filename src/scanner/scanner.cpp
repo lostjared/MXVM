@@ -170,33 +170,32 @@ namespace scan {
 
         return tokens.size();
     }
-
     std::optional<TToken> Scanner::grabId() {
-        auto ch = string_buffer.backward_step(1);
-        TToken token;
-        auto filename = string_buffer.cur_file();
-        auto pos = string_buffer.cur_line();
-        if(ch.has_value()) {
-            auto ch_t = token_map.lookup_int8(*ch);
-            decltype(token.getTokenValue()) tok_value;
-            while(true) {
-                ch = string_buffer.getch();
-                if(!ch.has_value()) break;
-                ch_t = token_map.lookup_int8(*ch);
-                if(!ch_t.has_value() || (*ch_t != types::CharType::TT_CHAR && *ch_t != types::CharType::TT_DIGIT)) break;
-                tok_value += *ch;    
-            }
-            token.set_pos(pos);
-            token.set_filename(filename);
-            token.setToken(types::TokenType::TT_ID, tok_value);
-            string_buffer.backward_step(1);
-            return token;
-        }
-        return std::nullopt;
-    }
+        
+        auto startPos  = string_buffer.cur_line();
+        auto filename  = string_buffer.cur_file();
 
+        string_buffer.backward_step(1);
+
+        std::string val;
+        while (true) {
+            auto c = string_buffer.curch();
+            if (!c.has_value()) break;
+            if (!std::isalnum(*c) && *c != '_') break;
+            val += *string_buffer.getch();
+        }
+
+        if (val.empty()) return std::nullopt;
+
+        TToken tok;
+        tok.set_pos(startPos);
+        tok.set_filename(filename);
+        tok.setToken(types::TokenType::TT_ID, val);
+        return tok;
+    }
     std::optional<TToken> Scanner::grabDigits() {
-        // helpers
+        auto pos      = string_buffer.cur_line();
+        auto filename = string_buffer.cur_file();
         auto is_op = [](char ch) {
             return ch == '+' || ch == '-' || ch == '*' || ch == '/' ||
                    ch == '%' || ch == '^' || ch == '|' || ch == '&' ||
@@ -209,8 +208,6 @@ namespace scan {
         };
 
         string_buffer.backward_step(1);
-        auto pos      = string_buffer.cur_line();
-        auto filename = string_buffer.cur_file();
         TToken token;
         std::string tok_value;
         auto first_opt = string_buffer.getch();

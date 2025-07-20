@@ -13,6 +13,7 @@ namespace mxvm {
         bool match(const types::TokenType &t);
         void require(const types::TokenType &t);
         bool next();
+        bool peekIs(const std::string &s);
     protected:
         scan::Scanner scanner;
         uint64_t index;

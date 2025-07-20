@@ -1,88 +1,131 @@
 #include "mxvm/valid.hpp"
 #include "scanner/exception.hpp"
+#include "mxvm/instruct.hpp"
+#include<algorithm>
 
 namespace mxvm {
-
     bool Validator::validate() {
+        
+
         scanner.scan();
-        next();
-        require("program");
-        next();
-        require(types::TokenType::TT_ID);
-        next();
-        require("{");
-        next();
+        next(); require("program"); next();
+        require(types::TokenType::TT_ID); next();
+        require("{"); next();
 
         while (token->getTokenValue() != "}") {
-            require("section");
-            next();
-            require(types::TokenType::TT_ID); 
-            std::string sectionName = token->getTokenValue();
-            next();
-            require("{");
-            next();
+            require("section"); next();
+            require(types::TokenType::TT_ID);
+            std::string sectionName = token->getTokenValue(); next();
+            require("{"); next();
 
             if (sectionName == "data") {
                 while (token->getTokenValue() != "}") {
                     if (token->getTokenType() == types::TokenType::TT_ID &&
-                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float")) {
-                        next();
-                        require(types::TokenType::TT_ID); 
-                        next();
-                        require("="); 
-                        next();
+                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float"))
+                    {
+                        next(); require(types::TokenType::TT_ID); next();
+                        require("="); next();
                         if (token->getTokenType() == types::TokenType::TT_NUM ||
                             token->getTokenType() == types::TokenType::TT_HEX ||
-                            token->getTokenType() == types::TokenType::TT_STR) {
+                            token->getTokenType() == types::TokenType::TT_STR)
+                        {
                             next();
                         } else {
                             throw mx::Exception("Syntax Error: Expected value for variable, found: " + token->getTokenValue());
                         }
-                    } else if (token->getTokenValue() == "\n" || token->getTokenValue() == ";") {
-                        next(); 
-                    } else {
+                    }
+                    else if (token->getTokenValue() == "\n" || token->getTokenValue() == ";") {
+                        next();
+                    }
+                    else {
                         throw mx::Exception("Syntax Error: Expected variable declaration, found: " + token->getTokenValue());
                     }
                 }
-                require("}");
-                next();
-            } else if (sectionName == "code") {
+                require("}"); next();
+            }
+            else if (sectionName == "code") {
                 while (token->getTokenValue() != "}") {
-                    if (token->getTokenType() == types::TokenType::TT_ID && next(), token->getTokenValue() == ":") {
+                    if (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
+                        next();
+                        continue;
+                    }
+                    if (match(types::TokenType::TT_ID) && peekIs(":")) {
+                        next();
                         next();
                         continue;
                     }
                     
-                    if (token->getTokenType() == types::TokenType::TT_ID || token->getTokenType() == types::TokenType::TT_NUM) {
+                    if (match(types::TokenType::TT_ID)) {
+                        std::string op = token->getTokenValue();
+                        if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
+                            throw mx::Exception(
+                                "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                            );
+                        }
                         next();
-                    } else {
-                        throw mx::Exception("Syntax Error: Expected instruction or label, found: " + token->getTokenValue());
                     }
-
-                    int operandCount = 0;
-                    while (token->getTokenValue() == ",") next();
-
-                    while (token->getTokenType() == types::TokenType::TT_ID ||
-                           token->getTokenType() == types::TokenType::TT_NUM ||
-                           token->getTokenType() == types::TokenType::TT_HEX ||
-                           token->getTokenType() == types::TokenType::TT_STR) {
-                        operandCount++;
-                        next();
-                        while (token->getTokenValue() == ",") next();
+                    else {
+                        throw mx::Exception(
+                            "Syntax Error: Expected instruction or label, found: " + token->getTokenValue() +
+                            " at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                        );
                     }
-                    while (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().starts_with("//")) {
-                        next();
+                    
+                    bool firstOperand = true;
+                    while (true) {
+                    
+                        while (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
+                            next();
+                        }
+                        if (firstOperand) {
+                            if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
+                                break; 
+                            }
+                        } else {
+                            if (token->getTokenValue() != ",") {
+                                break; 
+                            }
+                            next(); 
+                            
+                            while (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
+                                next();
+                            }
+                            
+                            if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
+                                throw mx::Exception(
+                                    "Syntax Error: Expected operand after comma at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                                );
+                            }
+                        }
+                        
+                        if (match(types::TokenType::TT_NUM)) {
+                            auto v = token->getTokenValue();
+                            if (v.find('e') != std::string::npos || v.find('.') != std::string::npos) {
+                                throw mx::Exception("Syntax Error: Invalid integer constant: " + v);
+                            }
+                        }
+                        if (match(types::TokenType::TT_HEX)) {
+                            auto v = token->getTokenValue();
+                            if (!v.starts_with("0x") && !v.starts_with("0X")) {
+                                throw mx::Exception("Syntax Error: Invalid hex constant: " + v);
+                            }
+                        }
+                        next(); 
+                        firstOperand = false;
                     }
                 }
-                require("}");
-                next();
-            } else {
+                require("}"); next();
+            }
+            else {
                 throw mx::Exception("Syntax Error: Unknown section: " + sectionName);
             }
         }
         require("}");
         return true;
     }
+
+
+
 
     bool Validator::match(const std::string &m) {
         if(token->getTokenValue() != m)
@@ -92,8 +135,13 @@ namespace mxvm {
 
     void Validator::require(const std::string &r) {
         if(r != token->getTokenValue()) 
-            throw mx::Exception("Syntax Error: Required: " + r +  " Found: " + token->getTokenValue());
-            
+            throw mx::Exception(
+                "Syntax Error: Required: " + r +
+                " Found: " + token->getTokenValue() +
+                " at line " +
+                std::to_string(token->getLine()) +
+                ", col " + std::to_string(token->getCol())
+            );
     }
 
     bool Validator::match(const types::TokenType &t) {
@@ -104,23 +152,28 @@ namespace mxvm {
 
     void Validator::require(const types::TokenType &t) {
          if(t != token->getTokenType()) 
-            throw mx::Exception("Syntax Error: Required: " + std::to_string(static_cast<int>(t)) + " instead found: " + token->getTokenValue() + ":" + std::to_string(static_cast<int>(token->getTokenType())));
+            throw mx::Exception(
+                "Syntax Error: Required: " + std::to_string(static_cast<int>(t)) +
+                " instead found: " + token->getTokenValue() +
+                ":" + std::to_string(static_cast<int>(token->getTokenType())) +
+                " at line " +
+                std::to_string(token->getLine()) +
+                ", col " + std::to_string(token->getCol())
+            );
     }
     
     bool Validator::next() {
-        while(index < scanner.size()) {
-            token = &scanner[index];
-            if(token->getTokenValue() == "\n") {
-                index++;   
-                continue;
-            }
-            else 
-                break;
+        while (index < scanner.size() && scanner[index].getTokenValue() == "\n") {
+            index++;
         }
-        if(index < scanner.size()) {
-            token = &scanner[index++];
+        if (index < scanner.size()) {
+            token = &scanner[index++];  
             return true;
         }
-        return false; 
+        return false;
+    }
+
+    bool Validator::peekIs(const std::string &s) {
+        return index < scanner.size() && scanner[index].getTokenValue() == s;
     }
 }
