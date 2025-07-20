@@ -12,12 +12,35 @@ namespace mxvm {
     public:
         Program();
         void add_instruction(const Instruction &i);
-        void add_label(const std::string &name);
+        void add_label(const std::string &name, uint64_t address);
+        void add_variable(const std::string &name, const Variable &v);
         void stop();
         void exec();
-        void printInstruction();
+        void print(std::ostream &out);
+    private:
+        size_t pc;  
+        bool running;
+                
+        bool zero_flag = false;
+        bool less_flag = false;
+        bool greater_flag = false;
+        
+        void exec_mov(const Instruction& instr);
+        void exec_add(const Instruction& instr);
+        void exec_sub(const Instruction& instr);
+        void exec_mul(const Instruction& instr);
+        void exec_div(const Instruction& instr);
+        void exec_cmp(const Instruction& instr);
+        void exec_jmp(const Instruction& instr);
+        void exec_print(const Instruction& instr);
+        void exec_exit(const Instruction& instr);
+        
+        Variable& getVariable(const std::string& name);
+        bool isVariable(const std::string& name);
+        void setVariableFromString(Variable& var, const std::string& value);
+        void addVariables(Variable& dest, Variable& src1, Variable& src2);
+        void printFormatted(const std::string& format, const std::vector<Variable*>& args);
     protected:
-        uint64_t ip = 0;
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, uint64_t> labels;

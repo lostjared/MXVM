@@ -2,6 +2,8 @@
 #include"scanner/exception.hpp"
 #include"scanner/scanner.hpp"
 #include"mxvm/ast.hpp"
+#include"mxvm/icode.hpp"
+
 #include<unordered_map>
 
 namespace mxvm {
@@ -51,7 +53,7 @@ namespace mxvm {
     
     std::unique_ptr<SectionNode> Parser::parseSection(uint64_t& index) {
         index++; 
-        
+    
         if (index >= scanner.size()) return nullptr;
         
         auto sectionNameToken = this->operator[](index);
@@ -67,29 +69,27 @@ namespace mxvm {
         }
         
         auto section = std::make_unique<SectionNode>(sectionType);
-        index++; 
+        index++;
         
         
         if (index < scanner.size() && this->operator[](index).getTokenValue() == "{") {
             index++; 
             
-            
             while (index < scanner.size()) {
                 auto token = this->operator[](index);
                 std::string value = token.getTokenValue();
                 
-            
                 if (value == "}") {
                     index++; 
                     break;
                 }
-            
-                if (value == "\n") {
+                
+                if (value == "\n" || value == " " || value == "\t") {
                     index++;
                     continue;
                 }
-
-                if (value == "//" || value.starts_with("//")) {
+            
+                if (value == "//" || value.starts_with("//") || value == "#" || value.starts_with("#")) {
                     auto comment = parseComment(index);
                     if (comment) {
                         section->addStatement(std::move(comment));
@@ -101,6 +101,8 @@ namespace mxvm {
                     auto variable = parseDataVariable(index);
                     if (variable) {
                         section->addStatement(std::move(variable));
+                    } else {
+                        index++;
                     }
                 } else if (sectionType == SectionNode::CODE) {
                     if (token.getTokenType() == types::TokenType::TT_ID && 
@@ -191,17 +193,17 @@ namespace mxvm {
         
         auto token = this->operator[](index);
         std::string tokenValue = token.getTokenValue();
+        
+        
         if (token.getTokenType() == types::TokenType::TT_ID) {
             if (index + 1 < scanner.size() && this->operator[](index + 1).getTokenValue() == ":") {
-                
                 return nullptr;
             }
         }
         
         auto instIt = instructionMap.find(tokenValue);
         if (instIt == instructionMap.end()) {
-            index++;
-            return nullptr;
+            return nullptr; 
         }
         
         Inc instruction = instIt->second;
@@ -209,17 +211,16 @@ namespace mxvm {
         
         std::vector<Operand> operands;
         
-        
         while (index < scanner.size()) {
             auto operandToken = this->operator[](index);
             std::string value = operandToken.getTokenValue();
             
-            
-            if (value == "\n" || value == "//" || value.starts_with("//")) {
+            if (value == "\n" || value == "//" || value.starts_with("//") || 
+                value == "#" || value.starts_with("#") || value == "}") {
                 break;
             }
-            
-            if (value == ",") {
+ 
+            if (value == "," || value == " " || value == "\t") {
                 index++;
                 continue;
             }
@@ -247,9 +248,13 @@ namespace mxvm {
     
     std::unique_ptr<CommentNode> Parser::parseComment(uint64_t& index) {
         std::string commentText;
-        if (this->operator[](index).getTokenValue() == "//") {
+    
+        auto token = this->operator[](index);
+        if (token.getTokenValue() == "//" || token.getTokenValue() == "#" || 
+            token.getTokenValue().starts_with("//") || token.getTokenValue().starts_with("#")) {
             index++;
-        }       
+        }
+    
         while (index < scanner.size()) {
             auto token = this->operator[](index);
             if (token.getTokenValue() == "\n") {
@@ -258,6 +263,7 @@ namespace mxvm {
             commentText += token.getTokenValue() + " ";
             index++;
         }
+        
         return std::make_unique<CommentNode>(commentText);
     }
 
@@ -287,6 +293,173 @@ namespace mxvm {
         auto ast = parseAST();
         if (ast) {
             std::cout << ast->toString() << std::endl;
+        }
+    }
+
+    bool Parser::generateProgramCode(std::unique_ptr<Program> &program) {
+        auto ast = parseAST();
+        if(ast) {
+            std::cout << ast->toString() << "\n";
+            
+            for (const auto& section : ast->sections) {
+                auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                if (!sectionNode) continue;
+                
+                if (sectionNode->type == SectionNode::DATA) {
+                    processDataSection(sectionNode, program);
+                } else if (sectionNode->type == SectionNode::CODE) {
+                    processCodeSection(sectionNode, program);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    void Parser::processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
+        for (const auto& statement : sectionNode->statements) {
+            auto variableNode = dynamic_cast<VariableNode*>(statement.get());
+            if (variableNode) {
+                Variable var;
+                var.type = variableNode->type;
+                var.var_name = variableNode->name;
+                
+                if (variableNode->hasInitializer) {
+                    setVariableValue(var, variableNode->type, variableNode->initialValue);
+                } else {
+                    setDefaultVariableValue(var, variableNode->type);
+                }
+                program->add_variable(var.var_name, var);
+            }
+        }
+    }
+
+    void Parser::processCodeSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
+        std::unordered_map<std::string, size_t> labelMap; 
+    
+        size_t instructionIndex = 0;
+        for (const auto& statement : sectionNode->statements) {
+            if (auto labelNode = dynamic_cast<LabelNode*>(statement.get())) {
+                labelMap[labelNode->name] = instructionIndex;
+                program->add_label(labelNode->name, instructionIndex);
+            } else if (dynamic_cast<InstructionNode*>(statement.get())) {
+                instructionIndex++;
+            }
+        }
+    for (const auto& statement : sectionNode->statements) {
+            auto instructionNode = dynamic_cast<InstructionNode*>(statement.get());
+            if (instructionNode) {
+                Instruction instr;
+                instr.instruction = instructionNode->instruction;
+                if (instructionNode->operands.size() > 0) {
+                    instr.op1 = instructionNode->operands[0];
+                    resolveLabelReference(instr.op1, labelMap);
+                }
+                if (instructionNode->operands.size() > 1) {
+                    instr.op2 = instructionNode->operands[1];
+                    resolveLabelReference(instr.op2, labelMap);
+                }
+                if (instructionNode->operands.size() > 2) {
+                    instr.op3 = instructionNode->operands[2];
+                    resolveLabelReference(instr.op3, labelMap);
+                }
+                if (instructionNode->instruction == PRINT && instructionNode->operands.size() > 3) {
+                    for (size_t i = 3; i < instructionNode->operands.size(); ++i) {
+                        Operand extraOp = instructionNode->operands[i];
+                        resolveLabelReference(extraOp, labelMap);
+                        instr.vop.push_back(extraOp);
+                    }
+                }
+                
+                program->add_instruction(instr);
+            }
+        }
+    }
+
+    void Parser::setVariableValue(Variable& var, VarType type, const std::string& value) {
+        switch (type) {
+            case VarType::VAR_INTEGER:
+                if (value.starts_with("0x") || value.starts_with("0X")) {
+                    var.var_value.int_value = std::stoull(value, nullptr, 16);
+                } else {
+                    var.var_value.int_value = std::stoull(value);
+                }
+                var.var_value.type = VarType::VAR_INTEGER;
+                break;
+                
+            case VarType::VAR_FLOAT:
+                var.var_value.float_value = std::stod(value);
+                var.var_value.type = VarType::VAR_FLOAT;
+                break;
+                
+            case VarType::VAR_STRING:
+                if (value.starts_with("\"") && value.ends_with("\"")) {
+                    var.var_value.str_value = value.substr(1, value.length() - 2);
+                } else {
+                    var.var_value.str_value = value;
+                }
+                var.var_value.type = VarType::VAR_STRING;
+                break;
+                
+            case VarType::VAR_POINTER:
+                if (value == "null" || value == "0") {
+                    var.var_value.ptr_value = nullptr;
+                } else {
+                    var.var_value.ptr_value = reinterpret_cast<void*>(std::stoull(value, nullptr, 16));
+                }
+                var.var_value.type = VarType::VAR_POINTER;
+                break;
+                
+            case VarType::VAR_LABEL:
+                var.var_value.label_value = value;
+                var.var_value.type = VarType::VAR_LABEL;
+                break;
+                
+            default:
+                setDefaultVariableValue(var, type);
+                break;
+        }
+    }
+
+    void Parser::setDefaultVariableValue(Variable& var, VarType type) {
+        switch (type) {
+            case VarType::VAR_INTEGER:
+                var.var_value.int_value = 0;
+                var.var_value.type = VarType::VAR_INTEGER;
+                break;
+                
+            case VarType::VAR_FLOAT:
+                var.var_value.float_value = 0.0;
+                var.var_value.type = VarType::VAR_FLOAT;
+                break;
+                
+            case VarType::VAR_STRING:
+                var.var_value.str_value = "";
+                var.var_value.type = VarType::VAR_STRING;
+                break;
+                
+            case VarType::VAR_POINTER:
+                var.var_value.ptr_value = nullptr;
+                var.var_value.type = VarType::VAR_POINTER;
+                break;
+                
+            case VarType::VAR_LABEL:
+                var.var_value.label_value = "";
+                var.var_value.type = VarType::VAR_LABEL;
+                break;
+                
+            default:
+                var.var_value.type = VarType::VAR_NULL;
+                break;
+        }
+    }
+
+    void Parser::resolveLabelReference(Operand& operand, const std::unordered_map<std::string, size_t>& labelMap) {
+        if (!operand.label.empty()) {
+            auto it = labelMap.find(operand.label);
+            if (it != labelMap.end()) {
+                operand.op_value = static_cast<int>(it->second);
+            }
         }
     }
 }

@@ -5,6 +5,7 @@
 #include<sstream>
 #include<string>
 #include<string_view>
+#include<memory>
 
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
@@ -116,7 +117,15 @@ void action_interpret(std::string_view input) {
         file.close();
         mxvm::Parser parser(stream.str());
         parser.scan();
-        parser.parse();
+        std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        if(parser.generateProgramCode(program)) {
+            std::cout << "Sucesss.\n";
+            program->print(std::cout);
+            program->exec();
+        } else {
+            std::cerr << "Runtime Error: Failed to generate intermediate code.\n";
+            exit(EXIT_FAILURE);
+        }
     } catch(mx::Exception &e) {
         std::cerr << "Runtime Error: "<< e.what() << "\n";
     }

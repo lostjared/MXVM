@@ -9,3 +9,7 @@ std::ostream &operator<<(std::ostream &out, const enum  Inc &i) {
     return out;
 
 }
+
+namespace mxvm {
+    Variable::Variable(const std::string name, const VarType &vtype, const Variable_Value &value) : type(vtype),var_name(name),var_value(value) {} 
+}

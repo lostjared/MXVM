@@ -49,6 +49,7 @@ namespace mxvm {
     struct Instruction {
         Inc instruction;
         Operand op1, op2, op3;
+        std::vector<Operand> vop;
     };
 
     enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY };
@@ -66,6 +67,8 @@ namespace mxvm {
         VarType type;
         std::string var_name;
         Variable_Value var_value;
+        Variable() = default;
+        Variable(const std::string name, const VarType &vtype, const Variable_Value &value);
     };
 }
 
