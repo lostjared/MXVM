@@ -12,7 +12,6 @@
 
 
 namespace mxvm {
-    // Forward declarations
     class ProgramNode;
     class SectionNode;
     class InstructionNode;
@@ -30,7 +29,6 @@ namespace mxvm {
         void parse();
         auto operator[](size_t pos);
         
-        // AST building methods
         std::unique_ptr<ProgramNode> parseAST();
         bool generateProgramCode(std::unique_ptr<Program> &program);
         
@@ -38,14 +36,12 @@ namespace mxvm {
         std::string source_file;
         scan::Scanner scanner;
         
-        // AST parsing helpers
         std::unique_ptr<SectionNode> parseSection(uint64_t& index);
         std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);
         std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t& index);
         std::unique_ptr<CommentNode> parseComment(uint64_t& index);
         std::unique_ptr<LabelNode> parseLabel(uint64_t& index);
         
-        // Program generation helpers
         void processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program);
         void processCodeSection(SectionNode* sectionNode, std::unique_ptr<Program>& program);
         void setVariableValue(Variable& var, VarType type, const std::string& value);
