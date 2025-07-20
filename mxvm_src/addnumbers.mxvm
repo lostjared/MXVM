@@ -1,0 +1,17 @@
+
+#data section
+section data {
+	int x = 1
+	int y = 2
+	int x1 = 0
+	string value = " %d + %d = %d "
+}
+
+section code {
+start:
+	mov x1, x
+	add x,y
+	print value, x1, y, x
+stop:
+	exit 0 
+}
