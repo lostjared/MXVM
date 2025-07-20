@@ -1,7 +1,5 @@
 section data {
 	int x = 1
-	int y = 2
-	int x1 = 0
 	string value = "%d"
 }
 
