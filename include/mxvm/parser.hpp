@@ -9,6 +9,7 @@
 #include"scanner/scanner.hpp"
 #include"scanner/exception.hpp"
 #include"mxvm/instruct.hpp"
+#include"mxvm/valid.hpp"
 
 
 namespace mxvm {
@@ -37,7 +38,7 @@ namespace mxvm {
     private:
         std::string source_file;
         scan::Scanner scanner;
-        
+        Validator validator;        
         std::unique_ptr<SectionNode> parseSection(uint64_t& index);
         std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);
         std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t& index);

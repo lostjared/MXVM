@@ -3,14 +3,13 @@
 #include"scanner/scanner.hpp"
 #include"mxvm/ast.hpp"
 #include"mxvm/icode.hpp"
-
 #include<unordered_map>
 
 namespace mxvm {
 
     bool debug_mode = false;
 
-    Parser::Parser(const std::string &source) : source_file(source), scanner(source)  {
+    Parser::Parser(const std::string &source) : source_file(source), scanner(source), validator(source)  {
 
     }
     
@@ -372,6 +371,15 @@ namespace mxvm {
     }
 
     bool Parser::generateProgramCode(std::unique_ptr<Program> &program) {
+        try {
+            if(!validator.validate()) {
+                return false;
+            }
+        } catch (mx::Exception &e) {
+            std::cerr << e.what() << "\n";
+            return false;
+        }
+
         auto ast = parseAST();
         if(ast) {
             if(debug_mode) {

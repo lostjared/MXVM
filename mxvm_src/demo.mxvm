@@ -1,15 +1,16 @@
+
 program Demo {
     section data {
         int x = 0;
         string fmt_str = "Hello World! Value of x is: %d"
         string fmt_end = "Goodbye!"
-    }
-
+   }
+   
    section code {
         mov x, 0
         start:
             add x, 1
-            print fmt_str,             
+            print fmt_str, x            
             cmp x, 10
             jne start
             print fmt_end

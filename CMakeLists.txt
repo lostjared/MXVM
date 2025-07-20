@@ -20,6 +20,7 @@ add_library(mxvm SHARED
     src/instruct.cpp
     src/icode.cpp
     src/ast.cpp
+    src/valid.cpp
 )
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
