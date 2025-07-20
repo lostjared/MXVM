@@ -7,6 +7,9 @@
 #include<unordered_map>
 
 namespace mxvm {
+
+    bool debug_mode = false;
+
     Parser::Parser(const std::string &source) : source_file(source), scanner(source)  {
 
     }
@@ -204,7 +207,7 @@ namespace mxvm {
         };
         
         if (index >= scanner.size()) return nullptr;
-        
+
         auto token = this->operator[](index);
         std::string tokenValue = token.getTokenValue();
         
@@ -216,6 +219,7 @@ namespace mxvm {
         
         auto instIt = instructionMap.find(tokenValue);
         if (instIt == instructionMap.end()) {
+            throw mx::Exception("Error invalid instruction: " + tokenValue);
             return nullptr;
         }
         
@@ -339,7 +343,8 @@ namespace mxvm {
     bool Parser::generateProgramCode(std::unique_ptr<Program> &program) {
         auto ast = parseAST();
         if(ast) {
-            std::cout << ast->toString() << "\n";
+            if(debug_mode)
+                std::cout << ast->toString() << "\n";
             
             for (const auto& section : ast->sections) {
                 auto sectionNode = dynamic_cast<SectionNode*>(section.get());

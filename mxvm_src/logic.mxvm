@@ -1,0 +1,14 @@
+
+section data {
+	int x = 255
+	int result = 0
+	string fmt_str = " value is %d"
+}
+
+section code {
+start:
+	and result, x, 0xFF
+	print fmt_str, result
+stop:
+	exit 0
+}

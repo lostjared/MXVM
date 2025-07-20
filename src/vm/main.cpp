@@ -31,12 +31,18 @@ Args proc_args(int argc, char **argv) {
     .addOptionDoubleValue(128, "action", "action to take [translate,  interpret]")
     .addOptionSingleValue('t', "target")
     .addOptionDoubleValue(129, "target", "output target")
+    .addOptionSingle('d', "debug mode")
+    .addOptionDouble(130, "debug", "debug mode")
     ;
     mx::Argument<std::string> arg;
     int value = 0;
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 'd':
+                case 130:
+                    mxvm::debug_mode = true;
+                break;
                 case 'o':
                     args.output_file = arg.arg_value;
                 break;
@@ -119,8 +125,7 @@ void action_interpret(std::string_view input) {
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         if(parser.generateProgramCode(program)) {
-            std::cout << "Sucesss.\n";
-            program->print(std::cout);
+            if(mxvm::debug_mode) program->print(std::cout);
             program->exec();
         } else {
             std::cerr << "Runtime Error: Failed to generate intermediate code.\n";

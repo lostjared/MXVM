@@ -22,6 +22,8 @@ namespace mxvm {
     struct Variable;
     struct Operand;
 
+    extern bool debug_mode;
+
     class Parser {
     public:
         explicit Parser(const std::string &source);

@@ -32,6 +32,22 @@ namespace mxvm {
         void exec_div(const Instruction& instr);
         void exec_cmp(const Instruction& instr);
         void exec_jmp(const Instruction& instr);
+        void exec_load(const Instruction& instr);
+        void exec_store(const Instruction& instr);
+        void exec_or(const Instruction& instr);
+        void exec_and(const Instruction& instr);
+        void exec_xor(const Instruction& instr);
+        void exec_not(const Instruction& instr);
+        void exec_je(const Instruction& instr);
+        void exec_jne(const Instruction& instr);
+        void exec_jl(const Instruction& instr);
+        void exec_jle(const Instruction& instr);
+        void exec_jg(const Instruction& instr);
+        void exec_jge(const Instruction& instr);
+        void exec_jz(const Instruction& instr);
+        void exec_jnz(const Instruction& instr);
+        void exec_ja(const Instruction& instr);
+        void exec_jb(const Instruction& instr);
         void exec_print(const Instruction& instr);
         void exec_exit(const Instruction& instr);
         

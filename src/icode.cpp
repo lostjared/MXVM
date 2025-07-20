@@ -1,4 +1,6 @@
 #include"mxvm/icode.hpp"
+#include"mxvm/parser.hpp"
+#include"scanner/exception.hpp"
 #include<iomanip>
 #include<iostream>
 #include<sstream>
@@ -36,7 +38,6 @@ namespace mxvm {
         
         while (running && pc < inc.size()) {
             const Instruction& instr = inc[pc];
-            
             switch (instr.instruction) {
                 case MOV:
                     exec_mov(instr);
@@ -58,30 +59,54 @@ namespace mxvm {
                     break;
                 case JMP:
                     exec_jmp(instr);
-                    continue; 
+                    continue;
                 case JE:
-                    if (zero_flag) {
-                        exec_jmp(instr);
-                        continue;
-                    }
-                    break;
+                    exec_je(instr);
+                    continue;
                 case JNE:
-                    if (!zero_flag) {
-                        exec_jmp(instr);
-                        continue;
-                    }
-                    break;
+                    exec_jne(instr);
+                    continue;
                 case JL:
-                    if (less_flag) {
-                        exec_jmp(instr);
-                        continue;
-                    }
-                    break;
+                    exec_jl(instr);
+                    continue;
+                case JLE:
+                    exec_jle(instr);
+                    continue;
                 case JG:
-                    if (greater_flag) {
-                        exec_jmp(instr);
-                        continue;
-                    }
+                    exec_jg(instr);
+                    continue;
+                case JGE:
+                    exec_jge(instr);
+                    continue;
+                case JZ:
+                    exec_jz(instr);
+                    continue;
+                case JNZ:
+                    exec_jnz(instr);
+                    continue;
+                case JA:
+                    exec_ja(instr);
+                    continue;
+                case JB:
+                    exec_jb(instr);
+                    continue;
+                case LOAD:
+                    exec_load(instr);
+                    break;
+                case STORE:
+                    exec_store(instr);
+                    break;
+                case OR:
+                    exec_or(instr);
+                    break;
+                case AND:
+                    exec_and(instr);
+                    break;
+                case XOR:
+                    exec_xor(instr);
+                    break;
+                case NOT:
+                    exec_not(instr);
                     break;
                 case PRINT:
                     exec_print(instr);
@@ -90,10 +115,9 @@ namespace mxvm {
                     exec_exit(instr);
                     return;
                 default:
-                    std::cerr << "Unknown instruction: " << instr.instruction << std::endl;
+                    throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
             }
-            
             pc++;
         }
     }
@@ -340,9 +364,14 @@ namespace mxvm {
     void Program::exec_exit(const Instruction& instr) {
         int exit_code = 0;
         if (!instr.op1.op.empty()) {
-            exit_code = std::stoi(instr.op1.op);
+            if (isVariable(instr.op1.op)) {
+                exit_code = getVariable(instr.op1.op).var_value.int_value;
+            } else {
+                exit_code = std::stoll(instr.op1.op, nullptr, 0);
+            }
         }
-        std::cout << "Program exited with code: " << exit_code << std::endl;
+        if(mxvm::debug_mode)
+            std::cout << "Program exited with code: " << exit_code << std::endl;
         stop();
     }
 
@@ -404,6 +433,20 @@ namespace mxvm {
                         case 's':
                             result += arg->var_value.str_value;
                             break;
+                        case 'b': {
+                            std::string bin;
+                            uint64_t val = arg->var_value.int_value;
+                            if (val == 0) {
+                                bin = "0";
+                            } else {
+                                while (val) {
+                                    bin = (val % 2 ? "1" : "0") + bin;
+                                    val /= 2;
+                                }
+                            }
+                            result += bin;
+                            break;
+                        }
                         default:
                             result += format[i];
                             result += format[i + 1];
@@ -541,11 +584,7 @@ namespace mxvm {
         temp.var_name = ""; 
 
         if (type == VarType::VAR_INTEGER) {
-            if (value.starts_with("0x") || value.starts_with("0X")) {
-                temp.var_value.int_value = std::stoll(value, nullptr, 16);
-            } else {
-                temp.var_value.int_value = std::stoll(value);
-            }
+            temp.var_value.int_value = std::stoll(value, nullptr, 0);
             temp.var_value.type = VarType::VAR_INTEGER;
         } else if (type == VarType::VAR_FLOAT) {
             temp.var_value.float_value = std::stod(value);
@@ -559,11 +598,7 @@ namespace mxvm {
 
     void Program::setVariableFromConstant(Variable& var, const std::string& value) {
         if (var.type == VarType::VAR_INTEGER) {
-            if (value.starts_with("0x") || value.starts_with("0X")) {
-                var.var_value.int_value = std::stoll(value, nullptr, 16);
-            } else {
-                var.var_value.int_value = std::stoll(value);
-            }
+            var.var_value.int_value = std::stoll(value, nullptr, 0);
             var.var_value.type = VarType::VAR_INTEGER;
         } else if (var.type == VarType::VAR_FLOAT) {
             var.var_value.float_value = std::stod(value);
@@ -572,5 +607,119 @@ namespace mxvm {
             var.var_value.str_value = value;
             var.var_value.type = VarType::VAR_STRING;
         }
+    }
+
+    void Program::exec_load(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("LOAD destination must be a variable\n");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        if (isVariable(instr.op2.op)) {
+            Variable& src = getVariable(instr.op2.op);
+            dest.var_value = src.var_value;
+        } else {
+            setVariableFromConstant(dest, instr.op2.op);
+        }
+    }
+
+    void Program::exec_store(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("STORE destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        if (isVariable(instr.op2.op)) {
+            Variable& src = getVariable(instr.op2.op);
+            dest.var_value = src.var_value;
+        } else {
+            setVariableFromConstant(dest, instr.op2.op);
+        }
+    }
+
+    void Program::exec_or(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("OR destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        int64_t v1 = isVariable(instr.op2.op) ? getVariable(instr.op2.op).var_value.int_value : std::stoll(instr.op2.op, nullptr, 0);
+        int64_t v2 = isVariable(instr.op3.op) ? getVariable(instr.op3.op).var_value.int_value : std::stoll(instr.op3.op, nullptr, 0);
+        dest.var_value.int_value = v1 | v2;
+        dest.var_value.type = VarType::VAR_INTEGER;
+    }
+
+    void Program::exec_and(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("AND destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        int64_t v1 = isVariable(instr.op2.op) ? getVariable(instr.op2.op).var_value.int_value : std::stoll(instr.op2.op, nullptr, 0);
+        int64_t v2 = isVariable(instr.op3.op) ? getVariable(instr.op3.op).var_value.int_value : std::stoll(instr.op3.op, nullptr, 0);
+        dest.var_value.int_value = v1 & v2;
+        dest.var_value.type = VarType::VAR_INTEGER;
+    }
+
+    void Program::exec_xor(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("XOR destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        int64_t v1 = isVariable(instr.op2.op) ? getVariable(instr.op2.op).var_value.int_value : std::stoll(instr.op2.op, nullptr, 0);
+        int64_t v2 = isVariable(instr.op3.op) ? getVariable(instr.op3.op).var_value.int_value : std::stoll(instr.op3.op, nullptr, 0);
+        dest.var_value.int_value = v1 ^ v2;
+        dest.var_value.type = VarType::VAR_INTEGER;
+    }
+
+    void Program::exec_not(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("NOT destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        dest.var_value.int_value = ~dest.var_value.int_value;
+        dest.var_value.type = VarType::VAR_INTEGER;
+    }
+
+    void Program::exec_je(const Instruction& instr) {
+        if (zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jne(const Instruction& instr) {
+        if (!zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jl(const Instruction& instr) {
+        if (less_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jle(const Instruction& instr) {
+        if (less_flag || zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jg(const Instruction& instr) {
+        if (greater_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jge(const Instruction& instr) {
+        if (greater_flag || zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jz(const Instruction& instr) {
+        if (zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jnz(const Instruction& instr) {
+        if (!zero_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_ja(const Instruction& instr) {
+        if (greater_flag) exec_jmp(instr);
+    }
+
+    void Program::exec_jb(const Instruction& instr) {
+        if (less_flag) exec_jmp(instr);
     }
 }
