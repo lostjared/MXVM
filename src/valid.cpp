@@ -19,11 +19,11 @@ namespace mxvm {
             if (sectionName == "data") {
                 while (token->getTokenValue() != "}") {
                     if (token->getTokenType() == types::TokenType::TT_ID &&
-                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float"))
+                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr"))
                     {
                         next(); require(types::TokenType::TT_ID); next();
                         require("="); next();
-                        if (token->getTokenType() == types::TokenType::TT_NUM ||
+                        if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
                             token->getTokenType() == types::TokenType::TT_HEX ||
                             token->getTokenType() == types::TokenType::TT_STR)
                         {

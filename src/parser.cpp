@@ -484,13 +484,11 @@ namespace mxvm {
                 break;
                 
             case VarType::VAR_POINTER:
+                var.var_value.ptr_value = nullptr;
                 if (value == "null" || value == "0") {
                     var.var_value.ptr_value = nullptr;
-                } else if (value.starts_with("0x") || value.starts_with("0X")) {
-                    var.var_value.ptr_value = reinterpret_cast<void*>(std::stoull(value, nullptr, 16));
-                } else {
-                    var.var_value.ptr_value = reinterpret_cast<void*>(std::stoull(value));
-                }
+                    var.var_value.str_value = "null";
+                } 
                 var.var_value.type = VarType::VAR_POINTER;
                 break;
                 

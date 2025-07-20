@@ -733,8 +733,12 @@ namespace mxvm {
                         out << std::setw(20) << ("\"" + var.second.var_value.str_value + "\"");
                         break;
                     case VarType::VAR_POINTER:
-                        out << std::setw(20) << std::hex << "0x" 
+                        if(var.second.var_value.ptr_value == nullptr)
+                            out << "null";
+                        else {
+                            out << std::setw(20) << std::hex << "0x" 
                             << reinterpret_cast<uintptr_t>(var.second.var_value.ptr_value) << std::dec;
+                        }
                         break;
                     case VarType::VAR_LABEL:
                         out << std::setw(20) << var.second.var_value.label_value;
