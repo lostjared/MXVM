@@ -55,9 +55,10 @@ namespace mxvm {
 
     struct Variable_Value {
         std::string str_value;
+        std::string label_value;
         uint64_t int_value;
         double  float_value;
-        uint64_t ptr_value;
+        void *ptr_value;
         VarType type;
     };
 

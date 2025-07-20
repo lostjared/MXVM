@@ -67,7 +67,7 @@ namespace mxvm {
         }
         
         auto section = std::make_unique<SectionNode>(sectionType);
-        index++;
+        index++; 
         
         
         if (index < scanner.size() && this->operator[](index).getTokenValue() == "{") {
@@ -83,14 +83,12 @@ namespace mxvm {
                     index++; 
                     break;
                 }
-                
-                
+            
                 if (value == "\n") {
                     index++;
                     continue;
                 }
-                
-                
+
                 if (value == "//" || value.starts_with("//")) {
                     auto comment = parseComment(index);
                     if (comment) {
@@ -105,9 +103,21 @@ namespace mxvm {
                         section->addStatement(std::move(variable));
                     }
                 } else if (sectionType == SectionNode::CODE) {
-                    auto instruction = parseCodeInstruction(index);
-                    if (instruction) {
-                        section->addStatement(std::move(instruction));
+                    if (token.getTokenType() == types::TokenType::TT_ID && 
+                        index + 1 < scanner.size() && 
+                        this->operator[](index + 1).getTokenValue() == ":") {
+                        
+                        auto label = parseLabel(index);
+                        if (label) {
+                            section->addStatement(std::move(label));
+                        }
+                    } else {
+                        auto instruction = parseCodeInstruction(index);
+                        if (instruction) {
+                            section->addStatement(std::move(instruction));
+                        } else {
+                            index++;
+                        }
                     }
                 }
             }
@@ -180,23 +190,30 @@ namespace mxvm {
         if (index >= scanner.size()) return nullptr;
         
         auto token = this->operator[](index);
-        std::string instructionName = token.getTokenValue();
+        std::string tokenValue = token.getTokenValue();
+        if (token.getTokenType() == types::TokenType::TT_ID) {
+            if (index + 1 < scanner.size() && this->operator[](index + 1).getTokenValue() == ":") {
+                
+                return nullptr;
+            }
+        }
         
-        auto instIt = instructionMap.find(instructionName);
+        auto instIt = instructionMap.find(tokenValue);
         if (instIt == instructionMap.end()) {
             index++;
             return nullptr;
         }
         
         Inc instruction = instIt->second;
-        index++; // Move past instruction name
+        index++; 
         
         std::vector<Operand> operands;
         
-        // Parse operands until newline or comment
+        
         while (index < scanner.size()) {
             auto operandToken = this->operator[](index);
             std::string value = operandToken.getTokenValue();
+            
             
             if (value == "\n" || value == "//" || value.starts_with("//")) {
                 break;
@@ -242,6 +259,28 @@ namespace mxvm {
             index++;
         }
         return std::make_unique<CommentNode>(commentText);
+    }
+
+    std::unique_ptr<LabelNode> Parser::parseLabel(uint64_t& index) {
+        if (index >= scanner.size()) return nullptr;
+    
+        auto token = this->operator[](index);
+    
+        
+        if (token.getTokenType() != types::TokenType::TT_ID) {
+            return nullptr;
+        }
+    
+        std::string labelName = token.getTokenValue();
+        index++; 
+    
+        
+        if (index < scanner.size() && this->operator[](index).getTokenValue() == ":") {
+            index++;
+            return std::make_unique<LabelNode>(labelName);
+        }
+    
+        return nullptr;
     }
 
     void Parser::parse() {
