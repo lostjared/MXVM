@@ -33,24 +33,55 @@ namespace mxvm {
 
     std::unique_ptr<ProgramNode> Parser::parseAST() {
         auto program = std::make_unique<ProgramNode>();
-        
+
         for (uint64_t i = 0; i < scanner.size(); ++i) {
             auto token = this->operator[](i);
-            
+
             if (token.getTokenValue() == "\n" || token.getTokenValue() == " ") {
                 continue;
             }
-            
+
             std::string tokenValue = token.getTokenValue();
-            
-            if (tokenValue == "section") {
+
+            if (tokenValue == "program") {
+                i++;
+                if (i < scanner.size()) {
+                    std::string program_name;
+                    auto nameToken = this->operator[](i);
+                    program_name = nameToken.getTokenValue();
+                    program->name = program_name; 
+                }
+                
+                i++;
+                if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {
+                    i++;
+                
+                    while (i < scanner.size()) {
+                        auto innerToken = this->operator[](i);
+                        std::string innerValue = innerToken.getTokenValue();
+                        if (innerValue == "}") {
+                            i++; 
+                            break;
+                        }
+                        if (innerValue == "section") {
+                            auto section = parseSection(i);
+                            if (section) {
+                                program->addSection(std::move(section));
+                            }
+                            continue;
+                        }
+                        i++;
+                    }
+                }
+                break; 
+            }
+            else if (tokenValue == "section") {
                 auto section = parseSection(i);
                 if (section) {
                     program->addSection(std::move(section));
                 }
             }
         }
-        
         return program;
     }
     
@@ -343,8 +374,10 @@ namespace mxvm {
     bool Parser::generateProgramCode(std::unique_ptr<Program> &program) {
         auto ast = parseAST();
         if(ast) {
-            if(debug_mode)
+            if(debug_mode) {
+                std::cout << "Program name: " << ast->name << "\n";
                 std::cout << ast->toString() << "\n";
+            }
             
             for (const auto& section : ast->sections) {
                 auto sectionNode = dynamic_cast<SectionNode*>(section.get());

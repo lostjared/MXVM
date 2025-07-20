@@ -7,10 +7,10 @@
 #include "mxvm/instruct.hpp"
 
 namespace mxvm {
-    // Forward declarations
+    
     class ASTVisitor;
 
-    // Base AST Node
+    
     class ASTNode {
     public:
         virtual ~ASTNode() = default;
@@ -18,9 +18,10 @@ namespace mxvm {
         virtual std::string toString() const = 0;
     };
 
-    // Program node - root of the AST
+    
     class ProgramNode : public ASTNode {
     public:
+        std::string name;
         std::vector<std::unique_ptr<ASTNode>> sections;
         
         void addSection(std::unique_ptr<ASTNode> section) {
@@ -31,7 +32,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Section node for data and code sections
+    
     class SectionNode : public ASTNode {
     public:
         enum SectionType { DATA, CODE };
@@ -48,7 +49,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Variable declaration node with initialization
+    
     class VariableNode : public ASTNode {
     public:
         std::string name;
@@ -66,7 +67,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Instruction node
+    
     class InstructionNode : public ASTNode {
     public:
         Inc instruction;
@@ -85,7 +86,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Label definition node
+    
     class LabelNode : public ASTNode {
     public:
         std::string name;
@@ -96,7 +97,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Expression node for operands
+    
     class ExpressionNode : public ASTNode {
     public:
         std::string value;
@@ -109,18 +110,17 @@ namespace mxvm {
         std::string toString() const override;
     };
 
-    // Comment node
+    
     class CommentNode : public ASTNode {
     public:
-        std::string text;
-        
+        std::string text;  
         CommentNode(const std::string& commentText) : text(commentText) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
     };
 
-    // Visitor pattern for AST traversal
+    
     class ASTVisitor {
     public:
         virtual ~ASTVisitor() = default;
