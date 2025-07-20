@@ -1,17 +1,16 @@
 program AddNumbers {
-	
-	#data section
 	section data {
 		int x = 1
 		int y = 2
-		int result = 0
-		string value = "%d + %d = %d "
+		float result = 0
+		float f = 10.0
+		string value = "%f + %d = %f "
 	}
 
 	section code {
 	start:
-		add result, x, y
-		print value, x, y, result
+		add result, f, y
+		print value, f, y, result
 	stop:
 		exit 0 
 	}

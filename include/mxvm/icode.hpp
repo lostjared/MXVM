@@ -55,6 +55,9 @@ namespace mxvm {
         bool isVariable(const std::string& name);
         void setVariableFromString(Variable& var, const std::string& value);
         void addVariables(Variable& dest, Variable& src1, Variable& src2);
+        void subVariables(Variable& dest, Variable& src1, Variable& src2);
+        void mulVariables(Variable& dest, Variable& src1, Variable& src2);
+        void divVariables(Variable& dest, Variable& src1, Variable& src2);
         void printFormatted(const std::string& format, const std::vector<Variable*>& args);
         void setVariableFromConstant(Variable& var, const std::string& value);
         Variable createTempVariable(VarType type, const std::string& value);
