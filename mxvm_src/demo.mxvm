@@ -3,11 +3,9 @@ program Demo {
         int x = 0;
         string fmt_str = "Hello World! Value of x is: %d"
         string fmt_end = "Goodbye!"
-        int result = 0
-
     }
 
-    section code {
+   section code {
         mov x, 0
         start:
             add x, 1
