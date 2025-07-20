@@ -58,7 +58,7 @@ namespace mxvm {
                     break;
                 case JMP:
                     exec_jmp(instr);
-                    continue; // Don't increment PC
+                    continue; 
                 case JE:
                     if (zero_flag) {
                         exec_jmp(instr);
@@ -99,17 +99,27 @@ namespace mxvm {
     }
 
     void Program::exec_mov(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: MOV destination must be a variable, not a constant\n";
+            return;
+        }
+        
         Variable& dest = getVariable(instr.op1.op);
         
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
             dest.var_value = src.var_value;
         } else {
-            setVariableFromString(dest, instr.op2.op);
+            setVariableFromConstant(dest, instr.op2.op);
         }
     }
 
     void Program::exec_add(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: ADD destination must be a variable, not a constant\n";
+            return;
+        }
+        
         Variable& dest = getVariable(instr.op1.op);
         
         if (instr.op3.op.empty()) {
@@ -117,56 +127,137 @@ namespace mxvm {
                 Variable& src = getVariable(instr.op2.op);
                 addVariables(dest, dest, src);
             } else {
-                Variable temp;
-                setVariableFromString(temp, instr.op2.op);
+                Variable temp = createTempVariable(dest.type, instr.op2.op);
                 addVariables(dest, dest, temp);
             }
         } else {
-            Variable& src1 = getVariable(instr.op2.op);
-            Variable& src2 = getVariable(instr.op3.op);
-            addVariables(dest, src1, src2);
+            Variable* src1 = nullptr;
+            Variable* src2 = nullptr;
+            Variable temp1, temp2;
+            
+            if (isVariable(instr.op2.op)) {
+                src1 = &getVariable(instr.op2.op);
+            } else {
+                temp1 = createTempVariable(dest.type, instr.op2.op);
+                src1 = &temp1;
+            }
+            
+            if (isVariable(instr.op3.op)) {
+                src2 = &getVariable(instr.op3.op);
+            } else {
+                temp2 = createTempVariable(dest.type, instr.op3.op);
+                src2 = &temp2;
+            }
+            
+            addVariables(dest, *src1, *src2);
         }
     }
 
     void Program::exec_sub(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: SUB destination must be a variable, not a constant\n";
+            return;
+        }
+        
         Variable& dest = getVariable(instr.op1.op);
-        Variable& src1 = getVariable(instr.op2.op);
-        Variable& src2 = getVariable(instr.op3.op);
+        Variable* src1 = nullptr;
+        Variable* src2 = nullptr;
+        Variable temp1, temp2;
+        
+        if (isVariable(instr.op2.op)) {
+            src1 = &getVariable(instr.op2.op);
+        } else {
+            temp1 = createTempVariable(dest.type, instr.op2.op);
+            src1 = &temp1;
+        }
+        
+        if (isVariable(instr.op3.op)) {
+            src2 = &getVariable(instr.op3.op);
+        } else {
+            temp2 = createTempVariable(dest.type, instr.op3.op);
+            src2 = &temp2;
+        }
         
         if (dest.type == VarType::VAR_INTEGER) {
-            dest.var_value.int_value = src1.var_value.int_value - src2.var_value.int_value;
+            dest.var_value.int_value = src1->var_value.int_value - src2->var_value.int_value;
+            dest.var_value.type = VarType::VAR_INTEGER;
         } else if (dest.type == VarType::VAR_FLOAT) {
-            dest.var_value.float_value = src1.var_value.float_value - src2.var_value.float_value;
+            dest.var_value.float_value = src1->var_value.float_value - src2->var_value.float_value;
+            dest.var_value.type = VarType::VAR_FLOAT;
         }
     }
 
     void Program::exec_mul(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: MUL destination must be a variable, not a constant\n";
+            return;
+        }
+        
         Variable& dest = getVariable(instr.op1.op);
-        Variable& src1 = getVariable(instr.op2.op);
-        Variable& src2 = getVariable(instr.op3.op);
+        Variable* src1 = nullptr;
+        Variable* src2 = nullptr;
+        Variable temp1, temp2;
+        
+        if (isVariable(instr.op2.op)) {
+            src1 = &getVariable(instr.op2.op);
+        } else {
+            temp1 = createTempVariable(dest.type, instr.op2.op);
+            src1 = &temp1;
+        }
+        
+        if (isVariable(instr.op3.op)) {
+            src2 = &getVariable(instr.op3.op);
+        } else {
+            temp2 = createTempVariable(dest.type, instr.op3.op);
+            src2 = &temp2;
+        }
         
         if (dest.type == VarType::VAR_INTEGER) {
-            dest.var_value.int_value = src1.var_value.int_value * src2.var_value.int_value;
+            dest.var_value.int_value = src1->var_value.int_value * src2->var_value.int_value;
+            dest.var_value.type = VarType::VAR_INTEGER;
         } else if (dest.type == VarType::VAR_FLOAT) {
-            dest.var_value.float_value = src1.var_value.float_value * src2.var_value.float_value;
+            dest.var_value.float_value = src1->var_value.float_value * src2->var_value.float_value;
+            dest.var_value.type = VarType::VAR_FLOAT;
         }
     }
 
     void Program::exec_div(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: DIV destination must be a variable, not a constant\n";
+            return;
+        }
+        
         Variable& dest = getVariable(instr.op1.op);
-        Variable& src1 = getVariable(instr.op2.op);
-        Variable& src2 = getVariable(instr.op3.op);
+        Variable* src1 = nullptr;
+        Variable* src2 = nullptr;
+        Variable temp1, temp2;
+        
+        if (isVariable(instr.op2.op)) {
+            src1 = &getVariable(instr.op2.op);
+        } else {
+            temp1 = createTempVariable(dest.type, instr.op2.op);
+            src1 = &temp1;
+        }
+        
+        if (isVariable(instr.op3.op)) {
+            src2 = &getVariable(instr.op3.op);
+        } else {
+            temp2 = createTempVariable(dest.type, instr.op3.op);
+            src2 = &temp2;
+        }
         
         if (dest.type == VarType::VAR_INTEGER) {
-            if (src2.var_value.int_value != 0) {
-                dest.var_value.int_value = src1.var_value.int_value / src2.var_value.int_value;
+            if (src2->var_value.int_value != 0) {
+                dest.var_value.int_value = src1->var_value.int_value / src2->var_value.int_value;
+                dest.var_value.type = VarType::VAR_INTEGER;
             } else {
                 std::cerr << "Division by zero error\n";
                 stop();
             }
         } else if (dest.type == VarType::VAR_FLOAT) {
-            if (src2.var_value.float_value != 0.0) {
-                dest.var_value.float_value = src1.var_value.float_value / src2.var_value.float_value;
+            if (src2->var_value.float_value != 0.0) {
+                dest.var_value.float_value = src1->var_value.float_value / src2->var_value.float_value;
+                dest.var_value.type = VarType::VAR_FLOAT;
             } else {
                 std::cerr << "Division by zero error\n";
                 stop();
@@ -175,23 +266,39 @@ namespace mxvm {
     }
 
     void Program::exec_cmp(const Instruction& instr) {
-        Variable& var1 = getVariable(instr.op1.op);
-        Variable& var2 = getVariable(instr.op2.op);
+        Variable* var1 = nullptr;
+        Variable* var2 = nullptr;
+        Variable temp1, temp2;
         
+        if (isVariable(instr.op1.op)) {
+            var1 = &getVariable(instr.op1.op);
+        } else {
+            temp1 = createTempVariable(VarType::VAR_INTEGER, instr.op1.op);
+            var1 = &temp1;
+        }
+        
+        if (isVariable(instr.op2.op)) {
+            var2 = &getVariable(instr.op2.op);
+        } else {
+            temp2 = createTempVariable(var1->type, instr.op2.op);
+            var2 = &temp2;
+        }
+        
+        // Reset flags
         zero_flag = false;
         less_flag = false;
         greater_flag = false;
         
-        if (var1.type == VarType::VAR_INTEGER && var2.type == VarType::VAR_INTEGER) {
-            int64_t val1 = var1.var_value.int_value;
-            int64_t val2 = var2.var_value.int_value;
+        if (var1->var_value.type == VarType::VAR_INTEGER && var2->var_value.type == VarType::VAR_INTEGER) {
+            int64_t val1 = var1->var_value.int_value;
+            int64_t val2 = var2->var_value.int_value;
             
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
-        } else if (var1.type == VarType::VAR_FLOAT && var2.type == VarType::VAR_FLOAT) {
-            double val1 = var1.var_value.float_value;
-            double val2 = var2.var_value.float_value;
+        } else if (var1->var_value.type == VarType::VAR_FLOAT && var2->var_value.type == VarType::VAR_FLOAT) {
+            double val1 = var1->var_value.float_value;
+            double val2 = var2->var_value.float_value;
             
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
@@ -253,7 +360,11 @@ namespace mxvm {
 
     void Program::setVariableFromString(Variable& var, const std::string& value) {
         if (var.type == VarType::VAR_INTEGER) {
-            var.var_value.int_value = std::stoll(value);
+            if (value.starts_with("0x") || value.starts_with("0X")) {
+                var.var_value.int_value = std::stoll(value, nullptr, 16);
+            } else {
+                var.var_value.int_value = std::stoll(value);
+            }
             var.var_value.type = VarType::VAR_INTEGER;
         } else if (var.type == VarType::VAR_FLOAT) {
             var.var_value.float_value = std::stod(value);
@@ -422,5 +533,44 @@ namespace mxvm {
             }
         }
         out << "\n";
+    }
+
+    Variable Program::createTempVariable(VarType type, const std::string& value) {
+        Variable temp;
+        temp.type = type;
+        temp.var_name = ""; 
+
+        if (type == VarType::VAR_INTEGER) {
+            if (value.starts_with("0x") || value.starts_with("0X")) {
+                temp.var_value.int_value = std::stoll(value, nullptr, 16);
+            } else {
+                temp.var_value.int_value = std::stoll(value);
+            }
+            temp.var_value.type = VarType::VAR_INTEGER;
+        } else if (type == VarType::VAR_FLOAT) {
+            temp.var_value.float_value = std::stod(value);
+            temp.var_value.type = VarType::VAR_FLOAT;
+        } else if (type == VarType::VAR_STRING) {
+            temp.var_value.str_value = value;
+            temp.var_value.type = VarType::VAR_STRING;
+        }
+        return temp;
+    }
+
+    void Program::setVariableFromConstant(Variable& var, const std::string& value) {
+        if (var.type == VarType::VAR_INTEGER) {
+            if (value.starts_with("0x") || value.starts_with("0X")) {
+                var.var_value.int_value = std::stoll(value, nullptr, 16);
+            } else {
+                var.var_value.int_value = std::stoll(value);
+            }
+            var.var_value.type = VarType::VAR_INTEGER;
+        } else if (var.type == VarType::VAR_FLOAT) {
+            var.var_value.float_value = std::stod(value);
+            var.var_value.type = VarType::VAR_FLOAT;
+        } else if (var.type == VarType::VAR_STRING) {
+            var.var_value.str_value = value;
+            var.var_value.type = VarType::VAR_STRING;
+        }
     }
 }

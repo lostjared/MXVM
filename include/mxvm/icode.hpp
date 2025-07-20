@@ -40,6 +40,9 @@ namespace mxvm {
         void setVariableFromString(Variable& var, const std::string& value);
         void addVariables(Variable& dest, Variable& src1, Variable& src2);
         void printFormatted(const std::string& format, const std::vector<Variable*>& args);
+        void setVariableFromConstant(Variable& var, const std::string& value);
+        Variable createTempVariable(VarType type, const std::string& value);
+        bool isConstant(const std::string& value);
     protected:
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;

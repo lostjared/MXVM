@@ -1,0 +1,18 @@
+section data {
+	int x = 1
+	int y = 2
+	int x1 = 0
+	string value = "%d"
+}
+
+section code {
+    mov x, 0
+start:
+    add x, 1
+	print value, x
+    cmp x, 0x10
+    je stop
+    jmp start
+stop:
+	exit 0 
+}

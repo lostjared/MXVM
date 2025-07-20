@@ -143,7 +143,7 @@ namespace mxvm {
         else return nullptr;
         
         index++; 
-        
+    
         if (index >= scanner.size()) return nullptr;
         
         auto nameToken = this->operator[](index);
@@ -152,7 +152,7 @@ namespace mxvm {
         }
         
         std::string varName = nameToken.getTokenValue();
-        index++; 
+        index++;
         
         
         if (index < scanner.size() && this->operator[](index).getTokenValue() == "=") {
@@ -161,16 +161,29 @@ namespace mxvm {
             if (index < scanner.size()) {
                 auto valueToken = this->operator[](index);
                 std::string value = valueToken.getTokenValue();
-                
-                
-                if (valueToken.getTokenType() == types::TokenType::TT_STR || 
-                    (value.starts_with("\"") && value.ends_with("\""))) {
-                    index++;
-                    return std::make_unique<VariableNode>(varType, varName, value);
-                } else {
-                    
-                    index++;
-                    return std::make_unique<VariableNode>(varType, varName, value);
+                types::TokenType tokenType = valueToken.getTokenType();
+                switch (tokenType) {
+                    case types::TokenType::TT_STR:
+                        if (value.starts_with("\"") && value.ends_with("\"")) {
+                            value = value.substr(1, value.length() - 2);
+                        }
+                        index++;
+                        return std::make_unique<VariableNode>(varType, varName, value);
+                        
+                    case types::TokenType::TT_NUM:
+                        index++;
+                        return std::make_unique<VariableNode>(varType, varName, value);
+                        
+                    case types::TokenType::TT_HEX:
+                        index++;
+                        return std::make_unique<VariableNode>(varType, varName, value);
+                        
+                    case types::TokenType::TT_ID:
+                        index++;
+                        return std::make_unique<VariableNode>(varType, varName, value);   
+                    default:
+                        index++;
+                        return std::make_unique<VariableNode>(varType, varName, value);
                 }
             }
         }
@@ -179,6 +192,7 @@ namespace mxvm {
     }
     
     std::unique_ptr<InstructionNode> Parser::parseCodeInstruction(uint64_t& index) {
+        // Map instruction names to enum values
         static std::unordered_map<std::string, Inc> instructionMap = {
             {"mov", MOV}, {"load", LOAD}, {"store", STORE},
             {"add", ADD}, {"sub", SUB}, {"mul", MUL}, {"div", DIV},
@@ -194,7 +208,6 @@ namespace mxvm {
         auto token = this->operator[](index);
         std::string tokenValue = token.getTokenValue();
         
-        
         if (token.getTokenType() == types::TokenType::TT_ID) {
             if (index + 1 < scanner.size() && this->operator[](index + 1).getTokenValue() == ":") {
                 return nullptr;
@@ -203,7 +216,7 @@ namespace mxvm {
         
         auto instIt = instructionMap.find(tokenValue);
         if (instIt == instructionMap.end()) {
-            return nullptr; 
+            return nullptr;
         }
         
         Inc instruction = instIt->second;
@@ -214,26 +227,53 @@ namespace mxvm {
         while (index < scanner.size()) {
             auto operandToken = this->operator[](index);
             std::string value = operandToken.getTokenValue();
+            types::TokenType tokenType = operandToken.getTokenType();
             
             if (value == "\n" || value == "//" || value.starts_with("//") || 
                 value == "#" || value.starts_with("#") || value == "}") {
                 break;
             }
- 
+            
             if (value == "," || value == " " || value == "\t") {
                 index++;
                 continue;
             }
             
             Operand operand;
-            if (operandToken.getTokenType() == types::TokenType::TT_NUM) {
-                operand.op = value;
-                operand.op_value = std::stoi(value);
-            } else if (operandToken.getTokenType() == types::TokenType::TT_ID) {
-                operand.op = value;
-                operand.label = value;
-            } else if (operandToken.getTokenType() == types::TokenType::TT_SYM && value != ",") {
-                operand.op = value;
+            
+            switch (tokenType) {
+                case types::TokenType::TT_NUM:
+                    operand.op = value;
+                    operand.op_value = std::stoi(value);
+                    break;
+                    
+                case types::TokenType::TT_HEX:
+                    operand.op = value;
+                    if (value.starts_with("0x") || value.starts_with("0X")) {
+                        operand.op_value = std::stoi(value, nullptr, 16);
+                    } else {
+                        operand.op_value = std::stoi(value, nullptr, 16);
+                    }
+                    break;
+                    
+                case types::TokenType::TT_ID:
+                    operand.op = value;
+                    operand.label = value;
+                    break;
+                    
+                case types::TokenType::TT_STR:
+                    operand.op = value;
+                    break;
+                    
+                case types::TokenType::TT_SYM:
+                    if (value != ",") {
+                        operand.op = value;
+                    }
+                    break;
+                    
+                default:
+                    operand.op = value;
+                    break;
             }
             
             if (!operand.op.empty()) {
@@ -393,19 +433,17 @@ namespace mxvm {
                 break;
                 
             case VarType::VAR_STRING:
-                if (value.starts_with("\"") && value.ends_with("\"")) {
-                    var.var_value.str_value = value.substr(1, value.length() - 2);
-                } else {
-                    var.var_value.str_value = value;
-                }
+                var.var_value.str_value = value;
                 var.var_value.type = VarType::VAR_STRING;
                 break;
                 
             case VarType::VAR_POINTER:
                 if (value == "null" || value == "0") {
                     var.var_value.ptr_value = nullptr;
-                } else {
+                } else if (value.starts_with("0x") || value.starts_with("0X")) {
                     var.var_value.ptr_value = reinterpret_cast<void*>(std::stoull(value, nullptr, 16));
+                } else {
+                    var.var_value.ptr_value = reinterpret_cast<void*>(std::stoull(value));
                 }
                 var.var_value.type = VarType::VAR_POINTER;
                 break;

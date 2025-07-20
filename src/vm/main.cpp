@@ -128,6 +128,8 @@ void action_interpret(std::string_view input) {
         }
     } catch(mx::Exception &e) {
         std::cerr << "Runtime Error: "<< e.what() << "\n";
+    } catch(std::runtime_error &e) {
+        std::cerr << "Runtime Error: " << e.what() << "\n";
     }
 }
 
