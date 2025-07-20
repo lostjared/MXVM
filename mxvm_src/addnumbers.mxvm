@@ -12,7 +12,6 @@ program AddNumbers {
 	start:
 		add result, x, y
 		print value, x, y, result
-		abc 
 	stop:
 		exit 0 
 	}

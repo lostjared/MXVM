@@ -5,8 +5,6 @@
 
 namespace mxvm {
     bool Validator::validate() {
-        
-
         scanner.scan();
         next(); require("program"); next();
         require(types::TokenType::TT_ID); next();
@@ -31,14 +29,21 @@ namespace mxvm {
                         {
                             next();
                         } else {
-                            throw mx::Exception("Syntax Error: Expected value for variable, found: " + token->getTokenValue());
+                            throw mx::Exception(
+                                "Syntax Error: Expected value for variable, found: " + token->getTokenValue() +
+                                " at line " + std::to_string(token->getLine()) +
+                                ", col " + std::to_string(token->getCol())
+                            );
                         }
                     }
                     else if (token->getTokenValue() == "\n" || token->getTokenValue() == ";") {
                         next();
                     }
                     else {
-                        throw mx::Exception("Syntax Error: Expected variable declaration, found: " + token->getTokenValue());
+                        throw mx::Exception(
+                            "Syntax Error: Expected variable declaration, found: " + token->getTokenValue() +
+                            " at line " + std::to_string(token->getLine()) +
+                            ", col " + std::to_string(token->getCol()));
                     }
                 }
                 require("}"); next();
@@ -101,13 +106,19 @@ namespace mxvm {
                         if (match(types::TokenType::TT_NUM)) {
                             auto v = token->getTokenValue();
                             if (v.find('e') != std::string::npos || v.find('.') != std::string::npos) {
-                                throw mx::Exception("Syntax Error: Invalid integer constant: " + v);
-                            }
+                                throw mx::Exception(
+                                    "Syntax Error: Invalid integer constant: " + v +
+                                    " at line " + std::to_string(token->getLine()) +
+                                    ", col " + std::to_string(token->getCol()));                            }
                         }
                         if (match(types::TokenType::TT_HEX)) {
                             auto v = token->getTokenValue();
                             if (!v.starts_with("0x") && !v.starts_with("0X")) {
-                                throw mx::Exception("Syntax Error: Invalid hex constant: " + v);
+                                throw mx::Exception(
+                                    "Syntax Error: Invalid hex constant: " + v +
+                                    " at line " + std::to_string(token->getLine()) +
+                                    ", col " + std::to_string(token->getCol())
+                                );
                             }
                         }
                         next(); 
@@ -123,9 +134,6 @@ namespace mxvm {
         require("}");
         return true;
     }
-
-
-
 
     bool Validator::match(const std::string &m) {
         if(token->getTokenValue() != m)

@@ -98,6 +98,7 @@ namespace scan {
         std::optional<Ch> StringBuffer<Ch, String>::backward_step(int num) {
             if (static_cast<int64_t>(index) >= num) {
                 index -= num;
+                if(buffer_[index] == '\n') currentLine --;
                 return buffer_[index];
             }
             return std::nullopt;
@@ -214,8 +215,8 @@ namespace scan {
         public:
             using ch_type = Ch;
             using string_type = String;
-            Token() = default;
-            Token(const types::TokenType &t) : type{t} {}
+            Token() : line{1}, col{1} {}
+            Token(const types::TokenType &t) : type{t}, line{1}, col{1} {}
             Token(const Token<Ch,String> &t) : type{t.type}, value{t.value}, line{t.line}, col{t.col}, filename{t.filename} {}
             Token(Token<Ch,String>  &&t) : type{t.type}, value{std::move(t.value)}, line{t.line}, col{t.col}, filename{t.filename} {}
             Token<Ch,String> &operator=(const types::TokenType &type);
@@ -229,8 +230,8 @@ namespace scan {
             void set_pos(const std::pair<uint64_t, uint64_t> &p);
             void set_filename(const std::string &filename) { this->filename = filename; }
             std::string get_filename() const { return this->filename; }
-            uint64_t getLine() const { return line-1; }
-            uint64_t getCol() const { return col;}
+            uint64_t getLine() const { return line; }
+            uint64_t getCol() const { return col; }
         private:
             types::TokenType type;
             string_type value;
