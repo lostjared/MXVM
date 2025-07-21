@@ -225,7 +225,6 @@ namespace mxvm {
     }
     
     std::unique_ptr<InstructionNode> Parser::parseCodeInstruction(uint64_t& index) {
-        // Map instruction names to enum values
         static std::unordered_map<std::string, Inc> instructionMap = {
             {"mov", MOV}, {"load", LOAD}, {"store", STORE},
             {"add", ADD}, {"sub", SUB}, {"mul", MUL}, {"div", DIV},
@@ -233,7 +232,7 @@ namespace mxvm {
             {"cmp", CMP}, {"jmp", JMP}, {"je", JE}, {"jne", JNE},
             {"jl", JL}, {"jle", JLE}, {"jg", JG}, {"jge", JGE},
             {"jz", JZ}, {"jnz", JNZ}, {"ja", JA}, {"jb", JB},
-            {"print", PRINT}, {"exit", EXIT}
+            {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE}
         };
         
         if (index >= scanner.size()) return nullptr;
@@ -449,7 +448,7 @@ namespace mxvm {
                     instr.op3 = instructionNode->operands[2];
                     resolveLabelReference(instr.op3, labelMap);
                 }
-                if (instructionNode->instruction == PRINT && instructionNode->operands.size() > 3) {
+                if (instructionNode->operands.size() > 3) {
                     for (size_t i = 3; i < instructionNode->operands.size(); ++i) {
                         Operand extraOp = instructionNode->operands[i];
                         resolveLabelReference(extraOp, labelMap);

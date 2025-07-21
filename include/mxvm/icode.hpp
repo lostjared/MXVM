@@ -11,6 +11,7 @@ namespace mxvm {
     class Program {
     public:
         Program();
+        ~Program();
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address);
         void add_variable(const std::string &name, const Variable &v);
@@ -50,6 +51,8 @@ namespace mxvm {
         void exec_jb(const Instruction& instr);
         void exec_print(const Instruction& instr);
         void exec_exit(const Instruction& instr);
+        void exec_alloc(const Instruction& instr);
+        void exec_free(const Instruction& instr);
         
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);

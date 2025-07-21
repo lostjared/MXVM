@@ -98,7 +98,7 @@ namespace scan {
         std::optional<Ch> StringBuffer<Ch, String>::backward_step(int num) {
             if (static_cast<int64_t>(index) >= num) {
                 index -= num;
-                if(buffer_[index] == '\n') currentLine --;
+                if(buffer_[index] == '\n') { currentLine --; currentColumn = 1; }
                 return buffer_[index];
             }
             return std::nullopt;

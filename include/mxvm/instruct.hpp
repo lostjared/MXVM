@@ -5,7 +5,7 @@
 #include<vector>
 #include<cstdint>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT};
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE};
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -33,7 +33,9 @@ inline std::vector<std::string> IncType {
     "ja",       // JA = 22
     "jb",       // JB = 23
     "print",    // PRINT = 24
-    "exit"      // EXIT = 25
+    "exit",     // EXIT = 25
+    "alloc",    // ALLOC = 26
+    "free"      // FREE =  27
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);
@@ -57,9 +59,11 @@ namespace mxvm {
     struct Variable_Value {
         std::string str_value;
         std::string label_value;
-        int64_t int_value;
-        double float_value;
-        void *ptr_value;
+        int64_t int_value = 0;
+        double float_value = 0;
+        void *ptr_value = nullptr;
+        uint64_t ptr_size = 0;
+        uint64_t ptr_count = 0;
         VarType type;
     };
 
