@@ -1,0 +1,16 @@
+program PrintCat {
+	section data {
+		string fmt = "%s%s\n"
+        string value = ""
+        string hello_world = "Hello"
+	}
+
+	section code {
+	start:
+        string_print value, fmt, value, hello_world
+        print value
+        jmp start
+	stop:
+		exit 0
+	}
+}

@@ -8,6 +8,7 @@ namespace mxvm {
     public:
         Validator(const std::string &text) : scanner(text), index(0) {}
         bool validate();
+        void collect_labels(std::unordered_map<std::string, std::string> &labels);
         bool match(const std::string &m);
         void require(const std::string &r);
         bool match(const types::TokenType &t);

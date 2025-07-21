@@ -4,8 +4,22 @@
 #include<algorithm>
 
 namespace mxvm {
+
+    void Validator::collect_labels(std::unordered_map<std::string, std::string> &labels) {
+        for (size_t i = 0; i < scanner.size(); ++i) {
+            const auto &tok = scanner[i];
+            if (tok.getTokenType() == types::TokenType::TT_ID) {
+                if (i + 1 < scanner.size() && scanner[i + 1].getTokenValue() == ":") {
+                    labels[tok.getTokenValue()] = tok.getTokenValue(); 
+                }
+            }
+        }
+    }
+
     bool Validator::validate() {
         scanner.scan();
+        std::unordered_map<std::string, std::string> labels;
+        collect_labels(labels);
         next(); require("program"); next();
         require(types::TokenType::TT_ID); next();
         require("{"); next();
@@ -75,6 +89,19 @@ namespace mxvm {
                         }
                         if(op == "ret") {
                             next();
+                            continue;
+                        }
+                        if(op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
+                            if(next()) {
+                                std::string label = token->getTokenValue();
+                                if(labels.find(label) == labels.end()) {
+                                    throw mx::Exception(
+                                        "Label not found: '" + label +
+                                        "' at line " + std::to_string(token->getLine()) 
+                                    );
+                                }
+                                next();
+                            }
                             continue;
                         }
                         next();
