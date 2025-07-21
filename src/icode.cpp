@@ -40,12 +40,11 @@ namespace mxvm {
         running = false;
     }
 
-    void Program::exec() {
+    int Program::exec() {
         if (inc.empty()) {
             std::cerr << "No instructions to execute\n";
-            return;
+            return EXIT_FAILURE;
         }
-        
         pc = 0;
         running = true;
         
@@ -138,7 +137,7 @@ namespace mxvm {
                     break;
                 case EXIT:
                     exec_exit(instr);
-                    return;
+                    return getExitCode();
                 case GETLINE:
                     exec_getline(instr);
                     break;
@@ -169,6 +168,7 @@ namespace mxvm {
             }
             pc++;
         }
+        return getExitCode();
     }
 
     void Program::exec_mov(const Instruction& instr) {
@@ -408,8 +408,7 @@ namespace mxvm {
                 exit_code = std::stoll(instr.op1.op, nullptr, 0);
             }
         }
-        if(mxvm::debug_mode)
-            std::cout << "Program exited with code: " << exit_code << std::endl;
+        exitCode = exit_code;
         stop();
     }
 

@@ -145,8 +145,10 @@ void action_interpret(std::string_view input) {
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         if(parser.generateProgramCode(program)) {
             if(mxvm::debug_mode) program->print(std::cout);
-            program->exec();
+            int exitCode = program->exec();
             if(mxvm::debug_mode) program->post(std::cout);
+            if(mxvm::debug_mode)
+                std::cout << "Program exited with code: " << exitCode << std::endl;
         } else {
             std::cerr << "Runtime Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);

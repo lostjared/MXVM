@@ -38,13 +38,14 @@ namespace mxvm {
         void add_label(const std::string &name, uint64_t address);
         void add_variable(const std::string &name, const Variable &v);
         void stop();
-        void exec();
+        int exec();
         void print(std::ostream &out);
         void post(std::ostream &out);
+        int getExitCode() const { return exitCode; }
     private:
         size_t pc;  
         bool running;
-                
+        int exitCode = 0;
         bool zero_flag = false;
         bool less_flag = false;
         bool greater_flag = false;
