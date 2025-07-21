@@ -144,6 +144,18 @@ namespace mxvm {
                 case POP:
                     exec_pop(instr);
                     break;
+                case STACK_LOAD:
+                    exec_stack_load(instr);
+                    break;
+                case STACK_STORE:
+                    exec_stack_store(instr);
+                    break;
+                case CALL:
+                    exec_call(instr);
+                    break;
+                case RET:
+                    exec_ret(instr);
+                    break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
@@ -1002,7 +1014,90 @@ namespace mxvm {
             throw mx::Exception("POP only supports integer or pointer variables");
         }
     }
-        
+
+    void Program::exec_stack_load(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("STACK_LOAD destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+
+        size_t index = 0;
+        if (!instr.op2.op.empty()) {
+            if (isVariable(instr.op2.op)) {
+                index = static_cast<size_t>(getVariable(instr.op2.op).var_value.int_value);
+            } else {
+                index = static_cast<size_t>(std::stoll(instr.op2.op, nullptr, 0));
+            }
+        }
+
+        if (index >= stack.size()) {
+            throw mx::Exception("STACK_LOAD: index out of bounds");
+            return;
+        }
+
+        StackValue &value = stack[index]; 
+        if (dest.type == VarType::VAR_INTEGER) {
+            if (!std::holds_alternative<int64_t>(value)) {
+                throw mx::Exception("STACK_LOAD type mismatch: expected integer, found pointer");
+            }
+            dest.var_value.int_value = std::get<int64_t>(value);
+            dest.var_value.type = VarType::VAR_INTEGER;
+        } else if (dest.type == VarType::VAR_POINTER) {
+            if (!std::holds_alternative<void*>(value)) {
+                throw mx::Exception("STACK_LOAD type mismatch: expected pointer, found integer");
+            }
+            dest.var_value.ptr_value = std::get<void*>(value);
+            dest.var_value.type = VarType::VAR_POINTER;
+        } else {
+            throw mx::Exception("STACK_LOAD only supports integer or pointer variables");
+        }
+    }
+
+    void Program::exec_stack_store(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("STACK_STORE source must be a variable");
+            return;
+        }
+        Variable& src = getVariable(instr.op1.op);
+
+        size_t index = 0;
+        if (!instr.op2.op.empty()) {
+            if (isVariable(instr.op2.op)) {
+                index = static_cast<size_t>(getVariable(instr.op2.op).var_value.int_value);
+            } else {
+                index = static_cast<size_t>(std::stoll(instr.op2.op, nullptr, 0));
+            }
+        }
+
+        if (index >= stack.size()) {
+            throw mx::Exception("STACK_STORE: index out of bounds");
+            return;
+        }
+        StackValue& value = stack[index]; 
+        if (src.type == VarType::VAR_INTEGER) {
+            if (!std::holds_alternative<int64_t>(value)) {
+                throw mx::Exception("STACK_STORE type mismatch: expected integer slot");
+            }
+            value = src.var_value.int_value;
+        } else if (src.type == VarType::VAR_POINTER) {
+            if (!std::holds_alternative<void*>(value)) {
+                throw mx::Exception("STACK_STORE type mismatch: expected pointer slot");
+            }
+            value = src.var_value.ptr_value;
+        } else {
+            throw mx::Exception("STACK_STORE only supports integer or pointer variables");
+        }
+    }
+
+    void Program::exec_call(const Instruction &instr) {
+
+    }
+
+    void Program::exec_ret(const Instruction &instr) {
+
+    }
+
     Variable Program::createTempVariable(VarType type, const std::string& value) {
         Variable temp;
         temp.type = type;

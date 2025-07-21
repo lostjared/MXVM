@@ -25,6 +25,7 @@ namespace mxvm {
         }
         bool empty() const { return data.empty(); }
         size_t size() const { return data.size(); }
+        StackValue &operator[](size_t index) { return data[index]; }
     private:
         std::vector<StackValue> data;
     };
@@ -78,7 +79,10 @@ namespace mxvm {
         void exec_getline(const Instruction &instr);
         void exec_push(const Instruction &instr);
         void exec_pop(const Instruction &instr);
-        
+        void exec_stack_load(const Instruction &instr);
+        void exec_stack_store(const Instruction &instr);
+        void exec_call(const Instruction &instr);
+        void exec_ret(const Instruction &instr);      
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);
         void setVariableFromString(Variable& var, const std::string& value);

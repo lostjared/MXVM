@@ -1,0 +1,17 @@
+program Stack {
+	section data {
+        string message = "Hello from subroutine\n"
+	}
+
+	section code {
+	start:
+        call subroutine
+    stop:
+        exit 0
+
+    subroutine:
+        print message
+        ret
+
+	}
+}

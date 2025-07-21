@@ -233,7 +233,8 @@ namespace mxvm {
             {"jl", JL}, {"jle", JLE}, {"jg", JG}, {"jge", JGE},
             {"jz", JZ}, {"jnz", JNZ}, {"ja", JA}, {"jb", JB},
             {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE},
-            {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}
+            {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}, {"stack_load", STACK_LOAD},
+            {"stack_store", STACK_STORE}, {"call", CALL}, {"ret", RET}
         };
         
         if (index >= scanner.size()) return nullptr;
