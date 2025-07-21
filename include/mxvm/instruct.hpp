@@ -5,7 +5,7 @@
 #include<vector>
 #include<cstdint>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE};
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP};
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -36,8 +36,10 @@ inline std::vector<std::string> IncType {
     "print",    // PRINT = 25
     "exit",     // EXIT = 26
     "alloc",    // ALLOC = 27
-    "free",      // FREE =  28
+    "free",     // FREE =  28
     "getline",  // GETLINE = 29
+    "push",     // PUSH = 30
+    "pop"       // POP = 31
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);

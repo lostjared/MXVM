@@ -138,6 +138,12 @@ namespace mxvm {
                 case GETLINE:
                     exec_getline(instr);
                     break;
+                case PUSH:
+                    exec_push(instr);
+                    break;
+                case POP:
+                    exec_pop(instr);
+                    break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
@@ -946,6 +952,57 @@ namespace mxvm {
         }
     }
 
+    void Program::exec_push(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            try {
+                int64_t int_val = std::stoll(instr.op1.op, nullptr, 0);
+                stack.push(int_val);
+                return;
+            } catch (...) {
+                throw mx::Exception("PUSH argument must be a variable or integer constant");
+                return;
+            }
+        }
+        Variable& var = getVariable(instr.op1.op);
+        if (var.var_value.type == VarType::VAR_INTEGER) {
+            stack.push(var.var_value.int_value);
+        } else if (var.var_value.type == VarType::VAR_POINTER) {
+            stack.push(var.var_value.ptr_value);
+        } else {
+            throw mx::Exception("PUSH only supports integer or pointer types");
+        }
+    }
+
+    void Program::exec_pop(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("POP destination must be a variable");
+            return;
+        }
+        Variable& var = getVariable(instr.op1.op);
+
+        if (stack.empty()) {
+            throw mx::Exception("POP from empty stack");
+            return;
+        }
+
+        StackValue value = stack.pop();
+        if (var.type == VarType::VAR_INTEGER) {
+            if (!std::holds_alternative<int64_t>(value)) {
+                throw mx::Exception("POP type mismatch: expected integer");
+            }
+            var.var_value.int_value = std::get<int64_t>(value);
+            var.var_value.type = VarType::VAR_INTEGER;
+        } else if (var.type == VarType::VAR_POINTER) {
+            if (!std::holds_alternative<void*>(value)) {
+                throw mx::Exception("POP type mismatch: expected pointer");
+            }
+            var.var_value.ptr_value = std::get<void*>(value);
+            var.var_value.type = VarType::VAR_POINTER;
+        } else {
+            throw mx::Exception("POP only supports integer or pointer variables");
+        }
+    }
+        
     Variable Program::createTempVariable(VarType type, const std::string& value) {
         Variable temp;
         temp.type = type;

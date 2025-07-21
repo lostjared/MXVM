@@ -2,11 +2,32 @@
 #define ICODE_HPP_
 
 #include"mxvm/instruct.hpp"
+#include"scanner/exception.hpp"
 #include<unordered_map>
 #include<vector>
-
+#include<variant>
 
 namespace mxvm {
+
+    using StackValue = std::variant<int64_t, void*>;
+
+    class Stack {
+    public:
+        Stack() = default;
+        void push(const StackValue& value) {
+            data.push_back(value);
+        }
+        StackValue pop() {
+            if (data.empty()) throw mx::Exception("Stack underflow");
+            StackValue val = data.back();
+            data.pop_back();
+            return val;
+        }
+        bool empty() const { return data.empty(); }
+        size_t size() const { return data.size(); }
+    private:
+        std::vector<StackValue> data;
+    };
 
     class Program {
     public:
@@ -55,6 +76,8 @@ namespace mxvm {
         void exec_alloc(const Instruction& instr);
         void exec_free(const Instruction& instr);
         void exec_getline(const Instruction &instr);
+        void exec_push(const Instruction &instr);
+        void exec_pop(const Instruction &instr);
         
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);
@@ -71,6 +94,7 @@ namespace mxvm {
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, uint64_t> labels;
+        Stack stack;
     };
     
 }

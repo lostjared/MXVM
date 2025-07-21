@@ -1,0 +1,20 @@
+program Stack {
+	section data {
+		int x = 255
+        int z = 0xF
+        int y = 0
+        string value = "The value is: %d\n"
+	}
+
+	section code {
+	start:
+        push x
+        push z
+        pop y
+        print value, y
+        pop y
+        print value, y
+	stop:
+		exit 0
+	}
+}
