@@ -2,21 +2,22 @@ program AddNumbers {
 	section data {
 		ptr pointer = null
 		int x = 0xFF
-		int y = 2
-		float result = 0
-		float f = 10.0
-		string value = "%f + %d = %f %p"
-		string fmt = " value is; %d\n"
+		int add_x = 0
+		int add_y = 0
+		int result = 0
+		string fmt = " value is: %d\n"
 		
 	}
 
 	section code {
 	start:
-	   alloc pointer, 8, 3
-	   store x, pointer, 5
-	   load x, pointer, 1
-	   mov y, x
-	   print fmt, y
+	   alloc pointer, 8, 2
+	   store x, pointer, 0
+	   store x, pointer, 1
+	   load add_x, pointer, 0
+	   load add_y, pointer, 1
+	   add result, add_x, add_y
+	   print fmt, result
 	stop:
 		free pointer
 		exit 0 
