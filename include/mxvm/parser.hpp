@@ -26,6 +26,7 @@ namespace mxvm {
     extern bool debug_mode;
     extern bool instruct_mode;
 
+
     class Parser {
     public:
         explicit Parser(const std::string &source);
@@ -35,7 +36,7 @@ namespace mxvm {
         
         std::unique_ptr<ProgramNode> parseAST();
         bool generateProgramCode(std::unique_ptr<Program> &program);
-        
+        bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
     private:
         std::string source_file;
         scan::Scanner scanner;

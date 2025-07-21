@@ -32,6 +32,7 @@ namespace mxvm {
 
     class Program {
     public:
+        friend class Parser;
         Program();
         ~Program();
         void add_instruction(const Instruction &i);
