@@ -1,15 +1,18 @@
 program PrintCat {
 	section data {
-		string fmt = "%s%s\n"
+		string fmt = "%s%s"
         string value = ""
+        string newline = "\n"
         string hello_world = "Hello"
 	}
 
 	section code {
 	start:
         string_print value, fmt, value, hello_world
+        string_print value, fmt, value, hello_world
+        string_print value, fmt, value, hello_world
         print value
-        jmp start
+        print newline
 	stop:
 		exit 0
 	}

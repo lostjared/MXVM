@@ -225,7 +225,7 @@ namespace mxvm {
     }
     
     bool Validator::next() {
-        while (index < scanner.size() && scanner[index].getTokenValue() == "\n") {
+        while (index < scanner.size() && scanner[index].getTokenType() != types::TokenType::TT_STR && scanner[index].getTokenValue() == "\n") {
             index++;
         }
         if (index < scanner.size()) {
