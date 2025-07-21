@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
 }
 
 void process_arguments(Args *args) { 
-    if(args->action == vm_action::translate && !args->output_file.empty()) {
+    if(args->action == vm_action::translate) {
         action_translate(args->source_file, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         action_interpret(args->source_file);
@@ -132,7 +132,36 @@ void action_translate(std::string_view input, std::string_view output, vm_target
 }
 
 void translate_x64_linux(std::string_view input, std::string_view output) {
-
+    try {
+        std::string input_file(input);
+        std::fstream file;
+        file.open(input_file, std::ios::in);
+        if(!file.is_open()) {
+            throw mx::Exception("Error could not open file: " + input_file);
+        }
+        std::ostringstream stream;
+        stream << file.rdbuf();
+        file.close();
+        mxvm::Parser parser(stream.str());
+        parser.scan();
+        std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        if(parser.generateProgramCode(program)) {
+            std::fstream file;
+            file.open(program->name + ".s", std::ios::out);
+            if(file.is_open()) {
+                program->generateCode(file);
+                file.close();
+                std::cout << "translated: " << program->name + ".s\n";
+            }
+        } else {
+            std::cerr << "Error: Failed to generate intermediate code.\n";
+            exit(EXIT_FAILURE);
+        }
+    } catch(const mx::Exception &e) {
+        std::cerr << "Error: " << e.what() << "\n";
+    } catch(const std::exception &e) { 
+        std::cerr << "Exception: " << e.what() << "\n";
+    }
 }
 
 void action_interpret(std::string_view input) {
@@ -156,7 +185,7 @@ void action_interpret(std::string_view input) {
             if(mxvm::debug_mode)
                 std::cout << "Program exited with code: " << exitCode << std::endl;
         } else {
-            std::cerr << "Runtime Error: Failed to generate intermediate code.\n";
+            std::cerr << "Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
     } catch(mx::Exception &e) {

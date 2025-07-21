@@ -24,16 +24,219 @@ namespace mxvm {
         }
     }
     
-    void Program::add_instruction(const Instruction &i) {
+    void Base::add_instruction(const Instruction &i) {
         inc.push_back(i);
     }
     
-    void Program::add_label(const std::string &name, uint64_t address) {
+    void Base::add_label(const std::string &name, uint64_t address) {
         labels[name] = address;
     }
 
-    void Program::add_variable(const std::string &name, const Variable &v) {
+    void Base::add_variable(const std::string &name, const Variable &v) {
         vars[name] = v;
+    }
+
+    std::string Program::escapeNewLines(const std::string& input) {
+        std::string result;
+        for (char c : input) {
+            switch (c) {
+                case '\t':
+                    result += "\\t";
+                    break;
+                case '\n':
+                    result += "\\n";
+                    break;
+                case '\r':
+                    result += "\\r";
+                    break;
+                default:
+                    result += c;
+                    break;
+            }
+        }
+        return result;
+    }
+
+    void Program::generateCode(std::ostream &out) {
+
+        std::unordered_map<int, std::string> labels_;
+        for(auto &l : labels) {
+            labels_[l.second] = l.first;
+        }
+        out << ".section .data\n";
+        // data section
+        for(auto &v :  vars) {
+            if(v.second.type == VarType::VAR_INTEGER) {
+                out << "\t" << v.first << ": .quad " << v.second.var_value.int_value << "\n";
+                continue;
+            }
+            if(v.second.type == VarType::VAR_FLOAT) {
+                out << "\t" << v.first << ": .double " << v.second.var_value.float_value << "\n";
+                continue;
+            }
+            if(v.second.type == VarType::VAR_STRING) {
+                out << "\t" << v.first << ": .asciz " << "\"" << escapeNewLines(v.second.var_value.str_value) << "\"\n";
+                continue;
+            }
+        }
+        // data 
+        out << ".section .rodata\n";
+        // read only
+        out << ".section .bss\n";
+        // bss
+        out << ".section .text\n";
+        // text
+        out << "\t.global main\n";
+        out << "\t.extern printf\n";
+        out << "\t.extern puts\n";
+        out << "\t.extern exit\n";
+
+        // rest of text
+        out << "main:\n";
+        out << "\tpush %rbp\n";
+        out << "\tmov %rsp, %rbp\n";
+        // main function
+        for(size_t i = 0; i < inc.size(); ++i) {
+            const Instruction &instr = inc[i];
+            if(labels_.find(i) != labels_.end()) {
+                out << labels_[i] << ":\n";
+            } 
+            generateInstruction(out, instr);
+        }
+        out << ".end_program: \n";
+        out << "\tmov %rbp, %rsp\n";
+        out << "\tpop %rbp\n";
+        out << "\tret\n";
+
+        
+        out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
+    }
+
+    void Program::generateInstruction(std::ostream &out, const Instruction  &i) {
+        switch(i.instruction) {
+            case ADD:
+                gen_add(out, i);
+                break;
+            case PRINT:
+                gen_print(out, i);
+                break;
+        default:
+            throw mx::Exception("Invalid or unsupported instruction");
+        }
+    }
+
+    int Program::generateLoadVar(std::ostream &out, int r, const Operand &op) {
+        int count = 0;
+        if(isVariable(op.op)) {
+            if(op.type != OperandType::OP_VARIABLE) {
+                throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
+            }
+            Variable &v = getVariable(op.op);
+            std::string reg = getRegisterByIndex(r, v.type);
+            switch(v.type) {
+                case VarType::VAR_INTEGER:
+                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    count = 0;
+                    break;
+                case VarType::VAR_FLOAT:
+                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    count = 1;
+                break;
+                case VarType::VAR_STRING:
+                    count = 0;
+                    out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
+                break;
+                default:
+                break;
+            }
+        }
+        else {
+            if(op.type == OperandType::OP_CONSTANT) {
+                out << "\tmovq $" << op.op << ", " << getRegisterByIndex(r, VarType::VAR_INTEGER) << "\n";
+            }
+        }
+        return count;
+    }
+    
+    int Program::generateLoadVar(std::ostream &out, std::string reg, const Operand &op) {
+        int count = 0;
+        if(isVariable(op.op)) {
+            if(op.type != OperandType::OP_VARIABLE) {
+                throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
+            }
+            Variable &v = getVariable(op.op);
+            switch(v.type) {
+                case VarType::VAR_INTEGER:
+                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    count = 0;
+                    break;
+                /*case VarType::VAR_FLOAT:
+                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    count = 1;
+                break;*/
+                case VarType::VAR_STRING:
+                    count = 0;
+                    out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
+                break;
+                default:
+                break;
+            }
+        }
+        else {
+            if(op.type == OperandType::OP_CONSTANT) {
+                out << "\tmovq $" << op.op << ", " << reg << "\n";
+            }
+        }
+        return count;
+    }
+
+    std::string Program::getRegisterByIndex(int index, VarType type) {
+        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING)) {
+            static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r8"};
+            return reg[index];
+        } else if(index < 9 && type == VarType::VAR_FLOAT) {
+              return "%xmm" +  std::to_string(xmm_offset++);
+        }
+        return "[stack]";
+    }
+
+    void Program::gen_print(std::ostream &out, const Instruction &i) {
+        xmm_offset = 0;
+        out << "\tlea " << i.op1.op << "(%rip), %rdi\n";
+        int total = 0;
+        if(!i.op2.op.empty()) {   
+            total += generateLoadVar(out, 1, i.op2);
+            if (!i.op3.op.empty()) {
+                total += generateLoadVar(out, 2, i.op3);
+                for (size_t arg = 0; arg < i.vop.size(); ++arg) {
+                    if (!i.vop[arg].op.empty()) {
+                        if (arg < 3) {
+                            total += generateLoadVar(out, 2+arg, i.vop[arg]);
+                        }
+                    }
+                }
+            }
+        }
+        if(total == 0) {
+            out << "\txor %rax, %rax\n";
+        } else {
+            out << "\tmov $" << total << ", %rax\n";
+        }
+        out << "\tcall printf\n";
+    }
+
+    void Program::gen_add(std::ostream &out, const Instruction &i) {
+         if(i.op3.op.empty()) {
+            generateLoadVar(out, "%rax", i.op1);
+            generateLoadVar(out, "%rcx", i.op2);
+            out << "\taddq %rcx, %rax\n";
+            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+         } else {
+            generateLoadVar(out, "%rax", i.op2);
+            generateLoadVar(out, "%rcx", i.op3);
+            out << "\taddq %rcx, %rax\n";
+            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+         }
     }
 
     void Program::stop() {
@@ -50,7 +253,7 @@ namespace mxvm {
         
         while (running && pc < inc.size()) {
             const Instruction& instr = inc[pc];
-
+            
             if(mxvm::instruct_mode)
                 std::cout << instr << "\n";
 

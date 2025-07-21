@@ -1,0 +1,15 @@
+program Hello {
+	
+    section data {
+		string hello = "Hello, World!: %d\n"
+		int value = 100
+		int f = 1
+		int result = 0
+	}
+    
+	section code {
+	start:
+	    add result, value, f
+        print hello, result
+	}
+}

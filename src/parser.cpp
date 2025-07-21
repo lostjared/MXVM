@@ -387,7 +387,7 @@ namespace mxvm {
             std::cerr << e.what() << "\n";
             return false;
         }
-
+        
         auto ast = parseAST();
         if(ast) {
             if(debug_mode) {

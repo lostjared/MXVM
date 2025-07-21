@@ -66,6 +66,7 @@ namespace mxvm {
         Inc instruction;
         Operand op1, op2, op3;
         std::vector<Operand> vop;
+        std::string label = "";
     };
 
     enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY };

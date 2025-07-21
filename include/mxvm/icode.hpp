@@ -30,20 +30,30 @@ namespace mxvm {
         std::vector<StackValue> data;
     };
 
-    class Program {
+    class Base {
+    public:
+        void add_instruction(const Instruction &i);
+        void add_label(const std::string &name, uint64_t address);
+        void add_variable(const std::string &name, const Variable &v);
+    protected:
+        std::vector<Instruction> inc;
+        std::unordered_map<std::string, Variable> vars;
+        std::unordered_map<std::string, uint64_t> labels;
+    };
+
+    class Program : public Base {
     public:
         friend class Parser;
         Program();
         ~Program();
-        void add_instruction(const Instruction &i);
-        void add_label(const std::string &name, uint64_t address);
-        void add_variable(const std::string &name, const Variable &v);
         void stop();
         int exec();
         void print(std::ostream &out);
         void post(std::ostream &out);
         int getExitCode() const { return exitCode; }
         std::string name;
+        void generateCode(std::ostream &out);
+        std::string escapeNewLines(const std::string &text);
     private:
         size_t pc;  
         bool running;
@@ -51,7 +61,15 @@ namespace mxvm {
         bool zero_flag = false;
         bool less_flag = false;
         bool greater_flag = false;
+        int xmm_offset = 0;
         
+        void generateInstruction(std::ostream &out, const Instruction  &i);
+        int generateLoadVar(std::ostream &out, int reg, const Operand &op);
+        int generateLoadVar(std::ostream &out, std::string reg, const Operand &op);
+        std::string getRegisterByIndex(int index, VarType type);
+        void gen_print(std::ostream &out, const Instruction &i);
+        void gen_add(std::ostream &out, const Instruction &i);
+
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
         void exec_sub(const Instruction& instr);
@@ -101,9 +119,6 @@ namespace mxvm {
         Variable createTempVariable(VarType type, const std::string& value);
         bool isConstant(const std::string& value);
     protected:
-        std::vector<Instruction> inc;
-        std::unordered_map<std::string, Variable> vars;
-        std::unordered_map<std::string, uint64_t> labels;
         Stack stack;
     };
     
