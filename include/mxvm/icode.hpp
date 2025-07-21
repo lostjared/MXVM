@@ -82,6 +82,7 @@ namespace mxvm {
         void exec_pop(const Instruction &instr);
         void exec_stack_load(const Instruction &instr);
         void exec_stack_store(const Instruction &instr);
+        void exec_stack_sub(const Instruction &instr);
         void exec_call(const Instruction &instr);
         void exec_ret(const Instruction &instr);      
         Variable& getVariable(const std::string& name);

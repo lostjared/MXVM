@@ -1,4 +1,4 @@
-program Stack {
+program Subroutine {
 	section data {
         string message = "Hello from subroutine\n"
         string return_message = "return from subroutine\n"

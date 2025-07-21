@@ -150,6 +150,9 @@ namespace mxvm {
                 case STACK_STORE:
                     exec_stack_store(instr);
                     break;
+                case STACK_SUB:
+                    exec_stack_sub(instr);
+                    break;
                 case CALL:
                     exec_call(instr);
                     continue;
@@ -1087,6 +1090,24 @@ namespace mxvm {
             value = src.var_value.ptr_value;
         } else {
             throw mx::Exception("STACK_STORE only supports integer or pointer variables");
+        }
+    }
+    
+    void Program::exec_stack_sub(const Instruction &instr) {
+        size_t count = 1;
+        if (!instr.op1.op.empty()) {
+            if (isVariable(instr.op1.op)) {
+                count = static_cast<size_t>(getVariable(instr.op1.op).var_value.int_value);
+            } else {
+                count = static_cast<size_t>(std::stoll(instr.op1.op, nullptr, 0));
+            }
+        }
+        if (count > stack.size()) {
+            throw mx::Exception("STACK_SUB: not enough values on stack to pop " + std::to_string(count));
+            return;
+        }
+        for (size_t i = 0; i < count; ++i) {
+            stack.pop();
         }
     }
 

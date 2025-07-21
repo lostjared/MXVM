@@ -1,6 +1,5 @@
 program Stack {
-	section data {
-		
+	section data {		
         int accum = 0
         int x = 255
         string value = "The value is: %d\n"

@@ -1,0 +1,25 @@
+program SubStack {
+	section data {
+        string message = "Hello from subroutine: %d, %d\n"
+        string return_message = "return from subroutine\n"
+        int value1 = 0
+        int value2 = 0
+	}
+
+	section code {
+	start:
+        push 0xFF
+        push 0xF
+        call subroutine
+        stack_sub 2
+        print return_message
+    stop:
+        exit 0
+
+    subroutine:
+        stack_load value1, 0
+        stack_load value2, 1
+        print message, value1, value2
+        ret
+	}
+}
