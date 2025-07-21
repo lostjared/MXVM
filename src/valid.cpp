@@ -10,6 +10,8 @@ namespace mxvm {
         require(types::TokenType::TT_ID); next();
         require("{"); next();
 
+        std::unordered_map<std::string, Variable> vars;
+
         while (token->getTokenValue() != "}") {
             require("section"); next();
             require(types::TokenType::TT_ID);
@@ -21,7 +23,13 @@ namespace mxvm {
                     if (token->getTokenType() == types::TokenType::TT_ID &&
                         (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr"))
                     {
-                        next(); require(types::TokenType::TT_ID); next();
+                        Variable value;
+
+                        next(); 
+                        require(types::TokenType::TT_ID); 
+                        value.var_name = token->getTokenValue();
+                        vars[value.var_name] = value;
+                        next();
                         require("="); next();
                         if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
                             token->getTokenType() == types::TokenType::TT_HEX ||
@@ -31,8 +39,7 @@ namespace mxvm {
                         } else {
                             throw mx::Exception(
                                 "Syntax Error: Expected value for variable, found: " + token->getTokenValue() +
-                                " at line " + std::to_string(token->getLine()) +
-                                ", col " + std::to_string(token->getCol())
+                                " at line " + std::to_string(token->getLine())
                             );
                         }
                     }
@@ -42,8 +49,7 @@ namespace mxvm {
                     else {
                         throw mx::Exception(
                             "Syntax Error: Expected variable declaration, found: " + token->getTokenValue() +
-                            " at line " + std::to_string(token->getLine()) +
-                            ", col " + std::to_string(token->getCol()));
+                            " at line " + std::to_string(token->getLine()));
                     }
                 }
                 require("}"); next();
@@ -64,7 +70,7 @@ namespace mxvm {
                         std::string op = token->getTokenValue();
                         if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
                             throw mx::Exception(
-                                "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                                "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine())
                             );
                         }
                         if(op == "ret") {
@@ -77,13 +83,24 @@ namespace mxvm {
                     else {
                         throw mx::Exception(
                             "Syntax Error: Expected instruction or label, found: " + token->getTokenValue() +
-                            " at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                            " at line " + std::to_string(token->getLine())
                         );
                     }
                     
                     bool firstOperand = true;
                     while (true) {
                         if (firstOperand) {
+
+                            if (match(types::TokenType::TT_ID)) {
+                                std::string argName = token->getTokenValue();
+                                if (vars.find(argName) == vars.end()) {
+                                    throw mx::Exception(
+                                        "Syntax Error: Argument variable not defined: " + argName +
+                                        " at line " + std::to_string(token->getLine())
+                                    );
+                                }
+                            }
+
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 break; 
                             }
@@ -98,10 +115,21 @@ namespace mxvm {
                                 next();
                             }
                             
+
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 throw mx::Exception(
-                                    "Syntax Error: Expected operand after comma at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
+                                    "Syntax Error: Expected operand after comma at line " + std::to_string(token->getLine())
                                 );
+                            }
+
+                            if (match(types::TokenType::TT_ID)) {
+                                std::string argName = token->getTokenValue();
+                                if (vars.find(argName) == vars.end()) {
+                                    throw mx::Exception(
+                                        "Syntax Error: Argument variable not defined: " + argName +
+                                        " at line " + std::to_string(token->getLine())
+                                    );
+                                }
                             }
                         }
                         
@@ -110,16 +138,15 @@ namespace mxvm {
                             if (v.find('e') != std::string::npos || v.find('.') != std::string::npos) {
                                 throw mx::Exception(
                                     "Syntax Error: Invalid integer constant: " + v +
-                                    " at line " + std::to_string(token->getLine()) +
-                                    ", col " + std::to_string(token->getCol()));                            }
+                                    " at line " + std::to_string(token->getLine())
+                                );                            }
                         }
                         if (match(types::TokenType::TT_HEX)) {
                             auto v = token->getTokenValue();
                             if (!v.starts_with("0x") && !v.starts_with("0X")) {
                                 throw mx::Exception(
                                     "Syntax Error: Invalid hex constant: " + v +
-                                    " at line " + std::to_string(token->getLine()) +
-                                    ", col " + std::to_string(token->getCol())
+                                    " at line " + std::to_string(token->getLine())
                                 );
                             }
                         }
@@ -130,7 +157,9 @@ namespace mxvm {
                 require("}"); next();
             }
             else {
-                throw mx::Exception("Syntax Error: Unknown section: " + sectionName);
+                throw mx::Exception("Syntax Error: Unknown section: " + sectionName +
+                    " at line " + std::to_string(token->getLine())
+                );
             }
         }
         require("}");
@@ -148,9 +177,7 @@ namespace mxvm {
             throw mx::Exception(
                 "Syntax Error: Required: " + r +
                 " Found: " + token->getTokenValue() +
-                " at line " +
-                std::to_string(token->getLine()) +
-                ", col " + std::to_string(token->getCol())
+                " at line " + std::to_string(token->getLine())
             );
     }
 
@@ -166,9 +193,7 @@ namespace mxvm {
                 "Syntax Error: Required: " + std::to_string(static_cast<int>(t)) +
                 " instead found: " + token->getTokenValue() +
                 ":" + std::to_string(static_cast<int>(token->getTokenType())) +
-                " at line " +
-                std::to_string(token->getLine()) +
-                ", col " + std::to_string(token->getCol())
+                " at line " + std::to_string(token->getLine())
             );
     }
     

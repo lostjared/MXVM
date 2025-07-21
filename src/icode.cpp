@@ -935,6 +935,11 @@ namespace mxvm {
         for (size_t i = 0; i < format.length(); ++i) {
             if (format[i] == '%' && i + 1 < format.length()) {
                 char specifier = format[i + 1];
+                if(format[i + 1] == '%') {
+                    result += "%";
+                    i++;
+                    continue;
+                }
                 if (argIndex < args.size()) {
                     Variable* arg = args[argIndex++];
                     switch (specifier) {
@@ -984,6 +989,9 @@ namespace mxvm {
                                 }
                             }
                         break;
+                        case '%':
+                            result += "%";
+                        break;
                         default:
                             result += format[i];
                             result += format[i + 1];
@@ -1008,6 +1016,12 @@ namespace mxvm {
         for (size_t i = 0; i < format.length(); ++i) {
             if (format[i] == '%' && i + 1 < format.length()) {
                 char specifier = format[i + 1];
+                if(format[i + 1] == '%') {
+                    result += "%";
+                    i++;
+                    continue;
+                }
+
                 if (argIndex < args.size()) {
                     Variable* arg = args[argIndex++];
                     switch (specifier) {
@@ -1285,7 +1299,6 @@ namespace mxvm {
         Variable temp;
         temp.type = type;
         temp.var_name = "";
-
         if (type == VarType::VAR_INTEGER) {
             if (value.empty()) throw mx::Exception("empty integer constant: " + value);
             temp.var_value.int_value = std::stoll(value, nullptr, 0);

@@ -281,16 +281,16 @@ namespace mxvm {
             switch (tokenType) {
                 case types::TokenType::TT_NUM:
                     operand.op = value;
-                    operand.op_value = std::stoi(value);
+                    operand.op_value = std::stoll(value);
                     operand.type = OperandType::OP_CONSTANT;
                     break;
                     
                 case types::TokenType::TT_HEX:
                     operand.op = value;
                     if (value.starts_with("0x") || value.starts_with("0X")) {
-                        operand.op_value = std::stoi(value, nullptr, 16);
+                        operand.op_value = std::stoll(value, nullptr, 16);
                     } else {
-                        operand.op_value = std::stoi(value, nullptr, 16);
+                        operand.op_value = std::stoll(value, nullptr, 16);
                     }
                     operand.type = OperandType::OP_CONSTANT;
                     break;
