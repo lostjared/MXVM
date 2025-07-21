@@ -83,7 +83,6 @@ namespace mxvm {
                     
                     bool firstOperand = true;
                     while (true) {
-
                         if (firstOperand) {
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 break; 

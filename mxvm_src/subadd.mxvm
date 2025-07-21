@@ -1,4 +1,4 @@
-program SubroutineAdd {
+program SubAdd {
 	section data {
         int rax = 0
         int rsi = 0
@@ -9,15 +9,17 @@ program SubroutineAdd {
 
 	section code {
 	start:
-        mov rsi, 5
-        call add_to
-        print output, rdi, rsi, rax
+        call get_number
+        mov rsi, rax
+        call get_number
+        mov rdi, rax
+        add rax, rsi, rdi
+        print output, rsi, rdi, rax
     stop:
         exit 0
-    add_to:
+    get_number:
         print message
-        getline rdi
-        add rax, rdi, rsi
+        getline rax
         ret
-	}
+ 	}
 }
