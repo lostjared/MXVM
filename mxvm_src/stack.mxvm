@@ -1,17 +1,19 @@
 program Stack {
 	section data {
 		int x = 255
-        int z = 0xF
+        ptr z = null
+        ptr zx = null
         int y = 0
         string value = "The value is: %d\n"
+        string ptr_value = "The pointer value is: %p\n"
 	}
 
 	section code {
 	start:
         push x
         push z
-        pop y
-        print value, y
+        pop zx
+        print ptr_value, zx
         pop y
         print value, y
 	stop:

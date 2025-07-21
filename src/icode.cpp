@@ -988,13 +988,13 @@ namespace mxvm {
         StackValue value = stack.pop();
         if (var.type == VarType::VAR_INTEGER) {
             if (!std::holds_alternative<int64_t>(value)) {
-                throw mx::Exception("POP type mismatch: expected integer");
+                throw mx::Exception("POP type mismatch: expected integer, pointer found.");
             }
             var.var_value.int_value = std::get<int64_t>(value);
             var.var_value.type = VarType::VAR_INTEGER;
         } else if (var.type == VarType::VAR_POINTER) {
             if (!std::holds_alternative<void*>(value)) {
-                throw mx::Exception("POP type mismatch: expected pointer");
+                throw mx::Exception("POP type mismatch: expected pointer, integer found.");
             }
             var.var_value.ptr_value = std::get<void*>(value);
             var.var_value.type = VarType::VAR_POINTER;
