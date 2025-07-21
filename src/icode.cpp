@@ -901,8 +901,14 @@ namespace mxvm {
                                 }
                             }
                             result += bin;
-                            break;
                         }
+                            break;
+                        case 'x': {
+                            std::ostringstream oss;
+                            oss << "0x" << std::uppercase << std::hex << arg->var_value.int_value;
+                            result += oss.str();
+                        }
+                            break;
                         case 'p':
                             if(arg->var_value.type == VarType::VAR_POINTER)  {
                                 if(arg->var_value.ptr_value == nullptr)
@@ -1092,7 +1098,7 @@ namespace mxvm {
             throw mx::Exception("STACK_STORE only supports integer or pointer variables");
         }
     }
-    
+
     void Program::exec_stack_sub(const Instruction &instr) {
         size_t count = 1;
         if (!instr.op1.op.empty()) {

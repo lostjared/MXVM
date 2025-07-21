@@ -1,11 +1,10 @@
 program SubStack {
 	section data {
-        string message = "Hello from subroutine: %d, %d\n"
+        string message = "Hello from subroutine: %x, %x\n"
         string return_message = "return from subroutine\n"
         int value1 = 0
         int value2 = 0
 	}
-
 	section code {
 	start:
         push 0xFF
