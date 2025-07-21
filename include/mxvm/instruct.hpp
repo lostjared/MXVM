@@ -85,4 +85,6 @@ namespace mxvm {
     };
 }
 
+std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc);
+
 #endif

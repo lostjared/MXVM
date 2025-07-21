@@ -24,6 +24,7 @@ namespace mxvm {
     struct Operand;
 
     extern bool debug_mode;
+    extern bool instruct_mode;
 
     class Parser {
     public:

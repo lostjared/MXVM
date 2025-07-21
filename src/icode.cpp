@@ -51,6 +51,10 @@ namespace mxvm {
         
         while (running && pc < inc.size()) {
             const Instruction& instr = inc[pc];
+
+            if(mxvm::instruct_mode)
+                std::cout << instr << "\n";
+
             switch (instr.instruction) {
                 case MOV:
                     exec_mov(instr);

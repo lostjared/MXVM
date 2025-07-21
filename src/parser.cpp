@@ -8,6 +8,7 @@
 namespace mxvm {
 
     bool debug_mode = false;
+    bool instruct_mode = false;
 
     Parser::Parser(const std::string &source) : source_file(source), scanner(source), validator(source)  {
 

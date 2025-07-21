@@ -33,12 +33,31 @@ Args proc_args(int argc, char **argv) {
     .addOptionDoubleValue(129, "target", "output target")
     .addOptionSingle('d', "debug mode")
     .addOptionDouble(130, "debug", "debug mode")
+    .addOptionSingle('i', "instruction mode")
+    .addOptionDouble(131, "instruction", "instruction output on")
+    .addOptionSingle('h', "Help")
+    .addOptionDouble(132, "help", "Help output")
     ;
+
+    if(argc == 1) {
+        argz.help(std::cout);
+        exit(EXIT_SUCCESS);
+    }
+
     mx::Argument<std::string> arg;
     int value = 0;
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 'h':
+                case 132:
+                    argz.help(std::cout);
+                    exit(EXIT_SUCCESS);
+                break;
+                case 'i':
+                case 131:
+                    mxvm::instruct_mode = true;
+                break;
                 case 'd':
                 case 130:
                     mxvm::debug_mode = true;
