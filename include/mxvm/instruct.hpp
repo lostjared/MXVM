@@ -5,7 +5,7 @@
 #include<vector>
 #include<cstdint>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET};
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT };
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -44,17 +44,22 @@ inline std::vector<std::string> IncType {
     "stack_store", // STACK_STORE = 33
     "stack_sub", // STACK_SUB = 34
     "call",     // CALL = 35
-    "ret"       // RET = 36
+    "ret",       // RET = 36
+    "string_print" // STRING_PRINT = 37
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);
 
+
 namespace mxvm {
+
+    enum class OperandType { OP_CONSTANT, OP_VARIABLE };
 
     struct Operand {
         std::string label;
         std::string op;
         int op_value = 0;        
+        OperandType type;
     };
 
     struct Instruction {

@@ -162,6 +162,9 @@ namespace mxvm {
                 case RET:
                     exec_ret(instr);
                     break;
+                case STRING_PRINT:
+                    exec_string_print(instr);
+                    break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
@@ -378,25 +381,40 @@ namespace mxvm {
     }
 
     void Program::exec_print(const Instruction& instr) {
-        if (isVariable(instr.op1.op)) {
+        std::string format;
+        std::vector<Variable> tempArgs;
+        std::vector<Variable*> args;
+       if (isVariable(instr.op1.op)) {
             Variable& fmt = getVariable(instr.op1.op);
-            if (fmt.type == VarType::VAR_STRING) {
-                std::string format = fmt.var_value.str_value;
-                std::vector<Variable*> args;
-                if (!instr.op2.op.empty() && isVariable(instr.op2.op)) {
-                    args.push_back(&getVariable(instr.op2.op));
+            if (fmt.type != VarType::VAR_STRING)
+                throw mx::Exception("PRINT format must be a string variable");
+            format = fmt.var_value.str_value;
+        } else {
+            format = instr.op1.op;
+        }
+        auto getArgVariable = [&](const Operand& op, VarType type = VarType::VAR_INTEGER) -> Variable* {
+            if (isVariable(op.op)) {
+                return &getVariable(op.op);
+            } else {
+                if(op.type == OperandType::OP_VARIABLE) {
+                    throw mx::Exception("Instruction variable not defined: " + op.op);
                 }
-                if (!instr.op3.op.empty() && isVariable(instr.op3.op)) {
-                    args.push_back(&getVariable(instr.op3.op));
-                }
-                for (const auto& vop : instr.vop) {
-                    if (isVariable(vop.op)) {
-                        args.push_back(&getVariable(vop.op));
-                    }
-                }
-                printFormatted(format, args);
+                tempArgs.push_back(createTempVariable(type, op.op));
+                return &tempArgs.back();
+            }
+        };
+        if (!instr.op2.op.empty()) {
+            args.push_back(getArgVariable(instr.op2));
+        }
+        if (!instr.op3.op.empty()) {
+            args.push_back(getArgVariable(instr.op3));
+        }
+        for (const auto& vop : instr.vop) {
+            if (!vop.op.empty()) {
+                args.push_back(getArgVariable(vop));
             }
         }
+        printFormatted(format, args);
     }
 
     void Program::exec_exit(const Instruction& instr) {
@@ -867,7 +885,123 @@ namespace mxvm {
             pc++;
     }
 
-     void Program::printFormatted(const std::string& format, const std::vector<Variable*>& args) {
+    void Program::exec_string_print(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("STRING_PRINT destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+
+        if (dest.type != VarType::VAR_STRING) {
+            throw mx::Exception("STRING_PRINT destination must be a string variable");
+            return;
+        }
+
+        std::string format;
+        std::vector<Variable> tempArgs;      
+        std::vector<Variable*> args;         
+        if (isVariable(instr.op2.op)) {
+            Variable& fmtVar = getVariable(instr.op2.op);
+            if (fmtVar.type != VarType::VAR_STRING)
+                throw mx::Exception("STRING_PRINT format must be a string variable");
+            format = fmtVar.var_value.str_value;
+        } else {
+            format = instr.op2.op;
+        }
+        
+        auto getArgVariable = [&](const Operand& op, VarType type = VarType::VAR_INTEGER) -> Variable* {
+            if (isVariable(op.op)) {
+                return &getVariable(op.op);
+            } else {
+                if(op.type == OperandType::OP_VARIABLE) {
+                    throw mx::Exception("string_print instruction variable not defined: " + op.op);
+                }
+                tempArgs.push_back(createTempVariable(type, op.op));
+                return &tempArgs.back();
+            }
+        };
+        
+        if (!instr.op3.op.empty()) {
+            args.push_back(getArgVariable(instr.op3));
+        }
+        for (const auto& vop : instr.vop) {
+            if (!vop.op.empty()) {
+                args.push_back(getArgVariable(vop));
+            }
+        }
+
+        size_t argIndex = 0;
+        std::string result;
+        for (size_t i = 0; i < format.length(); ++i) {
+            if (format[i] == '%' && i + 1 < format.length()) {
+                char specifier = format[i + 1];
+                if (argIndex < args.size()) {
+                    Variable* arg = args[argIndex++];
+                    switch (specifier) {
+                        case 'd':
+                            if(arg->var_value.type == VarType::VAR_INTEGER)
+                                result += std::to_string(arg->var_value.int_value);
+                            else if(arg->var_value.type == VarType::VAR_FLOAT)
+                                result += std::to_string(static_cast<int64_t>(arg->var_value.float_value));
+                            break;
+                        case 'f':
+                            if(arg->var_value.type == VarType::VAR_INTEGER)
+                                result += std::to_string(static_cast<double>(arg->var_value.int_value));
+                            else if(arg->var_value.type == VarType::VAR_FLOAT)
+                                result += std::to_string(arg->var_value.float_value);
+                            break;
+                        case 's':
+                            result += arg->var_value.str_value;
+                            break;
+                        case 'b': {
+                            std::string bin;
+                            uint64_t val = arg->var_value.int_value;
+                            if (val == 0) {
+                                bin = "0";
+                            } else {
+                                while (val) {
+                                    bin = (val % 2 ? "1" : "0") + bin;
+                                    val /= 2;
+                                }
+                            }
+                            result += bin;
+                        }
+                            break;
+                        case 'x': {
+                            std::ostringstream oss;
+                            oss << "0x" << std::uppercase << std::hex << arg->var_value.int_value;
+                            result += oss.str();
+                        }
+                            break;
+                        case 'p':
+                            if(arg->var_value.type == VarType::VAR_POINTER)  {
+                                if(arg->var_value.ptr_value == nullptr)
+                                    result += "null";
+                                else {
+                                    std::ostringstream oss;
+                                    oss << "0x" << std::hex << reinterpret_cast<uintptr_t>(arg->var_value.ptr_value);
+                                    result += oss.str();
+                                }
+                            }
+                        break;
+                        default:
+                            result += format[i];
+                            result += format[i + 1];
+                            break;
+                    }
+                    i++; 
+                } else {
+                    result += format[i];
+                }
+            } else {
+                result += format[i];
+            }
+        }
+        dest.var_value.str_value = result;
+        dest.var_value.type = VarType::VAR_STRING;
+    }
+    
+    void Program::printFormatted(const std::string& format, const std::vector<Variable*>& args) {
         size_t argIndex = 0;
         std::string result;
         

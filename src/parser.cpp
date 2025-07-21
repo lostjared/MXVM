@@ -235,7 +235,8 @@ namespace mxvm {
             {"jz", JZ}, {"jnz", JNZ}, {"ja", JA}, {"jb", JB},
             {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE},
             {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}, {"stack_load", STACK_LOAD},
-            {"stack_store", STACK_STORE}, {"stack_sub", STACK_SUB}, {"call", CALL}, {"ret", RET}
+            {"stack_store", STACK_STORE}, {"stack_sub", STACK_SUB}, {"call", CALL}, {"ret", RET},
+            {"string_print", STRING_PRINT}
         };
         
         if (index >= scanner.size()) return nullptr;
@@ -281,6 +282,7 @@ namespace mxvm {
                 case types::TokenType::TT_NUM:
                     operand.op = value;
                     operand.op_value = std::stoi(value);
+                    operand.type = OperandType::OP_CONSTANT;
                     break;
                     
                 case types::TokenType::TT_HEX:
@@ -290,15 +292,18 @@ namespace mxvm {
                     } else {
                         operand.op_value = std::stoi(value, nullptr, 16);
                     }
+                    operand.type = OperandType::OP_CONSTANT;
                     break;
                     
                 case types::TokenType::TT_ID:
                     operand.op = value;
                     operand.label = value;
+                    operand.type = OperandType::OP_VARIABLE;
                     break;
                     
                 case types::TokenType::TT_STR:
                     operand.op = value;
+                    operand.type = OperandType::OP_CONSTANT;
                     break;
                     
                 case types::TokenType::TT_SYM:
@@ -306,7 +311,6 @@ namespace mxvm {
                         operand.op = value;
                     }
                     break;
-                    
                 default:
                     operand.op = value;
                     break;
@@ -458,7 +462,6 @@ namespace mxvm {
                         instr.vop.push_back(extraOp);
                     }
                 }
-                
                 program->add_instruction(instr);
             }
         }

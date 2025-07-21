@@ -75,6 +75,7 @@ namespace mxvm {
         void exec_ja(const Instruction& instr);
         void exec_jb(const Instruction& instr);
         void exec_print(const Instruction& instr);
+        void exec_string_print(const Instruction &instr);
         void exec_exit(const Instruction& instr);
         void exec_alloc(const Instruction& instr);
         void exec_free(const Instruction& instr);

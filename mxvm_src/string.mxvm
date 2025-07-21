@@ -1,0 +1,15 @@
+program StringPrint {
+	section data {		
+        int x = 255
+        string value = ""
+        string fmt = "the value is: %d\n"
+	}
+
+	section code {
+	start:
+        string_print value, fmt, 255
+        print value
+	stop:
+		exit 0
+	}
+}
