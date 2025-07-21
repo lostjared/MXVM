@@ -40,6 +40,7 @@ namespace mxvm {
         void stop();
         void exec();
         void print(std::ostream &out);
+        void post(std::ostream &out);
     private:
         size_t pc;  
         bool running;

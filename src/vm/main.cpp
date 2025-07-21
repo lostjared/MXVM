@@ -127,6 +127,7 @@ void action_interpret(std::string_view input) {
         if(parser.generateProgramCode(program)) {
             if(mxvm::debug_mode) program->print(std::cout);
             program->exec();
+            if(mxvm::debug_mode) program->post(std::cout);
         } else {
             std::cerr << "Runtime Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);

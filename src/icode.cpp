@@ -1203,6 +1203,7 @@ namespace mxvm {
                 out << "\n";
             }
         }
+
         out << "\n";
 
         out << "=== LABELS ===\n";
@@ -1265,5 +1266,31 @@ namespace mxvm {
             }
         }
         out << "\n";
+    }
+
+    void Program::post(std::ostream &out) {
+        if(stack.empty()) {
+                out << "Stack aligned.\n";
+        } else {
+            out << "Stack unaligned. {\n";
+            for(size_t i = 0; i < stack.size(); ++i) {
+                out << "\tAddress: [" << i << "] = ";
+                const StackValue& value = stack[i];
+                if (std::holds_alternative<int64_t>(value)) {
+                    out << std::get<int64_t>(value);
+                } else if (std::holds_alternative<void*>(value)) {
+                    void* ptr = std::get<void*>(value);
+                    if (ptr == nullptr) {
+                        out << "null";
+                    } else {
+                        out << "0x" << std::hex << reinterpret_cast<uintptr_t>(ptr) << std::dec;
+                    }
+                } else {
+                    out << "(unknown)";
+                }
+                out << "\n";
+            }
+            out << "}\n";
+        }
     }
 }
