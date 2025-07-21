@@ -25,7 +25,7 @@ namespace mxvm {
 
     extern bool debug_mode;
     extern bool instruct_mode;
-
+    extern bool html_mode;
 
     class Parser {
     public:

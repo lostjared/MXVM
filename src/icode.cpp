@@ -1402,19 +1402,19 @@ namespace mxvm {
         if (inc.empty()) {
             out << "  (no instructions)\n";
         } else {
-            out << std::left << std::setw(5) << "Addr" 
-                << std::setw(12) << "Instruction" 
-                << std::setw(15) << "Operand1" 
-                << std::setw(15) << "Operand2" 
-                << std::setw(15) << "Operand3"
-                << std::setw(20) << "Extra Operands" << "\n";
-            out << std::string(82, '-') << "\n";
+            out << std::left << std::setw(10) << "Addr" 
+                << std::setw(20) << "Instruction" 
+                << std::setw(25) << "Operand1" 
+                << std::setw(25) << "Operand2" 
+                << std::setw(25) << "Operand3"
+                << std::setw(30) << "Extra Operands" << "\n";
+            out << std::string(130, '-') << "\n";
             
             for (size_t i = 0; i < inc.size(); ++i) {
                 const auto &instr = inc[i];
                 
                 
-                out << std::setw(5) << i;
+                out << std::setw(10) << i;
                 
                 
                 if (instr.instruction >= 0 && instr.instruction < static_cast<int>(IncType.size())) {
@@ -1423,9 +1423,9 @@ namespace mxvm {
                     out << std::setw(12) << "UNKNOWN";
                 }
                 
-                out << std::setw(15) << (instr.op1.op.empty() ? "-" : instr.op1.op);
-                out << std::setw(15) << (instr.op2.op.empty() ? "-" : instr.op2.op);
-                out << std::setw(15) << (instr.op3.op.empty() ? "-" : instr.op3.op);
+                out << std::setw(25) << (instr.op1.op.empty() ? "-" : instr.op1.op);
+                out << std::setw(25) << (instr.op2.op.empty() ? "-" : instr.op2.op);
+                out << std::setw(25) << (instr.op3.op.empty() ? "-" : instr.op3.op);
                 
                 
                 if (!instr.vop.empty()) {
@@ -1434,9 +1434,9 @@ namespace mxvm {
                         if (j > 0) extraOps += ", ";
                         extraOps += instr.vop[j].op;
                     }
-                    out << std::setw(20) << extraOps;
+                    out << std::setw(30) << extraOps;
                 } else {
-                    out << std::setw(20) << "-";
+                    out << std::setw(30) << "-";
                 }
                 
                 out << "\n";

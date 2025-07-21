@@ -43,6 +43,7 @@ namespace mxvm {
         void print(std::ostream &out);
         void post(std::ostream &out);
         int getExitCode() const { return exitCode; }
+        std::string name;
     private:
         size_t pc;  
         bool running;

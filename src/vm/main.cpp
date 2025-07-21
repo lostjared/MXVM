@@ -37,6 +37,8 @@ Args proc_args(int argc, char **argv) {
     .addOptionDouble(131, "instruction", "instruction output on")
     .addOptionSingle('h', "Help")
     .addOptionDouble(132, "help", "Help output")
+    .addOptionDouble(133, "html", "debug html")
+    .addOptionSingle('D', "print html")
     ;
 
     if(argc == 1) {
@@ -49,6 +51,10 @@ Args proc_args(int argc, char **argv) {
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 133:
+                case 'D':
+                    mxvm::html_mode = true;
+                    break;
                 case 'h':
                 case 132:
                     argz.help(std::cout);
