@@ -58,8 +58,8 @@ namespace mxvm {
                         next();
                         next();
                         continue;
-                    }
-                    
+                    } 
+                                     
                     if (match(types::TokenType::TT_ID)) {
                         std::string op = token->getTokenValue();
                         if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
@@ -67,7 +67,12 @@ namespace mxvm {
                                 "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()) + ", col " + std::to_string(token->getCol())
                             );
                         }
+                        if(op == "ret") {
+                            next();
+                            continue;
+                        }
                         next();
+
                     }
                     else {
                         throw mx::Exception(
@@ -78,14 +83,12 @@ namespace mxvm {
                     
                     bool firstOperand = true;
                     while (true) {
-                    
-                        while (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
-                            next();
-                        }
+
                         if (firstOperand) {
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 break; 
                             }
+
                         } else {
                             if (token->getTokenValue() != ",") {
                                 break; 
@@ -183,5 +186,9 @@ namespace mxvm {
 
     bool Validator::peekIs(const std::string &s) {
         return index < scanner.size() && scanner[index].getTokenValue() == s;
+    }
+
+    bool Validator::peekIs(const types::TokenType &t) {
+        return index < scanner.size() && scanner[index].getTokenType() == t;
     }
 }
