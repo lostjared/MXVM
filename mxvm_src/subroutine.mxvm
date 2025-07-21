@@ -1,11 +1,13 @@
 program Stack {
 	section data {
         string message = "Hello from subroutine\n"
+        string return_message = "return from subroutine\n"
 	}
 
 	section code {
 	start:
         call subroutine
+        print return_message
     stop:
         exit 0
 

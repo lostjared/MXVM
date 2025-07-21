@@ -152,7 +152,7 @@ namespace mxvm {
                     break;
                 case CALL:
                     exec_call(instr);
-                    break;
+                    continue;
                 case RET:
                     exec_ret(instr);
                     break;
@@ -1091,11 +1091,30 @@ namespace mxvm {
     }
 
     void Program::exec_call(const Instruction &instr) {
-
+        if (instr.op1.op.empty()) {
+            throw mx::Exception("CALL requires a label operand");
+            return;
+        }
+        auto it = labels.find(instr.op1.op);
+        if (it == labels.end()) {
+            throw mx::Exception("CALL: label not found: " + instr.op1.op);
+            return;
+        }
+        stack.push(static_cast<int64_t>(pc + 1));
+        pc = it->second;
     }
 
     void Program::exec_ret(const Instruction &instr) {
-
+        if (stack.empty()) {
+            throw mx::Exception("RET: stack is empty, no return address");
+            return;
+        }
+        StackValue value = stack.pop();
+        if (!std::holds_alternative<int64_t>(value)) {
+            throw mx::Exception("RET: return address on stack is not an integer");
+            return;
+        }
+        pc = static_cast<size_t>(std::get<int64_t>(value)) - 1;
     }
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {
