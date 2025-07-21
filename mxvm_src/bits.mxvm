@@ -2,7 +2,7 @@ program Bits {
 	section data {
 		int x = 255
 		int result = 0
-		string fmt_str = " value is %b "
+		string fmt_str = " value is %b \n"
 	}
 
 	section code {

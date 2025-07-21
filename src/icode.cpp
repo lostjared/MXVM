@@ -121,6 +121,8 @@ namespace mxvm {
                 case NOT:
                     exec_not(instr);
                     break;
+                case MOD:
+                    exec_mod(instr);
                 case PRINT:
                     exec_print(instr);
                     break;
@@ -133,6 +135,9 @@ namespace mxvm {
                 case EXIT:
                     exec_exit(instr);
                     return;
+                case GETLINE:
+                    exec_getline(instr);
+                    break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
@@ -723,8 +728,59 @@ namespace mxvm {
             return;
         }
         Variable& dest = getVariable(instr.op1.op);
-        dest.var_value.int_value = ~dest.var_value.int_value;
+        if(dest.var_value.type != VarType::VAR_INTEGER) {
+            throw mx::Exception("Error NOT bitwise operation must be on integer value");
+        }
+        dest.var_value.int_value = !dest.var_value.int_value;
         dest.var_value.type = VarType::VAR_INTEGER;
+    }
+
+    void Program::exec_mod(const Instruction& instr) {
+        if (!isVariable(instr.op1.op)) {
+            std::cerr << "Error: MOD destination must be a variable, not a constant\n";
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+
+        Variable *src1 = nullptr, *src2 = nullptr;
+        Variable temp1, temp2;
+
+        if (instr.op3.op.empty()) {
+            src1 = &dest;
+            if (isVariable(instr.op2.op)) {
+                src2 = &getVariable(instr.op2.op);
+            } else {
+                temp2 = createTempVariable(dest.type, instr.op2.op);
+                src2 = &temp2;
+            }
+        } else {
+            if (isVariable(instr.op2.op)) {
+                src1 = &getVariable(instr.op2.op);
+            } else {
+                temp1 = createTempVariable(dest.type, instr.op2.op);
+                src1 = &temp1;
+            }
+            if (isVariable(instr.op3.op)) {
+                src2 = &getVariable(instr.op3.op);
+            } else {
+                temp2 = createTempVariable(dest.type, instr.op3.op);
+                src2 = &temp2;
+            }
+        }
+
+        if (dest.type == VarType::VAR_INTEGER) {
+            int64_t v1 = (src1->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1->var_value.float_value) : src1->var_value.int_value;
+            int64_t v2 = (src2->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2->var_value.float_value) : src2->var_value.int_value;
+            if (v2 == 0) {
+                std::cerr << "Division by zero error in MOD\n";
+                stop();
+                return;
+            }
+            dest.var_value.int_value = v1 % v2;
+            dest.var_value.type = VarType::VAR_INTEGER;
+        } else {
+            std::cerr << "MOD only supports integer types\n";
+        }
     }
 
     void Program::exec_je(const Instruction& instr) {
@@ -850,8 +906,44 @@ namespace mxvm {
                 result += format[i];
             }
         }
-        
-        std::cout << result << std::endl;
+        std::cout << result;
+    }
+
+    void Program::exec_getline(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("GETLINE destination must be a variable");
+            return;
+        }
+        Variable& dest = getVariable(instr.op1.op);
+        std::string input;
+        std::getline(std::cin, input);
+     
+        switch (dest.type) {
+            case VarType::VAR_STRING:
+                dest.var_value.str_value = input;
+                dest.var_value.type = VarType::VAR_STRING;
+                break;
+            case VarType::VAR_INTEGER:
+                try {
+                    dest.var_value.int_value = std::stoll(input, nullptr, 0);
+                    dest.var_value.type = VarType::VAR_INTEGER;
+                } catch (...) {
+                    dest.var_value.int_value = 0;
+                    dest.var_value.type = VarType::VAR_INTEGER;
+                }
+                break;
+            case VarType::VAR_FLOAT:
+                try {
+                    dest.var_value.float_value = std::stod(input);
+                    dest.var_value.type = VarType::VAR_FLOAT;
+                } catch (...) {
+                    dest.var_value.float_value = 0.0;
+                    dest.var_value.type = VarType::VAR_FLOAT;
+                }
+                break;
+            default:
+                throw mx::Exception("GETLINE: unsupported variable type");
+        }
     }
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {

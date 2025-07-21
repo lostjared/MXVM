@@ -39,6 +39,7 @@ namespace mxvm {
         void exec_and(const Instruction& instr);
         void exec_xor(const Instruction& instr);
         void exec_not(const Instruction& instr);
+        void exec_mod(const Instruction& instr);
         void exec_je(const Instruction& instr);
         void exec_jne(const Instruction& instr);
         void exec_jl(const Instruction& instr);
@@ -53,6 +54,7 @@ namespace mxvm {
         void exec_exit(const Instruction& instr);
         void exec_alloc(const Instruction& instr);
         void exec_free(const Instruction& instr);
+        void exec_getline(const Instruction &instr);
         
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);

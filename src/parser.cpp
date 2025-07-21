@@ -228,11 +228,12 @@ namespace mxvm {
         static std::unordered_map<std::string, Inc> instructionMap = {
             {"mov", MOV}, {"load", LOAD}, {"store", STORE},
             {"add", ADD}, {"sub", SUB}, {"mul", MUL}, {"div", DIV},
-            {"or", OR}, {"and", AND}, {"xor", XOR}, {"not", NOT},
+            {"or", OR}, {"and", AND}, {"xor", XOR}, {"not", NOT}, {"mod", MOD},
             {"cmp", CMP}, {"jmp", JMP}, {"je", JE}, {"jne", JNE},
             {"jl", JL}, {"jle", JLE}, {"jg", JG}, {"jge", JGE},
             {"jz", JZ}, {"jnz", JNZ}, {"ja", JA}, {"jb", JB},
-            {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE}
+            {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE},
+            {"getline", GETLINE}
         };
         
         if (index >= scanner.size()) return nullptr;

@@ -1,0 +1,22 @@
+program LoopByX {
+	section data {
+		int counter = 0
+        int index = 0
+        string msg = "Hello, World: %d!\n"
+        string ask = "Enter times to loop: "
+	}
+
+	section code {
+        mov index, 1
+        print ask
+        getline counter
+	start:
+        cmp counter, index
+        jl stop
+        print msg, index
+        add index, 1
+        jmp start
+	stop:
+		exit 0 
+	}
+}

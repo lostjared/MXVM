@@ -1,7 +1,7 @@
 program Loop {
     section data {
         int x = 1
-        string value = "%d"
+        string value = "%d\n"
     }
     section code {
         mov x, 0

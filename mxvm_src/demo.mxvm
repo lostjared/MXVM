@@ -2,8 +2,8 @@
 program Demo {
     section data {
         int x = 0;
-        string fmt_str = "Hello World! Value of x is: %d"
-        string fmt_end = "Goodbye!"
+        string fmt_str = "Hello World! Value of x is: %d\n"
+        string fmt_end = "Goodbye!\n"
    }
    
    section code {

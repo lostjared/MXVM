@@ -5,7 +5,7 @@
 #include<vector>
 #include<cstdint>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE};
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE};
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -20,22 +20,24 @@ inline std::vector<std::string> IncType {
     "and",      // AND = 9  (was missing!)
     "xor",      // XOR = 10
     "not",      // NOT = 11
-    "cmp",      // CMP = 12
-    "jmp",      // JMP = 13
-    "je",       // JE = 14
-    "jne",      // JNE = 15 (was "jme")
-    "jl",       // JL = 16
-    "jle",      // JLE = 17
-    "jg",       // JG = 18
-    "jge",      // JGE = 19
-    "jz",       // JZ = 20
-    "jnz",      // JNZ = 21
-    "ja",       // JA = 22
-    "jb",       // JB = 23
-    "print",    // PRINT = 24
-    "exit",     // EXIT = 25
-    "alloc",    // ALLOC = 26
-    "free"      // FREE =  27
+    "mod",      // MOD = 12
+    "cmp",      // CMP = 13
+    "jmp",      // JMP = 14
+    "je",       // JE = 15
+    "jne",      // JNE = 16
+    "jl",       // JL = 17
+    "jle",      // JLE = 18
+    "jg",       // JG = 19
+    "jge",      // JGE = 20
+    "jz",       // JZ = 21
+    "jnz",      // JNZ = 22
+    "ja",       // JA = 23
+    "jb",       // JB = 24
+    "print",    // PRINT = 25
+    "exit",     // EXIT = 26
+    "alloc",    // ALLOC = 27
+    "free",      // FREE =  28
+    "getline",  // GETLINE = 29
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);

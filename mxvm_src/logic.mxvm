@@ -2,7 +2,7 @@ program Logic {
 	section data {
 		int x = 255
 		int result = 0
-		string fmt_str = " value is %d"
+		string fmt_str = " value is %d\m"
 	}
 
 	section code {
