@@ -1,5 +1,4 @@
 program SaveInt {
-
 	section data {
                 ptr data = null
                 int data_size = 5

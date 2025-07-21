@@ -90,22 +90,28 @@ namespace mxvm {
                         if(op == "ret") {
                             next();
                             continue;
-                        }
-                        if(op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
+                        } else if(op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
                             if(next()) {
-                                std::string label = token->getTokenValue();
-                                if(labels.find(label) == labels.end()) {
+                                if(match(types::TokenType::TT_ID)) {
+                                    std::string label = token->getTokenValue();
+                                    if(labels.find(label) == labels.end()) {
+                                        throw mx::Exception(
+                                            "Label not found: '" + label +
+                                            "' at line " + std::to_string(token->getLine()) 
+                                        );
+                                    }
+                                    next();
+                                } else {
                                     throw mx::Exception(
-                                        "Label not found: '" + label +
-                                        "' at line " + std::to_string(token->getLine()) 
+                                        "Instruction requires label at line " + std::to_string(token->getLine())
                                     );
                                 }
-                                next();
+                            } else {
+                                throw mx::Exception("Instruction requires label");                
                             }
                             continue;
                         }
                         next();
-
                     }
                     else {
                         throw mx::Exception(
