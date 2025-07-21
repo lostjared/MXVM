@@ -5,7 +5,6 @@ program LoopByX {
         string msg = "Hello, World: %d!\n"
         string ask = "Enter times to loop: "
 	}
-
 	section code {
         mov index, 1
         print ask
