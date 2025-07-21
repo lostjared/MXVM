@@ -90,7 +90,7 @@ namespace mxvm {
                         if(op == "ret") {
                             next();
                             continue;
-                        } else if(op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
+                        } else if(op == "call" || op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
                             if(next()) {
                                 if(match(types::TokenType::TT_ID)) {
                                     std::string label = token->getTokenValue();
