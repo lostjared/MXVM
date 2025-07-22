@@ -203,6 +203,25 @@ namespace mxvm {
             case DIV:
                 gen_div(out, i);
                 break;
+            case MOD:
+                gen_mod(out, i);
+                break;
+            case PUSH:
+                gen_push(out, i);
+                break;
+            case POP:
+                gen_pop(out, i);
+                break;
+            case STACK_LOAD:
+                gen_stack_load(out, i);
+                break;
+            case STACK_STORE:
+                gen_stack_store(out, i);
+                break;
+            case STACK_SUB:
+                gen_stack_sub(out, i);
+                break;
+
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -413,6 +432,39 @@ namespace mxvm {
         }
     }
 
+    void Program::gen_mod(std::ostream &out, const Instruction &i) {
+        if (i.op3.op.empty()) {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\tcqto\n"; // Sign-extend rax into rdx:rax for idivq
+                    out << "\tidivq %rcx\n";
+                    out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n"; // store remainder
+                } else {
+                    throw mx::Exception("MOD only supports integer variables");
+                }
+            } else {
+                throw mx::Exception("MOD: first argument must be a variable");
+            }
+        } else {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\tcqto\n";
+                    out << "\tidivq %rcx\n";
+                    out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("MOD only supports integer variables");
+                }
+            } else {
+                throw mx::Exception("MOD: first argument must be a variable");
+            }
+        }
+    }
 
     void Program::gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
         if (i.op3.op.empty()) {
@@ -463,6 +515,83 @@ namespace mxvm {
             throw mx::Exception("NOT instruction requires operand");
         }
     }
+
+    void Program::gen_push(std::ostream &out, const Instruction &i) {
+        if (isVariable(i.op1.op)) {
+            Variable &v = getVariable(i.op1.op);
+            if (v.type == VarType::VAR_INTEGER) {
+                out << "\tmovq " << i.op1.op << "(%rip), %rax\n";
+                out << "\tpushq %rax\n";
+            } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_STRING) {
+                out << "\tleaq " << i.op1.op << "(%rip), %rax\n";
+                out << "\tpushq %rax\n";
+            } else {
+                throw mx::Exception("PUSH only supports integer or pointer variables");
+            }
+        } else if (i.op1.type == OperandType::OP_CONSTANT) {
+            out << "\tmovq $" << i.op1.op << ", %rax\n";
+            out << "\tpushq %rax\n";
+        } else {
+            throw mx::Exception("PUSH argument must be a variable or integer constant");
+        }
+    }
+
+    void Program::gen_pop(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("POP destination must be a variable");
+        }
+        Variable &v = getVariable(i.op1.op);
+        if (v.type == VarType::VAR_INTEGER) {
+            out << "\tpopq %rax\n";
+            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+        } else if (v.type == VarType::VAR_POINTER) {
+            out << "\tpopq %rax\n";
+            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+        } else {
+            throw mx::Exception("POP only supports integer or pointer variables");
+        }
+    }
+
+    void Program::gen_stack_load(std::ostream &out, const Instruction &i) {
+        if(!isVariable(i.op1.op)) {
+            throw mx::Exception("stack_load, requires first argument to be a variable.");
+        }
+        Variable &dest = getVariable(i.op1.op);
+        if(i.op2.op.empty()) {
+            throw mx::Exception("stack_load, requires second argument");
+        }
+        generateLoadVar(out, dest.type, "%rax", i.op2);
+        out << "\tmovq (%rsp, %rax, 8), " << "%rcx\n";
+        out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+    }
+
+    void Program::gen_stack_store(std::ostream &out, const Instruction &i) {
+         if(!isVariable(i.op1.op)) {
+            throw mx::Exception("stack_store, requires first argument to be a variable.");
+        }
+        Variable &dest = getVariable(i.op1.op);
+        if(i.op2.op.empty()) {
+            throw mx::Exception("stack_store, requires second argument");
+        }
+        generateLoadVar(out, dest.type, "%rax", i.op2);
+        out << "\tmovq " << i.op1.op << "(%rip), %rcx\n";
+        out << "\tmovq %rcx, (%rsp, %rax, 8)\n";
+    }
+
+    void Program::gen_stack_sub(std::ostream &out, const Instruction &i) {
+        if (!i.op1.op.empty()) {
+            if (isVariable(i.op1.op)) {
+                out << "\tmovq " << i.op1.op << "(%rip), %rcx\n";
+            } else {
+                out << "\tmovq $" << i.op1.op << ", %rcx\n";
+            }
+        } else {
+            out << "\tmovq $1, %rcx\n";
+        }
+        out << "\tshl $3, %rcx\n"; 
+        out << "\taddq %rcx, %rsp\n";
+    }
+        
 
     int Program::generateLoadVar(std::ostream &out, int r, const Operand &op) {
         int count = 0;

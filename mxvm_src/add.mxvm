@@ -7,12 +7,20 @@ program Add {
 		int number1 = 25
 		int number2 = 5
 		string num_fmt = "%d * %d = %d\n";
+		string value1 = "%d\n"
 	}
     
 	section code {
 	start:
 	    div result, num2, num1
         print numbers, num2, num1, result
+		push number2
+		call print_number
+		pop number1
+		print value1, number1
 		done
+	function print_number:
+		print value1, number1
+		ret
 	}
 }
