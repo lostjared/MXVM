@@ -73,7 +73,8 @@ namespace mxvm {
         void gen_arth(std::ostream &out, std::string arth, const Instruction &i);
         void gen_exit(std::ostream &out, const Instruction &i);
         void gen_mov(std::ostream &out, const Instruction &i);
-
+        void gen_jmp(std::ostream &out, const Instruction &i);
+        void gen_cmp(std::ostream &out, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);

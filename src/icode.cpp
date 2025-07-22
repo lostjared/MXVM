@@ -104,6 +104,7 @@ namespace mxvm {
             generateInstruction(out, instr);
         }
         out << ".end_program: \n";
+        out << "\tmovq $0, %rax\n";
         out << "\tmov %rbp, %rsp\n";
         out << "\tpop %rbp\n";
         out << "\tret\n";
@@ -130,6 +131,22 @@ namespace mxvm {
                 break;
             case MOV:
                 gen_mov(out, i);
+                break;
+            case JMP:
+            case JE:
+            case JNE:
+            case JL:
+            case JLE:
+            case JG:
+            case JGE:
+            case JZ:
+            case JNZ:
+            case JA:
+            case JB:
+                gen_jmp(out, i);
+                break;
+            case CMP:
+                gen_cmp(out, i);
                 break;
         default:
             throw mx::Exception("Invalid or unsupported instruction");
@@ -262,6 +279,43 @@ namespace mxvm {
         out << "\tcall printf\n";
         if (num_pushes > 0 || needs_dummy) {
             out << "\tadd $" << ((num_pushes + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
+        }
+    }
+
+    void Program::gen_jmp(std::ostream &out, const Instruction &i) {
+        if(!i.op1.op.empty()) {
+            auto pos = labels.find(i.op1.op);
+            if(pos == labels.end()) {
+                throw mx::Exception("Jump instruction msut have valid label.");
+            }
+            out << "\t" << i.instruction << " " << i.op1.op << "\n";
+        } else {
+            throw mx::Exception("Jump instruction must have label");
+        }
+    }
+
+    void Program::gen_cmp(std::ostream &out, const Instruction &i) {
+        if (i.op2.op.empty()) {
+            throw mx::Exception("CMP requires two operands");
+        }
+
+        VarType type1 = VarType::VAR_INTEGER;
+        VarType type2 = VarType::VAR_INTEGER;
+        if (isVariable(i.op1.op)) {
+            type1 = getVariable(i.op1.op).type;
+        }
+        if (isVariable(i.op2.op)) {
+            type2 = getVariable(i.op2.op).type;
+        }
+
+        if (type1 == VarType::VAR_FLOAT || type2 == VarType::VAR_FLOAT) {
+            generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+            generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+            out << "\tcomisd %xmm1, %xmm0\n";
+        } else {
+            generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+            generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+            out << "\tcmpq %rcx, %rax\n";
         }
     }
 

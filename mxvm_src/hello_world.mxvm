@@ -1,15 +1,18 @@
+
 program HelloWorld {
     section data {
-        string data = "Hello, World: %f!\n"
+        string data = "Counting: %f!\n"
 		string val = ""
 		float x = 0
-		float q = 1.5
-		int z = 0
+		float q = 0.5
+		float v = 10.0
 	}
 	section code {
-		mov x, q
+		mov x, 0
 	start:
-	    print data, x
-		exit 0
+	    add x, q
+		print data, x
+		cmp v, x
+		jne start
 	}
 }
