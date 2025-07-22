@@ -104,6 +104,9 @@ namespace mxvm {
         out << "\tpush %rbp\n";
         out << "\tmov %rsp, %rbp\n";
         // main function
+
+        bool done_found = false;
+
         for(size_t i = 0; i < inc.size(); ++i) {
             const Instruction &instr = inc[i];
             if(labels_.find(i) != labels_.end()) {
@@ -116,14 +119,15 @@ namespace mxvm {
                     out << labels_[i] << ":\n";
                 }
             } 
+
+            if(instr.instruction == DONE)
+                done_found = true;
             generateInstruction(out, instr);
         }
-        out << ".end_program: \n";
-        out << "\tmovq $0, %rax\n";
-        out << "\tmov %rbp, %rsp\n";
-        out << "\tpop %rbp\n";
-        out << "\tret\n";
         
+        if(done_found == false)
+            throw mx::Exception("Program missing done to signal completion.\n");
+            
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
     }
 
@@ -180,6 +184,9 @@ namespace mxvm {
                 break;
             case CALL:
                 gen_call(out, i);
+                break;
+            case DONE:
+                gen_done(out, i);
                 break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
