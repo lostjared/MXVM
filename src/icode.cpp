@@ -36,6 +36,10 @@ namespace mxvm {
         vars[name] = v;
     }
 
+    void Base::add_extern(const std::string &name) {
+        external.push_back(name);
+    }
+
     std::string Program::escapeNewLines(const std::string& input) {
         std::string result;
         for (char c : input) {
@@ -104,6 +108,11 @@ namespace mxvm {
         out << "\t.extern strlen\n";
         out << "\t.extern atol\n";
         out << "\t.extern atof\n";
+
+        for(auto &e : external) {
+            out << "\t.extern " << e << "\n";
+        }
+
         // rest of text
         out << "main:\n";
         out << "\tpush %rbp\n";

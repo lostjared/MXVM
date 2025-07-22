@@ -35,10 +35,12 @@ namespace mxvm {
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
+        void add_extern(const std::string &name);
     protected:
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
+        std::vector<std::string> external;
     };
 
     class Program : public Base {
