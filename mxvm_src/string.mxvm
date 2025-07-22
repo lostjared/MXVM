@@ -1,16 +1,16 @@
-program StringPrint {
-	section data {		
-        int x = 255
-        string value = ""
-        string fmt = "the value is: 0x%X%%\n"
+program StringPrint {   
+        section data {		
+                int x = 255
+                string value = ""
+                string fmt = "the value is: 0x%X%%\n"
 	}
 
 	section code {
 	start:
-        add x, 255
-        string_print value, fmt, x
-        print value
-        print fmt, 0xDEADBEEF
+                add x, 255
+                string_print value, fmt, x
+                print value
+                print fmt, 0xDEADBEEF
 	stop:
 		exit 0
 	}

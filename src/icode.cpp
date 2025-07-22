@@ -107,7 +107,6 @@ namespace mxvm {
         out << "\tmov %rbp, %rsp\n";
         out << "\tpop %rbp\n";
         out << "\tret\n";
-
         
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
     }
@@ -200,30 +199,52 @@ namespace mxvm {
 
     std::string Program::getRegisterByIndex(int index, VarType type) {
         if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING)) {
-            static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r8"};
+            static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
             return reg[index];
         } else if(index < 9 && type == VarType::VAR_FLOAT) {
               return "%xmm" +  std::to_string(xmm_offset++);
-        }
+        } 
         return "[stack]";
     }
 
     void Program::gen_print(std::ostream &out, const Instruction &i) {
         xmm_offset = 0;
         out << "\tlea " << i.op1.op << "(%rip), %rdi\n";
+        std::vector<Operand> args;
+        if (!i.op2.op.empty()) args.push_back(i.op2);
+        if (!i.op3.op.empty()) args.push_back(i.op3);
+        for (const auto& v : i.vop) {
+            if (!v.op.empty()) args.push_back(v);
+        }
         int total = 0;
-        if(!i.op2.op.empty()) {   
-            total += generateLoadVar(out, 1, i.op2);
-            if (!i.op3.op.empty()) {
-                total += generateLoadVar(out, 2, i.op3);
-                for (size_t arg = 0; arg < i.vop.size(); ++arg) {
-                    if (!i.vop[arg].op.empty()) {
-                        if (arg < 3) {
-                            total += generateLoadVar(out, 2+arg, i.vop[arg]);
-                        }
-                    }
-                }
+        int stack_arg = 0;
+        int reg_count = 1;
+
+        size_t num_pushes = (args.size() > 5) ? (args.size() - 5) : 0;
+        bool needs_dummy = (num_pushes % 2 != 0);
+        
+        if(needs_dummy) {
+            out << "\tsub $8, %rsp\n";
+        }
+        
+        for (size_t idx = args.size() - 1; idx >= 5 && idx < args.size(); --idx) {
+            if(isVariable(args[idx].op)) {
+                Variable &v = getVariable(args[idx].op);
+                if(v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
+                    out << "\tpushq %rax\n";
+                    ++stack_arg;
+                } 
+            } else {
+                out << "\tpushq $" << args[idx].op << "\n";
             }
+        }
+
+
+
+        reg_count = 1;
+        for(size_t z = 0; z < args.size() && reg_count < 6; ++z, ++reg_count) {
+            total += generateLoadVar(out, reg_count, args[z]);
         }
         if(total == 0) {
             out << "\txor %rax, %rax\n";
@@ -231,6 +252,9 @@ namespace mxvm {
             out << "\tmov $" << total << ", %rax\n";
         }
         out << "\tcall printf\n";
+        if (num_pushes > 0 || needs_dummy) {
+            out << "\tadd $" << ((num_pushes + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
+        }
     }
 
     void Program::gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
