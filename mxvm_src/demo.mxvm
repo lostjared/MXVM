@@ -21,6 +21,6 @@ program Demo {
             jg loop
             print fmt_end
         stop:
-            exit 0
+            done
     }
 }

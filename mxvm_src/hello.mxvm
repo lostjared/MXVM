@@ -6,6 +6,7 @@ program Hello {
 		float y = 0
 		int amount = 1
 		string format = "value is: %f\n"
+		string subr = "hey\n"
 	}
     
 	section code {
@@ -14,7 +15,13 @@ program Hello {
 		store x, pointer, 0
 		load y, pointer, 0
 		print format, y
+		call hello
 	stop:
 		free pointer
+		done
+
+	function hello:
+		print subr
+		ret
 	}
 }

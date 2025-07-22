@@ -43,7 +43,7 @@ program SaveInt {
                 print the_total, total
                 stop:
                 free data
-                exit 0 
+                done 
         error_out:
                 print err_msg
                 exit 1

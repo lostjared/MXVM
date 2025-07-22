@@ -12,6 +12,6 @@ program Loop {
         je stop
         jmp start
     stop:
-        exit 0 
+        done 
     }
 }

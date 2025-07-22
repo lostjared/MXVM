@@ -14,5 +14,6 @@ program HelloWorld {
 		print data, x
 		cmp v, x
 		jne start
+		done
 	}
 }

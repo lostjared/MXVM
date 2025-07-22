@@ -90,7 +90,7 @@ namespace mxvm {
     class LabelNode : public ASTNode {
     public:
         std::string name;
-        
+        bool function = false;
         LabelNode(const std::string& labelName) : name(labelName) {}
         
         void accept(ASTVisitor& visitor) override;

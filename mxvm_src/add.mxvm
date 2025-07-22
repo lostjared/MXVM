@@ -10,5 +10,6 @@ program Add {
 	start:
 	    add result, num1, num2
         print numbers, num1, num2, result
+		done
 	}
 }

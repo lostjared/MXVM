@@ -17,8 +17,8 @@ program SubAdd {
         add rax, rsi, rdi
         print output, rsi, rdi, rax
     stop:
-        exit 0
-    get_number:
+        done
+    function get_number:
         print message
         getline rax
         ret

@@ -16,6 +16,6 @@ program LoopByX {
                 add index, 1
                 jmp start
         stop:
-                        exit 0 
+                done
 	}
 }

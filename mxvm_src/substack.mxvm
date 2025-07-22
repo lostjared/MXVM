@@ -13,9 +13,9 @@ program SubStack {
         stack_sub 2
         print return_message
     stop:
-        exit 0
+        done
 
-    subroutine:
+    function subroutine:
         stack_load value1, 0
         stack_load value2, 1
         print message, value1, value2

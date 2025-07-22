@@ -12,6 +12,6 @@ program Bits {
 		xor result, x, 0xF
 		print fmt_str, result
 	stop:
-		exit 0
+		done
 	}
 }

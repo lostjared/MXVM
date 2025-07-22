@@ -16,6 +16,6 @@ program AddNumbers {
 		add result, x, y
 		print fmt, x, y, result
 	stop:
-		exit 0 
+		done
 	}
 }

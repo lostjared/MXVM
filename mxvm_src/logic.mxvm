@@ -10,6 +10,6 @@ program Logic {
 		and result, x, 0xFF
 		print fmt_str, result
 	stop:
-		exit 0
+		done
 	}
 }

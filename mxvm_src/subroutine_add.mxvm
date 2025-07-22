@@ -13,8 +13,8 @@ program SubroutineAdd {
         call add_to
         print output, rdi, rsi, rax
     stop:
-        exit 0
-    add_to:
+        done
+    function add_to:
         print message
         getline rdi
         add rax, rdi, rsi

@@ -28,8 +28,8 @@ namespace mxvm {
         inc.push_back(i);
     }
     
-    void Base::add_label(const std::string &name, uint64_t address) {
-        labels[name] = address;
+    void Base::add_label(const std::string &name, uint64_t address, bool f) {
+        labels[name] = std::make_pair(address, f);
     }
 
     void Base::add_variable(const std::string &name, const Variable &v) {
@@ -60,7 +60,7 @@ namespace mxvm {
     void Program::generateCode(std::ostream &out) {
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
-            labels_[l.second] = l.first;
+            labels_[l.second.first] = l.first;
         }
         out << ".section .data\n";
         std::vector<std::string> var_names;
@@ -107,7 +107,14 @@ namespace mxvm {
         for(size_t i = 0; i < inc.size(); ++i) {
             const Instruction &instr = inc[i];
             if(labels_.find(i) != labels_.end()) {
-                out << labels_[i] << ":\n";
+                if(labels[labels_[i]].second == true) {
+                    out << labels_[i] << ":\n";
+                    out << "\tpush %rbp\n";
+                    out << "\tmov %rsp, %rbp\n";
+
+                } else {
+                    out << labels_[i] << ":\n";
+                }
             } 
             generateInstruction(out, instr);
         }
@@ -168,8 +175,36 @@ namespace mxvm {
             case STORE:
                 gen_store(out, i);
                 break;
+            case RET:
+                gen_ret(out, i);
+                break;
+            case CALL:
+                gen_call(out, i);
+                break;
         default:
-            throw mx::Exception("Invalid or unsupported instruction");
+            throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
+        }
+    }
+
+    void Program::gen_done(std::ostream &out, const Instruction &i) {
+        gen_ret(out, i);
+    }
+
+    void Program::gen_ret(std::ostream &out, const Instruction &i) {
+        out << "\tmov $0, %rax\n";
+        out << "\tmov %rbp, %rsp\n";
+        out << "\tpop %rbp\n";
+        out << "\tret\n";
+    }
+
+    void Program::gen_call(std::ostream &out, const Instruction &i) {
+        if(labels.find(i.op1.op) != labels.end()) {
+            if(!labels[i.op1.op].second) {
+                throw mx::Exception("call instruction requires function label for: " +  i.op1.op);
+            }
+            out << "\tcall " << i.op1.op << "\n";
+        } else {
+            throw mx::Exception("function label for call: " + i.op1.op + " not found.\n");
         }
     }
 
@@ -753,6 +788,9 @@ namespace mxvm {
                 case STRING_PRINT:
                     exec_string_print(instr);
                     break;
+                case DONE:
+                    exec_done(instr);
+                    break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
                     break;
@@ -962,7 +1000,7 @@ namespace mxvm {
     void Program::exec_jmp(const Instruction& instr) {
         auto it = labels.find(instr.op1.op);
         if (it != labels.end()) {
-            pc = it->second;
+            pc = it->second.first;
         } else {
             throw mx::Exception("Label not found: " + instr.op1.op);
         }
@@ -1813,8 +1851,13 @@ namespace mxvm {
             throw mx::Exception("CALL: label not found: " + instr.op1.op);
             return;
         }
+
+        if(it->second.second == false) {
+            throw mx::Exception("call requires function label found: " +  instr.op1.op);
+        }
+
         stack.push(static_cast<int64_t>(pc + 1));
-        pc = it->second;
+        pc = it->second.first;
     }
 
     void Program::exec_ret(const Instruction &instr) {
@@ -1828,6 +1871,11 @@ namespace mxvm {
             return;
         }
         pc = static_cast<size_t>(std::get<int64_t>(value)) - 1;
+    }
+
+    void Program::exec_done(const Instruction &i) {
+        exitCode = 0;
+        stop();
     }
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {
@@ -1928,7 +1976,7 @@ namespace mxvm {
             
             for (const auto &label : labels) {
                 out << std::setw(20) << label.first 
-                    << std::setw(10) << label.second << "\n";
+                    << std::setw(10) << label.second.first << "\n";
             }
         }
         out << "\n";

@@ -9,8 +9,8 @@ program CallInf {
 		call print_message
         jmp start
 	stop:
-		exit 0
-    print_message:
+		done
+    function print_message:
         print fmt_str
         ret
 	}

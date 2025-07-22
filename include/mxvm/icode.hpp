@@ -33,12 +33,12 @@ namespace mxvm {
     class Base {
     public:
         void add_instruction(const Instruction &i);
-        void add_label(const std::string &name, uint64_t address);
+        void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
     protected:
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
-        std::unordered_map<std::string, uint64_t> labels;
+        std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
     };
 
     class Program : public Base {
@@ -79,6 +79,9 @@ namespace mxvm {
         void gen_free(std::ostream &out, const Instruction &i);
         void gen_load(std::ostream &out, const Instruction &i);
         void gen_store(std::ostream &out, const Instruction &i);
+        void gen_ret(std::ostream &out, const Instruction &i);
+        void gen_call(std::ostream &out, const Instruction &i);
+        void gen_done(std::ostream &out, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
@@ -116,7 +119,8 @@ namespace mxvm {
         void exec_stack_store(const Instruction &instr);
         void exec_stack_sub(const Instruction &instr);
         void exec_call(const Instruction &instr);
-        void exec_ret(const Instruction &instr);      
+        void exec_ret(const Instruction &instr); 
+        void exec_done(const Instruction &instr);     
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);
         void setVariableFromString(Variable& var, const std::string& value);

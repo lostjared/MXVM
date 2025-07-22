@@ -74,11 +74,23 @@ namespace mxvm {
                         next();
                         continue;
                     }
-                    if (match(types::TokenType::TT_ID) && peekIs(":")) {
+
+                    if(match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
                         next();
-                        next();
-                        continue;
-                    } 
+                        if (match(types::TokenType::TT_ID) && peekIs(":")) {
+                            next();
+                            next();
+                            continue;
+                        } else {
+                            throw mx::Exception("Syntax Error: function must be followed by a label at l ine " + std::to_string(token->getLine()));
+                        }
+                    }  else {
+                        if (match(types::TokenType::TT_ID) && peekIs(":")) {
+                            next();
+                            next();
+                            continue;
+                        }
+                    }
                                      
                     if (match(types::TokenType::TT_ID)) {
                         std::string op = token->getTokenValue();
@@ -87,7 +99,7 @@ namespace mxvm {
                                 "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine())
                             );
                         }
-                        if(op == "ret") {
+                        if(op == "ret" || op == "done") {
                             next();
                             continue;
                         } else if(op == "call" || op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
