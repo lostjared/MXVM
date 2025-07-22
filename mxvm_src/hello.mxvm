@@ -1,32 +1,20 @@
 program Hello {
 	
     section data {
-		string hello = "%.02f + %.02f = %.02f%%\n"
-		string minus = "%.02f - %.02f = %0.2f%%\n"
-		string stack = "%d %d %d %d %d %d %d %d \n"
-		float x = 10.0
-		float y = 1.0
-		float v = 5.0
-		float result = 0
-		float sub_result = 0
-		int n = 1
-		int one = 1
-		int two = 2
-		int three = 3
-		int four = 4
-		int five = 5
-		int six =  6
-		int seven = 7
-		int eight = 8
-		int nine = 9
+		ptr pointer = null
+		float x = 10
+		float y = 0
+		int amount = 1
+		string format = "value is: %f\n"
 	}
     
 	section code {
 	start:
-	    add result, x, y
-        print hello, x,  y, result
-		sub sub_result, result, v
-		print minus, result, v, sub_result
-		print stack, one, two, three, four, five, six, seven, eight
+		alloc pointer, 8, amount
+		store x, pointer, 0
+		load y, pointer, 0
+		print format, y
+	stop:
+		free pointer
 	}
 }

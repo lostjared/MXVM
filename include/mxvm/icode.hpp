@@ -75,6 +75,10 @@ namespace mxvm {
         void gen_mov(std::ostream &out, const Instruction &i);
         void gen_jmp(std::ostream &out, const Instruction &i);
         void gen_cmp(std::ostream &out, const Instruction &i);
+        void gen_alloc(std::ostream &out, const Instruction &i);
+        void gen_free(std::ostream &out, const Instruction &i);
+        void gen_load(std::ostream &out, const Instruction &i);
+        void gen_store(std::ostream &out, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);

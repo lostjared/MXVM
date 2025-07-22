@@ -64,18 +64,26 @@ namespace mxvm {
             labels_[l.second] = l.first;
         }
         out << ".section .data\n";
+
+        std::vector<std::string> var_names;
+        for(auto &v : vars) {
+            var_names.push_back(v.first);
+        }
+        std::sort(var_names.begin(), var_names.end());
+        
         // data section
-        for(auto &v :  vars) {
-            if(v.second.type == VarType::VAR_INTEGER) {
-                out << "\t" << v.first << ": .quad " << v.second.var_value.int_value << "\n";
+        for(auto &v :  var_names) {
+
+            if(vars[v].type == VarType::VAR_INTEGER) {
+                out << "\t" << v << ": .quad " << vars[v].var_value.int_value << "\n";
                 continue;
             }
-            if(v.second.type == VarType::VAR_FLOAT) {
-                out << "\t" << v.first << ": .double " << v.second.var_value.float_value << "\n";
+            if(vars[v].type == VarType::VAR_FLOAT) {
+                out << "\t" << v<< ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
             }
-            if(v.second.type == VarType::VAR_STRING) {
-                out << "\t" << v.first << ": .asciz " << "\"" << escapeNewLines(v.second.var_value.str_value) << "\"\n";
+            if(vars[v].type == VarType::VAR_STRING) {
+                out << "\t" << v << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             }
         }
@@ -83,12 +91,18 @@ namespace mxvm {
         out << ".section .rodata\n";
         // read only
         out << ".section .bss\n";
+        for(auto &v : var_names) {
+            if(vars[v].type == VarType::VAR_POINTER) {
+                out << "\t.lcomm " << v << ", 8\n";
+            }
+        }
         // bss
         out << ".section .text\n";
         // text
         out << "\t.global main\n";
         out << "\t.extern printf\n";
-        out << "\t.extern puts\n";
+        out << "\t.extern calloc\n";
+        out << "\t.extern free\n";
         out << "\t.extern exit\n";
 
         // rest of text
@@ -148,8 +162,159 @@ namespace mxvm {
             case CMP:
                 gen_cmp(out, i);
                 break;
+            case ALLOC:
+                gen_alloc(out, i);
+                break;
+            case FREE:
+                gen_free(out, i);
+                break;
+            case LOAD:
+                gen_load(out, i);
+                break;
+            case STORE:
+                gen_store(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction");
+        }
+    }
+
+    void Program::gen_alloc(std::ostream &out, const Instruction &i) {
+
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("ALLOC destination must be a variable");
+        }
+
+        Variable &v = getVariable(i.op1.op);
+        if(v.type != VarType::VAR_POINTER) {
+            throw mx::Exception("ALLOC destination must be a pointer\n");
+        }
+        
+        if (!i.op2.op.empty()) {
+            if (isVariable(i.op2.op)) {
+                Variable &sizeVar = getVariable(i.op2.op);
+                if (sizeVar.type != VarType::VAR_INTEGER) {
+                    throw mx::Exception("ALLOC size must be integer");
+                }
+                out << "\tmovq " << i.op2.op << "(%rip), %rsi\n";
+            } else {
+                out << "\tmovq $" << i.op2.op << ", %rsi\n";
+            }
+        } else {
+            out << "\tmovq $8, %rsi\n"; 
+        }
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                Variable &countVar = getVariable(i.op3.op);
+                if (countVar.type != VarType::VAR_INTEGER) {
+                    throw mx::Exception("ALLOC count must be integer");
+                }
+                out << "\tmovq " << i.op3.op << "(%rip), %rdi\n";
+            } else {
+                out << "\tmovq $" << i.op3.op << ", %rdi\n";
+            }
+        } else {
+            out << "\tmovq $1, %rdi\n"; 
+        }
+        out << "\txor %rax, %rax\n"; 
+        out << "\tcall calloc\n";
+        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+    }
+
+    void Program::gen_free(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("FREE argument must be a variable");
+        }
+        Variable &v = getVariable(i.op1.op);
+        if (v.type != VarType::VAR_POINTER) {
+            throw mx::Exception("FREE argument must be a pointer");
+        }
+        out << "\tmovq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tcall free\n";
+    }
+    void Program::gen_load(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("LOAD destination must be a variable");
+        }
+        Variable &dest = getVariable(i.op1.op);
+
+        if (!isVariable(i.op2.op)) {
+            throw mx::Exception("LOAD source must be a pointer variable");
+        }
+        Variable &ptrVar = getVariable(i.op2.op);
+        if (ptrVar.type != VarType::VAR_POINTER) {
+            throw mx::Exception("LOAD source must be a pointer");
+        }
+        size_t size = (dest.type == VarType::VAR_FLOAT) ? sizeof(double) : sizeof(int64_t);
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                size = static_cast<size_t>(getVariable(i.vop[0].op).var_value.int_value);
+            } else {
+                size = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+            }
+        }
+        std::string idx_reg = "%rcx";
+        if (!i.op3.op.empty()) {
+            generateLoadVar(out, VarType::VAR_INTEGER, idx_reg, i.op3);
+        } else {
+            out << "\txor %rcx, %rcx\n";
+        }
+        out << "\tmovq " << i.op2.op << "(%rip), %rax\n";
+        out << "\timul $" << size << ", %rcx, %rcx\n";
+        out << "\tadd %rcx, %rax\n";
+        if (dest.type == VarType::VAR_INTEGER) {
+            out << "\tmovq (%rax), %rdx\n";
+            out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n";
+        } else if (dest.type == VarType::VAR_FLOAT) {
+            out << "\tmovsd (%rax), %xmm0\n";
+            out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+        } else {
+            throw mx::Exception("LOAD: unsupported destination type");
+        }
+    }
+
+    void Program::gen_store(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("STORE source must be a variable");
+        }
+        Variable &src = getVariable(i.op1.op);
+
+        if (!isVariable(i.op2.op)) {
+            throw mx::Exception("STORE destination must be a pointer variable");
+        }
+        Variable &ptrVar = getVariable(i.op2.op);
+        if (ptrVar.type != VarType::VAR_POINTER) {
+            throw mx::Exception("STORE destination must be a pointer");
+        }
+
+        size_t size = (src.type == VarType::VAR_FLOAT) ? sizeof(double) : sizeof(int64_t);
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                size = static_cast<size_t>(getVariable(i.vop[0].op).var_value.int_value);
+            } else {
+                size = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+            }
+        }
+
+        std::string idx_reg = "%rcx";
+        if (!i.op3.op.empty()) {
+            generateLoadVar(out, VarType::VAR_INTEGER, idx_reg, i.op3);
+        } else {
+            out << "\txor %rcx, %rcx\n";
+        }
+
+        out << "\tmovq " << i.op2.op << "(%rip), %rax\n";
+        out << "\timul $" << size << ", %rcx, %rcx\n";
+        out << "\tadd %rcx, %rax\n";
+
+        if (src.type == VarType::VAR_INTEGER) {
+            out << "\tmovq " << i.op1.op << "(%rip), %rdx\n";
+            out << "\tmovq %rdx, (%rax)\n";
+        } else if (src.type == VarType::VAR_FLOAT) {
+            out << "\tmovsd " << i.op1.op << "(%rip), %xmm0\n";
+            out << "\tmovsd %xmm0, (%rax)\n";
+        } else {
+            throw mx::Exception("STORE: unsupported source type");
         }
     }
 
