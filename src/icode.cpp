@@ -58,22 +58,17 @@ namespace mxvm {
     }
 
     void Program::generateCode(std::ostream &out) {
-
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second] = l.first;
         }
         out << ".section .data\n";
-
         std::vector<std::string> var_names;
         for(auto &v : vars) {
             var_names.push_back(v.first);
         }
         std::sort(var_names.begin(), var_names.end());
-        
-        // data section
         for(auto &v :  var_names) {
-
             if(vars[v].type == VarType::VAR_INTEGER) {
                 out << "\t" << v << ": .quad " << vars[v].var_value.int_value << "\n";
                 continue;
@@ -82,23 +77,22 @@ namespace mxvm {
                 out << "\t" << v<< ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
             }
+        }
+        out << ".section .rodata\n";
+        for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_STRING) {
                 out << "\t" << v << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             }
         }
-        // data 
-        out << ".section .rodata\n";
-        // read only
         out << ".section .bss\n";
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_POINTER) {
                 out << "\t.lcomm " << v << ", 8\n";
             }
         }
-        // bss
         out << ".section .text\n";
-        // text
+        
         out << "\t.global main\n";
         out << "\t.extern printf\n";
         out << "\t.extern calloc\n";
