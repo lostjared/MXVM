@@ -82,6 +82,7 @@ namespace mxvm {
         void gen_ret(std::ostream &out, const Instruction &i);
         void gen_call(std::ostream &out, const Instruction &i);
         void gen_done(std::ostream &out, const Instruction &i);
+        void gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);

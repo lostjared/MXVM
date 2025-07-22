@@ -188,6 +188,15 @@ namespace mxvm {
             case DONE:
                 gen_done(out, i);
                 break;
+            case AND:
+                gen_bitop(out, "and", i);
+                break;
+            case OR:
+                gen_bitop(out, "or", i);
+                break;
+            case XOR:
+                gen_bitop(out, "xor", i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -351,6 +360,38 @@ namespace mxvm {
             out << "\tmovsd %xmm0, (%rax)\n";
         } else {
             throw mx::Exception("STORE: unsupported source type");
+        }
+    }
+
+    void Program::gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
+        if (i.op3.op.empty()) {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\t" << opc << "q %rcx, %rax\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("Bitwise operations only supported for integer variables");
+                }
+            } else {
+                throw mx::Exception("First argument of bitop instruction must be a variable.");
+            }
+        } else {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\t" << opc << "q %rcx, %rax\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("Bitwise operations only supported for integer variables");
+                }
+            } else {
+                throw mx::Exception("First argument of bitop instruction must be a variable.");
+            }
         }
     }
 

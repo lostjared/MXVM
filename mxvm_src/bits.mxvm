@@ -11,6 +11,8 @@ program Bits {
 		print fmt_str, result
 		xor result, x, 0xF
 		print fmt_str, result
+		or result, 0xFF
+		print fmt_str, result
 	stop:
 		done
 	}
