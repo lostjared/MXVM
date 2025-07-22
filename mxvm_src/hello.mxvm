@@ -18,7 +18,7 @@ program Hello {
 		call hello
 	stop:
 		free pointer
-		#done
+		done
 
 	function hello:
 		print subr
