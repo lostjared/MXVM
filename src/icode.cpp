@@ -1179,12 +1179,22 @@ namespace mxvm {
             if (fmt[i] == '%' && i + 1 < format.length()) {
                 size_t start = i;
                 size_t j = i + 1;
+                while (j < format.length() && 
+                    (fmt[j] == '-' || fmt[j] == '+' || fmt[j] == ' ' || fmt[j] == '#' || fmt[j] == '0' ||
+                        (fmt[j] >= '0' && fmt[j] <= '9') || fmt[j] == '.' ||
+                        fmt[j] == 'l' || fmt[j] == 'h' || fmt[j] == 'z' || fmt[j] == 'j' || fmt[j] == 't')) {
+                    ++j;
+                }
                 if (j < format.length() && fmt[j] == '%') { 
                     oss << '%';
                     i = j;
                     continue;
                 }
-                if (fmt[j] == '\0') break;
+                if (j >= format.length()) break;
+                if (!std::isalpha(fmt[j])) {
+                    oss << fmt[i];
+                    continue;
+                }
                 std::string spec(fmt + start, fmt + j + 1);
                 if (argIndex < args.size()) {
                     Variable* arg = args[argIndex++];
@@ -1222,12 +1232,22 @@ namespace mxvm {
             if (fmt[i] == '%' && i+1 < format.length()) {
                 size_t start = i;
                 size_t j = i + 1;
+                while (j < format.length() && 
+                    (fmt[j] == '-' || fmt[j] == '+' || fmt[j] == ' ' || fmt[j] == '#' || fmt[j] == '0' ||
+                        (fmt[j] >= '0' && fmt[j] <= '9') || fmt[j] == '.' ||
+                        fmt[j] == 'l' || fmt[j] == 'h' || fmt[j] == 'z' || fmt[j] == 'j' || fmt[j] == 't')) {
+                    ++j;
+                }
                 if (j < format.length() && fmt[j] == '%') { 
                     oss << '%';
                     i = j;
                     continue;
                 }
-                if (fmt[j] == '\0') break;
+                if (j >= format.length()) break;
+                if (!std::isalpha(fmt[j])) {
+                    oss << fmt[i];
+                    continue;
+                }
                 std::string spec(fmt + start, fmt + j + 1);
                 if (argIndex < args.size()) {
 

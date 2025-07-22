@@ -2,7 +2,7 @@ program StringPrint {
 	section data {		
         int x = 255
         string value = ""
-        string fmt = "the value is: 0x%X\n"
+        string fmt = "the value is: 0x%X%%\n"
 	}
 
 	section code {
