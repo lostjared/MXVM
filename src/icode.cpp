@@ -63,6 +63,7 @@ namespace mxvm {
             labels_[l.second.first] = l.first;
         }
         out << ".section .data\n";
+        out << "\t.extern stdin, stdout, stderr\n";
         std::vector<std::string> var_names;
         for(auto &v : vars) {
             var_names.push_back(v.first);
@@ -80,7 +81,7 @@ namespace mxvm {
         }
         out << ".section .rodata\n";
         for(auto &v : var_names) {
-            if(vars[v].type == VarType::VAR_STRING) {
+            if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
                 out << "\t" << v << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             }
@@ -89,6 +90,8 @@ namespace mxvm {
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_POINTER) {
                 out << "\t.lcomm " << v << ", 8\n";
+            } else if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size > 0) {
+                out << "\t.lcomm " << v << ", " << vars[v].var_value.buffer_size << "\n";
             }
         }
         out << ".section .text\n";
@@ -98,7 +101,9 @@ namespace mxvm {
         out << "\t.extern calloc\n";
         out << "\t.extern free\n";
         out << "\t.extern exit\n";
-
+        out << "\t.extern strlen\n";
+        out << "\t.extern atol\n";
+        out << "\t.extern atof\n";
         // rest of text
         out << "main:\n";
         out << "\tpush %rbp\n";
@@ -221,7 +226,15 @@ namespace mxvm {
             case STACK_SUB:
                 gen_stack_sub(out, i);
                 break;
-
+            case GETLINE:
+                gen_getline(out, i);
+                break;
+            case TO_INT:
+                gen_to_int(out, i);
+                break;
+            case TO_FLOAT:
+                gen_to_float(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -388,6 +401,41 @@ namespace mxvm {
         }
     }
 
+    void Program::gen_to_int(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) {
+            throw mx::Exception("to_int requires two variables (dest int, src string)");
+        }
+        Variable &dest = getVariable(i.op1.op);
+        Variable &src = getVariable(i.op2.op);
+        if (dest.type != VarType::VAR_INTEGER) {
+            throw mx::Exception("to_int: first argument must be an integer variable");
+        }
+        if (src.type != VarType::VAR_STRING) {
+            throw mx::Exception("to_int: second argument must be a string variable");
+        }
+        out << "\tleaq " << i.op2.op << "(%rip), %rdi\n";
+        out << "\tcall atol\n";
+        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+    }
+
+    void Program::gen_to_float(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) {
+            throw mx::Exception("to_float requires two variables (dest float, src string)");
+        }
+        Variable &dest = getVariable(i.op1.op);
+        Variable &src = getVariable(i.op2.op);
+        if (dest.type != VarType::VAR_FLOAT) {
+            throw mx::Exception("to_float: first argument must be a float variable");
+        }
+        if (src.type != VarType::VAR_STRING) {
+            throw mx::Exception("to_float: second argument must be a string variable");
+        }
+        out << "\tleaq " << i.op2.op << "(%rip), %rdi\n";
+        out << "\tcall atof\n";
+        out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+    }
+        
+
     void Program::gen_div(std::ostream &out, const Instruction &i) {
         if (i.op3.op.empty()) {
             if (isVariable(i.op1.op)) {
@@ -464,6 +512,31 @@ namespace mxvm {
                 throw mx::Exception("MOD: first argument must be a variable");
             }
         }
+    }
+
+    void Program::gen_getline(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("GETLINE destination must be a variable");
+        }
+        Variable &dest = getVariable(i.op1.op);
+        if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0 ) {
+            throw mx::Exception("GETLINE destination must be a string buffer variable");
+        }
+        static int over_count = 0;
+        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n"; 
+        out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n"; 
+        out << "\tmovq stdin(%rip), %rdx\n"; 
+        out << "\tcall fgets\n";
+        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tcall strlen\n";
+        out << "\tmovq %rax, %rcx\n";
+        out << "\tcmp $0, %rax\n";
+        out << "\tje .over" << over_count << "\n";
+        out << "\tsub $1, %rcx\n";
+        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tmovb $0, (%rdi, %rcx, 1)\n";
+        out << ".over" << over_count << ": \n";
+        over_count++;
     }
 
     void Program::gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
@@ -666,7 +739,7 @@ namespace mxvm {
     }
 
     std::string Program::getRegisterByIndex(int index, VarType type) {
-        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING)) {
+        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING || type == VarType::VAR_POINTER)) {
             static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
             return reg[index];
         } else if(index < 9 && type == VarType::VAR_FLOAT) {
@@ -1043,6 +1116,12 @@ namespace mxvm {
                     break;
                 case DONE:
                     exec_done(instr);
+                    break;
+                case TO_INT:
+                    exec_to_int(instr);
+                    break;
+                case TO_FLOAT:
+                    exec_to_float(instr);
                     break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
@@ -1927,24 +2006,6 @@ namespace mxvm {
                 dest.var_value.str_value = input;
                 dest.var_value.type = VarType::VAR_STRING;
                 break;
-            case VarType::VAR_INTEGER:
-                try {
-                    dest.var_value.int_value = std::stoll(input, nullptr, 0);
-                    dest.var_value.type = VarType::VAR_INTEGER;
-                } catch (...) {
-                    dest.var_value.int_value = 0;
-                    dest.var_value.type = VarType::VAR_INTEGER;
-                }
-                break;
-            case VarType::VAR_FLOAT:
-                try {
-                    dest.var_value.float_value = std::stod(input);
-                    dest.var_value.type = VarType::VAR_FLOAT;
-                } catch (...) {
-                    dest.var_value.float_value = 0.0;
-                    dest.var_value.type = VarType::VAR_FLOAT;
-                }
-                break;
             default:
                 throw mx::Exception("GETLINE: unsupported variable type");
         }
@@ -2130,6 +2191,61 @@ namespace mxvm {
         exitCode = 0;
         stop();
     }
+
+    void Program::exec_to_int(const Instruction &instr) {
+        if(!instr.op1.op.empty() && isVariable(instr.op1.op)) {
+            Variable &v = getVariable(instr.op1.op);
+            if(v.type == VarType::VAR_INTEGER) {
+                if(isVariable(instr.op2.op)) {
+                    Variable &s = getVariable(instr.op2.op);
+                    if(s.type == VarType::VAR_STRING) {
+                        try {
+                            v.var_value.int_value = std::stoll(s.var_value.str_value, nullptr, 0); 
+                        } catch(...) {
+                            v.var_value.int_value = 0;
+                        }
+                    } else {
+                        throw mx::Exception("to_int second argument must be a string");
+                    }
+                } else {
+                    throw mx::Exception("to_int second argument must be a variable");
+                }
+            } else {
+                throw mx::Exception("to_int first argument must be an integer variable");
+            }
+        } else {
+            throw mx::Exception("to_int first argument must be a variable");
+        }
+    }
+
+    void Program::exec_to_float(const Instruction &instr) {
+        if (!instr.op1.op.empty() && isVariable(instr.op1.op)) {
+            Variable &v = getVariable(instr.op1.op);
+            if (v.type == VarType::VAR_FLOAT) {
+                if (isVariable(instr.op2.op)) {
+                    Variable &s = getVariable(instr.op2.op);
+                    if (s.type == VarType::VAR_STRING) {
+                        try {
+                            v.var_value.float_value = std::stod(s.var_value.str_value);
+                            v.var_value.type = VarType::VAR_FLOAT;
+                        } catch (...) {
+                            v.var_value.float_value = 0.0;
+                            v.var_value.type = VarType::VAR_FLOAT;
+                        }
+                    } else {
+                        throw mx::Exception("to_float second argument must be a string");
+                    }
+                } else {
+                    throw mx::Exception("to_float second argument must be a variable");
+                }
+            } else {
+                throw mx::Exception("to_float first argument must be a float variable");
+            }
+        } else {
+            throw mx::Exception("to_float first argument must be a variable");
+        }
+    }
+        
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {
         Variable temp;

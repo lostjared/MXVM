@@ -91,6 +91,9 @@ namespace mxvm {
         void gen_stack_store(std::ostream &out, const Instruction &i);
         void gen_stack_sub(std::ostream &out, const Instruction &i);
         void gen_mod(std::ostream &out, const Instruction &i);
+        void gen_getline(std::ostream &out, const Instruction &i);
+        void gen_to_int(std::ostream &out, const Instruction &i);
+        void gen_to_float(std::ostream &out, const Instruction  &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
@@ -129,7 +132,10 @@ namespace mxvm {
         void exec_stack_sub(const Instruction &instr);
         void exec_call(const Instruction &instr);
         void exec_ret(const Instruction &instr); 
-        void exec_done(const Instruction &instr);     
+        void exec_done(const Instruction &instr); 
+        void exec_to_int(const Instruction &instr);
+        void exec_to_float(const Instruction &instr);
+
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);
         void setVariableFromString(Variable& var, const std::string& value);

@@ -38,23 +38,34 @@ namespace mxvm {
                         (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr"))
                     {
                         Variable value;
+                        std::string vtype = token->getTokenValue();
 
                         next(); 
                         require(types::TokenType::TT_ID); 
                         value.var_name = token->getTokenValue();
                         vars[value.var_name] = value;
                         next();
-                        require("="); next();
-                        if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
-                            token->getTokenType() == types::TokenType::TT_HEX ||
-                            token->getTokenType() == types::TokenType::TT_STR)
-                        {
+                        if(match(",") && vtype == "string") {
                             next();
+                             if(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX)) {
+                                next();
+                                continue;
+                             } else {
+                                throw mx::Exception("Syntax Error: string buffer, requires number for size on line " + std::to_string(token->getLine()));
+                             }
                         } else {
-                            throw mx::Exception(
-                                "Syntax Error: Expected value for variable, found: " + token->getTokenValue() +
-                                " at line " + std::to_string(token->getLine())
-                            );
+                            require("="); next();
+                            if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
+                                token->getTokenType() == types::TokenType::TT_HEX ||
+                                token->getTokenType() == types::TokenType::TT_STR)
+                            {
+                                next();
+                            } else {
+                                throw mx::Exception(
+                                    "Syntax Error: Expected value for variable, found: " + token->getTokenValue() +
+                                    " at line " + std::to_string(token->getLine())
+                                );
+                            }
                         }
                     }
                     else if (token->getTokenValue() == "\n" || token->getTokenValue() == ";") {

@@ -227,8 +227,17 @@ namespace mxvm {
                         return std::make_unique<VariableNode>(varType, varName, value);
                 }
             }
+        } else if(index < scanner.size()  && this->operator[](index).getTokenValue() == "," && varType == VarType::VAR_STRING) {
+            index++;
+            size_t buf_size = 0;
+            if(index < scanner.size()) {
+                buf_size = std::stoll(this->operator[](index).getTokenValue(), nullptr, 0);
+            }
+            if(buf_size == 0) {
+                throw mx::Exception("string buffer: " + varName + " requires valid size");
+            }
+            return std::make_unique<VariableNode>(varType, varName, buf_size);
         }
-        
         return std::make_unique<VariableNode>(varType, varName);
     }
     
@@ -243,7 +252,7 @@ namespace mxvm {
             {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE},
             {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}, {"stack_load", STACK_LOAD},
             {"stack_store", STACK_STORE}, {"stack_sub", STACK_SUB}, {"call", CALL}, {"ret", RET},
-            {"string_print", STRING_PRINT}, {"done", DONE}
+            {"string_print", STRING_PRINT}, {"done", DONE}, {"to_int", TO_INT}, {"to_float", TO_FLOAT}
         };
         
         if (index >= scanner.size()) return nullptr;
@@ -520,6 +529,7 @@ namespace mxvm {
                 } else {
                     setDefaultVariableValue(var, variableNode->type);
                 }
+                var.var_value.buffer_size = variableNode->buffer_size;
                 program->add_variable(var.var_name, var);
             }
         }
@@ -566,7 +576,7 @@ namespace mxvm {
         }
     }
 
-    void Parser::setVariableValue(Variable& var, VarType type, const std::string& value) {
+    void Parser::setVariableValue(Variable& var, VarType type, const std::string& value, size_t buf_size) {
         switch (type) {
             case VarType::VAR_INTEGER:
                 if (value.starts_with("0x") || value.starts_with("0X")) {
@@ -585,6 +595,7 @@ namespace mxvm {
             case VarType::VAR_STRING:
                 var.var_value.str_value = value;
                 var.var_value.type = VarType::VAR_STRING;
+                var.var_value.buffer_size = buf_size;
                 break;
                 
             case VarType::VAR_POINTER:

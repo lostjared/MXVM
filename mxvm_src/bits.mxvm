@@ -1,20 +1,19 @@
 program Bits {
 	section data {
-		int x = 255
-		int result = 0
-		string fmt_str = " value is %b \n"
+		float result = 0
+		float fvalue = 2.5
+		string buffer, 0xFF
+		string fmt_str1 = "VALUE IS: %.02f\n"
+		string enter_value = "Enter value: "
 	}
 
 	section code {
 	start:
-		and result, x, 0xFF
-		print fmt_str, result
-		xor result, x, 0xF
-		print fmt_str, result
-		or result, 0xFF
-		print fmt_str, result
-		not result
-		print fmt_str, result
+		print enter_value
+		getline buffer
+		to_float result, buffer
+		add result, fvalue
+		print fmt_str1, result
 	stop:
 		done
 	}

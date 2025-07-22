@@ -7,6 +7,7 @@ program SaveInt {
                 int data_number = 0
                 int data_size_index = 0
                 int total = 0
+                string input_buffer, 256
                 string ask = "How many integers to store? "
                 string fmt = "Value is: %d\n"
                 string err_msg = "Error invalid input\n"
@@ -17,7 +18,8 @@ program SaveInt {
         }
 	section code {
                 print ask
-                getline data_size
+                getline input_buffer
+                to_int data_size, input_buffer
                 cmp data_size, 0
                 jle error_out
                 alloc data, 8, data_size
@@ -25,7 +27,8 @@ program SaveInt {
                 mov data_index, 0
                 start:
                 print enter_value
-                getline data_number
+                getline input_buffer
+                to_int data_number, input_buffer
                 store data_number, data, data_index
                 add data_index, 1
                 cmp data_index, data_size

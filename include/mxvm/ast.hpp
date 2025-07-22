@@ -56,12 +56,16 @@ namespace mxvm {
         VarType type;
         std::string initialValue;
         bool hasInitializer;
-        
+        size_t buffer_size = 0;
+
         VariableNode(VarType varType, const std::string& varName) 
-            : name(varName), type(varType), hasInitializer(false) {}
+            : name(varName), type(varType), hasInitializer(false), buffer_size(0) {}
+        
+        VariableNode(VarType varType, const std::string& varName, size_t buf_size) 
+            : name(varName), type(varType), hasInitializer(false), buffer_size(buf_size) {}
         
         VariableNode(VarType varType, const std::string& varName, const std::string& value)
-            : name(varName), type(varType), initialValue(value), hasInitializer(true) {}
+            : name(varName), type(varType), initialValue(value), hasInitializer(true), buffer_size(0) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
