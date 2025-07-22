@@ -197,6 +197,9 @@ namespace mxvm {
             case XOR:
                 gen_bitop(out, "xor", i);
                 break;
+            case NOT:
+                gen_not(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -392,6 +395,24 @@ namespace mxvm {
             } else {
                 throw mx::Exception("First argument of bitop instruction must be a variable.");
             }
+        }
+    }
+
+    void Program::gen_not(std::ostream &out, const Instruction &i) {
+        if(!i.op1.op.empty()) {
+            if(isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if(v.type != VarType::VAR_INTEGER) {
+                    throw mx::Exception("NOT instruction expect integer variable");
+                }
+                generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                out << "\tnotq %rax\n";
+                out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            } else {
+                throw mx::Exception("NOT instruction requires variable");
+            }
+        } else {
+            throw mx::Exception("NOT instruction requires operand");
         }
     }
 
@@ -1447,7 +1468,7 @@ namespace mxvm {
         if(dest.var_value.type != VarType::VAR_INTEGER) {
             throw mx::Exception("Error NOT bitwise operation must be on integer value");
         }
-        dest.var_value.int_value = !dest.var_value.int_value;
+        dest.var_value.int_value = ~dest.var_value.int_value;
         dest.var_value.type = VarType::VAR_INTEGER;
     }
 

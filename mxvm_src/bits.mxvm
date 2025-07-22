@@ -13,6 +13,8 @@ program Bits {
 		print fmt_str, result
 		or result, 0xFF
 		print fmt_str, result
+		not result
+		print fmt_str, result
 	stop:
 		done
 	}
