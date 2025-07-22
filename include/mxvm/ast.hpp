@@ -35,7 +35,7 @@ namespace mxvm {
     
     class SectionNode : public ASTNode {
     public:
-        enum SectionType { DATA, CODE };
+        enum SectionType { DATA, CODE, MODULE };
         SectionType type;
         std::vector<std::unique_ptr<ASTNode>> statements;
         
@@ -71,6 +71,15 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    // docbir.com
+
+    class ModuleNode : public ASTNode {
+    public:
+        std::string name;
+        ModuleNode(const std::string &n) : name(n) {}
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
     
     class InstructionNode : public ASTNode {
     public:
@@ -135,6 +144,7 @@ namespace mxvm {
         virtual void visit(VariableNode& node) = 0;
         virtual void visit(ExpressionNode& node) = 0;
         virtual void visit(CommentNode& node) = 0;
+        virtual void visit(ModuleNode &node) = 0;
     };
 }
 

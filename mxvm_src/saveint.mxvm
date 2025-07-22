@@ -1,5 +1,11 @@
 program SaveInt {
-	section data {
+
+        section module {
+                io,
+                sdl
+        }
+        
+        section data {
                 ptr data = null
                 int data_size = 5
                 int data_index = 0

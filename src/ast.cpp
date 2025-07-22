@@ -60,7 +60,16 @@ namespace mxvm {
         return oss.str();
     }
 
-    
+    void ModuleNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ModuleNode::toString() const {
+        std::ostringstream stream;
+        stream << "Module: (" << name << ")";
+        return stream.str();
+    }
+
     void LabelNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }

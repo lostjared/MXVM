@@ -98,7 +98,10 @@ namespace mxvm {
             sectionType = SectionNode::DATA;
         } else if (sectionName == "code") {
             sectionType = SectionNode::CODE;
-        } else {
+        } else if(sectionName == "module") {
+            sectionType = SectionNode::MODULE;
+        } 
+        else {
             return nullptr; 
         }
         
@@ -138,7 +141,15 @@ namespace mxvm {
                     } else {
                         index++;
                     }
-                } else if (sectionType == SectionNode::CODE) {
+                } else if(sectionType == SectionNode::MODULE) {
+                    auto module = parseModule(index);
+                    if(module) {
+                        section->addStatement(std::move(module));
+                    } else {
+                        index++;
+                    }
+                }
+                else if (sectionType == SectionNode::CODE) {
                     if(token.getTokenType() == types::TokenType::TT_ID && token.getTokenValue() == "function"  && index + 2 < scanner.size() && this->operator[](index + 1).getTokenType() == types::TokenType::TT_ID && this->operator[](index + 2).getTokenValue() == ":") {
                         index++;
                         auto label = parseLabel(index);
@@ -149,7 +160,6 @@ namespace mxvm {
                     } else if (token.getTokenType() == types::TokenType::TT_ID && 
                         index + 1 < scanner.size() && 
                         this->operator[](index + 1).getTokenValue() == ":") {
-                        
                         auto label = parseLabel(index);
                         if (label) {
                             section->addStatement(std::move(label));
@@ -167,6 +177,17 @@ namespace mxvm {
         }
         
         return section;
+    }
+
+    std::unique_ptr<ModuleNode> Parser::parseModule(uint64_t& index) {
+        if(index >= scanner.size()) return nullptr;
+        std::string name = this->operator[](index).getTokenValue();
+        index++;
+        if(index < scanner.size()) {
+            if(this->operator[](index).getTokenValue() == ",")
+                index++;
+        }
+        return std::make_unique<ModuleNode>(name);
     }
     
     std::unique_ptr<VariableNode> Parser::parseDataVariable(uint64_t& index) {
@@ -417,6 +438,8 @@ namespace mxvm {
                     processDataSection(sectionNode, program);
                 } else if (sectionNode->type == SectionNode::CODE) {
                     processCodeSection(sectionNode, program);
+                } else if(sectionNode->type == SectionNode::MODULE) {
+                    processModuleSection(sectionNode, program);
                 }
             }
             if(mxvm::html_mode) {
@@ -531,6 +554,17 @@ namespace mxvm {
                 }
                 var.var_value.buffer_size = variableNode->buffer_size;
                 program->add_variable(var.var_name, var);
+            }
+        }
+    }
+
+    void Parser::processModuleSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
+        for(const auto &statement : sectionNode->statements) {
+            auto moduleNode = dynamic_cast<ModuleNode *>(statement.get());
+            if(moduleNode) {
+                // std::string &name = moduleNode->name;
+                //  read in module
+
             }
         }
     }

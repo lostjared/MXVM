@@ -32,7 +32,20 @@ namespace mxvm {
             std::string sectionName = token->getTokenValue(); next();
             require("{"); next();
 
-            if (sectionName == "data") {
+            if(sectionName == "module") {
+                while(token->getTokenValue() != "}") {
+                    if(token->getTokenType() == types::TokenType::TT_ID) {
+                        next();
+                        if(match(",")) {
+                            next();
+                            continue;
+                        }
+                    } else {
+                        throw mx::Exception("Requires module name on line: " + std::to_string(token->getLine()));
+                    }
+                }
+            }
+            else if (sectionName == "data")  {
                 while (token->getTokenValue() != "}") {
                     if (token->getTokenType() == types::TokenType::TT_ID &&
                         (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr"))
