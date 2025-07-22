@@ -128,6 +128,9 @@ namespace mxvm {
             case EXIT:
                 gen_exit(out, i);
                 break;
+            case MOV:
+                gen_mov(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction");
         }
@@ -317,6 +320,41 @@ namespace mxvm {
         out << "\tcall " << name << "\n";
         if (num_pushes > 0 || needs_dummy) {
             out << "\tadd $" << ((num_pushes + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
+        }
+    }
+
+    void Program::gen_mov(std::ostream &out, const Instruction &i) {
+        if(isVariable(i.op1.op)) {
+            Variable &v = getVariable(i.op1.op);
+            if(isVariable(i.op2.op)) {
+                Variable &v2 = getVariable(i.op2.op);
+                if(v2.type != v.type) {
+                    throw mx::Exception ("mov operand type mismatch. ");
+                }
+                switch(v.type) {
+                    case VarType::VAR_INTEGER:
+                        generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);    
+                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    break;
+                    case VarType::VAR_FLOAT:
+                        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                        out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                    break;
+                    case VarType::VAR_STRING:
+                    case VarType::VAR_POINTER:
+                        generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2);
+                        out << "\tmovq %rax, " << i.op2.op << "\n";
+                    break;
+                default:
+                    throw mx::Exception("type not supported for mov instruction.");
+                }
+            } else {
+                if(i.op2.type == OperandType::OP_CONSTANT) {
+                    out << "\tmovq $" << i.op2.op << ", " << i.op1.op <<  "(%rip)\n";
+                }
+            } 
+        } else {
+            throw mx::Exception("For mov command first operand should be a Variable");
         }
     }
 

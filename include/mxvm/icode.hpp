@@ -63,6 +63,7 @@ namespace mxvm {
         bool greater_flag = false;
         int xmm_offset = 0;
         
+        // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
         void generateInstruction(std::ostream &out, const Instruction  &i);
         int generateLoadVar(std::ostream &out, int reg, const Operand &op);
@@ -71,7 +72,9 @@ namespace mxvm {
         void gen_print(std::ostream &out, const Instruction &i);
         void gen_arth(std::ostream &out, std::string arth, const Instruction &i);
         void gen_exit(std::ostream &out, const Instruction &i);
+        void gen_mov(std::ostream &out, const Instruction &i);
 
+        // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
         void exec_sub(const Instruction& instr);
