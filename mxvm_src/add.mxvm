@@ -1,15 +1,18 @@
 program Add {
     section data {
-		string numbers = "%.02f + %.02f = %.02f%%\n"
+		string numbers = "%.02f / %.02f = %.02f%%\n"
 		float num1 = 5.0
         float num2 = 25.0
         float result = 0
+		int number1 = 25
+		int number2 = 5
+		string num_fmt = "%d * %d = %d\n";
 	}
     
 	section code {
 	start:
-	    add result, num1, num2
-        print numbers, num1, num2, result
+	    div result, num2, num1
+        print numbers, num2, num1, result
 		done
 	}
 }

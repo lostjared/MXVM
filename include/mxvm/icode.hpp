@@ -71,6 +71,7 @@ namespace mxvm {
         std::string getRegisterByIndex(int index, VarType type);
         void gen_print(std::ostream &out, const Instruction &i);
         void gen_arth(std::ostream &out, std::string arth, const Instruction &i);
+        void gen_div(std::ostream &out, const Instruction &i);
         void gen_exit(std::ostream &out, const Instruction &i);
         void gen_mov(std::ostream &out, const Instruction &i);
         void gen_jmp(std::ostream &out, const Instruction &i);

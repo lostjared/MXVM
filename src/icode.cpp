@@ -200,6 +200,9 @@ namespace mxvm {
             case NOT:
                 gen_not(out, i);
                 break;
+            case DIV:
+                gen_div(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -366,6 +369,51 @@ namespace mxvm {
         }
     }
 
+    void Program::gen_div(std::ostream &out, const Instruction &i) {
+        if (i.op3.op.empty()) {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\tcqto\n";
+                    out << "\tidivq %rcx\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else if (v.type == VarType::VAR_FLOAT) {
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                    out << "\tdivsd %xmm1, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("DIV: unsupported variable type");
+                }
+            } else {
+                throw mx::Exception("DIV: first argument must be a variable");
+            }
+        } else {
+            if (isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if (v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\tcqto\n";
+                    out << "\tidivq %rcx\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else if (v.type == VarType::VAR_FLOAT) {
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
+                    out << "\tdivsd %xmm1, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("DIV: unsupported variable type");
+                }
+            } else {
+                throw mx::Exception("DIV: first argument must be a variable");
+            }
+        }
+    }
+
+
     void Program::gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
         if (i.op3.op.empty()) {
             if (isVariable(i.op1.op)) {
@@ -457,6 +505,9 @@ namespace mxvm {
                 throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
             }
             Variable &v = getVariable(op.op);
+            if(v.type != type) {
+                throw mx::Exception ("Variable type mismatch: " + op.op);
+            }
             switch(v.type) {
                 case VarType::VAR_INTEGER:
                     out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
@@ -679,9 +730,11 @@ namespace mxvm {
          if(i.op3.op.empty()) {
             if(isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
-                if(v.type == VarType::VAR_INTEGER) {\
+                if(v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    if(arth == "mul")
+                        arth = "imul";
                     out << "\t" << arth << "q %rcx, %rax\n";
                     out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
@@ -702,6 +755,8 @@ namespace mxvm {
                 if(v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    if(arth == "mul")
+                        arth = "imul";
                     out << "\t" << arth << "q %rcx, %rax\n";
                     out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
