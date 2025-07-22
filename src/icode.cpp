@@ -115,7 +115,13 @@ namespace mxvm {
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {
         switch(i.instruction) {
             case ADD:
-                gen_add(out, i);
+                gen_arth(out, "add", i);
+                break;
+            case SUB:
+                gen_arth(out, "sub", i);
+                break;
+            case MUL:
+                gen_arth(out, "mul", i);
                 break;
             case PRINT:
                 gen_print(out, i);
@@ -129,7 +135,7 @@ namespace mxvm {
         int count = 0;
         if(isVariable(op.op)) {
             if(op.type != OperandType::OP_VARIABLE) {
-                throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
+                throw mx::Exception("Operand expected variable instead I found: " + op.op);
             }
             Variable &v = getVariable(op.op);
             std::string reg = getRegisterByIndex(r, v.type);
@@ -139,7 +145,7 @@ namespace mxvm {
                     count = 0;
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovsd " << op.op << "(%rip), " << reg << "\n";
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
@@ -158,7 +164,7 @@ namespace mxvm {
         return count;
     }
     
-    int Program::generateLoadVar(std::ostream &out, std::string reg, const Operand &op) {
+    int Program::generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op) {
         int count = 0;
         if(isVariable(op.op)) {
             if(op.type != OperandType::OP_VARIABLE) {
@@ -170,10 +176,10 @@ namespace mxvm {
                     out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
-                /*case VarType::VAR_FLOAT:
-                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd " << op.op << "(%rip), " << reg << "\n";
                     count = 1;
-                break;*/
+                break;
                 case VarType::VAR_STRING:
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
@@ -183,8 +189,10 @@ namespace mxvm {
             }
         }
         else {
-            if(op.type == OperandType::OP_CONSTANT) {
+            if(op.type == OperandType::OP_CONSTANT && type == VarType::VAR_INTEGER) {
                 out << "\tmovq $" << op.op << ", " << reg << "\n";
+            } else if(op.type == OperandType::OP_CONSTANT && type == VarType::VAR_FLOAT) {
+                throw mx::Exception("You cannot use a constant with a floating point variable.");
             }
         }
         return count;
@@ -225,17 +233,46 @@ namespace mxvm {
         out << "\tcall printf\n";
     }
 
-    void Program::gen_add(std::ostream &out, const Instruction &i) {
+    void Program::gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
          if(i.op3.op.empty()) {
-            generateLoadVar(out, "%rax", i.op1);
-            generateLoadVar(out, "%rcx", i.op2);
-            out << "\taddq %rcx, %rax\n";
-            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            if(isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if(v.type == VarType::VAR_INTEGER) {\
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\t" << arth << "q %rcx, %rax\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else if(v.type == VarType::VAR_FLOAT) {
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                } else {
+                    // not im plement
+                    throw mx::Exception("Variable type not impelmented for add function");
+                }
+            } else {
+                throw mx::Exception("First argument of add instruction must ba a variable.");
+            }
          } else {
-            generateLoadVar(out, "%rax", i.op2);
-            generateLoadVar(out, "%rcx", i.op3);
-            out << "\taddq %rcx, %rax\n";
-            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            if(isVariable(i.op1.op)) {
+                Variable &v = getVariable(i.op1.op);
+                if(v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\t" << arth << "q %rcx, %rax\n";
+                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                } else if(v.type == VarType::VAR_FLOAT) {
+                    generateLoadVar(out,VarType::VAR_FLOAT,"%xmm0", i.op2);
+                    generateLoadVar(out,VarType::VAR_FLOAT, "%xmm1", i.op3);
+                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                } else {
+                    throw mx::Exception("Variable type not impelmented for add function");
+                }
+            } else{
+                throw mx::Exception("First argument of add instruction must be a variable.\n");
+            }
          }
     }
 
@@ -1133,163 +1170,90 @@ namespace mxvm {
             }
         }
 
+        std::ostringstream oss;
         size_t argIndex = 0;
-        std::string result;
+        const char* fmt = format.c_str();
+        char buffer[4096];
+
         for (size_t i = 0; i < format.length(); ++i) {
-            if (format[i] == '%' && i + 1 < format.length()) {
-                char specifier = format[i + 1];
-                if(format[i + 1] == '%') {
-                    result += "%";
-                    i++;
+            if (fmt[i] == '%' && i + 1 < format.length()) {
+                size_t start = i;
+                size_t j = i + 1;
+                if (j < format.length() && fmt[j] == '%') { 
+                    oss << '%';
+                    i = j;
                     continue;
                 }
+                if (fmt[j] == '\0') break;
+                std::string spec(fmt + start, fmt + j + 1);
                 if (argIndex < args.size()) {
                     Variable* arg = args[argIndex++];
-                    switch (specifier) {
-                        case 'd':
-                            if(arg->var_value.type == VarType::VAR_INTEGER)
-                                result += std::to_string(arg->var_value.int_value);
-                            else if(arg->var_value.type == VarType::VAR_FLOAT)
-                                result += std::to_string(static_cast<int64_t>(arg->var_value.float_value));
-                            break;
-                        case 'f':
-                            if(arg->var_value.type == VarType::VAR_INTEGER)
-                                result += std::to_string(static_cast<double>(arg->var_value.int_value));
-                            else if(arg->var_value.type == VarType::VAR_FLOAT)
-                                result += std::to_string(arg->var_value.float_value);
-                            break;
-                        case 's':
-                            result += arg->var_value.str_value;
-                            break;
-                        case 'b': {
-                            std::string bin;
-                            uint64_t val = arg->var_value.int_value;
-                            if (val == 0) {
-                                bin = "0";
-                            } else {
-                                while (val) {
-                                    bin = (val % 2 ? "1" : "0") + bin;
-                                    val /= 2;
-                                }
-                            }
-                            result += bin;
-                        }
-                            break;
-                        case 'x': {
-                            std::ostringstream oss;
-                            oss << "0x" << std::uppercase << std::hex << arg->var_value.int_value;
-                            result += oss.str();
-                        }
-                            break;
-                        case 'p':
-                            if(arg->var_value.type == VarType::VAR_POINTER)  {
-                                if(arg->var_value.ptr_value == nullptr)
-                                    result += "null";
-                                else {
-                                    std::ostringstream oss;
-                                    oss << "0x" << std::hex << reinterpret_cast<uintptr_t>(arg->var_value.ptr_value);
-                                    result += oss.str();
-                                }
-                            }
-                        break;
-                        case '%':
-                            result += "%";
-                        break;
-                        default:
-                            result += format[i];
-                            result += format[i + 1];
-                            break;
+                    if (arg->var_value.type == VarType::VAR_INTEGER) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
+                    } else if (arg->var_value.type == VarType::VAR_POINTER) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                    } else if (arg->var_value.type == VarType::VAR_FLOAT) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
+                    } else if (arg->var_value.type == VarType::VAR_STRING) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.str_value.c_str());
+                    } else {
+                        std::snprintf(buffer, sizeof(buffer), "%s", "(unsupported)");
                     }
-                    i++; 
+                    oss << buffer;
                 } else {
-                    result += format[i];
+                    oss << spec; 
                 }
+                i = j;
             } else {
-                result += format[i];
+                oss << fmt[i];
             }
         }
-        dest.var_value.str_value = result;
+        
+        dest.var_value.str_value = oss.str();
         dest.var_value.type = VarType::VAR_STRING;
     }
     
     void Program::printFormatted(const std::string& format, const std::vector<Variable*>& args) {
+        std::ostringstream oss;
         size_t argIndex = 0;
-        std::string result;
-        
+        const char* fmt = format.c_str();
+        char buffer[4096];
         for (size_t i = 0; i < format.length(); ++i) {
-            if (format[i] == '%' && i + 1 < format.length()) {
-                char specifier = format[i + 1];
-                if(format[i + 1] == '%') {
-                    result += "%";
-                    i++;
+            if (fmt[i] == '%' && i+1 < format.length()) {
+                size_t start = i;
+                size_t j = i + 1;
+                if (j < format.length() && fmt[j] == '%') { 
+                    oss << '%';
+                    i = j;
                     continue;
                 }
-
+                if (fmt[j] == '\0') break;
+                std::string spec(fmt + start, fmt + j + 1);
                 if (argIndex < args.size()) {
+
                     Variable* arg = args[argIndex++];
-                    switch (specifier) {
-                        case 'd':
-                            if(arg->var_value.type == VarType::VAR_INTEGER)
-                                result += std::to_string(arg->var_value.int_value);
-                            else if(arg->var_value.type == VarType::VAR_FLOAT)
-                                result += std::to_string(static_cast<int64_t>(arg->var_value.float_value));
-                            break;
-                        case 'f':
-                            if(arg->var_value.type == VarType::VAR_INTEGER)
-                                result += std::to_string(static_cast<double>(arg->var_value.int_value));
-                            else if(arg->var_value.type == VarType::VAR_FLOAT)
-                                result += std::to_string(arg->var_value.float_value);
-                            break;
-                        case 's':
-                            result += arg->var_value.str_value;
-                            break;
-                        case 'b': {
-                            std::string bin;
-                            uint64_t val = arg->var_value.int_value;
-                            if (val == 0) {
-                                bin = "0";
-                            } else {
-                                while (val) {
-                                    bin = (val % 2 ? "1" : "0") + bin;
-                                    val /= 2;
-                                }
-                            }
-                            result += bin;
-                        }
-                            break;
-                        case 'x': {
-                            std::ostringstream oss;
-                            oss << "0x" << std::uppercase << std::hex << arg->var_value.int_value;
-                            result += oss.str();
-                        }
-                            break;
-                        case 'p':
-                            if(arg->var_value.type == VarType::VAR_POINTER)  {
-                                if(arg->var_value.ptr_value == nullptr)
-                                    result += "null";
-                                else {
-                                    std::ostringstream oss;
-                                    oss << "0x" << std::hex << reinterpret_cast<uintptr_t>(arg->var_value.ptr_value);
-                                    result += oss.str();
-                                }
-                            }
-                        break;
-                        default:
-                            result += format[i];
-                            result += format[i + 1];
-                            break;
+                    if (arg->var_value.type == VarType::VAR_INTEGER) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
+                    } else if (arg->var_value.type == VarType::VAR_POINTER) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                    } else if (arg->var_value.type == VarType::VAR_FLOAT) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
+                    } else if (arg->var_value.type == VarType::VAR_STRING) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.str_value.c_str());
+                    } else {
+                        std::snprintf(buffer, sizeof(buffer), "%s", "(unsupported)");
                     }
-                    i++; 
+                    oss << buffer;
                 } else {
-                    result += format[i];
+                    oss << spec; 
                 }
+                i = j;
             } else {
-                result += format[i];
+                oss << fmt[i];
             }
         }
-        std::cout << result;
+        std::cout << oss.str();
     }
-
     void Program::exec_getline(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("GETLINE destination must be a variable");

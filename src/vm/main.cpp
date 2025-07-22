@@ -146,21 +146,23 @@ void translate_x64_linux(std::string_view input, std::string_view output) {
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         if(parser.generateProgramCode(program)) {
+            std::string output_file(output);
+            std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
             std::fstream file;
-            file.open(program->name + ".s", std::ios::out);
+            file.open(program_name, std::ios::out);
             if(file.is_open()) {
                 program->generateCode(file);
                 file.close();
-                std::cout << "translated: " << program->name + ".s\n";
+                std::cout << "translated: " << program_name << "\n";
             }
         } else {
             std::cerr << "Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
     } catch(const mx::Exception &e) {
-        std::cerr << "Error: " << e.what() << "\n";
-    } catch(const std::exception &e) { 
         std::cerr << "Exception: " << e.what() << "\n";
+    } catch(const std::runtime_error &e) {
+        std::cerr << "Runtime Error: " << e.what() << "\n";
     }
 }
 
@@ -188,10 +190,10 @@ void action_interpret(std::string_view input) {
             std::cerr << "Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
-    } catch(mx::Exception &e) {
-        std::cerr << "Runtime Error: "<< e.what() << "\n";
-    } catch(std::runtime_error &e) {
+    } catch(const mx::Exception &e) {
+        std::cerr << "Exception: "<< e.what() << "\n";
+    } catch(const std::runtime_error &e) {
         std::cerr << "Runtime Error: " << e.what() << "\n";
-    }
+    } 
 }
 

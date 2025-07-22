@@ -1,15 +1,20 @@
 program Hello {
 	
     section data {
-		string hello = "Hello, World!: %d\n"
-		int value = 100
-		int f = 1
-		int result = 0
+		string hello = "%.02f + %.02f = %.02f\n"
+		string minus = "%.02f - %.02f = %0.2f\n"
+		float x = 10.0
+		float y = 1.0
+		float v = 5.0
+		float result = 0
+		float sub_result = 0
 	}
     
 	section code {
 	start:
-	    add result, value, f
-        print hello, result
+	    add result, x, y
+        print hello, x,  y, result
+		sub sub_result, result, v
+		print minus, result, v, sub_result
 	}
 }

@@ -65,10 +65,10 @@ namespace mxvm {
         
         void generateInstruction(std::ostream &out, const Instruction  &i);
         int generateLoadVar(std::ostream &out, int reg, const Operand &op);
-        int generateLoadVar(std::ostream &out, std::string reg, const Operand &op);
+        int generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);
         std::string getRegisterByIndex(int index, VarType type);
         void gen_print(std::ostream &out, const Instruction &i);
-        void gen_add(std::ostream &out, const Instruction &i);
+        void gen_arth(std::ostream &out, std::string arth, const Instruction &i);
 
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
