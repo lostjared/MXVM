@@ -6,6 +6,8 @@
 #include<string>
 #include<string_view>
 #include<memory>
+#include<filesystem>
+
 
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
@@ -111,6 +113,12 @@ int main(int argc, char **argv) {
 }
 
 void process_arguments(Args *args) { 
+
+    if(!std::filesystem::is_regular_file(args->source_file) || !std::filesystem::exists(args->source_file)) {
+        std::cerr << "Error: input file: " << args->source_file << " does not exist or is not regular file.\n";
+        exit(EXIT_FAILURE);
+    }
+
     if(args->action == vm_action::translate) {
         action_translate(args->source_file, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
