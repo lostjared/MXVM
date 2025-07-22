@@ -63,6 +63,7 @@ namespace mxvm {
         bool greater_flag = false;
         int xmm_offset = 0;
         
+        void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
         void generateInstruction(std::ostream &out, const Instruction  &i);
         int generateLoadVar(std::ostream &out, int reg, const Operand &op);
         int generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);

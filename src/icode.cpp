@@ -151,6 +151,7 @@ namespace mxvm {
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
+                case VarType::VAR_POINTER:
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
                 break;
@@ -183,6 +184,7 @@ namespace mxvm {
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
+                case VarType::VAR_POINTER:
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
                 break;
@@ -260,6 +262,64 @@ namespace mxvm {
         }
     }
 
+    void Program::generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op) {
+        if(op.empty()) {
+            out << "\tcall name\n";
+            return;
+        }
+        xmm_offset = 0;
+        if(isVariable(op[0].op)) {
+            Variable &v = getVariable(op[0].op);
+            switch(v.type) {
+                case VarType::VAR_INTEGER:
+                out << "\tmovq " << op[0].op << "(%rip), %rdi\n";
+                break;
+                case VarType::VAR_STRING:
+                case VarType::VAR_POINTER:
+                out << "\tleaq " << op[0].op << "(%rip), %rdi\n";
+                break;
+            default:
+                throw mx::Exception("Argument type not supported yet\n");
+            }
+        } else if(op[0].type == OperandType::OP_CONSTANT) {
+                out << "\tmovq $" << op[0].op << ", %rdi\n";
+        }
+        std::vector<Operand> args;
+        for(size_t i = 1; i < op.size(); ++i) {
+            if(!op[i].op.empty()) {
+                args.push_back(op[i]);
+            }
+        }
+        int total = 0;
+        int stack_arg = 0;
+        int reg_count = 1;
+        size_t num_pushes = (args.size() > 5) ? (args.size() - 5) : 0;
+        bool needs_dummy = (num_pushes % 2 != 0);
+        if(needs_dummy) {
+            out << "\tsub $8, %rsp\n";
+        }
+        for (size_t idx = args.size() - 1; idx >= 5 && idx < args.size(); --idx) {
+            if(isVariable(args[idx].op)) {
+                Variable &v = getVariable(args[idx].op);
+                if(v.type == VarType::VAR_INTEGER) {
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
+                    out << "\tpushq %rax\n";
+                    ++stack_arg;
+                } 
+            } else {
+                out << "\tpushq $" << args[idx].op << "\n";
+            }
+        }
+        reg_count = 1;
+        for(size_t z = 0; z < args.size() && reg_count < 6; ++z, ++reg_count) {
+            total += generateLoadVar(out, reg_count, args[z]);
+        }
+        out << "\tcall " << name << "\n";
+        if (num_pushes > 0 || needs_dummy) {
+            out << "\tadd $" << ((num_pushes + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
+        }
+    }
+
     void Program::gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
          if(i.op3.op.empty()) {
             if(isVariable(i.op1.op)) {
@@ -305,8 +365,9 @@ namespace mxvm {
 
     void Program::gen_exit(std::ostream &out, const Instruction &i) {
         if(!i.op1.op.empty()) {
-            generateLoadVar(out, 0, i.op1);
-            out << "\tcall exit\n";
+            std::vector<Operand> opz;
+            opz.push_back(i.op1);
+            generateFunctionCall(out, "exit", opz);
         } else {
             throw mx::Exception("exit requires argument.\n");
         }
