@@ -125,6 +125,9 @@ namespace mxvm {
             case PRINT:
                 gen_print(out, i);
                 break;
+            case EXIT:
+                gen_exit(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction");
         }
@@ -298,6 +301,15 @@ namespace mxvm {
                 throw mx::Exception("First argument of add instruction must be a variable.\n");
             }
          }
+    }
+
+    void Program::gen_exit(std::ostream &out, const Instruction &i) {
+        if(!i.op1.op.empty()) {
+            generateLoadVar(out, 0, i.op1);
+            out << "\tcall exit\n";
+        } else {
+            throw mx::Exception("exit requires argument.\n");
+        }
     }
 
     void Program::stop() {

@@ -457,7 +457,7 @@ namespace mxvm {
             switch (var.type) {
                 case VarType::VAR_INTEGER: out << var.var_value.int_value; break;
                 case VarType::VAR_FLOAT: out << var.var_value.float_value; break;
-                case VarType::VAR_STRING: out << var.var_value.str_value; break;
+                case VarType::VAR_STRING: out << Program::escapeNewLines(var.var_value.str_value); break;
                 case VarType::VAR_POINTER: out << (var.var_value.ptr_value ? "0x" + std::to_string(reinterpret_cast<uintptr_t>(var.var_value.ptr_value)) : "null"); break;
                 case VarType::VAR_LABEL: out << var.var_value.label_value; break;
                 default: out << ""; break;

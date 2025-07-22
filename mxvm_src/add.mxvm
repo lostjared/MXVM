@@ -1,0 +1,14 @@
+program Add {
+    section data {
+		string numbers = "%.02f + %.02f = %.02f%%\n"
+		float num1 = 5.0
+        float num2 = 25.0
+        float result = 0
+	}
+    
+	section code {
+	start:
+	    add result, num1, num2
+        print numbers, num1, num2, result
+	}
+}

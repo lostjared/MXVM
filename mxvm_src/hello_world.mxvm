@@ -1,0 +1,9 @@
+program HelloWorld {
+    section data {
+        string data = "Hello, World!\n"
+	}
+	section code {
+	start:
+	    print data
+	}
+}
