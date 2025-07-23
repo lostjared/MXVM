@@ -37,6 +37,8 @@ namespace mxvm {
 
     using runtime_call = std::function<Operand(Program *program, std::vector<Operand> &operands)>;
 
+    
+
     class RuntimeFunction {
     public:
         RuntimeFunction() : func(nullptr), handle(nullptr) {}
@@ -57,6 +59,8 @@ namespace mxvm {
         void *func = nullptr;
         void *handle = nullptr;
         std::string mod_name;
+        std::string fname;
+        static std::unordered_map<std::string, void *> handles;
     };
 
     class Base {

@@ -31,10 +31,33 @@ namespace mxvm {
                 }
             }
         }
+
+        for(auto &h : RuntimeFunction::handles) {
+            if(h.second) {
+                dlclose(h.second);
+                char *errf = dlerror();
+                if(errf != nullptr) {
+                    std::cerr << "Error releaseing module: " << errf << "\n";
+                } else {
+                    if(mxvm::debug_mode) {
+                        std::cout << "Released module: " << h.first << "\n";
+                    }
+                }
+            }
+        }
     }
 
+    std::unordered_map<std::string, void *> RuntimeFunction::handles;
+
     RuntimeFunction::RuntimeFunction(const std::string &mod, const std::string &name) {
-        handle = dlopen(mod.c_str(), RTLD_LAZY);
+        fname = name;
+        handle = nullptr;
+        if(handles.find(mod) == handles.end()) {
+            handle = dlopen(mod.c_str(), RTLD_LAZY);
+            handles[mod] = handle;    
+        } else {
+            handle = handles[mod];
+        }
         if(handle == nullptr) {
             throw mx::Exception("Error could not open module: " + mod);
         }
@@ -50,7 +73,7 @@ namespace mxvm {
     
     Operand RuntimeFunction::call(Program *program, std::vector<Operand> &operands) {
         if (!func || !handle) {
-            throw mx::Exception("RuntimeFunction: function pointer is null");
+            throw mx::Exception("RuntimeFunction: function: " + this->fname + " pointer is null: " + this->mod_name);
         }
         using FuncType = Operand(*)(Program *program, std::vector<Operand>&);
         FuncType f = reinterpret_cast<FuncType>(func);
@@ -74,6 +97,10 @@ namespace mxvm {
     }
     
     void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
+
+        if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty())
+            return;
+
         if(external_functions.find(name) == external_functions.end()) {
             external_functions[name] = RuntimeFunction(mod, func_name);
             external_functions[name].mod_name = mod_name;
