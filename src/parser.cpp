@@ -563,14 +563,20 @@ namespace mxvm {
         for(const auto &statement : sectionNode->statements) {
             auto moduleNode = dynamic_cast<ModuleNode *>(statement.get());
             if(moduleNode) {
-                // std::string &name = moduleNode->name;
-                // read in module
-                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fopen", "fopen");
-                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fprintf", "fprintf");
-                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fclose", "fclose");   
+                std::string &name = moduleNode->name;
+                processModuleFile(name, program);
             }
         }
     }
+
+    void Parser::processModuleFile(const std::string &src, std::unique_ptr<Program> &program) {
+        if(src == "io") {
+            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fopen", "fopen");
+            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fprintf", "fprintf");
+            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fclose", "fclose");  
+        }
+    }
+
 
     void Parser::processCodeSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
         std::unordered_map<std::string, size_t> labelMap; 

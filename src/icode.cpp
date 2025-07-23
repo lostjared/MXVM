@@ -71,8 +71,10 @@ namespace mxvm {
     }
     
     void Base::add_runtime_extern(const std::string &mod, const std::string &func_name, const std::string &name) {
-        external.push_back(name);
-        external_functions[name] = RuntimeFunction(mod, func_name);
+        if(external_functions.find(name) == external_functions.end()) {
+            external.push_back(name);
+            external_functions[name] = RuntimeFunction(mod, func_name);
+        }
     }
 
     std::string Program::escapeNewLines(const std::string& input) {
