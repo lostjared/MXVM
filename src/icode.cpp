@@ -9,7 +9,12 @@
 namespace mxvm {
 
     Program::Program() : pc(0), running(false) {
-
+        add_variable("stdout", Variable());
+        vars["stdout"].type = VarType::VAR_EXTERN;
+        add_variable("stderr", Variable());
+        vars["stderr"].type = VarType::VAR_EXTERN;
+        add_variable("stdin", Variable());
+        vars["stdin"].type = VarType::VAR_EXTERN;
     }
 
     Program::~Program() {
@@ -67,7 +72,6 @@ namespace mxvm {
             labels_[l.second.first] = l.first;
         }
         out << ".section .data\n";
-        out << "\t.extern stdin, stdout, stderr\n";
         std::vector<std::string> var_names;
         for(auto &v : vars) {
             var_names.push_back(v.first);
@@ -81,6 +85,11 @@ namespace mxvm {
             if(vars[v].type == VarType::VAR_FLOAT) {
                 out << "\t" << v<< ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
+            }
+        }
+        for(auto &v : var_names) {
+            if(vars[v].type == VarType::VAR_EXTERN) {
+                out << "\t.extern "<< v << "\n";
             }
         }
         out << ".section .rodata\n";
@@ -244,6 +253,12 @@ namespace mxvm {
             case TO_FLOAT:
                 gen_to_float(out, i);
                 break;
+            case INVOKE:
+                gen_invoke(out, i);
+                break;
+            case RETURN:
+                gen_return(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -258,6 +273,35 @@ namespace mxvm {
         out << "\tmov %rbp, %rsp\n";
         out << "\tpop %rbp\n";
         out << "\tret\n";
+    }
+
+    void Program::gen_return(std::ostream &out, const Instruction &i) {
+        if(isVariable(i.op1.op)) {
+            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+        } else {
+            throw mx::Exception("return requires variable\n");
+        }
+    }
+
+    void Program::gen_invoke(std::ostream &out, const Instruction &i) {
+        if(!i.op1.op.empty()) {
+            std::vector<Operand> op;
+            op.push_back(i.op1);
+            if(!i.op2.op.empty()) {
+                op.push_back(i.op2);
+               if(!i.op3.op.empty()) {
+                    op.push_back(i.op3);
+                    for(size_t z = 0; z < i.vop.size(); ++z) {
+                        if(!i.vop[z].op.empty()) {
+                            op.push_back(i.vop[z]);
+                        }
+                    }
+                }
+            }
+            generateInvokeCall(out, op);
+        } else {
+            throw mx::Exception("invoke instruction requires operand of instruction name");
+        }
     }
 
     void Program::gen_call(std::ostream &out, const Instruction &i) {
@@ -844,9 +888,20 @@ namespace mxvm {
         }
     }
 
+    void Program::generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
+        if(!op.empty()  && !op[0].op.empty()) {
+            std::string name = op[0].op;
+            std::vector<Operand> opz;
+            for(size_t i = 1; i < op.size(); ++i) 
+                opz.push_back(op[i]);
+
+            generateFunctionCall(out, name, opz);
+        }
+    }
+
     void Program::generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op) {
         if(op.empty()) {
-            out << "\tcall name\n";
+            out << "\tcall " << name << "\n";
             return;
         }
         xmm_offset = 0;
@@ -854,10 +909,11 @@ namespace mxvm {
             Variable &v = getVariable(op[0].op);
             switch(v.type) {
                 case VarType::VAR_INTEGER:
+                case VarType::VAR_EXTERN:
+                case VarType::VAR_POINTER:
                 out << "\tmovq " << op[0].op << "(%rip), %rdi\n";
                 break;
                 case VarType::VAR_STRING:
-                case VarType::VAR_POINTER:
                 out << "\tleaq " << op[0].op << "(%rip), %rdi\n";
                 break;
             default:
@@ -883,8 +939,8 @@ namespace mxvm {
         for (size_t idx = args.size() - 1; idx >= 5 && idx < args.size(); --idx) {
             if(isVariable(args[idx].op)) {
                 Variable &v = getVariable(args[idx].op);
-                if(v.type == VarType::VAR_INTEGER) {
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
+                if(v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_EXTERN) {
+                    generateLoadVar(out, v.type, "%rax", args[idx]);
                     out << "\tpushq %rax\n";
                     ++stack_arg;
                 } 
@@ -1131,6 +1187,12 @@ namespace mxvm {
                     break;
                 case TO_FLOAT:
                     exec_to_float(instr);
+                    break;
+                case INVOKE:
+                    exec_invoke(instr);
+                    break;
+                case RETURN:
+                    exec_return(instr);
                     break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
@@ -2254,7 +2316,10 @@ namespace mxvm {
             throw mx::Exception("to_float first argument must be a variable");
         }
     }
-        
+
+    void Program::exec_return(const Instruction &instr) {
+
+    }
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {
         Variable temp;
@@ -2404,6 +2469,10 @@ namespace mxvm {
             }
         }
         out << "\n";
+    }
+
+    void Program::exec_invoke(const Instruction  &i) {
+
     }
 
     void Program::post(std::ostream &out) {

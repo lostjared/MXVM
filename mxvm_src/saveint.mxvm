@@ -21,6 +21,9 @@ program SaveInt {
                 string enter_msg = "Collecting: %d numbers at %p\n"
                 string output_msg = "Collected %d numbers:\n"
                 string the_total = "The total is: %d\n"
+                string filename = "text.txt"
+                string rb_mode - "w";
+                string data_w = "value"
         }
 	section code {
                 print ask

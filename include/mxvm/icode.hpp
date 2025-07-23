@@ -67,6 +67,7 @@ namespace mxvm {
         
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
+        void generateInvokeCall(std::ostream &out, std::vector<Operand> &op);
         void generateInstruction(std::ostream &out, const Instruction  &i);
         int generateLoadVar(std::ostream &out, int reg, const Operand &op);
         int generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);
@@ -96,6 +97,8 @@ namespace mxvm {
         void gen_getline(std::ostream &out, const Instruction &i);
         void gen_to_int(std::ostream &out, const Instruction &i);
         void gen_to_float(std::ostream &out, const Instruction  &i);
+        void gen_invoke(std::ostream &out, const Instruction &i);
+        void gen_return(std::ostream &out, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
@@ -137,6 +140,8 @@ namespace mxvm {
         void exec_done(const Instruction &instr); 
         void exec_to_int(const Instruction &instr);
         void exec_to_float(const Instruction &instr);
+        void exec_invoke(const Instruction  &instr);
+        void exec_return(const Instruction &instr);
 
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);

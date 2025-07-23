@@ -5,7 +5,7 @@
 #include<vector>
 #include<cstdint>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT };
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN };
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -48,7 +48,9 @@ inline std::vector<std::string> IncType {
     "string_print", // STRING_PRINT = 37
     "done",     // DONE = 38
     "to_int",   // TO_INT = 39
-    "to_float" // TO_INT = 40
+    "to_float", // TO_INT = 40
+    "invoke", // INVOKE = 41
+    "return" // RETURN
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);
@@ -72,7 +74,7 @@ namespace mxvm {
         std::string label = "";
     };
 
-    enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY };
+    enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY, VAR_EXTERN };
 
     struct Variable_Value {
         std::string str_value;

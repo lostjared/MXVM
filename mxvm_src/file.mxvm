@@ -1,0 +1,23 @@
+program File {
+
+    section module {
+        io
+    }
+
+    section data {
+        ptr handle = null
+        string filename = "test.txt"
+        string mode = "w"
+        string text = "Hello, World"
+
+    }
+    
+    section code {
+    start:
+        invoke fopen, filename, mode
+        return handle
+        invoke fprintf, handle, text
+        invoke fclose, handle
+        done
+    }
+}
