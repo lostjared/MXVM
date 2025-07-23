@@ -12,10 +12,13 @@ namespace mxvm {
     Program::Program() : pc(0), running(false) {
         add_variable("stdout", Variable());
         vars["stdout"].type = VarType::VAR_EXTERN;
+        vars["stdout"].var_value.ptr_value = stdout;
         add_variable("stderr", Variable());
         vars["stderr"].type = VarType::VAR_EXTERN;
+        vars["stderr"].var_value.ptr_value = stderr;
         add_variable("stdin", Variable());
         vars["stdin"].type = VarType::VAR_EXTERN;
+        vars["stdin"].var_value.ptr_value = stdin;
     }
 
     Program::~Program() {
@@ -677,10 +680,10 @@ namespace mxvm {
     void Program::gen_push(std::ostream &out, const Instruction &i) {
         if (isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
-            if (v.type == VarType::VAR_INTEGER) {
+            if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
                 out << "\tmovq " << i.op1.op << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
-            } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_STRING) {
+            } else if (v.type == VarType::VAR_STRING) {
                 out << "\tleaq " << i.op1.op << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
             } else {
@@ -702,7 +705,7 @@ namespace mxvm {
         if (v.type == VarType::VAR_INTEGER) {
             out << "\tpopq %rax\n";
             out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
-        } else if (v.type == VarType::VAR_POINTER) {
+        } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
             out << "\tpopq %rax\n";
             out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
         } else {
@@ -761,6 +764,8 @@ namespace mxvm {
             std::string reg = getRegisterByIndex(r, v.type);
             switch(v.type) {
                 case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
                     out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
@@ -769,7 +774,6 @@ namespace mxvm {
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
-                case VarType::VAR_POINTER:
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
                 break;
@@ -797,6 +801,8 @@ namespace mxvm {
             }
             switch(v.type) {
                 case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
                     out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
@@ -805,7 +811,6 @@ namespace mxvm {
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
-                case VarType::VAR_POINTER:
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
                 break;
@@ -824,7 +829,7 @@ namespace mxvm {
     }
 
     std::string Program::getRegisterByIndex(int index, VarType type) {
-        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING || type == VarType::VAR_POINTER)) {
+        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING || type == VarType::VAR_POINTER || type == VarType::VAR_EXTERN)) {
             static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
             return reg[index];
         } else if(index < 9 && type == VarType::VAR_FLOAT) {
@@ -1003,12 +1008,17 @@ namespace mxvm {
                         generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);    
                         out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
                     break;
+                    case VarType::VAR_POINTER:
+                    case VarType::VAR_EXTERN:
+                        generateLoadVar(out, v.type, "%rax", i.op2);    
+                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    break;
                     case VarType::VAR_FLOAT:
                         generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
                         out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
                     break;
+
                     case VarType::VAR_STRING:
-                    case VarType::VAR_POINTER:
                         generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2);
                         out << "\tmovq %rax, " << i.op2.op << "\n";
                     break;
@@ -2022,7 +2032,7 @@ namespace mxvm {
                     Variable* arg = args[argIndex++];
                     if (arg->var_value.type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
-                    } else if (arg->var_value.type == VarType::VAR_POINTER) {
+                    } else if (arg->var_value.type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
                     } else if (arg->var_value.type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
@@ -2076,7 +2086,7 @@ namespace mxvm {
                     Variable* arg = args[argIndex++];
                     if (arg->var_value.type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
-                    } else if (arg->var_value.type == VarType::VAR_POINTER) {
+                    } else if (arg->var_value.type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
                     } else if (arg->var_value.type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
@@ -2131,7 +2141,7 @@ namespace mxvm {
         Variable& var = getVariable(instr.op1.op);
         if (var.var_value.type == VarType::VAR_INTEGER) {
             stack.push(var.var_value.int_value);
-        } else if (var.var_value.type == VarType::VAR_POINTER) {
+        } else if (var.var_value.type == VarType::VAR_POINTER || var.var_value.type == VarType::VAR_EXTERN) {
             stack.push(var.var_value.ptr_value);
         } else {
             throw mx::Exception("PUSH only supports integer or pointer types");
@@ -2163,7 +2173,14 @@ namespace mxvm {
             }
             var.var_value.ptr_value = std::get<void*>(value);
             var.var_value.type = VarType::VAR_POINTER;
-        } else {
+        } else if (var.type == VarType::VAR_EXTERN) {
+            if (!std::holds_alternative<void*>(value)) {
+                throw mx::Exception("POP type mismatch: expected pointer, integer found.");
+            }
+            var.var_value.ptr_value = std::get<void*>(value);
+            var.var_value.type = VarType::VAR_EXTERN;
+        } 
+        else {
             throw mx::Exception("POP only supports integer or pointer variables");
         }
     }
@@ -2416,6 +2433,7 @@ namespace mxvm {
                     case VarType::VAR_STRING: typeStr = "string"; break;
                     case VarType::VAR_POINTER: typeStr = "ptr"; break;
                     case VarType::VAR_LABEL: typeStr = "label"; break;
+                    case VarType::VAR_EXTERN: typeStr = "external"; break;
                     case VarType::VAR_ARRAY: typeStr = "array"; break;
                     default: typeStr = "unknown"; break;
                 }

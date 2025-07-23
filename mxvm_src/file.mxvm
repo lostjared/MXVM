@@ -6,7 +6,7 @@ program File {
         ptr handle = null
         string filename = "test.txt"
         string mode = "w"
-        string text = "Hello, World"
+        string text = "Hello, World\n"
 
     }
     section code {
@@ -15,6 +15,7 @@ program File {
         return handle
         invoke fprintf, handle, text
         invoke fclose, handle
+        invoke fprintf, stderr, text
         done
     }
 }

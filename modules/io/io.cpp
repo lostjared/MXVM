@@ -61,7 +61,7 @@ extern "C" mxvm::Operand mxvm_io_fprintf(mxvm::Program *program, std::vector<mxv
             }
             std::string value = program->printFormatted(fmtv.var_value.str_value, v, false);
             mxvm::Variable &vx = program->getVariable(operand[0].op);
-            if(vx.type == mxvm::VarType::VAR_POINTER) {
+            if(vx.type == mxvm::VarType::VAR_POINTER || vx.type == mxvm::VarType::VAR_EXTERN) {
                 FILE *fptr = reinterpret_cast<FILE *>(vx.var_value.ptr_value);
                 fprintf(fptr, "%s", value.c_str());
             }
