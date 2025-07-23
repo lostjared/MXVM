@@ -53,9 +53,12 @@ namespace mxvm {
         return scanner[0];
     }
 
-    bool ModuleParser::generateProgramCode(const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program) {
+    bool ModuleParser::generateProgramCode(const Mode &m, const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program) {
         for(auto &f : functions) {
-            program->add_runtime_extern(mod_name, "mxvm_" + mod_id + "_" + f.name, f.name);
+            if(m == Mode::MODE_INTERPRET)
+                program->add_runtime_extern(mod_name, "mxvm_" + mod_id + "_" + f.name, f.name);
+            else 
+                program->add_extern(f.name);
         }
         return true;
     }
@@ -492,7 +495,8 @@ namespace mxvm {
         }
     }
 
-    bool Parser::generateProgramCode(std::unique_ptr<Program> &program) {
+    bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
+        parser_mode = mode;
         try {
             if(!validator.validate()) {
                 return false;
@@ -662,7 +666,7 @@ namespace mxvm {
         data << file.rdbuf();
         ModuleParser mod_parser(data.str());
         if(mod_parser.scan() > 0) {
-            if(mod_parser.parse() && mod_parser.generateProgramCode(src, module_path_so, program)) {
+            if(mod_parser.parse() && mod_parser.generateProgramCode(parser_mode, src, module_path_so, program)) {
                 return;
             } else {
                 throw mx::Exception("Error parsing module file.\n");

@@ -165,7 +165,7 @@ void translate_x64_linux(std::string_view input, std::string_view mod_path, std:
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         parser.module_path = std::string(mod_path);
-        if(parser.generateProgramCode(program)) {
+        if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
             std::fstream file;
@@ -201,7 +201,7 @@ void action_interpret(std::string_view input, std::string_view mod_path) {
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         parser.module_path = std::string(mod_path);
-        if(parser.generateProgramCode(program)) {
+        if(parser.generateProgramCode(mxvm::Mode::MODE_INTERPRET, program)) {
             if(mxvm::debug_mode) program->print(std::cout);
             int exitCode = program->exec();
             if(mxvm::debug_mode) program->post(std::cout);

@@ -28,6 +28,8 @@ namespace mxvm {
     extern bool instruct_mode;
     extern bool html_mode;
 
+    enum class Mode { MODE_INTERPRET, MODE_COMPILE };
+
     class Parser {
     public:
         explicit Parser(const std::string &source);
@@ -36,13 +38,14 @@ namespace mxvm {
         auto operator[](size_t pos);
         
         std::unique_ptr<ProgramNode> parseAST();
-        bool generateProgramCode(std::unique_ptr<Program> &program);
+        bool generateProgramCode(const Mode &m, std::unique_ptr<Program> &program);
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
         std::string module_path = ".";
     private:
         std::string source_file;
         scan::Scanner scanner;
-        Validator validator;        
+        Validator validator;
+        Mode parser_mode = Mode::MODE_INTERPRET;        
         std::unique_ptr<SectionNode> parseSection(uint64_t& index);
         std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);
         std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t& index);
@@ -70,7 +73,7 @@ namespace mxvm {
         bool parse();
         scan::TToken operator[](size_t pos);
         scan::TToken at(size_t pos);
-        bool generateProgramCode(const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program);
+        bool generateProgramCode(const Mode &m, const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program);
         bool next();
         bool match(const std::string &s);
         bool match(const types::TokenType &t);
