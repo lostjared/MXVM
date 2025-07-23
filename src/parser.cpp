@@ -272,8 +272,7 @@ namespace mxvm {
     }
     
     std::unique_ptr<VariableNode> Parser::parseDataVariable(uint64_t& index) {
-        if (index >= scanner.size()) return nullptr;
-        
+        if (index >= scanner.size()) return nullptr;   
         auto typeToken = this->operator[](index);
         std::string typeStr = typeToken.getTokenValue();
         
@@ -283,6 +282,7 @@ namespace mxvm {
         else if (typeStr == "string") varType = VarType::VAR_STRING;
         else if (typeStr == "ptr") varType = VarType::VAR_POINTER;
         else if (typeStr == "array") varType = VarType::VAR_ARRAY;
+        else if (typeStr == "byte") varType = VarType::VAR_BYTE;
         else return nullptr;
         
         index++; 
@@ -603,6 +603,7 @@ namespace mxvm {
                 case VarType::VAR_LABEL: out << "label"; break;
                 case VarType::VAR_ARRAY: out << "array"; break;
                 case VarType::VAR_EXTERN: out << "external"; break;
+                case VarType::VAR_BYTE: out << "byte"; break;
                 default: out << "unknown"; break;
             }
             out << "</td><td>";
@@ -612,6 +613,7 @@ namespace mxvm {
                 case VarType::VAR_STRING: out << Program::escapeNewLines(var.var_value.str_value); break;
                 case VarType::VAR_POINTER: out << (var.var_value.ptr_value ? "0x" + std::to_string(reinterpret_cast<uintptr_t>(var.var_value.ptr_value)) : "null"); break;
                 case VarType::VAR_LABEL: out << var.var_value.label_value; break;
+                case VarType::VAR_BYTE: out << static_cast<unsigned int>(static_cast<unsigned char>(var.var_value.int_value)); break;
                 default: out << ""; break;
             }
             out << "</td></tr>\n";

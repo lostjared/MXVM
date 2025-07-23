@@ -48,7 +48,7 @@ namespace mxvm {
             else if (sectionName == "data")  {
                 while (token->getTokenValue() != "}") {
                     if (token->getTokenType() == types::TokenType::TT_ID &&
-                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr"))
+                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr" || token->getTokenValue() == "byte"))
                     {
                         Variable value;
                         std::string vtype = token->getTokenValue();

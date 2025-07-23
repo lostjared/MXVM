@@ -22,6 +22,34 @@ std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc) {
     return out;
 }
 
+std::ostream &operator<<(std::ostream &out, const mxvm::VarType &type) {
+    switch(type) {
+        case mxvm::VarType::VAR_INTEGER:
+            out << "int";
+        break;
+        
+        case mxvm::VarType::VAR_STRING:
+            out << "string";
+        break;      
+        case mxvm::VarType::VAR_EXTERN:
+            out << "extern";
+        break;
+        case mxvm::VarType::VAR_POINTER:
+            out << "ptr";
+        break;
+        case mxvm::VarType::VAR_FLOAT:
+            out << "float";
+        break;
+        case mxvm::VarType::VAR_BYTE:
+            out << "byte";
+        break;
+        
+        default:
+            out << "unknown";
+    }
+    return out;
+}
+
 namespace mxvm {
-    Variable::Variable(const std::string name, const VarType &vtype, const Variable_Value &value) : type(vtype),var_name(name),var_value(value) {} 
+    
 }

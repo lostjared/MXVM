@@ -2,4 +2,6 @@ module io {
     extern fopen
     extern fclose
     extern fprintf
+    extern fsize
+    extern fread
 }

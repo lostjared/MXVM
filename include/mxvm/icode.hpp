@@ -37,8 +37,6 @@ namespace mxvm {
 
     using runtime_call = std::function<Operand(Program *program, std::vector<Operand> &operands)>;
 
-    
-
     class RuntimeFunction {
     public:
         RuntimeFunction() : func(nullptr), handle(nullptr) {}
@@ -48,12 +46,7 @@ namespace mxvm {
             handle = r.handle;
             return *this;
         }
-        ~RuntimeFunction() {
-            /*if(handle != nullptr) {
-                dlclose(handle);
-                handle = nullptr;
-            }*/
-        }
+        ~RuntimeFunction() = default;
         RuntimeFunction(const std::string &mod, const std::string &name);
         Operand call(Program *program, std::vector<Operand> &operands);
         void *func = nullptr;
@@ -189,6 +182,7 @@ namespace mxvm {
         void setVariableFromConstant(Variable& var, const std::string& value);
         Variable createTempVariable(VarType type, const std::string& value);
         bool isConstant(const std::string& value);
+        Variable variableFromOperand(const Operand &op);
         Stack stack;
         Operand result;
     };

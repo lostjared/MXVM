@@ -74,31 +74,110 @@ namespace mxvm {
         std::string label = "";
     };
 
-    enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY, VAR_EXTERN };
+    enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY, VAR_EXTERN, VAR_BYTE };
 
     struct Variable_Value {
         std::string str_value;
         std::string label_value;
-        int64_t int_value = 0;
-        double float_value = 0;
-        void *ptr_value = nullptr;
+        union {
+            int64_t int_value;
+            double float_value;
+            void *ptr_value;
+            char *buffer;
+        };
         uint64_t ptr_size = 0;
         uint64_t ptr_count = 0;
         VarType type;
         uint64_t buffer_size;
-        char *buffer;
         bool owns = false;
+
+        Variable_Value(const Variable_Value& other)
+            : str_value(other.str_value),
+            label_value(other.label_value),
+            ptr_size(other.ptr_size),
+            ptr_count(other.ptr_count),
+            type(other.type),
+            buffer_size(other.buffer_size),
+            owns(other.owns)
+        {
+            switch (type) {
+                case VarType::VAR_INTEGER: 
+                case VarType::VAR_BYTE:
+                        int_value = other.int_value; 
+                    break;
+                case VarType::VAR_FLOAT:
+                        float_value = other.float_value; 
+                   break;
+                case VarType::VAR_POINTER: 
+                        ptr_value = other.ptr_value; 
+                    break;
+                default:
+                        int_value = other.int_value; 
+                    break;
+            }
+        }
+
+        Variable_Value& operator=(const Variable_Value& other) {
+            if (this != &other) {
+                str_value = other.str_value;
+                label_value = other.label_value;
+                ptr_size = other.ptr_size;
+                ptr_count = other.ptr_count;
+                type = other.type;
+                buffer_size = other.buffer_size;
+                owns = other.owns;
+                switch (type) {
+                    case VarType::VAR_INTEGER:
+                         int_value = other.int_value; 
+                         break;
+                    case VarType::VAR_FLOAT:
+                        float_value = other.float_value;
+                        break;
+                    case VarType::VAR_POINTER: 
+                        ptr_value = other.ptr_value; 
+                        break;
+                    case VarType::VAR_BYTE:
+                        buffer = other.buffer;
+                        break;
+                    default:
+                        int_value = other.int_value; 
+                        break;
+                }
+            }
+            return *this;
+        }
+
+        Variable_Value() : int_value(0), ptr_size(0), ptr_count(0), type(VarType::VAR_NULL), buffer_size(0), owns(false) {}
     };
 
+    // Variable struct
     struct Variable {
         VarType type;
         std::string var_name;
         Variable_Value var_value;
-        Variable() = default;
-        Variable(const std::string name, const VarType &vtype, const Variable_Value &value);
+
+        Variable() : type(VarType::VAR_NULL), var_name(), var_value() {}
+
+        Variable(const std::string& name, const VarType &vtype, const Variable_Value &value)
+        : type(vtype), var_name(name), var_value(value) {}
+
+        
+        Variable(const Variable& v)
+            : type(v.type), var_name(v.var_name), var_value(v.var_value) {}
+
+        
+        Variable& operator=(const Variable& v) {
+            if (this != &v) {
+                type = v.type;
+                var_name = v.var_name;
+                var_value = v.var_value;
+            }
+            return *this;
+        }
     };
+
 }
 
 std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc);
-
+std::ostream &operator<<(std::ostream &out, const mxvm::VarType &type);
 #endif

@@ -97,7 +97,6 @@ namespace mxvm {
     }
     
     void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
-
         if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty())
             return;
 
@@ -147,6 +146,9 @@ namespace mxvm {
             if(vars[v].type == VarType::VAR_FLOAT) {
                 out << "\t" << v<< ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
+            }
+            if(vars[v].type == VarType::VAR_BYTE) {
+                out << "\t" << v << ": .byte " <<  (unsigned int)(unsigned char)vars[v].var_value.int_value << "\n";
             }
         }
         for(auto &v : var_names) {
@@ -508,6 +510,9 @@ namespace mxvm {
         if (src.type == VarType::VAR_INTEGER) {
             out << "\tmovq " << i.op1.op << "(%rip), %rdx\n";
             out << "\tmovq %rdx, (%rax)\n";
+        } else if(src.type == VarType::VAR_BYTE) {
+            out << "\tmovb " << i.op1.op << "(%rip), %al\n";
+            out << "\tmovb %al, (%rax)\n";
         } else if (src.type == VarType::VAR_FLOAT) {
             out << "\tmovsd " << i.op1.op << "(%rip), %xmm0\n";
             out << "\tmovsd %xmm0, (%rax)\n";
@@ -824,7 +829,7 @@ namespace mxvm {
             }
             Variable &v = getVariable(op.op);
             if(v.type != type) {
-                throw mx::Exception ("Variable type mismatch: " + op.op);
+                 throw mx::Exception ("Variable type mismatch: " + op.op);
             }
             switch(v.type) {
                 case VarType::VAR_INTEGER:
@@ -832,6 +837,9 @@ namespace mxvm {
                 case VarType::VAR_EXTERN:
                     out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
                     count = 0;
+                    break;
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq " << op.op << "(%rip), " << reg << "\n";
                     break;
                 case VarType::VAR_FLOAT:
                     out << "\tmovsd " << op.op << "(%rip), " << reg << "\n";
@@ -945,7 +953,12 @@ namespace mxvm {
             generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
             generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
             out << "\tcomisd %xmm1, %xmm0\n";
-        } else {
+        }  else if(type1 == VarType::VAR_POINTER && (type2 == VarType::VAR_INTEGER || type2 == VarType::VAR_BYTE)) {
+            generateLoadVar(out, VarType::VAR_POINTER, "%rax", i.op1);
+            generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+            out << "\tcmpq %rcx, %rax\n";
+        }
+        else {
             generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
             generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
@@ -1434,6 +1447,7 @@ namespace mxvm {
         Variable* var2 = nullptr;
         Variable temp1, temp2;
         
+       
         if (isVariable(instr.op1.op)) {
             var1 = &getVariable(instr.op1.op);
         } else {
@@ -1444,25 +1458,28 @@ namespace mxvm {
         if (isVariable(instr.op2.op)) {
             var2 = &getVariable(instr.op2.op);
         } else {
-            temp2 = createTempVariable(var1->type, instr.op2.op);
+            temp2 = createTempVariable(VarType::VAR_INTEGER, instr.op2.op);
             var2 = &temp2;
         }
-    
         zero_flag = false;
         less_flag = false;
         greater_flag = false;
-        
-        if (var1->var_value.type == VarType::VAR_INTEGER && var2->var_value.type == VarType::VAR_INTEGER) {
+    
+        if (var1->type == VarType::VAR_INTEGER && var2->type == VarType::VAR_INTEGER) {
             int64_t val1 = var1->var_value.int_value;
             int64_t val2 = var2->var_value.int_value;
-            
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
-        } else if (var1->var_value.type == VarType::VAR_FLOAT && var2->var_value.type == VarType::VAR_FLOAT) {
+        } else if (var1->type == VarType::VAR_FLOAT && var2->type == VarType::VAR_FLOAT) {
             double val1 = var1->var_value.float_value;
             double val2 = var2->var_value.float_value;
-            
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else if (var1->type == VarType::VAR_POINTER && (var2->type == VarType::VAR_INTEGER || var2->type == VarType::VAR_BYTE)) {
+            uintptr_t val1 = reinterpret_cast<uintptr_t>(var1->var_value.ptr_value);
+            uint64_t val2 = var2->var_value.int_value;
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
@@ -1731,7 +1748,7 @@ namespace mxvm {
         } 
         Variable& ptrVar = getVariable(instr.op2.op);
 
-        if (index >= ptrVar.var_value.ptr_count) {
+        if (index > ptrVar.var_value.ptr_count) {
             throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name);
         }
         if (size > ptrVar.var_value.ptr_size) {
@@ -1753,6 +1770,9 @@ namespace mxvm {
                 } else {
                     throw mx::Exception("STORE: size mismatch for float");
                 }
+                break;
+            case VarType::VAR_BYTE:
+                *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(dest.var_value.int_value);
                 break;
             case VarType::VAR_STRING:
                 // Optionally implement string storage if needed
@@ -2462,6 +2482,7 @@ namespace mxvm {
                     case VarType::VAR_LABEL: typeStr = "label"; break;
                     case VarType::VAR_EXTERN: typeStr = "external"; break;
                     case VarType::VAR_ARRAY: typeStr = "array"; break;
+                    case VarType::VAR_BYTE:  typeStr = "byte"; break;
                     default: typeStr = "unknown"; break;
                 }
                 out << std::setw(12) << typeStr;
@@ -2600,5 +2621,14 @@ namespace mxvm {
             }
             out << "}\n";
         }
+    }
+
+    Variable Program::variableFromOperand(const Operand &op) {
+        if(isVariable(op.op)) {
+            return getVariable(op.op);
+        } else if(op.type == OperandType::OP_CONSTANT) {
+            return createTempVariable(VarType::VAR_INTEGER, op.op);
+        }
+        throw mx::Exception("Could not create variable from operand: " + op.op);
     }
 }

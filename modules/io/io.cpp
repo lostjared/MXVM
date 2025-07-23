@@ -68,6 +68,8 @@ extern "C" mxvm::Operand mxvm_io_fprintf(mxvm::Program *program, std::vector<mxv
         } else {
             throw mx::Exception("fprintf requires format to be a variable");
         }
+    } else {
+        throw mx::Exception("fprintf requires first argument to be valid variable found: " + operand[0].op);
     }
     return mxvm::Operand();
 }
@@ -87,6 +89,69 @@ extern "C" mxvm::Operand mxvm_io_fclose(mxvm::Program *program, std::vector<mxvm
     }
     FILE *fp = reinterpret_cast<FILE*>(file_v.var_value.ptr_value);
     int result = fclose(fp);
+    
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+    mxvm::Operand o;
+    o.op = "%rax";
+    return o;
+}
+
+extern "C" mxvm::Operand mxvm_io_fsize(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("fsize requires a single file pointer argument.");
+    }
+    std::string &file_var = operand[0].op;
+    if (!program->isVariable(file_var)) {
+        throw mx::Exception("fsize argument must be a variable pointer.");
+    }
+    mxvm::Variable &file_v = program->getVariable(file_var);
+    if (file_v.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("fsize argument must be a pointer variable.");
+    }
+    FILE *fptr = reinterpret_cast<FILE*>(file_v.var_value.ptr_value);
+    if(fptr == NULL) {
+        throw mx::Exception("Error pointer handle must not be null");
+    }
+    fseek(fptr, 0, SEEK_END);
+    size_t result = ftell(fptr);
+    fseek(fptr, 0, SEEK_SET);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+    mxvm::Operand o;
+    o.op = "%rax";
+    return o;
+}
+
+
+extern "C" mxvm::Operand mxvm_io_fread(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 4) {
+        throw mx::Exception("fread requires a single file pointer argument.");
+    }
+    std::string &buf_var = operand[0].op;
+    if (!program->isVariable(buf_var)) {
+        throw mx::Exception("fread argument must be a variable pointer.");
+    }
+    mxvm::Variable &buf_v = program->getVariable(buf_var);
+    if (buf_v.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("fread argument must be a pointer variable.");
+    }
+
+    mxvm::Variable vsize, vcount, file_ptr;
+    vsize = program->variableFromOperand(operand[1]);
+    vcount = program->variableFromOperand(operand[2]);
+    file_ptr = program->variableFromOperand(operand[3]);
+
+    if(vsize.type != mxvm::VarType::VAR_INTEGER || vcount.type != mxvm::VarType::VAR_INTEGER) {
+        throw mx::Exception("Argument type mismatch expected integer for fread");
+    }
+    if(file_ptr.type != mxvm::VarType::VAR_POINTER && file_ptr.type != mxvm::VarType::VAR_EXTERN) {
+        throw mx::Exception("Final argument for fread requires pointer");
+    }
+    FILE *fptr = reinterpret_cast<FILE*>(file_ptr.var_value.ptr_value);
+    size_t result = fread(buf_v.var_value.ptr_value, vsize.var_value.int_value, vcount.var_value.int_value, fptr); 
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
     mxvm::Operand o;
