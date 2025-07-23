@@ -1,9 +1,7 @@
 program File {
-
     section module {
         io
     }
-
     section data {
         ptr handle = null
         string filename = "test.txt"
@@ -11,7 +9,6 @@ program File {
         string text = "Hello, World"
 
     }
-    
     section code {
     start:
         invoke fopen, filename, mode

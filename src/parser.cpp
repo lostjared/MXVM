@@ -602,6 +602,7 @@ namespace mxvm {
                 case VarType::VAR_POINTER: out << "ptr"; break;
                 case VarType::VAR_LABEL: out << "label"; break;
                 case VarType::VAR_ARRAY: out << "array"; break;
+                case VarType::VAR_EXTERN: out << "external"; break;
                 default: out << "unknown"; break;
             }
             out << "</td><td>";
