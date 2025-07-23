@@ -12,7 +12,7 @@ namespace mxvm {
     bool instruct_mode = false;
     bool html_mode = false;
 
-    ModuleParser::ModuleParser(const std::string &source) : scanner(source) {}
+    ModuleParser::ModuleParser(const std::string &m, const std::string &source) : mod_name(m), scanner(source) {}
     
     uint64_t ModuleParser::scan() {
         scanner.scan();
@@ -32,7 +32,7 @@ namespace mxvm {
                 next();
                 require(types::TokenType::TT_ID);
                 std::string func_name = token->getTokenValue();
-                functions.push_back({func_name});
+                functions.push_back({func_name, mod_name});
                 next();
                 continue;
             }
@@ -53,12 +53,12 @@ namespace mxvm {
         return scanner[0];
     }
 
-    bool ModuleParser::generateProgramCode(const Mode &m, const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program) {
+    bool ModuleParser::generateProgramCode(const Mode &m, const std::string &mod_id, const std::string &mod_name1, std::unique_ptr<Program> &program) {
         for(auto &f : functions) {
             if(m == Mode::MODE_INTERPRET)
-                program->add_runtime_extern(mod_name, "mxvm_" + mod_id + "_" + f.name, f.name);
+                program->add_runtime_extern(mod_name, mod_name1, "mxvm_" + mod_id + "_" + f.name, f.name);
             else 
-                program->add_extern(f.name);
+                program->add_extern(mod_name, f.name);
         }
         return true;
     }
@@ -556,7 +556,38 @@ namespace mxvm {
             ".inst { font-family: monospace; }\n"
             "</style>\n</head>\n<body>\n";
         out << "<h1>" << program->name << " MXVM Debug Information</h1>\n";
-
+        if(program->external.size() > 0 || program->external_functions.size() > 0) {
+            out << "<section>\n<h2>External</h2>\n<table\n";
+            out << "<tr><th>Module</th><th>Function</th></tr>\n";
+            if(parser_mode == Mode::MODE_COMPILE) {
+                std::vector<std::pair<std::string, std::string>> names;
+                for(auto &f : program->external) {
+                    names.push_back(std::make_pair(f.mod, f.name));
+                }
+                std::sort(names.begin(), names.end(), [](const auto &a, const auto &b) {
+                    if (a.first != b.first)
+                        return a.first < b.first;
+                    return a.second < b.second;
+                });
+                for(auto &name : names) {
+                    out << "<tr><td>" << name.first << "</td><td>" << name.second << "</td></tr>\n";
+                }
+            } else {
+                std::vector<std::pair<std::string, std::string>> names;
+                for(auto &f : program->external_functions) {
+                    names.push_back(std::make_pair(f.second.mod_name, f.first));
+                }
+                std::sort(names.begin(), names.end(), [](const auto &a, const auto &b) {
+                    if (a.first != b.first)
+                        return a.first < b.first;
+                    return a.second < b.second;
+                });
+                for(auto &name : names) {
+                    out << "<tr><td>" << name.first << "</td><td>" << name.second << "</td></tr>\n";
+                }
+            }
+            out << "</table></section>";
+        }
         // Variables Table
         out << "<section>\n<h2>Memory</h2>\n<table>\n";
         out << "<tr><th>Name</th><th>Type</th><th>Initial Value</th></tr>\n";
@@ -664,7 +695,7 @@ namespace mxvm {
         }
         std::ostringstream data;
         data << file.rdbuf();
-        ModuleParser mod_parser(data.str());
+        ModuleParser mod_parser(src, data.str());
         if(mod_parser.scan() > 0) {
             if(mod_parser.parse() && mod_parser.generateProgramCode(parser_mode, src, module_path_so, program)) {
                 return;

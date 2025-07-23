@@ -7,6 +7,7 @@
 #include<vector>
 #include<variant>
 #include"mxvm/function.hpp"
+#include"mxvm/parser.hpp"
 #include<functional>
 
 namespace mxvm {
@@ -55,6 +56,7 @@ namespace mxvm {
         Operand call(Program *program, std::vector<Operand> &operands);
         void *func = nullptr;
         void *handle = nullptr;
+        std::string mod_name;
     };
 
     class Base {
@@ -62,13 +64,13 @@ namespace mxvm {
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
-        void add_extern(const std::string &name);
-        void add_runtime_extern(const std::string &mod, const std::string &func_name, const std::string &name);
+        void add_extern(const std::string &mod, const std::string &name);
+        void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
     
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
-        std::vector<std::string> external;
+        std::vector<ExternalFunction> external;
         std::unordered_map<std::string, RuntimeFunction> external_functions;
     };
 

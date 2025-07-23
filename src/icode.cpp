@@ -66,14 +66,14 @@ namespace mxvm {
         vars[name] = v;
     }
 
-    void Base::add_extern(const std::string &name) {
-        external.push_back(name);   
+    void Base::add_extern(const std::string &mod, const std::string &name) {
+        external.push_back({name, mod});   
     }
     
-    void Base::add_runtime_extern(const std::string &mod, const std::string &func_name, const std::string &name) {
+    void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
         if(external_functions.find(name) == external_functions.end()) {
-            external.push_back(name);
             external_functions[name] = RuntimeFunction(mod, func_name);
+            external_functions[name].mod_name = mod_name;
         }
     }
 
@@ -151,7 +151,7 @@ namespace mxvm {
         out << "\t.extern atof\n";
 
         for(auto &e : external) {
-            out << "\t.extern " << e << "\n";
+            out << "\t.extern " << e.name << "\n";
         }
 
         // rest of text

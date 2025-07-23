@@ -64,11 +64,12 @@ namespace mxvm {
 
     struct ExternalFunction {
         std::string name;
+        std::string mod;
     };
 
     class ModuleParser {
     public:
-        explicit ModuleParser(const std::string &source);
+        explicit ModuleParser(const std::string &mod_name, const std::string &source);
         uint64_t scan();
         bool parse();
         scan::TToken operator[](size_t pos);
@@ -81,6 +82,7 @@ namespace mxvm {
         void require(const types::TokenType &t);
     protected:
         std::vector<ExternalFunction> functions;
+        std::string mod_name;
         scan::Scanner scanner;
         uint64_t index = 0;
         scan::TToken *token = nullptr;
