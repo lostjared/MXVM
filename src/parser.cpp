@@ -565,8 +565,9 @@ namespace mxvm {
             if(moduleNode) {
                 // std::string &name = moduleNode->name;
                 // read in module
-                
-
+                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fopen", "fopen");
+                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fprintf", "fprintf");
+                program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fclose", "fclose");   
             }
         }
     }

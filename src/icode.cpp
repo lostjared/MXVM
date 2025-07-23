@@ -1,6 +1,7 @@
 #include"mxvm/icode.hpp"
 #include"mxvm/parser.hpp"
 #include"scanner/exception.hpp"
+#include"mxvm/function.hpp"
 #include<iomanip>
 #include<iostream>
 #include<sstream>
@@ -19,7 +20,7 @@ namespace mxvm {
 
     Program::~Program() {
         for(auto &i : vars) {
-            if(i.second.var_value.ptr_value != nullptr) {
+            if(i.second.var_value.ptr_value != nullptr && i.second.var_value.owns) {
                 free(i.second.var_value.ptr_value);
                 i.second.var_value.ptr_value = nullptr;
                 if(debug_mode) {
@@ -28,7 +29,31 @@ namespace mxvm {
             }
         }
     }
+
+    RuntimeFunction::RuntimeFunction(const std::string &mod, const std::string &name) {
+        handle = dlopen(mod.c_str(), RTLD_LAZY);
+        if(handle == nullptr) {
+            throw mx::Exception("Error could not open module: " + mod);
+        }
+        func = (void*)dlsym(handle, name.c_str());
+        if(func == nullptr) {
+            throw mx::Exception("Error could not find symbol: " + name + " in: " + mod);
+        }
+        char *dl_err = dlerror();
+        if(dl_err != nullptr) {
+            throw mx::Exception ("Error: " + std::string(dl_err));
+        }
+    }
     
+    Operand RuntimeFunction::call(Program *program, std::vector<Operand> &operands) {
+        if (!func || !handle) {
+            throw mx::Exception("RuntimeFunction: function pointer is null");
+        }
+        using FuncType = Operand(*)(Program *program, std::vector<Operand>&);
+        FuncType f = reinterpret_cast<FuncType>(func);
+        return f(program, operands);
+    }
+           
     void Base::add_instruction(const Instruction &i) {
         inc.push_back(i);
     }
@@ -42,7 +67,12 @@ namespace mxvm {
     }
 
     void Base::add_extern(const std::string &name) {
+        external.push_back(name);   
+    }
+    
+    void Base::add_runtime_extern(const std::string &mod, const std::string &func_name, const std::string &name) {
         external.push_back(name);
+        external_functions[name] = RuntimeFunction(mod, func_name);
     }
 
     std::string Program::escapeNewLines(const std::string& input) {
@@ -1780,6 +1810,7 @@ namespace mxvm {
         }
         dest.var_value.ptr_size = size;
         dest.var_value.ptr_count = count;
+        dest.var_value.owns = true;
     }
     void Program::exec_free(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
@@ -2012,7 +2043,7 @@ namespace mxvm {
         dest.var_value.type = VarType::VAR_STRING;
     }
     
-    void Program::printFormatted(const std::string& format, const std::vector<Variable*>& args) {
+    std::string Program::printFormatted(const std::string& format, const std::vector<Variable*>& args, bool output) {
         std::ostringstream oss;
         size_t argIndex = 0;
         const char* fmt = format.c_str();
@@ -2061,7 +2092,9 @@ namespace mxvm {
                 oss << fmt[i];
             }
         }
-        std::cout << oss.str();
+        if(output)
+            std::cout << oss.str();
+        return oss.str();
     }
     void Program::exec_getline(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
@@ -2318,7 +2351,16 @@ namespace mxvm {
     }
 
     void Program::exec_return(const Instruction &instr) {
-
+        if(!instr.op1.op.empty() && isVariable(instr.op1.op)) {
+            Variable &v = getVariable(instr.op1.op);
+            std::string name = v.var_name;
+            Variable &r = getVariable(result.op);
+            if(v.type != r.type) {
+                throw mx::Exception("Invalid return type, type mismatch.\n");
+            }
+            v = r;
+            v.var_name = name;
+        }
     }
 
     Variable Program::createTempVariable(VarType type, const std::string& value) {
@@ -2471,8 +2513,20 @@ namespace mxvm {
         out << "\n";
     }
 
-    void Program::exec_invoke(const Instruction  &i) {
-
+    
+    void Program::exec_invoke(const Instruction &instr) {
+        auto it = external_functions.find(instr.op1.op);
+        if (it == external_functions.end()) {
+            throw mx::Exception("INVOKE: external function not found: " + instr.op1.op);
+        }
+        RuntimeFunction &fn = it->second;
+        std::vector<Operand> args;
+        if (!instr.op2.op.empty()) args.push_back(instr.op2);
+        if (!instr.op3.op.empty()) args.push_back(instr.op3);
+        for (const auto& vop : instr.vop) {
+            if (!vop.op.empty()) args.push_back(vop);
+        }
+        result = fn.call(this, args);
     }
 
     void Program::post(std::ostream &out) {

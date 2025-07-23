@@ -21,6 +21,7 @@ add_library(mxvm SHARED
     src/icode.cpp
     src/ast.cpp
     src/valid.cpp
+    src/function.cpp
 )
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -29,6 +30,7 @@ target_include_directories(mxvm PUBLIC
 
 target_link_libraries(mxvm PUBLIC scanner)
 
+add_subdirectory(modules/io)
 add_subdirectory(src/vm)
 
 include(GNUInstallDirs)

@@ -87,6 +87,7 @@ namespace mxvm {
         VarType type;
         uint64_t buffer_size;
         char *buffer;
+        bool owns = false;
     };
 
     struct Variable {

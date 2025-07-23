@@ -6,6 +6,8 @@
 #include<unordered_map>
 #include<vector>
 #include<variant>
+#include"mxvm/function.hpp"
+#include<functional>
 
 namespace mxvm {
 
@@ -30,17 +32,44 @@ namespace mxvm {
         std::vector<StackValue> data;
     };
 
+    class Program;
+
+    using runtime_call = std::function<Operand(Program *program, std::vector<Operand> &operands)>;
+
+    class RuntimeFunction {
+    public:
+        RuntimeFunction() : func(nullptr), handle(nullptr) {}
+        RuntimeFunction(const RuntimeFunction &r) : func(r.func), handle(r.handle) {}
+        RuntimeFunction &operator=(const RuntimeFunction &r) {
+            func = r.func;
+            handle = r.handle;
+            return *this;
+        }
+        ~RuntimeFunction() {
+            /*if(handle != nullptr) {
+                dlclose(handle);
+                handle = nullptr;
+            }*/
+        }
+        RuntimeFunction(const std::string &mod, const std::string &name);
+        Operand call(Program *program, std::vector<Operand> &operands);
+        void *func = nullptr;
+        void *handle = nullptr;
+    };
+
     class Base {
     public:
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
         void add_extern(const std::string &name);
-    protected:
+        void add_runtime_extern(const std::string &mod, const std::string &func_name, const std::string &name);
+    
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
         std::vector<std::string> external;
+        std::unordered_map<std::string, RuntimeFunction> external_functions;
     };
 
     class Program : public Base {
@@ -64,7 +93,7 @@ namespace mxvm {
         bool less_flag = false;
         bool greater_flag = false;
         int xmm_offset = 0;
-        
+    public:    
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
         void generateInvokeCall(std::ostream &out, std::vector<Operand> &op);
@@ -150,12 +179,12 @@ namespace mxvm {
         void subVariables(Variable& dest, Variable& src1, Variable& src2);
         void mulVariables(Variable& dest, Variable& src1, Variable& src2);
         void divVariables(Variable& dest, Variable& src1, Variable& src2);
-        void printFormatted(const std::string& format, const std::vector<Variable*>& args);
+        std::string printFormatted(const std::string& format, const std::vector<Variable*>& args, bool output = true);
         void setVariableFromConstant(Variable& var, const std::string& value);
         Variable createTempVariable(VarType type, const std::string& value);
         bool isConstant(const std::string& value);
-    protected:
         Stack stack;
+        Operand result;
     };
     
 }

@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.10)
+
+project(mxvm_io)
+
+set(SOURCES
+    io.cpp
+)
+
+add_library(mxvm_io SHARED ${SOURCES})
+
+target_include_directories(mxvm_io
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(mxvm_io
+    PUBLIC
+        mxvm
+)
