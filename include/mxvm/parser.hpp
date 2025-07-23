@@ -38,6 +38,7 @@ namespace mxvm {
         std::unique_ptr<ProgramNode> parseAST();
         bool generateProgramCode(std::unique_ptr<Program> &program);
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
+        std::string module_path = ".";
     private:
         std::string source_file;
         scan::Scanner scanner;
@@ -56,6 +57,30 @@ namespace mxvm {
         void setVariableValue(Variable& var, VarType type, const std::string& value, size_t buf_size = 0);
         void setDefaultVariableValue(Variable& var, VarType type);
         void resolveLabelReference(Operand& operand, const std::unordered_map<std::string, size_t>& labelMap);
+    };
+
+    struct ExternalFunction {
+        std::string name;
+    };
+
+    class ModuleParser {
+    public:
+        explicit ModuleParser(const std::string &source);
+        uint64_t scan();
+        bool parse();
+        scan::TToken operator[](size_t pos);
+        scan::TToken at(size_t pos);
+        bool generateProgramCode(const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program);
+        bool next();
+        bool match(const std::string &s);
+        bool match(const types::TokenType &t);
+        void require(const std::string &s);
+        void require(const types::TokenType &t);
+    protected:
+        std::vector<ExternalFunction> functions;
+        scan::Scanner scanner;
+        uint64_t index = 0;
+        scan::TToken *token = nullptr;
     };
 }
 

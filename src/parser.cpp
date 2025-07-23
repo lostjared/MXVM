@@ -12,6 +12,84 @@ namespace mxvm {
     bool instruct_mode = false;
     bool html_mode = false;
 
+    ModuleParser::ModuleParser(const std::string &source) : scanner(source) {}
+    
+    uint64_t ModuleParser::scan() {
+        scanner.scan();
+        return scanner.size();
+    }
+    
+    bool ModuleParser::parse() {
+        next();
+        require("module");
+        next();
+        require(types::TokenType::TT_ID);
+        std::string mod_name = token->getTokenValue();
+        next();
+        require("{");    
+        while(!match("}")) {
+            if(match(types::TokenType::TT_ID) && token->getTokenValue() == "extern") {
+                next();
+                require(types::TokenType::TT_ID);
+                std::string func_name = token->getTokenValue();
+                functions.push_back({func_name});
+                next();
+                continue;
+            }
+            next();
+        }
+        return true;
+    }
+    
+    scan::TToken ModuleParser::operator[](size_t pos) {
+        return at(pos);
+    }
+        
+    scan::TToken ModuleParser::at(size_t pos) {
+        if(pos < scanner.size())
+            return scanner[pos];
+
+        throw scan::ScanExcept("Out of bounds");
+        return scanner[0];
+    }
+
+    bool ModuleParser::generateProgramCode(const std::string &mod_id, const std::string &mod_name, std::unique_ptr<Program> &program) {
+        for(auto &f : functions) {
+            program->add_runtime_extern(mod_name, "mxvm_" + mod_id + "_" + f.name, f.name);
+        }
+        return true;
+    }
+
+    bool ModuleParser::next() {
+        while (index < scanner.size() && scanner[index].getTokenType() != types::TokenType::TT_STR && scanner[index].getTokenValue() == "\n") {
+            index++;
+        }
+        if (index < scanner.size()) {
+            token = &scanner[index++];  
+            return true;
+        }
+        return false;
+    }
+
+    bool ModuleParser::match(const std::string &s) {
+        return (token->getTokenValue() == s);
+    }
+
+    bool ModuleParser::match(const types::TokenType &t) {
+        return (token->getTokenType() == t);
+    }
+
+    void ModuleParser::require(const std::string &s) {
+        if(!match(s)) {
+            throw mx::Exception("Syntax Error: Looking for: " + s + " on line " + std::to_string(token->getLine()));
+        }
+    }
+    void ModuleParser::require(const types::TokenType &t) {
+        if(!match(t)) {
+            throw mx::Exception("Syntax Error: Looking for: " + std::to_string(static_cast<unsigned int>(t)) + " on line " + std::to_string(token->getLine()));
+        }
+    }
+
     Parser::Parser(const std::string &source) : source_file(source), scanner(source), validator(source)  {
 
     }
@@ -570,13 +648,27 @@ namespace mxvm {
     }
 
     void Parser::processModuleFile(const std::string &src, std::unique_ptr<Program> &program) {
-        if(src == "io") {
-            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fopen", "fopen");
-            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fprintf", "fprintf");
-            program->add_runtime_extern("modules/io/libmxvm_io.so", "mxvm_io_fclose", "fclose");  
+        std::string module_name = "libmxvm_" + src;
+        std::string module_path_so = "modules/" + src + "/" + module_name + ".so";
+        if(!module_path.ends_with("/"))
+            module_path += "/";
+        std::string module_src = module_path + "modules/" + src + "/" + src + ".mxvm";
+        std::fstream file;
+        file.open(module_src, std::ios::in);
+        if(!file.is_open()) {
+            throw mx::Exception("Error could not find module source file: " + module_src);
+        }
+        std::ostringstream data;
+        data << file.rdbuf();
+        ModuleParser mod_parser(data.str());
+        if(mod_parser.scan() > 0) {
+            if(mod_parser.parse() && mod_parser.generateProgramCode(src, module_path_so, program)) {
+                return;
+            } else {
+                throw mx::Exception("Error parsing module file.\n");
+            }
         }
     }
-
 
     void Parser::processCodeSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
         std::unordered_map<std::string, size_t> labelMap; 

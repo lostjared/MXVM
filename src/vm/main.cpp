@@ -15,14 +15,15 @@ enum class vm_target { x86_64_linux };
 struct Args {
     std::string source_file;
     std::string output_file;
+    std::string module_path;
     vm_action action = vm_action::null_action;
     vm_target target = vm_target::x86_64_linux;
 };
 
 void process_arguments(Args *args);
-void action_translate(std::string_view input, std::string_view output, vm_target &target);
-void action_interpret(std::string_view input);
-void translate_x64_linux(std::string_view input, std::string_view output);
+void action_translate(std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+void action_interpret(std::string_view input, std::string_view mod_path);
+void translate_x64_linux(std::string_view input, std::string_view mod_path, std::string_view output);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -41,6 +42,8 @@ Args proc_args(int argc, char **argv) {
     .addOptionDouble(132, "help", "Help output")
     .addOptionDouble(133, "html", "debug html")
     .addOptionSingle('D', "print html")
+    .addOptionSingleValue('p', "path")
+    .addOptionDoubleValue(134, "path", "module path")
     ;
 
     if(argc == 1) {
@@ -53,6 +56,10 @@ Args proc_args(int argc, char **argv) {
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 134:
+                case 'p':
+                    args.module_path = arg.arg_value;
+                break;
                 case 133:
                 case 'D':
                     mxvm::html_mode = true;
@@ -102,6 +109,10 @@ Args proc_args(int argc, char **argv) {
         std::cerr << "Error source file required..\n";
         exit(EXIT_FAILURE);
     }
+    if(args.module_path.empty()) {
+        std::cerr << "Errror: please set module path.\n";
+        exit(EXIT_FAILURE);
+    }
     return args;
 }
 
@@ -120,26 +131,26 @@ void process_arguments(Args *args) {
     }
 
     if(args->action == vm_action::translate) {
-        action_translate(args->source_file, args->output_file, args->target);
+        action_translate(args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
-        action_interpret(args->source_file);
+        action_interpret(args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
-        action_interpret(args->source_file);
+        action_interpret(args->source_file, args->module_path);
     } else {
         std::cerr << "Error invalid action/command\n";
         exit(EXIT_FAILURE);
     }
 }
 
-void action_translate(std::string_view input, std::string_view output, vm_target &target) {
+void action_translate(std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
     switch(target) {
         case vm_target::x86_64_linux:
-            translate_x64_linux(input, output);
+            translate_x64_linux(input, mod_path, output);
         break;
     }
 }
 
-void translate_x64_linux(std::string_view input, std::string_view output) {
+void translate_x64_linux(std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
         std::string input_file(input);
         std::fstream file;
@@ -153,6 +164,7 @@ void translate_x64_linux(std::string_view input, std::string_view output) {
         mxvm::Parser parser(stream.str());
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        parser.module_path = std::string(mod_path);
         if(parser.generateProgramCode(program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
@@ -174,7 +186,7 @@ void translate_x64_linux(std::string_view input, std::string_view output) {
     }
 }
 
-void action_interpret(std::string_view input) {
+void action_interpret(std::string_view input, std::string_view mod_path) {
     try {
         std::string input_file(input);
         std::fstream file;
@@ -188,6 +200,7 @@ void action_interpret(std::string_view input) {
         mxvm::Parser parser(stream.str());
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        parser.module_path = std::string(mod_path);
         if(parser.generateProgramCode(program)) {
             if(mxvm::debug_mode) program->print(std::cout);
             int exitCode = program->exec();
