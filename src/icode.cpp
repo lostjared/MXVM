@@ -217,7 +217,7 @@ namespace mxvm {
                 continue;
             }
             if(vars[v].type == VarType::VAR_BYTE) {
-                out << "\t" << v << ": .byte " <<  (unsigned int)(unsigned char)vars[v].var_value.int_value << "\n";
+                out << "\t" << v << ": .byte " <<  vars[v].var_value.int_value << "\n";
             }
         }
         for(auto &v : var_names) {
@@ -537,7 +537,11 @@ namespace mxvm {
         } else if (dest.type == VarType::VAR_FLOAT) {
             out << "\tmovsd (%rax), %xmm0\n";
             out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
-        } else {
+        } else if(dest.type == VarType::VAR_BYTE) {
+            out << "\tmovb (%rax), %r8b\n";
+            out << "\tmovb %r8b, " << i.op1.op << "(%rip)\n";
+        } 
+        else {
             throw mx::Exception("LOAD: unsupported destination type");
         }
     }
@@ -581,8 +585,8 @@ namespace mxvm {
             out << "\tmovq " << i.op1.op << "(%rip), %rdx\n";
             out << "\tmovq %rdx, (%rax)\n";
         } else if(src.type == VarType::VAR_BYTE) {
-            out << "\tmovb " << i.op1.op << "(%rip), %al\n";
-            out << "\tmovb %al, (%rax)\n";
+            out << "\tmovb " << i.op1.op << "(%rip), %r8b\n";
+            out << "\tmovb %r8b, (%rax)\n";
         } else if (src.type == VarType::VAR_FLOAT) {
             out << "\tmovsd " << i.op1.op << "(%rip), %xmm0\n";
             out << "\tmovsd %xmm0, (%rax)\n";
@@ -879,6 +883,10 @@ namespace mxvm {
                     count = 0;
                     out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
                 break;
+                case VarType::VAR_BYTE:
+                    count = 0;
+                    out << "\tmovzbq " << op.op << "(%rip), " << reg << "\n";
+                break;
                 default:
                 break;
             }
@@ -898,8 +906,10 @@ namespace mxvm {
                 throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
             }
             Variable &v = getVariable(op.op);
-            if(v.type != type) {
-                 throw mx::Exception ("Variable type mismatch: " + op.op);
+            if(v.type != type && type != VarType::VAR_INTEGER) {
+                std::ostringstream vartype;
+                vartype << v.type << " != " << type << "\n";  
+                throw mx::Exception ("LoadVar Variable type mismatch: " + op.op + " " + vartype.str());
             }
             switch(v.type) {
                 case VarType::VAR_INTEGER:
@@ -934,7 +944,7 @@ namespace mxvm {
     }
 
     std::string Program::getRegisterByIndex(int index, VarType type) {
-        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING || type == VarType::VAR_POINTER || type == VarType::VAR_EXTERN)) {
+        if(index < 6 && (type == VarType::VAR_INTEGER || type == VarType::VAR_STRING || type == VarType::VAR_POINTER || type == VarType::VAR_EXTERN || type == VarType::VAR_BYTE)) {
             static const char *reg[] = {"%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
             return reg[index];
         } else if(index < 9 && type == VarType::VAR_FLOAT) {
@@ -1024,8 +1034,8 @@ namespace mxvm {
             generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
             out << "\tcomisd %xmm1, %xmm0\n";
         }  else if(type1 == VarType::VAR_POINTER && (type2 == VarType::VAR_INTEGER || type2 == VarType::VAR_BYTE)) {
-            generateLoadVar(out, VarType::VAR_POINTER, "%rax", i.op1);
-            generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+            generateLoadVar(out, type1, "%rax", i.op1);
+            generateLoadVar(out, type2, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
         }
         else {
@@ -1062,6 +1072,9 @@ namespace mxvm {
                 break;
                 case VarType::VAR_STRING:
                 out << "\tleaq " << op[0].op << "(%rip), %rdi\n";
+                break;
+                case VarType::VAR_BYTE:
+                out << "\tmovzbq " << op[0].op << "(%rip), %rdi\n";
                 break;
             default:
                 throw mx::Exception("Argument type not supported yet\n");
@@ -1136,7 +1149,11 @@ namespace mxvm {
 
                     case VarType::VAR_STRING:
                         generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2);
-                        out << "\tmovq %rax, " << i.op2.op << "\n";
+                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    break;
+                    case VarType::VAR_BYTE:
+                        generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2);
+                        out << "\tmovb %al, " << i.op1.op << "(%rip)\n";
                     break;
                 default:
                     throw mx::Exception("type not supported for mov instruction.");

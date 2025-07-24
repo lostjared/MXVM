@@ -761,13 +761,14 @@ namespace mxvm {
 
     void Parser::setVariableValue(Variable& var, VarType type, const std::string& value, size_t buf_size) {
         switch (type) {
+            case VarType::VAR_BYTE:
             case VarType::VAR_INTEGER:
                 if (value.starts_with("0x") || value.starts_with("0X")) {
                     var.var_value.int_value = std::stoull(value, nullptr, 16);
                 } else {
                     var.var_value.int_value = std::stoull(value);
                 }
-                var.var_value.type = VarType::VAR_INTEGER;
+                var.var_value.type = type;
                 break;
                 
             case VarType::VAR_FLOAT:
