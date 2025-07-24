@@ -27,7 +27,6 @@ program File {
         alloc buffer, file_size_null, 1
         invoke fread, buffer, 1, file_size, handle
         invoke fseek, handle, 0, 0
-        sub file_size, 1
         store null_term, buffer, 1, file_size
         invoke fprintf, stdout, ptr_val, buffer
         free buffer

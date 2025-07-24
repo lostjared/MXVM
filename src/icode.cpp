@@ -1098,6 +1098,12 @@ namespace mxvm {
         for(size_t z = 0; z < args.size() && reg_count < 6; ++z, ++reg_count) {
             total += generateLoadVar(out, reg_count, args[z]);
         }
+
+        if(total != 0) {
+            out << "\tmovq $" << total << ", %rax\n";
+        } else {
+            out << "\txor %rax, %rax\n";  
+        }
         out << "\tcall " << name << "\n";
         if (num_pushes > 0 || needs_dummy) {
             out << "\tadd $" << ((num_pushes + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
