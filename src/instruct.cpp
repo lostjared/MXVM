@@ -51,5 +51,9 @@ std::ostream &operator<<(std::ostream &out, const mxvm::VarType &type) {
 }
 
 namespace mxvm {
-    
+    std::string Variable::toString() const {
+        std::ostringstream stream;
+        stream << type;
+        return stream.str();
+    }
 }

@@ -1602,8 +1602,7 @@ namespace mxvm {
             else greater_flag = true;
         } else {
             throw mx::Exception("cmp: unsupported type combination: " +
-                std::to_string(static_cast<int>(var1->type)) + " vs " +
-                std::to_string(static_cast<int>(var2->type)));
+               var1->toString() + " vs " + var2->toString());
         }
     }
 

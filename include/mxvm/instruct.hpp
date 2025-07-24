@@ -4,6 +4,8 @@
 #include<iostream>
 #include<vector>
 #include<cstdint>
+#include<string>
+#include<sstream>
 
 enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN };
 
@@ -157,7 +159,6 @@ namespace mxvm {
         Variable_Value var_value;
 
         Variable() : type(VarType::VAR_NULL), var_name(), var_value() {}
-
         Variable(const std::string& name, const VarType &vtype, const Variable_Value &value)
         : type(vtype), var_name(name), var_value(value) {}
 
@@ -174,6 +175,8 @@ namespace mxvm {
             }
             return *this;
         }
+
+        std::string toString() const;
     };
 
 }
