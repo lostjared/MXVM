@@ -1601,7 +1601,7 @@ namespace mxvm {
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
         } else {
-            throw mx::Exception("exec_cmp: unsupported type combination: " +
+            throw mx::Exception("cmp: unsupported type combination: " +
                 std::to_string(static_cast<int>(var1->type)) + " vs " +
                 std::to_string(static_cast<int>(var2->type)));
         }
