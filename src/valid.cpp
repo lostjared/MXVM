@@ -25,6 +25,12 @@ namespace mxvm {
         require("{"); next();
 
         std::unordered_map<std::string, Variable> vars;
+        vars["stdout"] = Variable();
+        vars["stdout"].var_name = "stdout";
+        vars["stdin"] = Variable();
+        vars["stdin"].var_name = "stdin";
+        vars["stderr"] = Variable();
+        vars["stderr"].var_name = "stderr";
 
         while (token->getTokenValue() != "}") {
             require("section"); next();
@@ -39,6 +45,9 @@ namespace mxvm {
                         if(match(",")) {
                             next();
                             continue;
+                        } else if(match("}")) {
+                            next();
+                            break;
                         }
                     } else {
                         throw mx::Exception("Requires module name on line: " + std::to_string(token->getLine()));
@@ -68,10 +77,19 @@ namespace mxvm {
                              }
                         } else {
                             require("="); next();
-                            if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
+                            if(vtype == "byte") {   
+                                if(vtype == "byte" && (token->getTokenType() == types::TokenType::TT_HEX || token->getTokenType() == types::TokenType::TT_NUM)) {
+                                    int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
+                                    if(value < 0 || value > 0xFF) {
+                                        throw mx::Exception("Syntax Error: byte must be a valid byte 0-255 on line: " + std::to_string(token->getLine()));                               
+                                    }
+                                } else if(vtype == "byte"  && token->getTokenType() != types::TokenType::TT_HEX  && token->getTokenType() != types::TokenType::TT_NUM) {
+                                    throw mx::Exception("Syntax Error: byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
+                                }
+                                next();
+                            } else if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
                                 token->getTokenType() == types::TokenType::TT_HEX ||
-                                token->getTokenType() == types::TokenType::TT_STR)
-                            {
+                                token->getTokenType() == types::TokenType::TT_STR) {
                                 next();
                             } else {
                                 throw mx::Exception(
@@ -115,9 +133,12 @@ namespace mxvm {
                             continue;
                         }
                     }
+
+                    std::string instr;
                                      
                     if (match(types::TokenType::TT_ID)) {
                         std::string op = token->getTokenValue();
+                        instr = op;
                         if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
                             throw mx::Exception(
                                 "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine())
@@ -162,7 +183,7 @@ namespace mxvm {
 
                             if (match(types::TokenType::TT_ID)) {
                                 std::string argName = token->getTokenValue();
-                                if (vars.find(argName) == vars.end()) {
+                                if ((instr != "invoke" && firstOperand == true) && vars.find(argName) == vars.end()) {
                                     throw mx::Exception(
                                         "Syntax Error: Argument variable not defined: " + argName +
                                         " at line " + std::to_string(token->getLine())
