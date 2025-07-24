@@ -1819,9 +1819,7 @@ namespace mxvm {
         if (!instr.vop.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
-                
                 index = getVariable(sizeOp.op).var_value.int_value;
-
             } else if (!sizeOp.op.empty()) {
                 index = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             } else {
