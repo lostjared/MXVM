@@ -19,7 +19,7 @@ program SaveInt {
                 string output_msg = "Collected %d numbers:\n"
                 string the_total = "The total is: %d\n"
                 string filename = "text.txt"
-                string rb_mode - "w";
+                string rb_mode = "w";
                 string data_w = "value"
         }
 	section code {
@@ -35,7 +35,7 @@ program SaveInt {
                 print enter_value
                 getline input_buffer
                 to_int data_number, input_buffer
-                store data_number, data, data_index
+                store data_number, data, 8, data_index
                 add data_index, 1
                 cmp data_index, data_size
                 jl start
