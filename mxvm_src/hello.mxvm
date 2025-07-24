@@ -12,7 +12,7 @@ program Hello {
 	section code {
 	start:
 		alloc pointer, 8, amount
-		store x, pointer, 0
+		store x, pointer, 8, 0
 		load y, pointer, 0
 		print format, y
 		call hello
