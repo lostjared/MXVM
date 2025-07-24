@@ -1557,9 +1557,34 @@ namespace mxvm {
         zero_flag = false;
         less_flag = false;
         greater_flag = false;
-        if (var1->type == VarType::VAR_FLOAT && var2->type == VarType::VAR_FLOAT) {
+        if ((var1->type == VarType::VAR_INTEGER || var1->type == VarType::VAR_BYTE) &&
+            (var2->type == VarType::VAR_INTEGER || var2->type == VarType::VAR_BYTE)) {
+            int64_t val1 = var1->var_value.int_value;
+            int64_t val2 = var2->var_value.int_value;
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else if (var1->type == VarType::VAR_FLOAT && var2->type == VarType::VAR_FLOAT) {
             double val1 = var1->var_value.float_value;
             double val2 = var2->var_value.float_value;
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else if (var1->type == VarType::VAR_FLOAT && (var2->type == VarType::VAR_INTEGER || var2->type == VarType::VAR_BYTE)) {
+            double val1 = var1->var_value.float_value;
+            double val2 = static_cast<double>(var2->var_value.int_value);
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else if ((var1->type == VarType::VAR_INTEGER || var1->type == VarType::VAR_BYTE) && var2->type == VarType::VAR_FLOAT) {
+            double val1 = static_cast<double>(var1->var_value.int_value);
+            double val2 = var2->var_value.float_value;
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else if (var1->type == VarType::VAR_POINTER && var2->type == VarType::VAR_POINTER) {
+            uintptr_t val1 = reinterpret_cast<uintptr_t>(var1->var_value.ptr_value);
+            uintptr_t val2 = reinterpret_cast<uintptr_t>(var2->var_value.ptr_value);
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
@@ -1569,12 +1594,16 @@ namespace mxvm {
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
-        } else {
-            int64_t val1 = var1->var_value.int_value;
-            int64_t val2 = var2->var_value.int_value;
+        } else if ((var1->type == VarType::VAR_INTEGER || var1->type == VarType::VAR_BYTE) && var2->type == VarType::VAR_POINTER) {
+            uint64_t val1 = var1->var_value.int_value;
+            uintptr_t val2 = reinterpret_cast<uintptr_t>(var2->var_value.ptr_value);
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
+        } else {
+            throw mx::Exception("exec_cmp: unsupported type combination: " +
+                std::to_string(static_cast<int>(var1->type)) + " vs " +
+                std::to_string(static_cast<int>(var2->type)));
         }
     }
 

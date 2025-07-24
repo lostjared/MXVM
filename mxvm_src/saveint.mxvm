@@ -35,7 +35,7 @@ program SaveInt {
                 print enter_value
                 getline input_buffer
                 to_int data_number, input_buffer
-                store data_number, data, 8, data_index
+                store data_number, data,  data_index, 8
                 add data_index, 1
                 cmp data_index, data_size
                 jl start
