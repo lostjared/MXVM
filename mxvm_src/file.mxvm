@@ -7,12 +7,10 @@ program File {
         ptr buffer = null
         string filename = "test.txt"
         string mode = "rb"
-        string text = "Hello, World\n"
         int file_size = 0
         int file_size_null = 0
         string err_msg = "Error has occoured.\n"
         byte null_term = 0
-        string read_size = "Value is: %d\n"
         string ptr_val = "Value is: %s\n"
     }
     section code {
