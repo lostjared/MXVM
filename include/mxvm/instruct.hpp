@@ -6,6 +6,7 @@
 #include<cstdint>
 #include<string>
 #include<sstream>
+#include<optional>
 
 enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN };
 
@@ -74,6 +75,7 @@ namespace mxvm {
         Operand op1, op2, op3;
         std::vector<Operand> vop;
         std::string label = "";
+        std::string toString() const;
     };
 
     enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY, VAR_EXTERN, VAR_BYTE };
@@ -85,7 +87,6 @@ namespace mxvm {
             int64_t int_value;
             double float_value;
             void *ptr_value;
-            char *buffer;
         };
         uint64_t ptr_size = 0;
         uint64_t ptr_count = 0;
@@ -130,6 +131,7 @@ namespace mxvm {
                 owns = other.owns;
                 switch (type) {
                     case VarType::VAR_INTEGER:
+                    case VarType::VAR_BYTE:
                          int_value = other.int_value; 
                          break;
                     case VarType::VAR_FLOAT:
@@ -137,9 +139,6 @@ namespace mxvm {
                         break;
                     case VarType::VAR_POINTER: 
                         ptr_value = other.ptr_value; 
-                        break;
-                    case VarType::VAR_BYTE:
-                        buffer = other.buffer;
                         break;
                     default:
                         int_value = other.int_value; 
@@ -175,10 +174,8 @@ namespace mxvm {
             }
             return *this;
         }
-
         std::string toString() const;
     };
-
 }
 
 std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc);

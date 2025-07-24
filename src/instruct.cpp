@@ -11,14 +11,17 @@ std::ostream &operator<<(std::ostream &out, const enum  Inc &i) {
 }
 
 std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc) {
-    out << inc.instruction << " [ ";
-    if (!inc.op1.op.empty()) out << inc.op1.op << " ";
-    if (!inc.op2.op.empty()) out << inc.op2.op << " ";
-    if (!inc.op3.op.empty()) out << inc.op3.op << " ";
+    out << "[" << inc.instruction << "] ";
+    std::ostringstream opc;
+    if (!inc.op1.op.empty()) opc << inc.op1.op;
+    if (!inc.op2.op.empty()) opc << ", " << inc.op2.op;
+    if (!inc.op3.op.empty()) opc << ", " << inc.op3.op;
     for (const auto &arg : inc.vop) {
-        if (!arg.op.empty()) out << arg.op << " ";
+        if (!arg.op.empty()) opc << ", " << arg.op;
     }
-    out << "]";
+    if(opc.str().length() > 0) {
+        out << " " << opc.str();
+    }  
     return out;
 }
 
@@ -51,6 +54,13 @@ std::ostream &operator<<(std::ostream &out, const mxvm::VarType &type) {
 }
 
 namespace mxvm {
+
+    std::string Instruction::toString() const {
+        std::ostringstream stream;
+        stream << *this;
+        return stream.str();
+    }
+
     std::string Variable::toString() const {
         std::ostringstream stream;
         stream << type;
