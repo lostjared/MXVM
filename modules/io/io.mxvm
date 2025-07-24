@@ -4,4 +4,7 @@ module io {
     extern fprintf
     extern fsize
     extern fread
+    extern fwrite
+    extern fseek
+    
 }

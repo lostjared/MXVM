@@ -84,6 +84,7 @@ namespace mxvm {
         std::string name;
         void generateCode(std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
+        void memoryDump(std::ostream &out);
     private:
         size_t pc;  
         bool running;

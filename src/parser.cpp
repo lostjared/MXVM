@@ -508,10 +508,6 @@ namespace mxvm {
         
         auto ast = parseAST();
         if(ast) {
-            if(debug_mode) {
-                std::cout << "Program name: " << ast->name << "\n";
-                std::cout << ast->toString() << "\n";
-            }
             program->name = ast->name;
             for (const auto& section : ast->sections) {
                 auto sectionNode = dynamic_cast<SectionNode*>(section.get());

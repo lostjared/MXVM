@@ -26,7 +26,7 @@ program File {
         add file_size_null, file_size, 1
         alloc buffer, file_size_null, 1
         invoke fread, buffer, 1, file_size, handle
-        return file_size
+        invoke fseek, handle, 0, 0
         sub file_size, 1
         store null_term, buffer, 1, file_size
         invoke fprintf, stdout, ptr_val, buffer

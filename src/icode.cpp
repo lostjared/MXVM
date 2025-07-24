@@ -127,6 +127,75 @@ namespace mxvm {
         return result;
     }
 
+    void Program::memoryDump(std::ostream &out) {
+        out << "=== MEMORY DUMP ===\n";
+        if (vars.empty()) {
+            out << "  (no variables)\n";
+        } else {
+            out << std::left << std::setw(15) << "Name"
+                << std::setw(12) << "Type"
+                << std::setw(20) << "Value"
+                << std::setw(12) << "PtrSize"
+                << std::setw(12) << "PtrCount"
+                << std::setw(8) << "Owns"
+                << "\n";
+            out << std::string(79, '-') << "\n";
+            for (const auto &var : vars) {
+                out << std::setw(15) << var.first;
+                std::string typeStr;
+                switch (var.second.type) {
+                    case VarType::VAR_INTEGER: typeStr = "int"; break;
+                    case VarType::VAR_FLOAT: typeStr = "float"; break;
+                    case VarType::VAR_STRING: typeStr = "string"; break;
+                    case VarType::VAR_POINTER: typeStr = "ptr"; break;
+                    case VarType::VAR_LABEL: typeStr = "label"; break;
+                    case VarType::VAR_EXTERN: typeStr = "external"; break;
+                    case VarType::VAR_ARRAY: typeStr = "array"; break;
+                    case VarType::VAR_BYTE:  typeStr = "byte"; break;
+                    default: typeStr = "unknown"; break;
+                }
+                out << std::setw(12) << typeStr;
+                switch (var.second.var_value.type) {
+                    case VarType::VAR_INTEGER:
+                        out << std::setw(20) << var.second.var_value.int_value;
+                        break;
+                    case VarType::VAR_FLOAT:
+                        out << std::setw(20) << std::fixed << std::setprecision(6)
+                            << var.second.var_value.float_value;
+                        break;
+                    case VarType::VAR_STRING:
+                        out << std::setw(20) << ("\"" + var.second.var_value.str_value + "\"");
+                        break;
+                    case VarType::VAR_POINTER:
+                        if (var.second.var_value.ptr_value == nullptr)
+                            out << std::setw(20) << "null";
+                        else
+                            out << std::setw(20) << std::hex << "0x"
+                                << reinterpret_cast<uintptr_t>(var.second.var_value.ptr_value) << std::dec;
+                        break;
+                    case VarType::VAR_LABEL:
+                        out << std::setw(20) << var.second.var_value.label_value;
+                        break;
+                    default:
+                        out << std::setw(20) << "(uninitialized)";
+                        break;
+                }
+                if (var.second.type == VarType::VAR_POINTER) {
+                    out << std::setw(12) << var.second.var_value.ptr_size
+                        << std::setw(12) << var.second.var_value.ptr_count
+                        << std::setw(8) << (var.second.var_value.owns ? "yes" : "no");
+                } else {
+                    out << std::setw(12) << "-"
+                        << std::setw(12) << "-"
+                        << std::setw(8) << "-";
+                }
+                out << "\n";
+            }
+        }
+        out << "\n";
+
+    }
+
     void Program::generateCode(std::ostream &out) {
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
@@ -1718,8 +1787,8 @@ namespace mxvm {
         }
         Variable& dest = getVariable(instr.op1.op);
         void* ptr = nullptr;
-        size_t index = 0;
-        size_t size = 8;
+        int64_t index = 0;
+        int64_t size = 8;
         if (isVariable(instr.op2.op)) {
             Variable& ptrVar = getVariable(instr.op2.op);
             if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
@@ -1741,18 +1810,22 @@ namespace mxvm {
         if (!instr.vop.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
-                size = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
-            } else {
+                
+                size = getVariable(sizeOp.op).var_value.int_value;
+
+            } else if (!sizeOp.op.empty()) {
                 size = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
+            } else {
+                throw mx::Exception("STORE: size operand is empty or invalid");
             }
-        } 
+        }
         Variable& ptrVar = getVariable(instr.op2.op);
 
-        if (index > ptrVar.var_value.ptr_count) {
-            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name);
+        if (index > static_cast<int64_t>(ptrVar.var_value.ptr_count)) {
+            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name + " " + std::to_string(index) + " > " + std::to_string( ptrVar.var_value.ptr_count));
         }
-        if (size > ptrVar.var_value.ptr_size) {
-            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name);
+        if (size > static_cast<int64_t>(ptrVar.var_value.ptr_size)) {
+            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name + " " + std::to_string(size) + " > " + std::to_string(ptrVar.var_value.ptr_size));
         }
 
         char* base = static_cast<char*>(ptr) + index * size;
@@ -1842,25 +1915,24 @@ namespace mxvm {
             return;
         }
         Variable& dest = getVariable(instr.op1.op);
-        size_t size = 0;
-        size_t count = 1;
+        int64_t size = 0;
+        int64_t count = 1;
 
         if (!instr.op2.op.empty()) {
             if (isVariable(instr.op2.op)) {
-            size = static_cast<size_t>(getVariable(instr.op2.op).var_value.int_value);
+                size = getVariable(instr.op2.op).var_value.int_value;
             } else {
-            size = static_cast<size_t>(std::stoll(instr.op2.op, nullptr, 0));
+                size = std::stoll(instr.op2.op, nullptr, 0);
             }
         }
 
         if (!instr.op3.op.empty()) {
             if (isVariable(instr.op3.op)) {
-            count = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
+                count = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
             } else {
-            count = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
+                count = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
             }
         }
-
         dest.type = VarType::VAR_POINTER;
         dest.var_value.type = VarType::VAR_POINTER;
         dest.var_value.ptr_value = calloc(count, size);
