@@ -775,7 +775,6 @@ namespace mxvm {
                 var.var_value.float_value = std::stod(value);
                 var.var_value.type = VarType::VAR_FLOAT;
                 break;
-                
             case VarType::VAR_STRING:
                 var.var_value.str_value = value;
                 var.var_value.type = VarType::VAR_STRING;

@@ -155,8 +155,9 @@ namespace mxvm {
                     default: typeStr = "unknown"; break;
                 }
                 out << std::setw(12) << typeStr;
-                switch (var.second.var_value.type) {
+                switch (var.second.type) {
                     case VarType::VAR_INTEGER:
+                    case VarType::VAR_BYTE:
                         out << std::setw(20) << var.second.var_value.int_value;
                         break;
                     case VarType::VAR_FLOAT:
@@ -177,7 +178,8 @@ namespace mxvm {
                         out << std::setw(20) << var.second.var_value.label_value;
                         break;
                     default:
-                        out << std::setw(20) << "(uninitialized)";
+                        //out << std::setw(20) << "(uninitialized)";
+                        out << std::setw(20) << var.second.var_value.int_value;
                         break;
                 }
                 if (var.second.type == VarType::VAR_POINTER) {
@@ -1540,14 +1542,12 @@ namespace mxvm {
         Variable* var2 = nullptr;
         Variable temp1, temp2;
         
-       
         if (isVariable(instr.op1.op)) {
             var1 = &getVariable(instr.op1.op);
         } else {
             temp1 = createTempVariable(VarType::VAR_INTEGER, instr.op1.op);
             var1 = &temp1;
         }
-        
         if (isVariable(instr.op2.op)) {
             var2 = &getVariable(instr.op2.op);
         } else {
@@ -1557,14 +1557,7 @@ namespace mxvm {
         zero_flag = false;
         less_flag = false;
         greater_flag = false;
-    
-        if (var1->type == VarType::VAR_INTEGER && var2->type == VarType::VAR_INTEGER) {
-            int64_t val1 = var1->var_value.int_value;
-            int64_t val2 = var2->var_value.int_value;
-            if (val1 == val2) zero_flag = true;
-            else if (val1 < val2) less_flag = true;
-            else greater_flag = true;
-        } else if (var1->type == VarType::VAR_FLOAT && var2->type == VarType::VAR_FLOAT) {
+        if (var1->type == VarType::VAR_FLOAT && var2->type == VarType::VAR_FLOAT) {
             double val1 = var1->var_value.float_value;
             double val2 = var2->var_value.float_value;
             if (val1 == val2) zero_flag = true;
@@ -1573,6 +1566,12 @@ namespace mxvm {
         } else if (var1->type == VarType::VAR_POINTER && (var2->type == VarType::VAR_INTEGER || var2->type == VarType::VAR_BYTE)) {
             uintptr_t val1 = reinterpret_cast<uintptr_t>(var1->var_value.ptr_value);
             uint64_t val2 = var2->var_value.int_value;
+            if (val1 == val2) zero_flag = true;
+            else if (val1 < val2) less_flag = true;
+            else greater_flag = true;
+        } else {
+            int64_t val1 = var1->var_value.int_value;
+            int64_t val2 = var2->var_value.int_value;
             if (val1 == val2) zero_flag = true;
             else if (val1 < val2) less_flag = true;
             else greater_flag = true;
@@ -1795,6 +1794,10 @@ namespace mxvm {
                     throw mx::Exception("LOAD: size mismatch for float");
                 }
                 break;
+            case VarType::VAR_BYTE:
+                    dest.var_value.int_value =  *reinterpret_cast<unsigned char*>(base);
+                    dest.var_value.type = VarType::VAR_BYTE;
+                break;
             case VarType::VAR_STRING:
                 //dest.var_value.str_value = std::string(base, size);
                 //dest.var_value.type = VarType::VAR_STRING;
@@ -1825,9 +1828,9 @@ namespace mxvm {
 
         if (!instr.op3.op.empty()) {
             if (isVariable(instr.op3.op)) {
-                size = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
+                index = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
             } else {
-                size = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
+                index = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
             }
         } else {
             throw mx::Exception("STORE: operand 3 is empty\n");
@@ -1836,9 +1839,9 @@ namespace mxvm {
         if (!instr.vop.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
-                index = getVariable(sizeOp.op).var_value.int_value;
+                size = getVariable(sizeOp.op).var_value.int_value;
             } else if (!sizeOp.op.empty()) {
-                index = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
+                size = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             } else {
                 throw mx::Exception("STORE: index operand is empty or invalid");
             }
@@ -2175,14 +2178,16 @@ namespace mxvm {
                 std::string spec(fmt + start, fmt + j + 1);
                 if (argIndex < args.size()) {
                     Variable* arg = args[argIndex++];
-                    if (arg->var_value.type == VarType::VAR_INTEGER) {
+                    if (arg->type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
-                    } else if (arg->var_value.type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
+                    } else if (arg->type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
-                    } else if (arg->var_value.type == VarType::VAR_FLOAT) {
+                    } else if (arg->type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
-                    } else if (arg->var_value.type == VarType::VAR_STRING) {
+                    } else if (arg->type == VarType::VAR_STRING) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.str_value.c_str());
+                    } else if (arg->type == VarType::VAR_BYTE) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
                     } else {
                         std::snprintf(buffer, sizeof(buffer), "%s", "(unsupported)");
                     }
@@ -2229,15 +2234,18 @@ namespace mxvm {
                 if (argIndex < args.size()) {
 
                     Variable* arg = args[argIndex++];
-                    if (arg->var_value.type == VarType::VAR_INTEGER) {
+                    if (arg->type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
-                    } else if (arg->var_value.type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
+                    } else if (arg->type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
-                    } else if (arg->var_value.type == VarType::VAR_FLOAT) {
+                    } else if (arg->type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
-                    } else if (arg->var_value.type == VarType::VAR_STRING) {
+                    } else if (arg->type == VarType::VAR_STRING) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.str_value.c_str());
-                    } else {
+                    } else if(arg->type == VarType::VAR_BYTE) {
+                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
+                    } 
+                    else {
                         std::snprintf(buffer, sizeof(buffer), "%s", "(unsupported)");
                     }
                     oss << buffer;
