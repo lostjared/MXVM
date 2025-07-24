@@ -587,7 +587,14 @@ namespace mxvm {
         // Variables Table
         out << "<section>\n<h2>Memory</h2>\n<table>\n";
         out << "<tr><th>Name</th><th>Type</th><th>Initial Value</th></tr>\n";
-        for (const auto& [name, var] : program->vars) {
+        std::vector<std::pair<std::string, Variable>> vars_;
+        for(const auto & [name, var] : program->vars) {
+            vars_.push_back(std::make_pair(name, var));
+        }
+        std::sort(vars_.begin(), vars_.end(), [](auto &one, auto &two) {
+            return (one.first < two.first);
+        });
+        for (const auto& [name, var] : vars_) {
             out << "<tr>";
             out << "<td>" << name << "</td>";
             out << "<td class=\"type\">";
@@ -639,7 +646,14 @@ namespace mxvm {
         out << "</table>\n</section>\n";
         out << "<section>\n<h2>Labels</h2>\n<table>\n";
         out << "<tr><th>Name</th><th>Address</th></tr>\n";
-        for (const auto& [label, addr] : program->labels) {
+        std::vector<std::pair<std::string, std::pair<uint64_t, bool>>> lbl;
+        for(const auto &[label, addr] : program->labels) {
+            lbl.push_back(std::make_pair(label, addr));
+        }
+        std::sort(lbl.begin(), lbl.end(), [](auto &one, auto &two) {
+            return (one.second.first < two.second.first);
+        });
+        for (const auto& [label, addr] : lbl) {
             std::string ltype = "";
             if(addr.second)
                 ltype = "<b>function</b> ";

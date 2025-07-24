@@ -11,7 +11,7 @@ program File {
         int file_size_null = 0
         string err_msg = "Error has occoured.\n"
         byte null_term = 0
-        string ptr_val = "Value is: %s\n"
+        string ptr_val = "Value is: %s"
     }
     section code {
     start:
