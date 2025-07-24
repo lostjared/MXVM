@@ -10,7 +10,7 @@
 #include"scanner/exception.hpp"
 #include"mxvm/instruct.hpp"
 #include"mxvm/valid.hpp"
-
+#include<algorithm>
 
 namespace mxvm {
     class ProgramNode;
