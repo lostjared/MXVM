@@ -22,7 +22,7 @@ program File {
         invoke fsize, handle
         return file_size
         add file_size_null, file_size, 1
-        alloc buffer, file_size_null, 1
+        alloc buffer, 1, file_size_null
         cmp buffer, 0
         je error_out
         invoke fread, buffer, 1, file_size, handle
