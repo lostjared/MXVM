@@ -6,11 +6,11 @@ program File {
         ptr handle = null
         ptr buffer = null
         string filename = "test.txt"
-        string mode = "r"
+        string mode = "rb"
         string text = "Hello, World\n"
         int file_size = 0
         int file_size_null = 0
-        string err_msg = "Error could not open file.\n"
+        string err_msg = "Error has occoured.\n"
         byte null_term = 0
         string read_size = "Value is: %d\n"
         string ptr_val = "Value is: %s\n"
@@ -25,14 +25,19 @@ program File {
         return file_size
         add file_size_null, file_size, 1
         alloc buffer, file_size_null, 1
+        cmp buffer, 0
+        je error_out
         invoke fread, buffer, 1, file_size, handle
-        invoke fseek, handle, 0, 0
+        return file_size
+        cmp file_size, 0
+        je error_out
         store null_term, buffer, 1, file_size
         invoke fprintf, stdout, ptr_val, buffer
+        invoke fclose, handle
         free buffer
         done
     error_out:
-        print err_msg
+        invoke fprintf, stderr, err_msg
         exit 1
     }
 }

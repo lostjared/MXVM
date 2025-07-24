@@ -555,26 +555,27 @@ namespace mxvm {
         if (ptrVar.type != VarType::VAR_POINTER) {
             throw mx::Exception("STORE destination must be a pointer");
         }
-
-        size_t size = (src.type == VarType::VAR_FLOAT) ? sizeof(double) : sizeof(int64_t);
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
-                size = static_cast<size_t>(getVariable(i.vop[0].op).var_value.int_value);
+                Variable &v = getVariable(i.vop[0].op);
+                generateLoadVar(out, v.type, "%rdx", i.vop[0]);
             } else {
-                size = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+                generateLoadVar(out, VarType::VAR_INTEGER, "%rdx", i.vop[0]);
             }
+        } else {
+            throw mx::Exception("STORE: requires allocaiton size 4th argument.");
         }
 
         std::string idx_reg = "%rcx";
         if (!i.op3.op.empty()) {
             generateLoadVar(out, VarType::VAR_INTEGER, idx_reg, i.op3);
         } else {
-            out << "\txor %rcx, %rcx\n";
+           throw mx::Exception("STORE resize third argument of size count");
         }
 
         out << "\tmovq " << i.op2.op << "(%rip), %rax\n";
-        out << "\timul $" << size << ", %rcx, %rcx\n";
-        out << "\tadd %rcx, %rax\n";
+        out << "\timulq %rdx, %rcx\n";
+        out << "\taddq %rcx, %rax\n";
 
         if (src.type == VarType::VAR_INTEGER) {
             out << "\tmovq " << i.op1.op << "(%rip), %rdx\n";
