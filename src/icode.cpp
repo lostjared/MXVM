@@ -169,15 +169,16 @@ namespace mxvm {
                     case VarType::VAR_EXTERN:
                         if (var.second.var_value.ptr_value == nullptr)
                             out << std::setw(20) << "null";
-                        else
-                            out << std::setw(20) << std::hex << "0x"
-                                << reinterpret_cast<uintptr_t>(var.second.var_value.ptr_value) << std::dec;
+                        else {
+                            char ptr_buf[256];
+                            snprintf(ptr_buf, sizeof(ptr_buf), "%p", var.second.var_value.ptr_value);
+                            out << std::setw(20) << ptr_buf << std::dec;
+                        }
                         break;
                     case VarType::VAR_LABEL:
                         out << std::setw(20) << var.second.var_value.label_value;
                         break;
                     default:
-                        //out << std::setw(20) << "(uninitialized)";
                         out << std::setw(20) << var.second.var_value.int_value;
                         break;
                 }
