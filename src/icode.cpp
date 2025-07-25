@@ -1330,8 +1330,7 @@ namespace mxvm {
         running = true;
         
         while (running && pc < inc.size()) {
-            const Instruction& instr = inc[pc];
-            
+            const Instruction& instr = inc.at(pc);
             if(mxvm::instruct_mode)
                 std::cout << instr << "\n";
 
