@@ -4,9 +4,6 @@ object Hello {
     }
 
     section code {
-    start:
-        call hello_world
-        done
 
     function hello_world:
         print value

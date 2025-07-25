@@ -7,10 +7,6 @@ object StringPrint {
         }
 
         section code {
-	start:
-                call intro
-	stop:
-		done
 
         function intro:
                 call Hello.hello_world

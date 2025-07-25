@@ -332,7 +332,7 @@ namespace mxvm {
             generateInstruction(out, instr);
         }
         
-        if(done_found == false)
+        if(obj == false && done_found == false)
             throw mx::Exception("Program missing done to signal completion.\n");
             
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
