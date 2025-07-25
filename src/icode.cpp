@@ -291,6 +291,7 @@ namespace mxvm {
         }
 
         for(auto &o : this->objects) {
+            out << "\t.extern " << o->name << "\n";
             for(auto l : o->labels) {
                 if(l.second.second) {
                     out << "\t.extern " << l.first << "\n";
