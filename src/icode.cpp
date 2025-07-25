@@ -41,6 +41,7 @@ namespace mxvm {
         for(auto &h : RuntimeFunction::handles) {
             if(h.second) {
                 dlclose(h.second);
+                h.second = nullptr;
                 char *errf = dlerror();
                 if(errf != nullptr) {
                     std::cerr << "Error releaseing module: " << errf << "\n";
@@ -102,11 +103,13 @@ namespace mxvm {
     }
     
     void Base::add_label(const std::string &name, uint64_t address, bool f) {
-        labels[name] = std::make_pair(address, f);
+        if(labels.find(name) == labels.end())
+            labels[name] = std::make_pair(address, f);
     }
 
     void Base::add_variable(const std::string &name, const Variable &v) {
-        vars[name] = v;
+        if(vars.find(name) == vars.end())
+            vars[name] = v;
     }
 
     void Base::add_extern(const std::string &mod, const std::string &name) {
@@ -145,7 +148,7 @@ namespace mxvm {
     }
 
     void Program::memoryDump(std::ostream &out) {
-        out << "=== MEMORY DUMP ===\n";
+        out << "=== MEMORY DUMP for " << name << " ===\n";
         if (vars.empty()) {
             out << "  (no variables)\n";
         } else {
@@ -211,6 +214,23 @@ namespace mxvm {
                         << std::setw(8) << "-";
                 }
                 out << "\n";
+            }
+        }
+        out << "\n";
+        out << "=== LABELS ===\n";
+        if (labels.empty()) {
+            out << "  (no labels)\n";
+        } else {
+            out << std::left << std::setw(20) << "Label"
+                << std::setw(10) << "Address"
+                << std::setw(10) << "Function"
+                << "\n";
+            out << std::string(40, '-') << "\n";
+            for (const auto &label : labels) {
+                out << std::setw(20) << label.first
+                    << std::setw(10) << label.second.first
+                    << std::setw(10) << (label.second.second ? "yes" : "no")
+                    << "\n";
             }
         }
         out << "\n";
@@ -1277,6 +1297,30 @@ namespace mxvm {
         running = false;
     }
 
+    void Program::flatten_inc(Program *root, Instruction &i) {
+        root->add_instruction(i);
+    }
+
+    void Program::flatten_label(Program *root, int64_t offset, std::string label, bool func) {
+        root->add_label(label, offset, func);
+    }
+
+    void Program::flatten(Program *program) {   
+        if(program != this) {
+            for(auto &i : inc) {
+                flatten_inc(program, i);
+            }
+            int64_t size = program->inc.size();
+            for(auto &lbl : labels) {
+                flatten_label(program, lbl.second.first+size, lbl.first, lbl.second.second);
+            }
+        }
+        for (auto &obj : objects) {
+            if(obj.get() != program)
+                obj->flatten(program);
+        }
+    }
+
     int Program::exec() {
         if (inc.empty()) {
             std::cerr << "No instructions to execute\n";
@@ -1711,19 +1755,17 @@ namespace mxvm {
         stop();
     }
 
-    Variable& Program::getVariable(const std::string& name) {
-        auto it = vars.find(name);
+    Variable& Program::getVariable(const std::string& n) {
+        auto it = vars.find(n);
         if (it != vars.end()) {
             return it->second;
         }
         for(auto &o : objects) {
-            if(o->isVariable(name)) {
-                auto it = o->vars.find(name);
-                if(it != o->vars.end())
-                    return it->second;
+           if(o->isVariable(n)) {
+                return o->getVariable(n);         
             }
         }
-        throw mx::Exception("Variable not found: " + name);
+        throw mx::Exception("Variable not found: " + name + "." + n);
     }
 
     bool Program::isVariable(const std::string& name) {
@@ -2539,17 +2581,12 @@ namespace mxvm {
             return;
         }
         auto it = labels.find(instr.op1.op);
-        if (it == labels.end()) {
-            throw mx::Exception("CALL: label not found: " + instr.op1.op);
-            return;
+        if(it != labels.end()) {
+            stack.push(static_cast<int64_t>(pc + 1));
+            pc = it->second.first;
+        } else {
+            throw mx::Exception("CALL Label not found: " + instr.op1.op);
         }
-
-        if(it->second.second == false) {
-            throw mx::Exception("call requires function label found: " +  instr.op1.op);
-        }
-
-        stack.push(static_cast<int64_t>(pc + 1));
-        pc = it->second.first;
     }
 
     void Program::exec_ret(const Instruction &instr) {

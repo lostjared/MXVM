@@ -63,7 +63,6 @@ namespace mxvm {
         void add_variable(const std::string &name, const Variable &v);
         void add_extern(const std::string &mod, const std::string &name);
         void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
-    
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
@@ -91,6 +90,9 @@ namespace mxvm {
         bool isFunctionValid(const std::string &f);
         bool object = false;
         bool validateNames(Validator &v);
+        void flatten(Program *program);
+        void flatten_inc(Program *root, Instruction &i);
+        void flatten_label(Program *root, int64_t offset, std::string label, bool func);
     private:
         size_t pc;  
         bool running;

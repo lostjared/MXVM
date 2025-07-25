@@ -277,6 +277,7 @@ void signal_action(int signum) {
         parser.object_path = std::string(object_path);
         if(parser.generateProgramCode(false, mxvm::Mode::MODE_INTERPRET, program)) {
             if(mxvm::debug_mode && debug_output.is_open()) program->print(debug_output);
+            program->flatten(program.get());
             exitCode = program->exec();
             if(mxvm::debug_mode && debug_output.is_open()) program->post(debug_output);
             if(mxvm::debug_mode) {

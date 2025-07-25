@@ -209,8 +209,6 @@ namespace mxvm {
         std::unique_ptr<Program> prog(new Program());
         program->object = true;
         if(parser->generateProgramCode(true, mxvm::Mode::MODE_INTERPRET, prog)) {
-            if(mxvm::debug_mode)
-                prog->memoryDump(std::cout);
             program->objects.push_back(std::move(prog));
         }
         file.close();
