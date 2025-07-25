@@ -42,6 +42,8 @@ namespace mxvm {
         bool generateProgramCode(const Mode &m, std::unique_ptr<Program> &program);
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
         std::string module_path = ".";
+        std::string object_path = ".";
+        bool object_mode = false;
     private:
         std::string source_file;
         scan::Scanner scanner;

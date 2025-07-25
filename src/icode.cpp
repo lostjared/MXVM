@@ -249,6 +249,8 @@ namespace mxvm {
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_EXTERN) {
                 out << "\t.extern "<< v << "\n";
+            } else if(vars[v].type != VarType::VAR_STRING) {
+                out << "\t.global " << v << "\n";
             }
         }
         out << ".section .rodata\n";
@@ -256,25 +258,32 @@ namespace mxvm {
             if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
                 out << "\t" << v << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
+            } 
+        }
+
+        for(auto &v : var_names) {
+            if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
+                out << "\t.global " << v << "\n";
             }
         }
+
         out << ".section .bss\n";
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_POINTER) {
-                out << "\t.lcomm " << v << ", 8\n";
+                out << "\t.comm " << v << ", 8\n";
             } else if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size > 0) {
-                out << "\t.lcomm " << v << ", " << vars[v].var_value.buffer_size << "\n";
+                out << "\t.comm " << v << ", " << vars[v].var_value.buffer_size << "\n";
             }
         }
         out << ".section .text\n";
         if(object)
-            out << ".global " << name << "\n";
+            out << "\t.global " << name << "\n";
         else
             out << "\t.global main\n";
 
         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
-                out << ".global " << lbl.first << "\n";
+                out << "\t.global " << lbl.first << "\n";
             }
         }
 
@@ -291,7 +300,6 @@ namespace mxvm {
         }
 
         for(auto &o : this->objects) {
-            out << "\t.extern " << o->name << "\n";
             for(auto l : o->labels) {
                 if(l.second.second) {
                     out << "\t.extern " << l.first << "\n";

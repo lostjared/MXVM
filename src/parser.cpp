@@ -136,6 +136,9 @@ namespace mxvm {
                     if(tokenValue == "object") {
                         program->object = true;
                     } else {
+                        if(object_mode == true) {
+                            throw mx::Exception("Program mode requires program object");
+                        }
                         program->object = false;
                     }
                 }
@@ -193,15 +196,23 @@ namespace mxvm {
     }
 
     void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
-
         std::fstream file;
-        file.open(src + ".mxvm", std::ios::in);
+        std::string path;
+        if(object_path.ends_with("/"))
+            path = object_path;
+        else
+            path = object_path + "/";
+
+        file.open(path + src + ".mxvm", std::ios::in);
         if(!file.is_open()) {
-            throw mx::Exception("Could not open: " + src + ".mxvm");
+            throw mx::Exception("Could not open: " + path + src + ".mxvm");
         }
         std::ostringstream stream;
         stream << file.rdbuf();
         std::unique_ptr<Parser> parser(new Parser(stream.str()));
+        parser->module_path = module_path;
+        parser->object_path = object_path;
+        parser->object_mode = true;
         parser->scan();
         std::unique_ptr<Program> prog(new Program());
         if(parser->generateProgramCode(mxvm::Mode::MODE_INTERPRET, prog)) {
@@ -553,7 +564,7 @@ namespace mxvm {
     bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
         parser_mode = mode;
         try {
-            if(!validator.validate()) {
+            if(!validator.validate(program->object)) {
                 return false;
             }
         } catch (mx::Exception &e) {

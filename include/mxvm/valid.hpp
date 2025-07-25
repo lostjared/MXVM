@@ -7,7 +7,7 @@ namespace mxvm {
     class Validator {
     public:
         Validator(const std::string &text) : scanner(text), index(0) {}
-        bool validate();
+        bool validate(bool mode);
         void collect_labels(std::unordered_map<std::string, std::string> &labels);
         bool match(const std::string &m);
         void require(const std::string &r);
