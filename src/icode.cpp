@@ -10,15 +10,13 @@
 namespace mxvm {
 
     Program::Program() : pc(0), running(false) {
-        add_variable("stdout", Variable());
-        vars["stdout"].type = VarType::VAR_EXTERN;
-        vars["stdout"].var_value.ptr_value = stdout;
-        add_variable("stderr", Variable());
-        vars["stderr"].type = VarType::VAR_EXTERN;
-        vars["stderr"].var_value.ptr_value = stderr;
-        add_variable("stdin", Variable());
-        vars["stdin"].type = VarType::VAR_EXTERN;
-        vars["stdin"].var_value.ptr_value = stdin;
+        Variable vstdout, vstdin, vstderr;
+        vstdout.setExtern("stdout", stdout);
+        vstdin.setExtern("stdin", stdin);
+        vstderr.setExtern("stderr", stderr);
+        add_variable("stdout", vstdout);
+        add_variable("stdin", vstdin);
+        add_variable("stderr", vstderr);
     }
 
     Program::~Program() {
@@ -168,6 +166,7 @@ namespace mxvm {
                         out << std::setw(20) << ("\"" + var.second.var_value.str_value + "\"");
                         break;
                     case VarType::VAR_POINTER:
+                    case VarType::VAR_EXTERN:
                         if (var.second.var_value.ptr_value == nullptr)
                             out << std::setw(20) << "null";
                         else

@@ -165,6 +165,14 @@ namespace mxvm {
         Variable(const Variable& v)
             : type(v.type), var_name(v.var_name), var_value(v.var_value) {}
 
+        void setExtern(std::string name, void *value) {
+            type = VarType::VAR_EXTERN;
+            var_value.type = VarType::VAR_EXTERN;
+            var_value.ptr_value = value;
+            var_value.ptr_count = 0;
+            var_value.ptr_size = 0;
+            var_value.owns = false;
+        }
         
         Variable& operator=(const Variable& v) {
             if (this != &v) {
