@@ -43,6 +43,7 @@ namespace mxvm {
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
         std::string module_path = ".";
         std::string object_path = ".";
+        std::string include_path = "/usr/local/include/mxvm/modules";
         bool object_mode = false;
     private:
         std::string source_file;

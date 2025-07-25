@@ -5,7 +5,8 @@
 #include<iomanip>
 #include<iostream>
 #include<sstream>
-#include <regex>
+#include<regex>
+#include<filesystem>
 
 namespace mxvm {
 
@@ -148,6 +149,14 @@ namespace mxvm {
     }
 
     void Program::memoryDump(std::ostream &out) {
+
+        out << "Current working directory: ";
+        try {
+            out << std::filesystem::current_path().string() << "\n";
+        } catch (const std::exception& e) {
+            out << "(unable to retrieve: " << e.what() << ")\n";
+        }
+
         out << "=== MEMORY DUMP for " << name << " ===\n";
         if (vars.empty()) {
             out << "  (no variables)\n";
@@ -230,6 +239,23 @@ namespace mxvm {
                 out << std::setw(20) << label.first
                     << std::setw(10) << label.second.first
                     << std::setw(10) << (label.second.second ? "yes" : "no")
+                    << "\n";
+            }
+        }
+        out << "\n";
+        out << "=== EXTERNAL FUNCTIONS ===\n";
+        if (external_functions.empty()) {
+            out << "  (no external functions)\n";
+        } else {
+            out << std::left << std::setw(25) << "Name"
+                << std::setw(30) << "Module"
+                << std::setw(30) << "Function"
+                << "\n";
+            out << std::string(85, '-') << "\n";
+            for (const auto& ext : external_functions) {
+                out << std::setw(25) << ext.first
+                    << std::setw(30) << ext.second.mod_name
+                    << std::setw(30) << ext.second.fname
                     << "\n";
             }
         }
@@ -1301,18 +1327,27 @@ namespace mxvm {
         root->add_instruction(i);
     }
 
-    void Program::flatten_label(Program *root, int64_t offset, std::string label, bool func) {
+    void Program::flatten_label(Program *root, int64_t offset, const std::string &label, bool func) {
         root->add_label(label, offset, func);
+    }
+
+    void Program::flatten_external(Program *root, const std::string &e, RuntimeFunction &r) {
+        if(external_functions.find(e) == external_functions.end()) {
+            external_functions[e] = r;
+        }
     }
 
     void Program::flatten(Program *program) {   
         if(program != this) {
+            int64_t size = program->inc.size();
             for(auto &i : inc) {
                 flatten_inc(program, i);
             }
-            int64_t size = program->inc.size();
             for(auto &lbl : labels) {
                 flatten_label(program, lbl.second.first+size, lbl.first, lbl.second.second);
+            }
+            for(auto &e : external_functions) {
+                flatten_external(program, e.first, e.second);
             }
         }
         for (auto &obj : objects) {

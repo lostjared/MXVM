@@ -866,10 +866,12 @@ namespace mxvm {
 
     void Parser::processModuleFile(const std::string &src, std::unique_ptr<Program> &program) {
         std::string module_name = "libmxvm_" + src;
-        std::string module_path_so = "modules/" + src + "/" + module_name + ".so";
         if(!module_path.ends_with("/"))
             module_path += "/";
-        std::string module_src = module_path + "modules/" + src + "/" + src + ".mxvm";
+        if(!include_path.ends_with("/"))
+            include_path += "/";
+        std::string module_path_so = module_path + "modules/" + src + "/" + module_name + ".so";
+        std::string module_src = include_path + src + "/" + src + ".mxvm";
         std::fstream file;
         file.open(module_src, std::ios::in);
         if(!file.is_open()) {

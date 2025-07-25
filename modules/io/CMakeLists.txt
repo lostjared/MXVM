@@ -11,9 +11,12 @@ target_link_libraries(mxvm_io
         mxvm
 )
 add_library(mxvm_io_static STATIC io.c)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm
-    DESTINATION lib/modules/io
+    DESTINATION include/mxvm/modules/io
+    RENAME io.mxvm
 )
+
 install(TARGETS mxvm_io mxvm_io_static
     LIBRARY DESTINATION lib/modules/io
     ARCHIVE DESTINATION lib/modules/io

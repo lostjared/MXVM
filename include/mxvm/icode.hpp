@@ -40,10 +40,12 @@ namespace mxvm {
     class RuntimeFunction {
     public:
         RuntimeFunction() : func(nullptr), handle(nullptr) {}
-        RuntimeFunction(const RuntimeFunction &r) : func(r.func), handle(r.handle) {}
+        RuntimeFunction(const RuntimeFunction &r) : func(r.func), handle(r.handle), mod_name(r.mod_name), fname(r.fname) {}
         RuntimeFunction &operator=(const RuntimeFunction &r) {
             func = r.func;
             handle = r.handle;
+            mod_name = r.mod_name;
+            fname = r.fname;
             return *this;
         }
         ~RuntimeFunction() = default;
@@ -92,7 +94,8 @@ namespace mxvm {
         bool validateNames(Validator &v);
         void flatten(Program *program);
         void flatten_inc(Program *root, Instruction &i);
-        void flatten_label(Program *root, int64_t offset, std::string label, bool func);
+        void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
+        void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
     private:
         size_t pc;  
         bool running;

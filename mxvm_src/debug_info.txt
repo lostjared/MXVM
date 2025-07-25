@@ -1,0 +1,162 @@
+=== VARIABLES ===
+Name           Type        Value               
+-----------------------------------------------
+%rax           int         0                   
+ascii_buf      ptr         null
+line_len       int         16                  
+hex_index      int         16                  
+ascii_index    int         11                  
+character_fmt  string      "%c"                
+newline        string      "
+"                 
+mod_check      int         11                  
+ascii_fmt      string      "|%s|
+"             
+loop_index     int         2651                
+stdout         external    (uninitialized)     
+null_term      byte        (uninitialized)     
+stdin          external    (uninitialized)     
+read_mode      string      "rb"                
+stderr         external    (uninitialized)     
+file_handle    ptr         (uninitialized)     
+buffer         ptr         null
+filename       string      "print_hex.mxvm"    
+err_msg        string      "Error has occoured.
+"
+space_str      string      "   "               
+temp_char      byte        (uninitialized)     
+file_size      int         2651                
+character      byte        (uninitialized)     
+dot_char       byte        (uninitialized)     
+hex_value      string      "%02x "             
+prompt         string      "Enter filename: "  
+
+=== LABELS ===
+Label               Address   
+------------------------------
+error               53        
+pad_hex             41        
+stop                48        
+print_ascii_and_exit38        
+continue_loop       36        
+print_last_ascii    46        
+after_ascii         29        
+not_printable       28        
+loop                17        
+start               0         
+
+=== INSTRUCTIONS ===
+Addr      Instruction         Operand1                 Operand2                 Operand3                 Extra Operands                
+----------------------------------------------------------------------------------------------------------------------------------
+0         print       prompt                   -                        -                        -                             
+1         getline     filename                 -                        -                        -                             
+2         invoke      fopen                    filename                 read_mode                -                             
+3         return      file_handle              -                        -                        -                             
+4         cmp         file_handle              0                        -                        -                             
+5         je          error                    -                        -                        -                             
+6         invoke      fsize                    file_handle              -                        -                             
+7         return      file_size                -                        -                        -                             
+8         cmp         file_size                0                        -                        -                             
+9         je          error                    -                        -                        -                             
+10        alloc       buffer                   1                        file_size                -                             
+11        cmp         buffer                   0                        -                        -                             
+12        je          error                    -                        -                        -                             
+13        alloc       ascii_buf                1                        25                       -                             
+14        invoke      fread                    buffer                   1                        file_size, file_handle        
+15        mov         loop_index               0                        -                        -                             
+16        mov         ascii_index              0                        -                        -                             
+17        cmp         loop_index               file_size                -                        -                             
+18        jge         print_ascii_and_exit     -                        -                        -                             
+19        load        character                buffer                   loop_index               1                             
+20        invoke      fprintf                  stdout                   hex_value                character                     
+21        mov         temp_char                character                -                        -                             
+22        cmp         temp_char                32                       -                        -                             
+23        jl          not_printable            -                        -                        -                             
+24        cmp         temp_char                126                      -                        -                             
+25        jg          not_printable            -                        -                        -                             
+26        store       character                ascii_buf                ascii_index              1                             
+27        jmp         after_ascii              -                        -                        -                             
+28        store       dot_char                 ascii_buf                ascii_index              1                             
+29        add         ascii_index              1                        -                        -                             
+30        mov         mod_check                ascii_index              -                        -                             
+31        cmp         mod_check                line_len                 -                        -                             
+32        jne         continue_loop            -                        -                        -                             
+33        store       null_term                ascii_buf                ascii_index              1                             
+34        invoke      fprintf                  stdout                   ascii_fmt                ascii_buf                     
+35        mov         ascii_index              0                        -                        -                             
+36        add         loop_index               1                        -                        -                             
+37        jmp         loop                     -                        -                        -                             
+38        cmp         ascii_index              0                        -                        -                             
+39        je          stop                     -                        -                        -                             
+40        mov         hex_index                ascii_index              -                        -                             
+41        cmp         hex_index                line_len                 -                        -                             
+42        jge         print_last_ascii         -                        -                        -                             
+43        invoke      fprintf                  stdout                   space_str                -                             
+44        add         hex_index                1                        -                        -                             
+45        jmp         pad_hex                  -                        -                        -                             
+46        store       null_term                ascii_buf                ascii_index              1                             
+47        invoke      fprintf                  stdout                   ascii_fmt                ascii_buf                     
+48        invoke      fprintf                  stdout                   newline                  -                             
+49        invoke      fclose                   file_handle              -                        -                             
+50        free        buffer                   -                        -                        -                             
+51        free        ascii_buf                -                        -                        -                             
+52        done        -                        -                        -                        -                             
+53        invoke      fprintf                  stderr                   err_msg                  -                             
+54        exit        1                        -                        -                        -                             
+
+Stack aligned.
+=== MEMORY DUMP for PrintHex ===
+Name           Type        Value               PtrSize     PtrCount    Owns    
+-------------------------------------------------------------------------------
+%rax           int         0                   -           -           -       
+ascii_buf      ptr         null                1           25          yes     
+line_len       int         16                  -           -           -       
+hex_index      int         16                  -           -           -       
+ascii_index    int         11                  -           -           -       
+character_fmt  string      "%c"                -           -           -       
+newline        string      "\n"                -           -           -       
+mod_check      int         11                  -           -           -       
+ascii_fmt      string      "|%s|\n"            -           -           -       
+loop_index     int         2651                -           -           -       
+stdout         external    0x79dced6045c0      -           -           -       
+null_term      byte        0                   -           -           -       
+stdin          external    0x79dced6038e0      -           -           -       
+read_mode      string      "rb"                -           -           -       
+stderr         external    0x79dced6044e0      -           -           -       
+file_handle    ptr         0x6462261da410      0           0           no      
+buffer         ptr         null                1           2651        yes     
+filename       string      "print_hex.mxvm"    -           -           -       
+err_msg        string      "Error has occoured.\n"-           -           -       
+space_str      string      "   "               -           -           -       
+temp_char      byte        125                 -           -           -       
+file_size      int         2651                -           -           -       
+character      byte        125                 -           -           -       
+dot_char       byte        46                  -           -           -       
+hex_value      string      "%02x "             -           -           -       
+prompt         string      "Enter filename: "  -           -           -       
+
+=== LABELS ===
+Label               Address   Function  
+----------------------------------------
+error               53        no        
+pad_hex             41        no        
+stop                48        no        
+print_ascii_and_exit38        no        
+continue_loop       36        no        
+print_last_ascii    46        no        
+after_ascii         29        no        
+not_printable       28        no        
+loop                17        no        
+start               0         no        
+
+=== EXTERNAL FUNCTIONS ===
+Name                     Module                        Function                      
+-------------------------------------------------------------------------------------
+fseek                    io                            mxvm_io_fseek                 
+fread                    io                            mxvm_io_fread                 
+fsize                    io                            mxvm_io_fsize                 
+fwrite                   io                            mxvm_io_fwrite                
+fprintf                  io                            mxvm_io_fprintf               
+fclose                   io                            mxvm_io_fclose                
+fopen                    io                            mxvm_io_fopen                 
+
