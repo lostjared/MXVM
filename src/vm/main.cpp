@@ -201,7 +201,6 @@ void translate_x64_linux(std::string_view object_path, bool object, std::string_
         if(parser.generateProgramCode(object, mxvm::Mode::MODE_COMPILE, program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
-
             std::fstream file;
             file.open(program_name, std::ios::out);
             if(file.is_open()) {

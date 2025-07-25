@@ -1,18 +1,17 @@
-object StringPrint {   
-        section data {		
-                string message = "Hello, World\n"
-    	}
+object StringPrint { 
+        section object {
+                Hello
+        }
+        section data {}
 
-	section code {
+        section code {
 	start:
-            print message
-            call intro
+                call intro
 	stop:
 		done
 
-    function intro:
-        print message
-        ret
-
+        function intro:
+                call hello_world
+                ret
 	}
 }

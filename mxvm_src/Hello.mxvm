@@ -1,0 +1,15 @@
+object Hello {
+    section data {
+        string value = "Test from Hello\n"
+    }
+
+    section code {
+    start:
+        call hello_world
+        done
+
+    function hello_world:
+        print value
+        ret
+    }
+}
