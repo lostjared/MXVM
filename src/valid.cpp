@@ -25,7 +25,7 @@ namespace mxvm {
             require("program"); 
         else
             require("object");
-            
+
         next();
         require(types::TokenType::TT_ID); next();
         require("{"); next();
@@ -44,7 +44,7 @@ namespace mxvm {
             std::string sectionName = token->getTokenValue(); next();
             require("{"); next();
 
-            if(sectionName == "module") {
+            if(sectionName == "module" || sectionName == "object") {
                 while(token->getTokenValue() != "}") {
                     if(token->getTokenType() == types::TokenType::TT_ID) {
                         next();
@@ -56,7 +56,7 @@ namespace mxvm {
                             break;
                         }
                     } else {
-                        throw mx::Exception("Requires module name on line: " + std::to_string(token->getLine()));
+                        throw mx::Exception("Requires " + sectionName + " name on line: " + std::to_string(token->getLine()));
                     }
                 }
             }
@@ -157,12 +157,13 @@ namespace mxvm {
                             if(next()) {
                                 if(match(types::TokenType::TT_ID)) {
                                     std::string label = token->getTokenValue();
-                                    if(labels.find(label) == labels.end()) {
+                                    /*if(labels.find(label) == labels.end()) {
                                         throw mx::Exception(
                                             "Label not found: '" + label +
                                             "' at line " + std::to_string(token->getLine()) 
                                         );
-                                    }
+                                    }*/
+                                     
                                     next();
                                 } else {
                                     throw mx::Exception(

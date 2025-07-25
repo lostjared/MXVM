@@ -54,6 +54,21 @@ namespace mxvm {
     }
 
 
+    bool Program::isFunctionValid(const std::string &f) {
+        auto lbl = labels.find(f);
+        if(lbl != labels.end() && lbl->second.second)
+            return true;
+        for(auto &o : objects) {
+            auto lbl = o->labels.find(f);
+            if(lbl != o->labels.end() && lbl->second.second)
+                return true;
+            if(o->name == f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::unordered_map<std::string, void *> RuntimeFunction::handles;
 
     RuntimeFunction::RuntimeFunction(const std::string &mod, const std::string &name) {
@@ -275,6 +290,14 @@ namespace mxvm {
             out << "\t.extern " << e.name << "\n";
         }
 
+        for(auto &o : this->objects) {
+            for(auto l : o->labels) {
+                if(l.second.second) {
+                    out << "\t.extern " << l.first << "\n";
+                }
+            }
+        }
+
         // rest of text
         if(object) 
             out << name << ":\n";
@@ -462,10 +485,7 @@ namespace mxvm {
     }
 
     void Program::gen_call(std::ostream &out, const Instruction &i) {
-        if(labels.find(i.op1.op) != labels.end()) {
-            if(!labels[i.op1.op].second) {
-                throw mx::Exception("call instruction requires function label for: " +  i.op1.op);
-            }
+        if(isFunctionValid(i.op1.op)) {
             out << "\tcall " << i.op1.op << "\n";
         } else {
             throw mx::Exception("function label for call: " + i.op1.op + " not found.\n");
@@ -1075,7 +1095,7 @@ namespace mxvm {
             std::vector<Operand> opz;
             for(size_t i = 1; i < op.size(); ++i) 
                 opz.push_back(op[i]);
-                
+
             generateFunctionCall(out, name, opz);
         }
     }

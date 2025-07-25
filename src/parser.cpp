@@ -171,6 +171,48 @@ namespace mxvm {
         return program;
     }
     
+    std::unique_ptr<ObjectNode> Parser::parseObject(uint64_t &index) {
+        if(index >= scanner.size()) return nullptr;
+        std::string name = this->operator[](index).getTokenValue();
+        index++;
+        if(index < scanner.size()) {
+            if(this->operator[](index).getTokenValue() == ",")
+                index++;
+        }
+        return std::make_unique<ObjectNode>(name);
+    }
+
+    void Parser::processObjectSection(SectionNode *sectionNode, std::unique_ptr<Program>& program) {
+      for(const auto &statement : sectionNode->statements) {
+            auto objNode = dynamic_cast<ObjectNode *>(statement.get());
+            if(objNode) {
+                std::string &name = objNode->name;
+                processObjectFile(name, program);
+            }
+        }
+    }
+
+    void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
+
+        std::fstream file;
+        file.open(src + ".mxvm", std::ios::in);
+        if(!file.is_open()) {
+            throw mx::Exception("Could not open: " + src + ".mxvm");
+        }
+        std::ostringstream stream;
+        stream << file.rdbuf();
+        std::unique_ptr<Parser> parser(new Parser(stream.str()));
+        parser->scan();
+        std::unique_ptr<Program> prog(new Program());
+        if(parser->generateProgramCode(mxvm::Mode::MODE_INTERPRET, prog)) {
+            if(mxvm::debug_mode)
+                prog->memoryDump(std::cout);
+            program->objects.push_back(std::move(prog));
+        }
+        file.close();
+    }
+        
+
     std::unique_ptr<SectionNode> Parser::parseSection(uint64_t& index) {
         index++; 
     
@@ -185,8 +227,10 @@ namespace mxvm {
         } else if (sectionName == "code") {
             sectionType = SectionNode::CODE;
         } else if(sectionName == "module") {
-            sectionType = SectionNode::MODULE;
-        } 
+            sectionType = SectionNode::MODULE; 
+        } else if(sectionName == "object") {
+             sectionType = SectionNode::OBJECT;
+        }
         else {
             return nullptr; 
         }
@@ -234,8 +278,14 @@ namespace mxvm {
                     } else {
                         index++;
                     }
-                }
-                else if (sectionType == SectionNode::CODE) {
+                }else if(sectionType == SectionNode::OBJECT) {
+                    auto obj = parseObject(index);
+                    if(obj) {
+                        section->addStatement(std::move(obj));
+                    } else {
+                        index++;
+                    }
+                } else if (sectionType == SectionNode::CODE) {
                     if(token.getTokenType() == types::TokenType::TT_ID && token.getTokenValue() == "function"  && index + 2 < scanner.size() && this->operator[](index + 1).getTokenType() == types::TokenType::TT_ID && this->operator[](index + 2).getTokenValue() == ":") {
                         index++;
                         auto label = parseLabel(index);
@@ -524,6 +574,8 @@ namespace mxvm {
                     processCodeSection(sectionNode, program);
                 } else if(sectionNode->type == SectionNode::MODULE) {
                     processModuleSection(sectionNode, program);
+                } else if(sectionNode->type == SectionNode::OBJECT) {
+                    processObjectSection(sectionNode, program);
                 }
             }
             if(mxvm::html_mode) {

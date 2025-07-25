@@ -87,6 +87,8 @@ namespace mxvm {
         void memoryDump(std::ostream &out);
         void setArgs(const std::vector<std::string> &argv);
         void setObject(bool obj);
+        std::vector<std::unique_ptr<Program>> objects;
+        bool isFunctionValid(const std::string &f);
     private:
         size_t pc;  
         bool running;

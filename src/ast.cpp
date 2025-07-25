@@ -71,6 +71,16 @@ namespace mxvm {
         return stream.str();
     }
 
+     void ObjectNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ObjectNode::toString() const {
+        std::ostringstream stream;
+        stream << "Object: (" << name << ")";
+        return stream.str();
+    }
+
     void LabelNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }

@@ -1,0 +1,11 @@
+program StringMain {   
+
+    section object { StringPrint }
+    section data {}
+	section code {
+	start:
+            call intro
+	stop:
+		done
+	}
+}
