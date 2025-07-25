@@ -1,10 +1,13 @@
 program StringMain {   
 
     section object { StringPrint }
-    section data {}
+    section data {
+		string format = "%d\n"
+	}
 	section code {
 	start:
-            call intro
+            call StringPrint.intro
+			print format, StringPrint.value1
 	stop:
 		done
 	}

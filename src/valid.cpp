@@ -156,8 +156,9 @@ namespace mxvm {
                         } else if(op == "call" || op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
                             if(next()) {
                                 if(match(types::TokenType::TT_ID)) {
-                                    std::string label = token->getTokenValue();
-                                    /*if(labels.find(label) == labels.end()) {
+                                    
+                                    
+                                     /*if(labels.find(label) == labels.end()) {
                                         throw mx::Exception(
                                             "Label not found: '" + label +
                                             "' at line " + std::to_string(token->getLine()) 
@@ -165,6 +166,10 @@ namespace mxvm {
                                     }*/
                                      
                                     next();
+                                    if(match(".")) {
+                                        next();
+                                        next();
+                                    }
                                 } else {
                                     throw mx::Exception(
                                         "Instruction requires label at line " + std::to_string(token->getLine())
@@ -177,24 +182,29 @@ namespace mxvm {
                         }
                         next();
                     }
-                    else {
+                    else {/*
                         throw mx::Exception(
                             "Syntax Error: Expected instruction or label, found: " + token->getTokenValue() +
                             " at line " + std::to_string(token->getLine())
-                        );
+                        );*/
+                        lbl_names.push_back(std::make_pair(token->getTokenValue(), *token));
                     }
                     
                     bool firstOperand = true;
                     while (true) {
                         if (firstOperand) {
-
                             if (match(types::TokenType::TT_ID)) {
+                                scan::TToken var_token = *token;
                                 std::string argName = token->getTokenValue();
-                                if ((instr != "invoke" && firstOperand == true) && vars.find(argName) == vars.end()) {
-                                    throw mx::Exception(
-                                        "Syntax Error: Argument variable not defined: " + argName +
-                                        " at line " + std::to_string(token->getLine())
-                                    );
+                                std::string object_name = "program";
+                                if(peekIs(".")) {
+                                    object_name = argName;
+                                    next();
+                                    argName = token->getTokenValue();
+                                
+                                }
+                                if ((instr != "invoke" && firstOperand == true)) {
+                                    var_names.push_back(std::make_pair(object_name, var_token));
                                 }
                             }
 
@@ -221,11 +231,20 @@ namespace mxvm {
 
                             if (match(types::TokenType::TT_ID)) {
                                 std::string argName = token->getTokenValue();
+                                std::string object_name = "program";
+                                if(peekIs(".")) {
+                                    object_name = argName;
+                                    next();
+                                    next();
+                                    argName = token->getTokenValue();
+                                }
                                 if (vars.find(argName) == vars.end()) {
-                                    throw mx::Exception(
+                                    /*throw mx::Exception(
                                         "Syntax Error: Argument variable not defined: " + argName +
                                         " at line " + std::to_string(token->getLine())
-                                    );
+                                    );*/
+
+                                    var_names.push_back(std::make_pair(object_name, *token));
                                 }
                             }
                         }

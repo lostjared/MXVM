@@ -53,18 +53,13 @@ namespace mxvm {
         }
     }
 
-
     bool Program::isFunctionValid(const std::string &f) {
         auto lbl = labels.find(f);
         if(lbl != labels.end() && lbl->second.second)
             return true;
         for(auto &o : objects) {
-            auto lbl = o->labels.find(f);
-            if(lbl != o->labels.end() && lbl->second.second)
+            if(o->isFunctionValid(f))
                 return true;
-            if(o->name == f) {
-                return true;
-            }
         }
         return false;
     }
@@ -1721,11 +1716,39 @@ namespace mxvm {
         if (it != vars.end()) {
             return it->second;
         }
-        throw std::runtime_error("Variable not found: " + name);
+        for(auto &o : objects) {
+            if(o->isVariable(name)) {
+                auto it = o->vars.find(name);
+                if(it != o->vars.end())
+                    return it->second;
+            }
+        }
+        throw mx::Exception("Variable not found: " + name);
     }
 
     bool Program::isVariable(const std::string& name) {
-        return vars.find(name) != vars.end();
+        if(vars.find(name) != vars.end())
+            return true;
+
+        for(auto &o : objects)  {
+            if(o->isVariable(name))
+                return true;
+        }
+        return false;
+    }
+
+    bool Program::validateNames(Validator &v) {
+        for(auto &variable :  v.var_names) {
+            auto it = vars.find(variable.second.getTokenValue());
+            if(it == vars.end()) {
+                for(auto &o : objects) {
+                    if(o->name == variable.first && !o->isVariable(variable.second.getTokenValue())) {
+                        throw mx::Exception("Syntax Error: Argument variable not defined: Object: " + variable.first +  " variable: " + variable.second.getTokenValue() +" at line " + std::to_string(variable.second.getLine()));
+                    }               
+                }
+            }
+        }
+        return true;
     }
 
     void Program::setVariableFromString(Variable& var, const std::string& value) {

@@ -90,6 +90,7 @@ namespace mxvm {
         std::vector<std::unique_ptr<Program>> objects;
         bool isFunctionValid(const std::string &f);
         bool object = false;
+        bool validateNames(Validator &v);
     private:
         size_t pc;  
         bool running;

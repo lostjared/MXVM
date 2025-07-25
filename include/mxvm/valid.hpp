@@ -16,10 +16,14 @@ namespace mxvm {
         bool next();
         bool peekIs(const std::string &s);
         bool peekIs(const types::TokenType &t);
+
+        std::vector<std::pair<std::string, scan::TToken>> var_names;
+        std::vector<std::pair<std::string, scan::TToken>> lbl_names;
     protected:
         scan::Scanner scanner;
         uint64_t index;
         scan::TToken *token;
+        
     };
 }
 

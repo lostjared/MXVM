@@ -2,7 +2,9 @@ object StringPrint {
         section object {
                 Hello
         }
-        section data {}
+        section data {
+                int value1 = 255
+        }
 
         section code {
 	start:
@@ -11,7 +13,7 @@ object StringPrint {
 		done
 
         function intro:
-                call hello_world
+                call Hello.hello_world
                 ret
 	}
 }

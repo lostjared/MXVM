@@ -68,6 +68,7 @@ namespace mxvm {
         std::string op;
         int op_value = 0;        
         OperandType type;
+        std::string object;
     };
 
     struct Instruction {

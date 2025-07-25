@@ -25,9 +25,9 @@ struct Args {
 };
 
 void process_arguments(Args *args);
-void action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-void translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output);
+int translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -159,7 +159,7 @@ void process_arguments(Args *args) {
         exit(EXIT_FAILURE);
     }
     if(args->action == vm_action::translate) {
-        action_translate(args->object_path, args->object, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->object_path, args->object, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
@@ -171,15 +171,16 @@ void process_arguments(Args *args) {
     exit(exitCode);
 }
 
-void action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
+int action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
     switch(target) {
         case vm_target::x86_64_linux:
-            translate_x64_linux(object_path, object, input, mod_path, output);
+            return translate_x64_linux(object_path, object, input, mod_path, output);
         break;
     }
+    return 0;
 }
 
-void translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output) {
+int translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
         std::string input_file(input);
@@ -218,9 +219,12 @@ void translate_x64_linux(std::string_view object_path, bool object, std::string_
         }
     } catch(const mx::Exception &e) {
         std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
         std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
+        return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
 }
 
 mxvm::Program *signal_program = nullptr;

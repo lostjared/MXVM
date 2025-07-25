@@ -474,6 +474,14 @@ namespace mxvm {
                     break;
                     
                 case types::TokenType::TT_ID:
+
+                    if(index + 1 < scanner.size() && this->operator[](index + 1).getTokenValue() == ".") {
+                        operand.object = value;
+                        index += 2;
+                        if(index < scanner.size())
+                            value = this->operator[](index).getTokenValue();
+                    }
+
                     operand.op = value;
                     operand.label = value;
                     operand.type = OperandType::OP_VARIABLE;
@@ -582,6 +590,11 @@ namespace mxvm {
                     processObjectSection(sectionNode, program);
                 }
             }
+
+            if(!program->validateNames(validator)) {
+                throw mx::Exception("Could not validate variables/functions\n");
+            }
+            
             if(mxvm::html_mode) {
                 std::fstream ofile;
                 ofile.open(ast->name + ".html", std::ios::out);
@@ -592,6 +605,8 @@ namespace mxvm {
                     ofile.close();
                 }
             }
+
+
             return true;
         }
         return false;
