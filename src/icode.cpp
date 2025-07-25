@@ -222,7 +222,7 @@ namespace mxvm {
 
     }
 
-    void Program::generateCode(std::ostream &out) {
+    void Program::generateCode(bool obj, std::ostream &out) {
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second.first] = l.first;
@@ -276,7 +276,7 @@ namespace mxvm {
             }
         }
         out << ".section .text\n";
-        if(object)
+        if(obj)
             out << "\t.global " << name << "\n";
         else
             out << "\t.global main\n";
@@ -308,7 +308,7 @@ namespace mxvm {
         }
 
         // rest of text
-        if(object) 
+        if(obj) 
             out << name << ":\n";
         else
             out << "main:\n";

@@ -39,7 +39,7 @@ namespace mxvm {
         auto operator[](size_t pos);
         
         std::unique_ptr<ProgramNode> parseAST();
-        bool generateProgramCode(const Mode &m, std::unique_ptr<Program> &program);
+        bool generateProgramCode(bool cmode, const Mode &m, std::unique_ptr<Program> &program);
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
         std::string module_path = ".";
         std::string object_path = ".";

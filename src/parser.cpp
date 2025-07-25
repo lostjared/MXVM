@@ -133,14 +133,6 @@ namespace mxvm {
                     auto nameToken = this->operator[](i);
                     program_name = nameToken.getTokenValue();
                     program->name = program_name; 
-                    if(tokenValue == "object") {
-                        program->object = true;
-                    } else {
-                        if(object_mode == true) {
-                            throw mx::Exception("Program mode requires program object");
-                        }
-                        program->object = false;
-                    }
                 }
                 i++;
                 if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {
@@ -215,7 +207,8 @@ namespace mxvm {
         parser->object_mode = true;
         parser->scan();
         std::unique_ptr<Program> prog(new Program());
-        if(parser->generateProgramCode(mxvm::Mode::MODE_INTERPRET, prog)) {
+        program->object = true;
+        if(parser->generateProgramCode(true, mxvm::Mode::MODE_INTERPRET, prog)) {
             if(mxvm::debug_mode)
                 prog->memoryDump(std::cout);
             program->objects.push_back(std::move(prog));
@@ -561,10 +554,10 @@ namespace mxvm {
         }
     }
 
-    bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
+    bool Parser::generateProgramCode(bool cmode, const Mode &mode, std::unique_ptr<Program> &program) {
         parser_mode = mode;
         try {
-            if(!validator.validate(program->object)) {
+            if(!validator.validate(cmode)) {
                 return false;
             }
         } catch (mx::Exception &e) {

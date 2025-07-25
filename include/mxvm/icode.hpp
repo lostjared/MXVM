@@ -82,7 +82,7 @@ namespace mxvm {
         void post(std::ostream &out);
         int getExitCode() const { return exitCode; }
         std::string name;
-        void generateCode(std::ostream &out);
+        void generateCode(bool obj, std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
         void memoryDump(std::ostream &out);
         void setArgs(const std::vector<std::string> &argv);

@@ -194,20 +194,24 @@ void translate_x64_linux(std::string_view object_path, bool object, std::string_
         mxvm::Parser parser(stream.str());
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
-        program->setObject(object);
+        program->setObject(false);
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.object_mode = object;
-        if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
+        if(parser.generateProgramCode(object, mxvm::Mode::MODE_COMPILE, program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
 
             std::fstream file;
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
-                program->generateCode(file);
+                program->generateCode(object, file);
                 file.close();
-                std::cout << "MXVM: Compiled: " << program_name << "\n";
+                std::string mainFunc = " Object";
+                if(object == false) {
+                    mainFunc = " Program";
+                }
+                std::cout << "MXVM: Compiled: " << program_name << mainFunc << "\n";
             }
         } else {
             std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
@@ -268,7 +272,7 @@ void signal_action(int signum) {
         
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
-        if(parser.generateProgramCode(mxvm::Mode::MODE_INTERPRET, program)) {
+        if(parser.generateProgramCode(false, mxvm::Mode::MODE_INTERPRET, program)) {
             if(mxvm::debug_mode && debug_output.is_open()) program->print(debug_output);
             exitCode = program->exec();
             if(mxvm::debug_mode && debug_output.is_open()) program->post(debug_output);
