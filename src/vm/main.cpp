@@ -119,8 +119,6 @@ Args proc_args(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     Args args = proc_args(argc, argv);
-
-
     process_arguments(&args);
     return 0;
 }
@@ -195,7 +193,7 @@ mxvm::Program *signal_program = nullptr;
 
 void signal_action(int signum) {
     if(signum == SIGINT) {
-        std::cout << "MXVM: Signal SIGINT Recived Exiting...\n";
+        std::cout << "MXVM: Signal SIGINT Received Exiting...\n";
         if(mxvm::debug_mode) {
             std::cout << "MXVM: Debug Mode Dumping Memory.\n";
             if(signal_program != nullptr)
