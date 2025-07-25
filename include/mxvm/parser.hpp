@@ -67,11 +67,15 @@ namespace mxvm {
         void setVariableValue(Variable& var, VarType type, const std::string& value, size_t buf_size = 0);
         void setDefaultVariableValue(Variable& var, VarType type);
         void resolveLabelReference(Operand& operand, const std::unordered_map<std::string, size_t>& labelMap);
+        void collectObjectNames(std::vector<std::pair<std::string, std::string>> &names, const std::unique_ptr<Program> &program);
     };
 
     struct ExternalFunction {
         std::string name;
         std::string mod;
+        bool operator==(const ExternalFunction &f) {
+            return (name == f.name && mod == f.mod);
+        }
     };
 
     class ModuleParser {

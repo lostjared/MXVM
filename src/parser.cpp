@@ -205,10 +205,11 @@ namespace mxvm {
         parser->module_path = module_path;
         parser->object_path = object_path;
         parser->object_mode = true;
+        parser->parser_mode = parser_mode;
         parser->scan();
         std::unique_ptr<Program> prog(new Program());
         program->object = true;
-        if(parser->generateProgramCode(true, mxvm::Mode::MODE_INTERPRET, prog)) {
+        if(parser->generateProgramCode(true, parser_mode, prog)) {
             program->objects.push_back(std::move(prog));
         }
         file.close();
@@ -593,7 +594,7 @@ namespace mxvm {
                 throw mx::Exception("Could not validate variables/functions\n");
             }
             
-            if(mxvm::html_mode) {
+            if(cmode == false && mxvm::html_mode) {
                 std::fstream ofile;
                 ofile.open(ast->name + ".html", std::ios::out);
                 if(ofile.is_open()) {
@@ -603,11 +604,20 @@ namespace mxvm {
                     ofile.close();
                 }
             }
-
-
             return true;
         }
         return false;
+    }
+
+    void Parser::collectObjectNames(std::vector<std::pair<std::string, std::string>> &names, const std::unique_ptr<Program> &program) {
+        for (const auto& objPtr : program->objects) {
+            if (!objPtr) continue;
+            for (const auto& ext : objPtr->external) {
+                if(std::find(names.begin(), names.end(), std::make_pair(ext.mod, ext.name)) == names.end())
+                    names.push_back(std::make_pair(ext.mod, ext.name));
+            }
+            collectObjectNames(names, objPtr);
+        }
     }
 
     bool Parser::generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program) {
@@ -634,6 +644,8 @@ namespace mxvm {
                 for(auto &f : program->external) {
                     names.push_back(std::make_pair(f.mod, f.name));
                 }
+                collectObjectNames(names, program);
+
                 std::sort(names.begin(), names.end(), [](const auto &a, const auto &b) {
                     if (a.first != b.first)
                         return a.first < b.first;
@@ -748,7 +760,7 @@ namespace mxvm {
         out << "</table>\n</section>\n";
 
         if (!program->objects.empty()) {
-            out << "<section>\n<h2>Compiled Objects</h2>\n";
+            out << "<section>\n<h2>Objects</h2>\n";
             for (const auto& objPtr : program->objects) {
                 if (!objPtr) continue;
                 out << "<div style=\"border:1px solid #ccc; margin-bottom:20px; padding:10px; background:#fafafa;\">";

@@ -1,6 +1,6 @@
 object HexFile {
 
-    section module { io }
+    section module { io  }
 
     section data {
         ptr file_handle = null

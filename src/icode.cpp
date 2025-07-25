@@ -114,7 +114,10 @@ namespace mxvm {
     }
 
     void Base::add_extern(const std::string &mod, const std::string &name) {
-        external.push_back({name, mod});   
+        ExternalFunction f = {name, mod};
+        auto it = std::find(external.begin(), external.end(),f);
+        if(it == external.end())
+            external.push_back({name, mod});   
     }
     
     void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
