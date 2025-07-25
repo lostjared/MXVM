@@ -101,16 +101,16 @@ Args proc_args(int argc, char **argv) {
             }
         }
     } catch(mx::ArgException<std::string> &exec) {
-        std::cerr << "Sytnax Error: "<< exec.text() << "\n";
+        std::cerr << "MXVM: Sytnax Error: "<< exec.text() << "\n";
         exit(EXIT_FAILURE);
     }
 
     if(args.source_file.empty()) {
-        std::cerr << "Error source file required..\n";
+        std::cerr << "MXVM: Error source file required..\n";
         exit(EXIT_FAILURE);
     }
     if(args.module_path.empty()) {
-        std::cerr << "Errror: please set module path.\n";
+        std::cerr << "MXVM: Errror: please set module path.\n";
         exit(EXIT_FAILURE);
     }
     return args;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
 void process_arguments(Args *args) { 
     int exitCode = 0;
     if(!std::filesystem::is_regular_file(args->source_file) || !std::filesystem::exists(args->source_file)) {
-        std::cerr << "Error: input file: " << args->source_file << " does not exist or is not regular file.\n";
+        std::cerr << "MXVM: Error: input file: " << args->source_file << " does not exist or is not regular file.\n";
         exit(EXIT_FAILURE);
     }
     if(args->action == vm_action::translate) {
@@ -136,11 +136,8 @@ void process_arguments(Args *args) {
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
         exitCode = action_interpret(args->source_file, args->module_path);
     } else {
-        std::cerr << "Error invalid action/command\n";
+        std::cerr << "MXVM: Error invalid action/command\n";
         exit(EXIT_FAILURE);
-    }
-    if(mxvm::debug_mode) {
-        std::cout << "Program exited with: " << exitCode << "\n";
     }
     exit(exitCode);
 }
@@ -176,16 +173,16 @@ void translate_x64_linux(std::string_view input, std::string_view mod_path, std:
             if(file.is_open()) {
                 program->generateCode(file);
                 file.close();
-                std::cout << "translated: " << program_name << "\n";
+                std::cout << "MXVM: Compiled: " << program_name << "\n";
             }
         } else {
-            std::cerr << "Error: Failed to generate intermediate code.\n";
+            std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
     } catch(const mx::Exception &e) {
-        std::cerr << "Exception: " << e.what() << "\n";
+        std::cerr << "MXVM: Exception: " << e.what() << "\n";
     } catch(const std::runtime_error &e) {
-        std::cerr << "Runtime Error: " << e.what() << "\n";
+        std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
     }
 }
 
@@ -211,9 +208,8 @@ void signal_action(int signum) {
     if(mxvm::debug_mode) {
         debug_output.open("debug_info.txt", std::ios::out);
         if(!debug_output.is_open()) {
-            std::cerr << "Error could not open debug_info.txt\n";
+            std::cerr << "MXVM: Error could not open debug_info.txt\n";
         }
-    
     }
 
     signal_program =  program.get();
@@ -246,17 +242,17 @@ void signal_action(int signum) {
                     program->memoryDump(debug_output);
             }
         } else {
-            std::cerr << "Error: Failed to generate intermediate code.\n";
+            std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
     } catch(const mx::Exception &e) {
-        std::cerr << "Exception: "<< e.what() << "\n";
+        std::cerr << "MXVM: Exception: "<< e.what() << "\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
         }
     } catch(const std::runtime_error &e) {
-        std::cerr << "Runtime Error: " << e.what() << "\n";
+        std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
@@ -266,10 +262,12 @@ void signal_action(int signum) {
     if(mxvm::debug_mode) {
         if(debug_output.is_open()) {
             debug_output.close();
-            std::cout << "Generated debug information: debug_info.txt\n";
+            std::cout << "MXVM: Generated debug information: debug_info.txt\n";
         }
     }
-
+    if(mxvm::debug_mode) {
+        std::cout << "MXVM: Program exited with: " << exitCode << "\n";
+    }
     return exitCode;
 }
 

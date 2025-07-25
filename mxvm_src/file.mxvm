@@ -29,7 +29,7 @@ program File {
         return file_size
         cmp file_size, 0
         je error_out
-        store null_term, buffer, 1, file_size
+        store null_term, buffer, file_size, 1
         invoke fprintf, stdout, ptr_val, buffer
         invoke fclose, handle
         free buffer

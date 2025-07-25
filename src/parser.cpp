@@ -526,7 +526,7 @@ namespace mxvm {
                 ofile.open(ast->name + ".html", std::ios::out);
                 if(ofile.is_open()) {
                     if(generateDebugHTML(ofile, program)) {
-                        std::cout << "generated " << ast->name + ".html\n";
+                        std::cout << "MXVM: Generated Debug Information: " << ast->name + ".html\n";
                     }
                     ofile.close();
                 }
