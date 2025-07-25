@@ -18,6 +18,7 @@ struct Args {
     std::string output_file;
     std::string module_path;
     std::string object_path = ".";
+    std::string include_path = "/usr/local/include/mxvm/modules";
     vm_action action = vm_action::null_action;
     vm_target target = vm_target::x86_64_linux;
     std::vector<std::string> argv;
@@ -25,9 +26,9 @@ struct Args {
 };
 
 void process_arguments(Args *args);
-int action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
-int action_interpret(std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-int translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output);
+int action_translate(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
+int translate_x64_linux(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -52,6 +53,8 @@ Args proc_args(int argc, char **argv) {
     .addOptionDoubleValue(136, "object-path", "Object path")
     .addOptionSingleValue('p', "path")
     .addOptionDoubleValue(134, "path", "module path")
+    .addOptionSingleValue('I', "include path")
+    .addOptionDoubleValue(137, "include", "include path");
     ;
 
     if(argc == 1) {
@@ -64,6 +67,10 @@ Args proc_args(int argc, char **argv) {
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 'I':
+                case 137:
+                    args.include_path = arg.arg_value;
+                break;
                 case 'x':
                 case 136:
                     args.object_path = arg.arg_value;
@@ -159,11 +166,11 @@ void process_arguments(Args *args) {
         exit(EXIT_FAILURE);
     }
     if(args->action == vm_action::translate) {
-        exitCode = action_translate(args->object_path, args->object, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->include_path, args->object_path, args->object, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
-        exitCode = action_interpret(args->object_path, args->argv, args->source_file, args->module_path);
+        exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
-        exitCode = action_interpret(args->object_path, args->argv, args->source_file, args->module_path);
+        exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else {
         std::cerr << "MXVM: Error invalid action/command\n";
         exit(EXIT_FAILURE);
@@ -171,16 +178,16 @@ void process_arguments(Args *args) {
     exit(exitCode);
 }
 
-int action_translate(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
+int action_translate(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
     switch(target) {
         case vm_target::x86_64_linux:
-            return translate_x64_linux(object_path, object, input, mod_path, output);
+            return translate_x64_linux(include_path, object_path, object, input, mod_path, output);
         break;
     }
     return 0;
 }
 
-int translate_x64_linux(std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output) {
+int translate_x64_linux(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
         std::string input_file(input);
@@ -199,6 +206,7 @@ int translate_x64_linux(std::string_view object_path, bool object, std::string_v
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.object_mode = object;
+        parser.include_path =  include_path;
         if(parser.generateProgramCode(object, mxvm::Mode::MODE_COMPILE, program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
@@ -241,7 +249,7 @@ void signal_action(int signum) {
     }
 }
 
- int action_interpret(std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path) {
+ int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path) {
     int exitCode = 0;
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
     program->setArgs(argv);
@@ -275,6 +283,7 @@ void signal_action(int signum) {
         
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
+        parser.include_path = std::string(include_path);
         if(parser.generateProgramCode(false, mxvm::Mode::MODE_INTERPRET, program)) {
             program->flatten(program.get());
             exitCode = program->exec();
