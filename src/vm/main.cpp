@@ -7,7 +7,7 @@
 #include<string_view>
 #include<memory>
 #include<filesystem>
-
+#include<csignal>
 
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
@@ -119,6 +119,8 @@ Args proc_args(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     Args args = proc_args(argc, argv);
+
+
     process_arguments(&args);
     return 0;
 }
@@ -189,6 +191,20 @@ void translate_x64_linux(std::string_view input, std::string_view mod_path, std:
     }
 }
 
+mxvm::Program *signal_program = nullptr;
+
+void signal_action(int signum) {
+    if(signum == SIGINT) {
+        std::cout << "MXVM: Signal SIGINT Recived Exiting...\n";
+        if(mxvm::debug_mode) {
+            std::cout << "MXVM: Debug Mode Dumping Memory.\n";
+            if(signal_program != nullptr)
+                signal_program->memoryDump(std::cout);
+        }
+        exit(EXIT_FAILURE);
+    }
+}
+
  int action_interpret(std::string_view input, std::string_view mod_path) {
     int exitCode = 0;
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
@@ -199,8 +215,15 @@ void translate_x64_linux(std::string_view input, std::string_view mod_path, std:
         if(!debug_output.is_open()) {
             std::cerr << "Error could not open debug_info.txt\n";
         }
+    
     }
 
+    signal_program =  program.get();
+    struct sigaction sa;
+    sa.sa_handler = signal_action;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, nullptr);
 
     try {
         std::string input_file(input);

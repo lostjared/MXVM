@@ -163,7 +163,7 @@ namespace mxvm {
                             << var.second.var_value.float_value;
                         break;
                     case VarType::VAR_STRING:
-                        out << std::setw(20) << ("\"" + var.second.var_value.str_value + "\"");
+                        out << std::setw(20) << ("\"" + Program::escapeNewLines(var.second.var_value.str_value) + "\"");
                         break;
                     case VarType::VAR_POINTER:
                     case VarType::VAR_EXTERN:
