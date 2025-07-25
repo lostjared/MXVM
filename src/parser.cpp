@@ -126,13 +126,18 @@ namespace mxvm {
 
             std::string tokenValue = token.getTokenValue();
 
-            if (tokenValue == "program") {
+            if (tokenValue == "program" || tokenValue == "object") {
                 i++;
                 if (i < scanner.size()) {
                     std::string program_name;
                     auto nameToken = this->operator[](i);
                     program_name = nameToken.getTokenValue();
                     program->name = program_name; 
+                    if(tokenValue == "object") {
+                        program->object = true;
+                    } else {
+                        program->object = false;
+                    }
                 }
                 i++;
                 if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {

@@ -19,6 +19,14 @@ namespace mxvm {
         add_variable("stderr", vstderr);
     }
 
+    void Program::setArgs(const std::vector<std::string> &argv) {
+        std::copy(argv.begin(), argv.end(), std::back_inserter(args));
+    }
+
+    void Program::setObject(bool obj) {
+        object = obj;
+    }
+
     Program::~Program() {
         for(auto &i : vars) {
             if(i.second.var_value.ptr_value != nullptr && i.second.var_value.owns) {
@@ -44,6 +52,7 @@ namespace mxvm {
             }
         }
     }
+
 
     std::unordered_map<std::string, void *> RuntimeFunction::handles;
 
@@ -243,8 +252,17 @@ namespace mxvm {
             }
         }
         out << ".section .text\n";
-        
-        out << "\t.global main\n";
+        if(object)
+            out << ".global " << name << "\n";
+        else
+            out << "\t.global main\n";
+
+        for(auto &lbl : labels) {
+            if(lbl.second.second == true) {
+                out << ".global " << lbl.first << "\n";
+            }
+        }
+
         out << "\t.extern printf\n";
         out << "\t.extern calloc\n";
         out << "\t.extern free\n";
@@ -258,7 +276,11 @@ namespace mxvm {
         }
 
         // rest of text
-        out << "main:\n";
+        if(object) 
+            out << name << ":\n";
+        else
+            out << "main:\n";
+
         out << "\tpush %rbp\n";
         out << "\tmov %rsp, %rbp\n";
         // main function
@@ -274,7 +296,7 @@ namespace mxvm {
                     out << "\tmov %rsp, %rbp\n";
 
                 } else {
-                    out << labels_[i] << ":\n";
+                    out << "." << labels_[i] << ":\n";
                 }
             } 
 
@@ -1011,7 +1033,7 @@ namespace mxvm {
             if(pos == labels.end()) {
                 throw mx::Exception("Jump instruction msut have valid label.");
             }
-            out << "\t" << i.instruction << " " << i.op1.op << "\n";
+            out << "\t" << i.instruction << " ." << i.op1.op << "\n";
         } else {
             throw mx::Exception("Jump instruction must have label");
         }
@@ -1053,7 +1075,7 @@ namespace mxvm {
             std::vector<Operand> opz;
             for(size_t i = 1; i < op.size(); ++i) 
                 opz.push_back(op[i]);
-
+                
             generateFunctionCall(out, name, opz);
         }
     }

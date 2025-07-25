@@ -20,7 +20,13 @@ namespace mxvm {
         scanner.scan();
         std::unordered_map<std::string, std::string> labels;
         collect_labels(labels);
-        next(); require("program"); next();
+        next(); 
+        if(match("program")) 
+            require("program"); 
+        else
+            require("object");
+            
+        next();
         require(types::TokenType::TT_ID); next();
         require("{"); next();
 

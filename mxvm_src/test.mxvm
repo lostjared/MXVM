@@ -1,0 +1,18 @@
+object StringPrint {   
+        section data {		
+                string message = "Hello, World\n"
+    	}
+
+	section code {
+	start:
+            print message
+            call intro
+	stop:
+		done
+
+    function intro:
+        print message
+        ret
+
+	}
+}

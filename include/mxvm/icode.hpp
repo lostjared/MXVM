@@ -85,6 +85,8 @@ namespace mxvm {
         void generateCode(std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
         void memoryDump(std::ostream &out);
+        void setArgs(const std::vector<std::string> &argv);
+        void setObject(bool obj);
     private:
         size_t pc;  
         bool running;
@@ -93,6 +95,9 @@ namespace mxvm {
         bool less_flag = false;
         bool greater_flag = false;
         int xmm_offset = 0;
+        std::vector<std::string> args;
+        bool main_function;
+        bool object = false;
     public:    
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);

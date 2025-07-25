@@ -9,7 +9,8 @@ namespace mxvm {
     
     std::string ProgramNode::toString() const {
         std::ostringstream oss;
-        oss << "Program {\n";
+        std::string ptype = (object == true) ? "Object" : "Program";
+        oss << ptype <<  " {\n";
         for (const auto& section : sections) {
             oss << "  " << section->toString() << "\n";
         }
