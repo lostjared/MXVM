@@ -522,9 +522,18 @@ namespace mxvm {
     void Program::gen_neg(std::ostream &out, const Instruction &i) {
         if(isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
-            generateLoadVar(out, v.type, "%rcx", i.op1);
-            out << "\tnegq %rcx\n";
-            out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+            if(v.type == VarType::VAR_INTEGER) {
+                generateLoadVar(out, v.type, "%rcx", i.op1);
+                out << "\tnegq %rcx\n";
+                out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+            } else if(v.type == VarType::VAR_FLOAT) {
+                generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                out << "\txorpd %xmm1, %xmm1\n";
+                out << "\tsubsd %xmm0, %xmm1\n";
+                out << "\tmovsd %xmm1, " << i.op1.op << "(%rip)\n";
+            } else {
+                throw mx::Exception("neg requires float or integer.");
+            }
         } else {
             throw mx::Exception("neg requires variable");
         }
