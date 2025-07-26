@@ -18,7 +18,7 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm
 )
 
 set_target_properties(mxvm_io PROPERTIES
-    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/modules/io"
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/io"
 )
 
 install(TARGETS mxvm_io mxvm_io_static
