@@ -1,0 +1,7 @@
+module string {
+    extern strlen
+    extern strcmp
+    extern strncat
+    extern strncpy
+    extern snprintf
+}
