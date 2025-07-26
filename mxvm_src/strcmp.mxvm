@@ -1,20 +1,16 @@
 program Compare {
-
     section module { string }
-
     section data {
         string var1 = "test"
         string var2 = "Test"
         string var3 = "The result: %d\n"
         int value = -1
     }
-    
-    section text {
+    section code {
     start:
         invoke strcmp, var1, var2
         return value
         print var3, value
         done
     }
-
 }

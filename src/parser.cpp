@@ -359,6 +359,12 @@ namespace mxvm {
         if (index < scanner.size() && this->operator[](index).getTokenValue() == "=") {
             index++; 
             
+            std::string add_op;
+            if(index < scanner.size() && this->operator[](index).getTokenValue() == "-") {
+                add_op = "-";
+                index++;
+            }
+
             if (index < scanner.size()) {
                 auto valueToken = this->operator[](index);
                 std::string value = valueToken.getTokenValue();
@@ -373,7 +379,7 @@ namespace mxvm {
                         
                     case types::TokenType::TT_NUM:
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, value);
+                        return std::make_unique<VariableNode>(varType, varName, add_op+value);
                         
                     case types::TokenType::TT_HEX:
                         index++;
@@ -439,6 +445,12 @@ namespace mxvm {
         std::vector<Operand> operands;
         
         while (index < scanner.size()) {
+
+            std::string add_value;
+            if(index < scanner.size() && this->operator[](index).getTokenValue() == "-") {
+                add_value = "-";
+                index++;
+            }
             auto operandToken = this->operator[](index);
             std::string value = operandToken.getTokenValue();
             types::TokenType tokenType = operandToken.getTokenType();
@@ -453,12 +465,13 @@ namespace mxvm {
                 continue;
             }
             
+            
             Operand operand;
             
             switch (tokenType) {
                 case types::TokenType::TT_NUM:
-                    operand.op = value;
-                    operand.op_value = std::stoll(value);
+                    operand.op = add_value+value;
+                    operand.op_value = std::stoll(add_value+value);
                     operand.type = OperandType::OP_CONSTANT;
                     break;
                     

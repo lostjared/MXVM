@@ -69,6 +69,7 @@ namespace mxvm {
                         std::string vtype = token->getTokenValue();
 
                         next(); 
+
                         require(types::TokenType::TT_ID); 
                         value.var_name = token->getTokenValue();
                         vars[value.var_name] = value;
@@ -83,6 +84,9 @@ namespace mxvm {
                              }
                         } else {
                             require("="); next();
+                            if(match("-"))
+                                next();
+
                             if(vtype == "byte") {   
                                 if(vtype == "byte" && (token->getTokenType() == types::TokenType::TT_HEX || token->getTokenType() == types::TokenType::TT_NUM)) {
                                     int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
@@ -208,6 +212,23 @@ namespace mxvm {
                                 }
                             }
 
+                            if(match("-") && peekIs(types::TokenType::TT_NUM)) {
+                                next();
+                                if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
+                                    throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
+                                }
+                                next();
+                                break;
+                            }
+
+                            if(match("-") && peekIs(types::TokenType::TT_ID)) {
+                                throw mx::Exception("Syntax Error: use neg instruction on variable to negate on line: " + std::to_string(token->getLine()));
+                            }
+
+                            if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
+                                throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
+                            }
+
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 break; 
                             }
@@ -222,6 +243,24 @@ namespace mxvm {
                                 next();
                             }
                             
+                            if(match("-") && peekIs(types::TokenType::TT_NUM)) {
+                                next();
+                                if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
+                                    throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
+                                }
+                                next();
+                                break;
+                            }
+
+                            if(match("-") && peekIs(types::TokenType::TT_ID)) {
+                                throw mx::Exception("Syntax Error: use neg instruction on variable to negate on line: " + std::to_string(token->getLine()));
+                            }
+
+
+                            if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
+                                throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
+                            }
+
 
                             if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
                                 throw mx::Exception(
@@ -229,6 +268,7 @@ namespace mxvm {
                                 );
                             }
 
+                      
                             if (match(types::TokenType::TT_ID)) {
                                 std::string argName = token->getTokenValue();
                                 std::string object_name = "program";

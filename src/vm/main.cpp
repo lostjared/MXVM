@@ -231,6 +231,13 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
     } catch(const std::runtime_error &e) {
         std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
         return EXIT_FAILURE;
+    } catch(const std::exception &e) {
+        std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
+    catch(...) {
+        std::cerr << "MXVM: Unknown Exception.\n";
+        return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
 }
@@ -311,7 +318,20 @@ void signal_action(int signum) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
         }
-    } 
+    } catch(const std::exception &e) {
+        std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        if(mxvm::debug_mode) {
+            if(debug_output.is_open())
+                program->memoryDump(debug_output);
+        }
+    }  
+    catch(...) {
+        std::cerr << "MXVM: Unknown Exception.\n";
+        if(mxvm::debug_mode) {
+            if(debug_output.is_open())
+                program->memoryDump(debug_output);
+        }
+    }
 
     if(mxvm::debug_mode) {
         if(debug_output.is_open()) {
