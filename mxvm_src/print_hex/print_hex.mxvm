@@ -1,12 +1,11 @@
 program PrintHex {
     section object { HexFile }
-    section module { io }
+    #section module { io }
     section data {
-        string test1 = "Hello, World\n"
+
     }
     section code {
     start:
-        print test1
         call HexFile.start_hex
         done    
     }
