@@ -2913,4 +2913,10 @@ namespace mxvm {
         }
         throw mx::Exception("Could not create variable from operand: " + op.op);
     }
+
+    void except_assert(std::string reason, bool value) {
+        if(value == false) {
+            throw mx::Exception(reason);
+        }
+    }
 }

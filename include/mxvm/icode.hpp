@@ -200,6 +200,8 @@ namespace mxvm {
         Stack stack;
         Operand result;
     };
+
+    void except_assert(std::string reason, bool value);
     
 }
 

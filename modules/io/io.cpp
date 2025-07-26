@@ -89,7 +89,7 @@ extern "C" mxvm::Operand mxvm_io_fclose(mxvm::Program *program, std::vector<mxvm
     }
     FILE *fp = reinterpret_cast<FILE*>(file_v.var_value.ptr_value);
     int result = fclose(fp);
-    
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
     mxvm::Operand o;
