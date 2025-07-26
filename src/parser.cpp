@@ -419,7 +419,7 @@ namespace mxvm {
             {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}, {"stack_load", STACK_LOAD},
             {"stack_store", STACK_STORE}, {"stack_sub", STACK_SUB}, {"call", CALL}, {"ret", RET},
             {"string_print", STRING_PRINT}, {"done", DONE}, {"to_int", TO_INT}, {"to_float", TO_FLOAT},
-            {"invoke", INVOKE}, {"return", RETURN}
+            {"invoke", INVOKE}, {"return", RETURN}, {"neg", NEG}
         };
         
         if (index >= scanner.size()) return nullptr;

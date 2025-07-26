@@ -8,7 +8,7 @@
 #include<sstream>
 #include<optional>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN };
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN , NEG};
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -53,7 +53,8 @@ inline std::vector<std::string> IncType {
     "to_int",   // TO_INT = 39
     "to_float", // TO_INT = 40
     "invoke", // INVOKE = 41
-    "return" // RETURN
+    "return", // RETURN = 42
+    "neg" // NEG = 43
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);

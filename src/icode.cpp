@@ -492,6 +492,9 @@ namespace mxvm {
             case RETURN:
                 gen_return(out, i);
                 break;
+            case NEG:
+                gen_neg(out, i);
+                break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -513,6 +516,17 @@ namespace mxvm {
             out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
         } else {
             throw mx::Exception("return requires variable\n");
+        }
+    }
+    
+    void Program::gen_neg(std::ostream &out, const Instruction &i) {
+        if(isVariable(i.op1.op)) {
+            Variable &v = getVariable(i.op1.op);
+            generateLoadVar(out, v.type, "%rcx", i.op1);
+            out << "\tnegq %rcx\n";
+            out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+        } else {
+            throw mx::Exception("neg requires variable");
         }
     }
 
@@ -1497,6 +1511,9 @@ namespace mxvm {
                     break;
                 case RETURN:
                     exec_return(instr);
+                    break;
+                case NEG:
+                    exec_neg(instr);
                     break;
                 default:
                     throw mx::Exception("Unknown instruction: " + instr.instruction);
@@ -2708,6 +2725,21 @@ namespace mxvm {
             }
             v = r;
             v.var_name = name;
+        }
+    }
+    void Program::exec_neg(const Instruction &instr) {
+        if(!instr.op1.op.empty() && isVariable(instr.op1.op)) {
+            Variable &v = getVariable(instr.op1.op);
+            switch(v.type) {
+                case VarType::VAR_INTEGER:
+                    v.var_value.int_value = -v.var_value.int_value;
+                break;
+                case VarType::VAR_FLOAT:
+                    v.var_value.float_value = -v.var_value.float_value;
+                break;
+            default:
+                    v.var_value.int_value = -v.var_value.int_value;
+            }
         }
     }
 
