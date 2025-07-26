@@ -17,7 +17,7 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm
     RENAME io.mxvm
 )
 
-set_target_properties(mxvm_string PROPERTIES
+set_target_properties(mxvm_io PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/modules/io"
 )
 
