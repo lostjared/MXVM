@@ -13,7 +13,7 @@ target_link_libraries(mxvm_string
 add_library(mxvm_string_static STATIC string.c)
 
 set_target_properties(mxvm_string PROPERTIES
-    INSTALL_RPATH "$ORIGIN/../../.."
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/modules/string"
 )
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/string.mxvm
@@ -22,6 +22,6 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/string.mxvm
 )
 
 install(TARGETS mxvm_string mxvm_string_static
-    LIBRARY DESTINATION lib/modules/io
-    ARCHIVE DESTINATION lib/modules/io
+    LIBRARY DESTINATION lib/modules/string
+    ARCHIVE DESTINATION lib/modules/string
 )
