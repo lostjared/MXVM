@@ -207,7 +207,7 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
         throw mx::Exception("snprintf format must be a string variable.");
     }
     std::ostringstream oss;
-    size_t argIndex = 2;
+    size_t argIndex = 3;
     const char* format = fmt.var_value.str_value.c_str();
     char buffer[4096];
     for (size_t i = 0; i < fmt.var_value.str_value.length(); ++i) {
@@ -259,11 +259,15 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
             oss << format[i];
         }
     }
-    mxvm::except_assert("snpritnf dest poitner is null", dest.var_value.ptr_value != nullptr);
-    strncpy(reinterpret_cast<char*>(dest.var_value.ptr_value), oss.str().c_str(), n);
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        mxvm::except_assert("snpritnf dest pointer is null", dest.var_value.ptr_value != nullptr);
+        strncpy(reinterpret_cast<char*>(dest.var_value.ptr_value), oss.str().c_str(), n);
+    } else if(dest.type == mxvm::VarType::VAR_STRING) {
+        dest.var_value.str_value = oss.str();
+    }
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
-    program->vars["%rax"].var_value.int_value = n;
+    program->vars["%rax"].var_value.int_value = oss.str().length();
     mxvm::Operand o;
     o.op = "%rax";
     return o;

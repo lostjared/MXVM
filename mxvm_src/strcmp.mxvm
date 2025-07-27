@@ -3,7 +3,7 @@ program Compare {
     section data {
         string var1 = "test"
         string var2 = "Test"
-        string var3 = "The result: %d\n"
+        string var3 = "The result: %d"
         string data, 255
         string fmt = "Enter Value: "
         int  result= 0
@@ -16,7 +16,8 @@ program Compare {
         alloc v, 1, 256
         invoke strncpy, v, fmt, 255 
         invoke strncat, v, var2,255
-        print wrong, v 
+        invoke snprintf, data, var3, 255, result
+        print wrong, data 
         free v
         done
 }
