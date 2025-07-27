@@ -123,6 +123,14 @@ namespace mxvm {
             vars[name] = v;
     }
 
+    void Base::add_global(const std::string &name, const Variable &v) {
+        if(base != nullptr) {
+            if(base->vars.find(name) == base->vars.end()) {
+                base->vars[name] = v;
+            }
+        }
+    }
+
     void Base::add_extern(const std::string &mod, const std::string &name) {
         ExternalFunction f = {name, mod};
         auto it = std::find(external.begin(), external.end(),f);
@@ -134,7 +142,6 @@ namespace mxvm {
         if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty()) {
             throw mx::Exception("External function missing information.");
         }
-
         if(base != nullptr) {
             if(base->external_functions.find(name) == base->external_functions.end()) {
                 base->external_functions[name] = RuntimeFunction(mod, func_name);
@@ -1368,8 +1375,8 @@ namespace mxvm {
     }
 
     void Program::flatten_external(Program *root, const std::string &e, RuntimeFunction &r) {
-        if(external_functions.find(e) == external_functions.end()) {
-            external_functions[e] = r;
+        if(root->external_functions.find(e) == root->external_functions.end()) {
+            root->external_functions[e] = r;
         }
     }
 
