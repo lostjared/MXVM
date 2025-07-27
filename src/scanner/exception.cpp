@@ -6,7 +6,7 @@
 #include <csignal>
 #include <iostream>
 #include <sstream>
-#include <stdint.h>
+#include <cstdint>
 #include <iomanip>
 
 namespace mx {

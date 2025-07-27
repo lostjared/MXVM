@@ -10,7 +10,6 @@
 #include<errno.h>
 #include<cstring>
 #include<cstdint>
-#include<termios.h>
 #include<unistd.h>
 
 namespace mx {
