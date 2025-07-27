@@ -202,6 +202,7 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         program->setObject(false);
+        program->setMainBase(program.get());
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.object_mode = object;
@@ -259,6 +260,7 @@ void signal_action(int signum) {
     int exitCode = 0;
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
     program->setArgs(argv);
+    program->setMainBase(program.get());
     std::fstream debug_output;
     if(mxvm::debug_mode) {
         debug_output.open("debug_info.txt", std::ios::out);

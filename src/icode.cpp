@@ -106,7 +106,9 @@ namespace mxvm {
         FuncType f = reinterpret_cast<FuncType>(func);
         return f(program, operands);
     }
-           
+       
+    Base *Base::base = nullptr;
+
     void Base::add_instruction(const Instruction &i) {
         inc.push_back(i);
     }
@@ -129,12 +131,15 @@ namespace mxvm {
     }
     
     void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
-        if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty())
-            return;
+        if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty()) {
+            throw mx::Exception("External function missing information.");
+        }
 
-        if(external_functions.find(name) == external_functions.end()) {
-            external_functions[name] = RuntimeFunction(mod, func_name);
-            external_functions[name].mod_name = mod_name;
+        if(base != nullptr) {
+            if(base->external_functions.find(name) == base->external_functions.end()) {
+                base->external_functions[name] = RuntimeFunction(mod, func_name);
+                base->external_functions[name].mod_name = mod_name;
+            }
         }
     }
 
@@ -1381,6 +1386,7 @@ namespace mxvm {
                 flatten_external(program, e.first, e.second);
             }
         }
+
         for (auto &obj : objects) {
             if(obj.get() != program)
                 obj->flatten(program);
@@ -1394,7 +1400,7 @@ namespace mxvm {
         }
         pc = 0;
         running = true;
-        
+   
         while (running && pc < inc.size()) {
             const Instruction& instr = inc.at(pc);
             if(mxvm::instruct_mode)

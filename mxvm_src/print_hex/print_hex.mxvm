@@ -1,6 +1,5 @@
 program PrintHex {
     section object { HexFile }
-    #section module { io }
     section data {
 
     }

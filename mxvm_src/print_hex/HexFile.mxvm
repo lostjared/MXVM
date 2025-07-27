@@ -9,6 +9,7 @@ object HexFile {
         string read_mode = "rb"
         int file_size = 0
         string err_msg = "Error has occoured.\n"
+        string file_open_err = "File could not be opened..\n"
         byte character = 0
         byte dot_char = 46 
         string hex_value = "%02x "
@@ -34,7 +35,7 @@ object HexFile {
         invoke fopen, filename, read_mode
         return file_handle
         cmp file_handle, 0
-        je error
+        je file_open_error
         invoke fsize, file_handle
         return file_size
         cmp file_size, 0
@@ -90,6 +91,8 @@ object HexFile {
         free buffer
         free ascii_buf
         ret
+    file_open_error:
+        invoke fprintf, stderr, file_open_err
     error:
         invoke fprintf, stderr, err_msg
         exit 1

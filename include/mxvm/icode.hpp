@@ -60,6 +60,7 @@ namespace mxvm {
 
     class Base {
     public:
+        void setMainBase(Base *b) { base = b; }
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
@@ -70,6 +71,7 @@ namespace mxvm {
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
         std::vector<ExternalFunction> external;
         std::unordered_map<std::string, RuntimeFunction> external_functions;
+        static Base *base;
     };
 
     class Program : public Base {
@@ -77,6 +79,7 @@ namespace mxvm {
         friend class Parser;
         Program();
         ~Program();
+        
         void stop();
         int exec();
         void print(std::ostream &out);
