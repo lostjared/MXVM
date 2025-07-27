@@ -4,14 +4,23 @@ program Compare {
         string var1 = "test"
         string var2 = "Test"
         string var3 = "The result: %d\n"
-        int value = -1
+        string data, 255
+        string fmt = "Enter Value: "
+        int  result= 0
+        string wrong = "wrong\n"
     }
     section code {
     start:
-        invoke strcmp, var1, var2
-        return value
-        neg value
-        print var3, value
+        print fmt
+        getline data
+        invoke strcmp, data, var1
+        return result
+        cmp result,  0
+        je correct
+        print wrong
+        jmp over
+        correct:
+        print var3, result
+        over:
         done
-    }
 }
