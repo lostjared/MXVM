@@ -124,7 +124,7 @@ Args proc_args(int argc, char **argv) {
             }
         }
     } catch(mx::ArgException<std::string> &exec) {
-        std::cerr << "MXVM: Sytnax Error: "<< exec.text() << "\n";
+        std::cerr << "MXVM: Command Line Argument Parsing Sytnax Error: "<< exec.text() << "\n";
         exit(EXIT_FAILURE);
     }
 

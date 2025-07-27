@@ -7,20 +7,16 @@ program Compare {
         string data, 255
         string fmt = "Enter Value: "
         int  result= 0
-        string wrong = "wrong\n"
+        string wrong = "wrong %s\n"
+
+        ptr v = null
     }
     section code {
     start:
-        print fmt
-        getline data
-        invoke strcmp, data, var1
-        return result
-        cmp result,  0
-        je correct
-        print wrong
-        jmp over
-        correct:
-        print var3, result
-        over:
+        alloc v, 1, 256
+        invoke strncpy, v, fmt, 255 
+        invoke strncat, v, var2,255
+        print wrong, v 
+        free v
         done
 }

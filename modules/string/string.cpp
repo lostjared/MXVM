@@ -90,11 +90,20 @@ extern "C" mxvm::Operand mxvm_string_strncpy(mxvm::Program *program, std::vector
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &src = program->getVariable(src_var);
 
-    if (dest.type != mxvm::VarType::VAR_POINTER) {
-        throw mx::Exception("strncpy destination must be a pointer variable.");
+    if (dest.type != mxvm::VarType::VAR_POINTER && dest.type != mxvm::VarType::VAR_STRING && dest.var_value.buffer_size == 0) {
+        throw mx::Exception("strncpy destination must be a pointer/string  buffer variable.");
     }
-    mxvm::except_assert("strncpy: destination pointer is null", (dest.var_value.ptr_value != nullptr));
-    char *dptr = reinterpret_cast<char*>(dest.var_value.ptr_value);
+
+    if(dest.type != mxvm::VarType::VAR_STRING && static_cast<int64_t>(dest.var_value.buffer_size) > n) {
+        throw mx::Exception("strncpy destination string must be large enogh:  " + std::to_string(dest.var_value.buffer_size) + " > " + std::to_string(n));
+    }
+
+    char *dptr = nullptr;
+
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        mxvm::except_assert("strncpy: destination pointer is null", (dest.var_value.ptr_value != nullptr));
+        dptr = reinterpret_cast<char*>(dest.var_value.ptr_value);
+    }
 
     const char *sptr = nullptr;
     if (src.type == mxvm::VarType::VAR_POINTER) {
@@ -106,7 +115,11 @@ extern "C" mxvm::Operand mxvm_string_strncpy(mxvm::Program *program, std::vector
         throw mx::Exception("strncpy source must be a pointer or string variable.");
     }
 
-    strncpy(dptr, sptr, n);
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        strncpy(dptr, sptr, n);
+    } else {
+        dest.var_value.str_value = sptr;
+    }
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = n;
@@ -130,11 +143,19 @@ extern "C" mxvm::Operand mxvm_string_strncat(mxvm::Program *program, std::vector
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &src = program->getVariable(src_var);
 
-    if (dest.type != mxvm::VarType::VAR_POINTER) {
-        throw mx::Exception("strncat destination must be a pointer variable.");
+    
+    if (dest.type != mxvm::VarType::VAR_POINTER && dest.type != mxvm::VarType::VAR_STRING && dest.var_value.buffer_size == 0) {
+        throw mx::Exception("strncpy destination must be a pointer/string  buffer variable.");
     }
-    mxvm::except_assert("strncat: destination pointer is null", (dest.var_value.ptr_value != nullptr));
-    char *dptr = reinterpret_cast<char*>(dest.var_value.ptr_value);
+    if(dest.type != mxvm::VarType::VAR_STRING && static_cast<int64_t>(dest.var_value.buffer_size) > n) {
+        throw mx::Exception("strncpy destination string must be large enogh:  " + std::to_string(dest.var_value.buffer_size) + " > " + std::to_string
+        (n));
+    }
+    char *dptr = nullptr;
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        mxvm::except_assert("strncat: destination pointer is null", (dest.var_value.ptr_value != nullptr));
+        dptr = reinterpret_cast<char*>(dest.var_value.ptr_value);
+    }
 
     const char *sptr = nullptr;
     if (src.type == mxvm::VarType::VAR_POINTER) {
@@ -145,8 +166,12 @@ extern "C" mxvm::Operand mxvm_string_strncat(mxvm::Program *program, std::vector
     } else {
         throw mx::Exception("strncat source must be a pointer or string variable.");
     }
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        strncat(dptr, sptr, n);
+    } else {
+        dest.var_value.str_value += sptr;
+    }
 
-    strncat(dptr, sptr, n);
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = n;
@@ -168,8 +193,14 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
     mxvm::except_assert("snprintf size is zero", n != 0);
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &fmt = program->getVariable(fmt_var);
-    if (dest.type != mxvm::VarType::VAR_POINTER) {
-        throw mx::Exception("snprintf destination must be a pointer variable.");
+    
+    if (dest.type != mxvm::VarType::VAR_POINTER && dest.type != mxvm::VarType::VAR_STRING && dest.var_value.buffer_size == 0) {
+        throw mx::Exception("strncpy destination must be a pointer/string  buffer variable.");
+    }
+
+
+    if(dest.type != mxvm::VarType::VAR_STRING && static_cast<int64_t>(dest.var_value.buffer_size) > n) {
+        throw mx::Exception("strncpy destination string must be large enogh:  " + std::to_string(dest.var_value.buffer_size) + " > " + std::to_string(n));
     }
 
     if (fmt.type != mxvm::VarType::VAR_STRING) {
