@@ -18,7 +18,6 @@ target_include_directories(scanner PUBLIC
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
-    DESTINATION include/scanner
-)
+    DESTINATION include)
 
 target_compile_features(scanner PUBLIC cxx_std_20)
