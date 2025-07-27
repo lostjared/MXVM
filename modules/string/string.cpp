@@ -185,8 +185,8 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
         throw mx::Exception("snprintf requires at least destination, format, and one argument.");
     }
     std::string &dest_var = operand[0].op;
-    std::string &fmt_var = operand[1].op;
-    int64_t n = operand[2].op_value;
+    std::string &fmt_var = operand[2].op;
+    int64_t n = operand[1].op_value;
     if (!program->isVariable(dest_var) || !program->isVariable(fmt_var)) {
         throw mx::Exception("snprintf destination and format must be variables.");
     }
