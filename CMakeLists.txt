@@ -12,12 +12,14 @@ endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+    set(DEBUG_MODE "Release Mode")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ")
+    set(DEBUG_MODE "Debug Mode")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g ")
+    set(DEBUG_MODE "Debug Mode")
 endif()
-
-
-
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -fPIC")
 
@@ -71,32 +73,25 @@ endif()
 include(CheckLibraryExists)
 check_library_exists(dl dlopen "" HAVE_LIBDL)
 check_library_exists(pthread pthread_create "" HAVE_LIBPTHREAD)
-
 if(NOT HAVE_LIBDL)
     message(FATAL_ERROR "Missing required library: dl")
 endif()
 if(NOT HAVE_LIBPTHREAD)
     message(FATAL_ERROR "Missing required library: pthread")
 endif()
-
 find_program(CMAKE_C_COMPILER NAMES gcc clang REQUIRED)
 find_program(CMAKE_CXX_COMPILER NAMES g++ clang++ REQUIRED)
-
 if(NOT CMAKE_C_COMPILER)
     message(FATAL_ERROR "C compiler not found (gcc or clang required)")
 endif()
 if(NOT CMAKE_CXX_COMPILER)
     message(FATAL_ERROR "C++ compiler not found (g++ or clang++ required)")
 endif()
-
 find_program(AR_EXECUTABLE ar)
-
 if(NOT AR_EXECUTABLE)
     message(FATAL_ERROR "ar tool not found")
 endif()
-
 add_subdirectory(src/scanner)
-
 add_library(mxvm SHARED
     src/mxvm.cpp
     src/parser.cpp
@@ -110,9 +105,7 @@ target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
 )
-
 target_link_libraries(mxvm PUBLIC scanner)
-
 add_subdirectory(modules/io)
 add_subdirectory(modules/string)
 add_compile_definitions()
@@ -129,3 +122,7 @@ install(TARGETS mxvm
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+message(STATUS "CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+message(STATUS "Mode: ${DEBUG_MODE}")
+message(STATUS "Set CMAKE_BUILD_TYPE to Debug/Release")
+
