@@ -137,7 +137,6 @@ Args proc_args(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-
     bool add = false;
     for(int i = 0; i < argc; ++i) {
         if(std::string(argv[i]) == "--args") {

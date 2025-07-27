@@ -1,23 +1,18 @@
 program Compare {
     section module { string }
     section data {
-        string var1 = "test"
-        string var2 = "Test"
-        string var3 = "The result: %d\n"
-        string data, 255
-        string fmt = "Enter Value: "
-        int  result= 0
-        string wrong = "wrong %s\n"
+        string fmt = "hey the value is: %s\n"
+        string buffer, 255
+        string buffer2, 512
+        string prompt = "Enter value: "
 
-        ptr v = null
     }
     section code {
     start:
-        alloc v, 1, 256
-        invoke strncpy, v, fmt, 255 
-        invoke strncat, v, var2,255
-        invoke snprintf, v,255,var3, result
-        print wrong, v 
-        free v
+        print prompt
+        getline buffer
+        invoke snprintf,buffer2,767,fmt,buffer
+        print buffer2
         done
+    }
 }

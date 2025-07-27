@@ -18,6 +18,14 @@ namespace mxvm {
         add_variable("stdout", vstdout);
         add_variable("stdin", vstdin);
         add_variable("stderr", vstderr);
+
+        add_extern("string", "strlen");
+        add_extern("main", "printf");
+        add_extern("main", "calloc");
+        add_extern("main", "free");
+        add_extern("main", "exit");
+        add_extern("main", "atol");
+        add_extern("main", "atof");
     }
 
     void Program::setArgs(const std::vector<std::string> &argv) {
@@ -330,14 +338,11 @@ namespace mxvm {
                 out << "\t.global " << lbl.first << "\n";
             }
         }
-
-        out << "\t.extern printf\n";
-        out << "\t.extern calloc\n";
-        out << "\t.extern free\n";
-        out << "\t.extern exit\n";
-        out << "\t.extern strlen\n";
-        out << "\t.extern atol\n";
-        out << "\t.extern atof\n";
+        std::sort(external.begin(), external.end(), [](const ExternalFunction &a, const ExternalFunction &b) {
+            if (a.mod == b.mod)
+            return a.name < b.name;
+            return a.mod < b.mod;
+        });
 
         for(auto &e : external) {
             out << "\t.extern " << e.name << "\n";
