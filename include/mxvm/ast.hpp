@@ -22,7 +22,7 @@ namespace mxvm {
     class ProgramNode : public ASTNode {
     public:
         std::string name;
-        bool object;
+        bool object = true;
         std::vector<std::unique_ptr<ASTNode>> sections;
         
         void addSection(std::unique_ptr<ASTNode> section) {

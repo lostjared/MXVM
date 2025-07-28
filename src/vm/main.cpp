@@ -26,7 +26,6 @@ struct Args {
     vm_action action = vm_action::null_action;
     vm_target target = vm_target::x86_64_linux;
     std::vector<std::string> argv;
-    bool object = false;
 };
 
 template<typename T>
@@ -38,9 +37,9 @@ void print_help(T &type) {
 }
 
 void process_arguments(Args *args);
-int action_translate(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-int translate_x64_linux(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output);
+int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -59,8 +58,6 @@ Args proc_args(int argc, char **argv) {
     .addOptionDouble(132, "help", "Help output")
     .addOptionDouble(133, "html", "debug html")
     .addOptionSingle('D', "print html")
-    .addOptionSingle('c', "object")
-    .addOptionDouble(135, "object", "File contains object")
     .addOptionSingleValue('x', "object path")
     .addOptionDoubleValue(136, "object-path", "Object path")
     .addOptionSingleValue('p', "path")
@@ -86,10 +83,6 @@ Args proc_args(int argc, char **argv) {
                 case 136:
                     args.object_path = arg.arg_value;
                 break;
-                case 'c':
-                case 135:
-                    args.object = true;
-                    break;
                 case 134:
                 case 'p':
                     args.module_path = arg.arg_value;
@@ -175,7 +168,7 @@ void process_arguments(Args *args) {
         exit(EXIT_FAILURE);
     }
     if(args->action == vm_action::translate) {
-        exitCode = action_translate(args->include_path, args->object_path, args->object, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
@@ -187,16 +180,16 @@ void process_arguments(Args *args) {
     exit(exitCode);
 }
 
-int action_translate(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
+int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
     switch(target) {
         case vm_target::x86_64_linux:
-            return translate_x64_linux(include_path, object_path, object, input, mod_path, output);
+            return translate_x64_linux(include_path, object_path, input, mod_path, output);
         break;
     }
     return 0;
 }
 
-int translate_x64_linux(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output) {
+int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
         std::string input_file(input);
@@ -211,24 +204,27 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
         mxvm::Parser parser(stream.str());
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
-        program->setObject(false);
         program->setMainBase(program.get());
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
-        parser.object_mode = object;
         parser.include_path =  include_path;
-        if(parser.generateProgramCode(object, mxvm::Mode::MODE_COMPILE, program)) {
+        if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
             std::fstream file;
+
+            if(program->root_name == program->name)
+                program->object = false;
+            else
+                program->object = true;
+
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
-                program->generateCode(object, file);
+                program->generateCode(program->object, file);
                 file.close();
                 std::string mainFunc = " Object";
-                if(object == false) {
+                 if(program->root_name == program->name)
                     mainFunc = " Program";
-                }
                 std::cout << "MXVM: Compiled: " << program_name << mainFunc << "\n";
             }
         } else {
@@ -327,7 +323,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.include_path = std::string(include_path);
-        if(parser.generateProgramCode(false, mxvm::Mode::MODE_INTERPRET, program)) {
+        if(parser.generateProgramCode(mxvm::Mode::MODE_INTERPRET, program)) {
             program->flatten(program.get());
             exitCode = program->exec();
             

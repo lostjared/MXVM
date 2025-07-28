@@ -16,17 +16,18 @@ namespace mxvm {
         }
     }
 
-    bool Validator::validate(bool mode) {
+    bool Validator::validate() {
         scanner.scan();
         std::unordered_map<std::string, std::string> labels;
         collect_labels(labels);
         next(); 
-        if(mode == false) 
-            require("program"); 
-        else
+        if(match("program")) {
+            next();
+        } 
+        else {
             require("object");
-
-        next();
+            next();
+        }
         require(types::TokenType::TT_ID); next();
         require("{"); next();
 

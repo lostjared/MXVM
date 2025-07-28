@@ -75,6 +75,7 @@ namespace mxvm {
     }
 
     std::unordered_map<std::string, void *> RuntimeFunction::handles;
+    std::string Base::root_name;
 
     RuntimeFunction::RuntimeFunction(const std::string &mod, const std::string &name) {
         fname = name;
@@ -340,7 +341,7 @@ namespace mxvm {
             }
         }
         out << ".section .text\n";
-        if(obj)
+        if(this->object)
             out << "\t.global " << name << "\n";
         else
             out << "\t.global main\n";
@@ -369,7 +370,7 @@ namespace mxvm {
         }
 
         // rest of text
-        if(obj) 
+        if(this->object) 
             out << name << ":\n";
         else
             out << "main:\n";
@@ -398,7 +399,7 @@ namespace mxvm {
             generateInstruction(out, instr);
         }
         
-        if(obj == false && done_found == false)
+        if(this->object == false && done_found == false)
             throw mx::Exception("Program missing done to signal completion.\n");
             
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";

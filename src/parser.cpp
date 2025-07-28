@@ -133,6 +133,10 @@ namespace mxvm {
                     auto nameToken = this->operator[](i);
                     program_name = nameToken.getTokenValue();
                     program->name = program_name; 
+                    program->object = (tokenValue == "program") ? false : true;
+                   if(program->object == false) 
+                        Program::root_name = program_name;     
+
                 }
                 i++;
                 if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {
@@ -209,7 +213,7 @@ namespace mxvm {
         parser->scan();
         std::unique_ptr<Program> prog(new Program());
         program->object = true;
-        if(parser->generateProgramCode(true, parser_mode, prog)) {
+        if(parser->generateProgramCode(parser_mode, prog)) {
             program->objects.push_back(std::move(prog));
         }
         file.close();
@@ -574,10 +578,9 @@ namespace mxvm {
         }
     }
 
-    bool Parser::generateProgramCode(bool cmode, const Mode &mode, std::unique_ptr<Program> &program) {
-        parser_mode = mode;
+    bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
         try {
-            if(!validator.validate(cmode)) {
+            if(!validator.validate()) {
                 return false;
             }
         } catch (mx::Exception &e) {
@@ -588,6 +591,8 @@ namespace mxvm {
         auto ast = parseAST();
         if(ast) {
             program->name = ast->name;
+            program->object = ast->object;
+
             for (const auto& section : ast->sections) {
                 auto sectionNode = dynamic_cast<SectionNode*>(section.get());
                 if (!sectionNode) continue;
@@ -607,7 +612,7 @@ namespace mxvm {
                 throw mx::Exception("Could not validate variables/functions\n");
             }
             
-            if(cmode == false && mxvm::html_mode) {
+            if(program->object == false && mxvm::html_mode) {
                 std::fstream ofile;
                 ofile.open(ast->name + ".html", std::ios::out);
                 if(ofile.is_open()) {
