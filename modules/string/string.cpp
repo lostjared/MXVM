@@ -90,6 +90,11 @@ extern "C" mxvm::Operand mxvm_string_strncpy(mxvm::Program *program, std::vector
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &src = program->getVariable(src_var);
 
+
+    if(program->isVariable(operand[2].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[2].op);
+        n = iv.var_value.int_value;
+    }
     if (dest.type != mxvm::VarType::VAR_POINTER && dest.type != mxvm::VarType::VAR_STRING && dest.var_value.buffer_size == 0) {
         throw mx::Exception("strncpy destination must be a pointer/string  buffer variable.");
     }
@@ -143,6 +148,10 @@ extern "C" mxvm::Operand mxvm_string_strncat(mxvm::Program *program, std::vector
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &src = program->getVariable(src_var);
 
+    if(program->isVariable(operand[2].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[2].op);
+        n = iv.var_value.int_value;
+    }
     
     if (dest.type != mxvm::VarType::VAR_POINTER && dest.type != mxvm::VarType::VAR_STRING && dest.var_value.buffer_size == 0) {
         throw mx::Exception("strncpy destination must be a pointer/string  buffer variable.");
@@ -190,6 +199,12 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
     if (!program->isVariable(dest_var) || !program->isVariable(fmt_var)) {
         throw mx::Exception("snprintf destination and format must be variables.");
     }
+    
+    if(program->isVariable(operand[1].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[2].op);
+        n = iv.var_value.int_value;
+    }
+
     mxvm::except_assert("snprintf size is zero", n != 0);
     mxvm::Variable &dest = program->getVariable(dest_var);
     mxvm::Variable &fmt = program->getVariable(fmt_var);
@@ -268,6 +283,111 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = oss.str().length();
+    mxvm::Operand o;
+    o.op = "%rax";
+    return o;
+}
+
+extern "C" mxvm::Operand mxvm_string_strfind(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("strfind requires destination, source, and length arguments.");
+    }
+    std::string &dest_var = operand[0].op;
+    std::string &src_var = operand[1].op;
+    std::string bytes_value = operand[2].op;
+    int64_t n = operand[2].op_value;
+
+    if (!program->isVariable(dest_var) || !program->isVariable(src_var)) {
+        throw mx::Exception("strfind arguments must be variables (pointer or string).");
+    }
+    mxvm::Variable &dest = program->getVariable(dest_var);
+    mxvm::Variable &src = program->getVariable(src_var);
+    if(program->isVariable(operand[2].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[2].op);
+        n = iv.var_value.int_value;
+    }
+    const char *dptr = nullptr;
+    if(dest.type == mxvm::VarType::VAR_POINTER) {
+        mxvm::except_assert("stfind: arg1 pointer is null", (dest.var_value.ptr_value != nullptr));
+        dptr = reinterpret_cast<char*>(dest.var_value.ptr_value);
+    } else {
+        dptr = dest.var_value.str_value.c_str();
+    }
+    const char *sptr = nullptr;
+    if (src.type == mxvm::VarType::VAR_POINTER) {
+        mxvm::except_assert("strfind: source pointer is null", (src.var_value.ptr_value != nullptr));
+        sptr = reinterpret_cast<const char*>(src.var_value.ptr_value);
+    } else if (src.type == mxvm::VarType::VAR_STRING) {
+        sptr = src.var_value.str_value.c_str();
+    } else {
+        throw mx::Exception("strfind: arg2e must be a pointer or string variable.");
+    }
+    int64_t result = 0;
+    auto pos = std::string(dptr).find(sptr, n);
+    if(pos == std::string::npos) {
+        result = -1;
+    } else {
+        result = pos;
+    }
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+    mxvm::Operand o;
+    o.op = "%rax";
+    return o;
+}
+
+//long substr(char *dest, long size, const char *src, long pos,  long len)
+
+extern "C" mxvm::Operand mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 5) {
+        throw mx::Exception("sub requires position then length you used: " + std::to_string(operand.size()));
+    }
+    std::string &v_dest = operand[0].op;
+    int64_t size = operand[1].op_value;
+    std::string &v_src = operand[2].op;
+    int64_t pos = operand[3].op_value;
+    int64_t len = operand[4].op_value;;
+    
+    if(!program->isVariable(v_dest)) {
+        throw mx::Exception("substr first argument requires variable\n");
+    }
+
+    if(!program->isVariable(v_src)) {
+        throw mx::Exception("substr third argument requires variable\n");
+    }
+
+    
+    if(program->isVariable(operand[1].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[1].op);
+        size = iv.var_value.int_value;
+    }
+
+    if(program->isVariable(operand[3].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[3].op);
+        pos = iv.var_value.int_value;
+    }
+
+    if(program->isVariable(operand[4].op)) {
+        mxvm::Variable &iv = program->getVariable(operand[4].op);
+        len = iv.var_value.int_value;
+    }
+    
+    mxvm::Variable &v = program->getVariable(v_src);
+    std::string s = v.var_value.str_value;
+    std::string result = s.substr(pos, len);
+
+    mxvm::Variable &d = program->getVariable(v_dest);
+    if(d.type == mxvm::VarType::VAR_STRING && d.var_value.buffer_size > 0) {
+        d.var_value.str_value = result;
+    } else if(d.type == mxvm::VarType::VAR_POINTER) {
+        strncpy((char*)d.var_value.ptr_value, result.c_str(), size);
+    } else {
+        
+    }
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result.length();
     mxvm::Operand o;
     o.op = "%rax";
     return o;

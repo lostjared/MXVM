@@ -4,4 +4,6 @@ module string {
     extern strncat
     extern strncpy
     extern snprintf
+    extern strfind
+    extern substr
 }

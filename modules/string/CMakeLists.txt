@@ -10,7 +10,7 @@ target_link_libraries(mxvm_string
     PUBLIC
         mxvm
 )
-add_library(mxvm_string_static STATIC string.c)
+add_library(mxvm_string_static STATIC cstring.c)
 
 include(CheckFunctionExists)
 
