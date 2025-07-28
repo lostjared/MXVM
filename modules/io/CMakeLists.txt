@@ -11,6 +11,32 @@ target_link_libraries(mxvm_io
         mxvm
 )
 add_library(mxvm_io_static STATIC io.c)
+include(CheckFunctionExists)
+
+check_function_exists(fopen HAVE_FOPEN)
+if(NOT HAVE_FOPEN)
+    message(FATAL_ERROR "Required function 'fopen' not found.")
+endif()
+
+check_function_exists(fclose HAVE_FCLOSE)
+if(NOT HAVE_FCLOSE)
+    message(FATAL_ERROR "Required function 'fclose' not found.")
+endif()
+
+check_function_exists(fread HAVE_FREAD)
+if(NOT HAVE_FREAD)
+    message(FATAL_ERROR "Required function 'fread' not found.")
+endif()
+
+check_function_exists(fwrite HAVE_FWRITE)
+if(NOT HAVE_FWRITE)
+    message(FATAL_ERROR "Required function 'fwrite' not found.")
+endif()
+
+check_function_exists(fseek HAVE_FSEEK)
+if(NOT HAVE_FSEEK)
+    message(FATAL_ERROR "Required function 'fseek' not found.")
+endif()
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm
     DESTINATION include/mxvm/modules/io
