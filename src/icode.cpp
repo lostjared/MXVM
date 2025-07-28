@@ -99,13 +99,13 @@ namespace mxvm {
         }
     }
     
-    Operand RuntimeFunction::call(Program *program, std::vector<Operand> &operands) {
+    void RuntimeFunction::call(Program *program, std::vector<Operand> &operands) {
         if (!func || !handle) {
             throw mx::Exception("RuntimeFunction: function: " + this->fname + " pointer is null: " + this->mod_name);
         }
-        using FuncType = Operand(*)(Program *program, std::vector<Operand>&);
+        using FuncType = void(*)(Program *program, std::vector<Operand>&);
         FuncType f = reinterpret_cast<FuncType>(func);
-        return f(program, operands);
+        f(program, operands);
     }
        
     Base *Base::base = nullptr;
@@ -2936,7 +2936,8 @@ namespace mxvm {
         for (const auto& vop : instr.vop) {
             if (!vop.op.empty()) args.push_back(vop);
         }
-        result = fn.call(this, args);
+        fn.call(this, args);
+        result.op = "%rax";
     }
 
     void Program::post(std::ostream &out) {

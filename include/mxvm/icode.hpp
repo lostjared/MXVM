@@ -35,7 +35,7 @@ namespace mxvm {
 
     class Program;
 
-    using runtime_call = std::function<Operand(Program *program, std::vector<Operand> &operands)>;
+    using runtime_call = std::function<void(Program *program, std::vector<Operand> &operands)>;
 
     class RuntimeFunction {
     public:
@@ -50,7 +50,7 @@ namespace mxvm {
         }
         ~RuntimeFunction() = default;
         RuntimeFunction(const std::string &mod, const std::string &name);
-        Operand call(Program *program, std::vector<Operand> &operands);
+        void call(Program *program, std::vector<Operand> &operands);
         void *func = nullptr;
         void *handle = nullptr;
         std::string mod_name;

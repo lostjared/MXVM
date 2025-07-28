@@ -3,7 +3,7 @@
 #include<vector>
 #include<string>
 
-extern "C" mxvm::Operand mxvm_io_fopen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fopen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if(operand.size() == 2) {
         std::string &filename = operand[0].op;
         std::string &mode = operand[1].op;
@@ -28,16 +28,12 @@ extern "C" mxvm::Operand mxvm_io_fopen(mxvm::Program *program, std::vector<mxvm:
         program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
         program->vars["%rax"].var_name = "%rax";
         program->vars["%rax"].var_value.ptr_value = (void*)fopen(filename.c_str(), mode.c_str());
-        mxvm::Operand o;
-        o.op = "%rax";
-        return o;
     } else {
         throw mx::Exception("Error invalid types for fopen.\n");
     }
-    return mxvm::Operand();
 }
 
-extern "C" mxvm::Operand mxvm_io_fprintf(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fprintf(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if(operand.size() < 2) {
         throw mx::Exception("Requires at least two arguments for fprintf.");
      }
@@ -71,11 +67,10 @@ extern "C" mxvm::Operand mxvm_io_fprintf(mxvm::Program *program, std::vector<mxv
     } else {
         throw mx::Exception("fprintf requires first argument to be valid variable found: " + operand[0].op);
     }
-    return mxvm::Operand();
 }
 
 
-extern "C" mxvm::Operand mxvm_io_fclose(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fclose(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("fclose requires a single file pointer argument.");
     }
@@ -92,12 +87,9 @@ extern "C" mxvm::Operand mxvm_io_fclose(mxvm::Program *program, std::vector<mxvm
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_io_fsize(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fsize(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("fsize requires a single file pointer argument.");
     }
@@ -119,13 +111,10 @@ extern "C" mxvm::Operand mxvm_io_fsize(mxvm::Program *program, std::vector<mxvm:
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
 
-extern "C" mxvm::Operand mxvm_io_fread(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fread(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 4) {
         throw mx::Exception("fread requires four arguments.");
     }
@@ -154,12 +143,9 @@ extern "C" mxvm::Operand mxvm_io_fread(mxvm::Program *program, std::vector<mxvm:
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_io_fwrite(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fwrite(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 4) {
         throw mx::Exception("fwrite requires four arguments.");
     }
@@ -188,13 +174,10 @@ extern "C" mxvm::Operand mxvm_io_fwrite(mxvm::Program *program, std::vector<mxvm
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
 
-extern "C" mxvm::Operand mxvm_io_fseek(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_io_fseek(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 3) {
         throw mx::Exception("fseek requires three arguments got: " + std::to_string(operand.size()));
     }
@@ -223,7 +206,4 @@ extern "C" mxvm::Operand mxvm_io_fseek(mxvm::Program *program, std::vector<mxvm:
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }

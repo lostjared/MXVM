@@ -5,7 +5,7 @@
 #include<cstdarg>
 #include<cstdio>
 
-extern "C" mxvm::Operand mxvm_string_strlen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_strlen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("strlen requires a single file pointer/string argument.");
     }
@@ -26,12 +26,9 @@ extern "C" mxvm::Operand mxvm_string_strlen(mxvm::Program *program, std::vector<
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = length;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_string_strcmp(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_strcmp(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 2) {
         throw mx::Exception("strcmp requires two pointer/string arguments.");
     }
@@ -70,12 +67,9 @@ extern "C" mxvm::Operand mxvm_string_strcmp(mxvm::Program *program, std::vector<
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = cmp_result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 3) {
         throw mx::Exception("strncpy requires destination, source, and length arguments.");
     }
@@ -128,12 +122,9 @@ extern "C" mxvm::Operand mxvm_string_strncpy(mxvm::Program *program, std::vector
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = n;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_string_strncat(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_strncat(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 3) {
         throw mx::Exception("strncat requires destination, source, and length arguments.");
     }
@@ -184,12 +175,9 @@ extern "C" mxvm::Operand mxvm_string_strncat(mxvm::Program *program, std::vector
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = n;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() < 4) {
         throw mx::Exception("snprintf requires at least destination, format, and one argument.");
     }
@@ -283,12 +271,9 @@ extern "C" mxvm::Operand mxvm_string_snprintf(mxvm::Program *program, std::vecto
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = oss.str().length();
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
-extern "C" mxvm::Operand mxvm_string_strfind(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_strfind(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 3) {
         throw mx::Exception("strfind requires destination, source, and length arguments.");
     }
@@ -332,14 +317,11 @@ extern "C" mxvm::Operand mxvm_string_strfind(mxvm::Program *program, std::vector
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
 
 //long substr(char *dest, long size, const char *src, long pos,  long len)
 
-extern "C" mxvm::Operand mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 5) {
         throw mx::Exception("sub requires position then length you used: " + std::to_string(operand.size()));
     }
@@ -388,7 +370,4 @@ extern "C" mxvm::Operand mxvm_string_substr(mxvm::Program *program, std::vector<
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result.length();
-    mxvm::Operand o;
-    o.op = "%rax";
-    return o;
 }
