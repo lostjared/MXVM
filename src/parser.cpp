@@ -895,7 +895,13 @@ namespace mxvm {
             module_path += "/";
         if(!include_path.ends_with("/"))
             include_path += "/";
-        std::string module_path_so = module_path + "modules/" + src + "/" + module_name + ".so";
+
+        std::string shared_ext = ".so";
+#ifdef _WIN32
+        shared_ext = ".dll";
+#endif
+
+        std::string module_path_so = module_path + "modules/" + src + "/" + module_name + shared_ext;
         std::string module_src = include_path + src + "/" + src + ".mxvm";
         std::fstream file;
         file.open(module_src, std::ios::in);
