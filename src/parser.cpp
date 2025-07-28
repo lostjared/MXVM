@@ -902,7 +902,15 @@ namespace mxvm {
 #endif
 
         std::string module_path_so = module_path + "modules/" + src + "/" + module_name + shared_ext;
-        std::string module_src = include_path + src + "/" + src + ".mxvm";
+
+        std::string msys_prefix;
+#ifdef _WIN32
+        msys2prefix = std::getenv("MSYSTEM_PREFIX");
+        if(!msys2prefix.ends_with("/"))
+            msys2prefix += "/";
+#endif
+
+        std::string module_src = msys_prefix+include_path + src + "/" + src + ".mxvm";
         std::fstream file;
         file.open(module_src, std::ios::in);
         if(!file.is_open()) {
