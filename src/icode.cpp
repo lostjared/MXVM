@@ -1101,7 +1101,6 @@ namespace mxvm {
             if (!v.op.empty()) args.push_back(v);
         }
         int total = 0;
-        int stack_arg = 0;
         int reg_count = 1;
 
         size_t num_pushes = (args.size() > 5) ? (args.size() - 5) : 0;
@@ -1117,7 +1116,6 @@ namespace mxvm {
                 if(v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
                     out << "\tpushq %rax\n";
-                    ++stack_arg;
                 } 
             } else {
                 out << "\tpushq $" << args[idx].op << "\n";
@@ -1227,7 +1225,6 @@ namespace mxvm {
             }
         }
         int total = 0;
-        int stack_arg = 0;
         int reg_count = 1;
         size_t num_pushes = (args.size() > 5) ? (args.size() - 5) : 0;
         bool needs_dummy = (num_pushes % 2 != 0);
@@ -1240,7 +1237,6 @@ namespace mxvm {
                 if(v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_EXTERN) {
                     generateLoadVar(out, v.type, "%rax", args[idx]);
                     out << "\tpushq %rax\n";
-                    ++stack_arg;
                 } 
             } else {
                 out << "\tpushq $" << args[idx].op << "\n";
@@ -1544,7 +1540,7 @@ namespace mxvm {
                     exec_neg(instr);
                     break;
                 default:
-                    throw mx::Exception("Unknown instruction: " + instr.instruction);
+                    throw mx::Exception("Unknown instruction: " + std::to_string(instr.instruction));
                     break;
             }
             pc++;
