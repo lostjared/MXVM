@@ -12,15 +12,16 @@ TARGET=print-hex
 .PHONY: all clean
 
 %.s: %.mxvm
-    $(MXVMC) $< --path $(LIB_PATH) --object-path $(OBJ_PATH) --action translate -c
+	$(MXVMC) $< --path $(LIB_PATH) --object-path $(OBJ_PATH) --action translate -c
 
-%.o: %.s
-    $(CC) $< -c -o $@
+
+%.o: %.s 
+	$(CC) $< -c -o $@
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ_S)
-    $(CC) $(OBJ_S:.s=.o) -o $(TARGET) -L$(IO_MODULE_PATH) $(IO_LIB)
+	$(CC) $(OBJ_S:.s=.o) -o $(TARGET) -L$(IO_MODULE_PATH) $(IO_LIB)
 
 clean:
-    rm -f $(OBJ_S) $(TARGET)
+	rm -f $(OBJ_S) $(TARGET)
