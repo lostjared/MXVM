@@ -906,6 +906,10 @@ namespace mxvm {
         std::string msys2prefix;
 #ifdef _WIN32
         msys2prefix = std::getenv("MSYSTEM_PREFIX");
+        size_t pos = msys2prefix.find("/msys64/");
+        if (pos != std::string::npos) {
+            msys2prefix = msts2orefux.substr(0, pos + 8); 
+        }
 #endif
 
         std::string module_src = msys2prefix+include_path + src + "/" + src + ".mxvm";
