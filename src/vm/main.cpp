@@ -29,6 +29,14 @@ struct Args {
     bool object = false;
 };
 
+template<typename T>
+void print_help(T &type) {
+    std::cout << "MXVM: Compiler/Interpreter v" << VERSION_INFO << "\n";
+    std::cout << "(C) 2025 LostSideDead Software\n";
+    std::cout << "https://lostsidedead.biz\n";
+    type.help(std::cout);
+}
+
 void process_arguments(Args *args);
 int action_translate(std::string_view include_path, std::string_view object_path, bool object, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
@@ -62,8 +70,7 @@ Args proc_args(int argc, char **argv) {
     ;
 
     if(argc == 1) {
-        argz.help(std::cout);
-        exit(EXIT_SUCCESS);
+        print_help(argz);
     }
 
     mx::Argument<std::string> arg;
@@ -93,8 +100,7 @@ Args proc_args(int argc, char **argv) {
                     break;
                 case 'h':
                 case 132:
-                    argz.help(std::cout);
-                    exit(EXIT_SUCCESS);
+                    print_help(argz);
                 break;
                 case 'i':
                 case 131:
