@@ -7,6 +7,7 @@ IO_LIB=-lmxvm_io_static
 
 SRC_MXVM=HexFile.mxvm PrintHex.mxvm
 OBJ_S=$(SRC_MXVM:.mxvm=.s)
+OBJ_O=$(SRC_MXVM:.mxvm=.o)
 
 TARGET=print-hex
 
@@ -20,8 +21,8 @@ TARGET=print-hex
 
 all: $(TARGET)
 
-$(TARGET): $(OBJ_S)
-	$(CC) $(OBJ_S:.s=.o) -o $(TARGET) -L$(IO_MODULE_PATH) $(IO_LIB)
+$(TARGET): $(OBJ_O)
+	$(CC) $(OBJ_O) -o $(TARGET) -L$(IO_MODULE_PATH) $(IO_LIB)
 
 clean:
-	rm -f $(OBJ_S) $(OBJ_S:.s=.o) $(TARGET)
+	rm -f $(OBJ_S) $(OBJ_O) $(TARGET)
