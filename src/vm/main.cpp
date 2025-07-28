@@ -10,6 +10,10 @@
 #include<csignal>
 #include<vector>
 
+#ifdef _WIN32
+#include<windows.h>
+#endif
+
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
 
@@ -244,6 +248,7 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
 
 mxvm::Program *signal_program = nullptr;
 
+#ifndef _WIN32
 void signal_action(int signum) {
     if(signum == SIGINT) {
         std::cout << "MXVM: Signal SIGINT Received Exiting...\n";
@@ -255,7 +260,27 @@ void signal_action(int signum) {
         exit(EXIT_FAILURE);
     }
 }
-
+#else
+BOOL WINAPI CtrlHandler(DWORD ctrlType) {
+    switch(ctrlType) {
+      case CTRL_C_EVENT: {
+        std::cout << "MXVM: Signal SIGINT Received Exiting...\n";
+        if(mxvm::debug_mode) {
+            std::cout << "MXVM: Debug Mode Dumping Memory.\n";
+            if(signal_program != nullptr)
+                signal_program->memoryDump(std::cout);
+        }
+        exit(EXIT_FAILURE);
+      }
+          return TRUE; 
+      case CTRL_CLOSE_EVENT:
+          return TRUE;
+      default:
+          return FALSE;
+    }
+}
+#endif
+    
  int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path) {
     int exitCode = 0;
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
@@ -270,11 +295,15 @@ void signal_action(int signum) {
     }
 
     signal_program =  program.get();
+#ifndef _WIN32
     struct sigaction sa;
     sa.sa_handler = signal_action;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, nullptr);
+#else
+    SetConsoleCtrlHandler(CtrlHandler, TRUE);
+#endif
 
     try {
         std::string input_file(input);
