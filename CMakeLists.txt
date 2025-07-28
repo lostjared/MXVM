@@ -70,16 +70,35 @@ endif()
 if(NOT HAVE_STDLIB_H)
     message(FATAL_ERROR "Missing required header: stdlib.h")
 endif()
+
+add_library(mxvm SHARED
+    src/mxvm.cpp
+    src/parser.cpp
+    src/instruct.cpp
+    src/icode.cpp
+    src/ast.cpp
+    src/valid.cpp
+    src/function.cpp
+)
+
 include(CheckLibraryExists)
 check_library_exists(dl dlopen "" HAVE_LIBDL)
 check_library_exists(pthread pthread_create "" HAVE_LIBPTHREAD)
+
 if(WIN32)
-	find_package(dlfcn-win32 REQUIRED)
+    check_include_file_cxx("dlfcn.h" HAVE_DLFCN_H)
+    if(NOT HAVE_DLFCN_H)
+        message(FATAL_ERROR "Missing required header: dlfcn.h (required for dlfcn-win32)")
+    endif()
+    find_package(dlfcn-win32 REQUIRED)
+    target_link_libraries(mxvm PUBLIC scanner dlfcn-win32::dl)
 else()
-if(NOT HAVE_LIBDL)
-    message(FATAL_ERROR "Missing required library: dl")
+    if(NOT HAVE_LIBDL)
+        message(FATAL_ERROR "Missing required library: dl")
+    endif()
+    target_link_libraries(mxvm PUBLIC scanner)
 endif()
-endif()
+
 if(NOT HAVE_LIBPTHREAD)
     message(FATAL_ERROR "Missing required library: pthread")
 endif()
@@ -96,24 +115,12 @@ if(NOT AR_EXECUTABLE)
     message(FATAL_ERROR "ar tool not found")
 endif()
 add_subdirectory(src/scanner)
-add_library(mxvm SHARED
-    src/mxvm.cpp
-    src/parser.cpp
-    src/instruct.cpp
-    src/icode.cpp
-    src/ast.cpp
-    src/valid.cpp
-    src/function.cpp
-)
+
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
 )
-if(WIN32)
-target_link_libraries(mxvm PUBLIC scanner dlfcn-win32::dl)
-else()
-target_link_libraries(mxvm PUBLIC scanner)
-endif()
+
 add_subdirectory(modules/io)
 add_subdirectory(modules/string)
 add_compile_definitions()

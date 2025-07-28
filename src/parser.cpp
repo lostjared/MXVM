@@ -895,14 +895,11 @@ namespace mxvm {
             module_path += "/";
         if(!include_path.ends_with("/"))
             include_path += "/";
-
         std::string shared_ext = ".so";
 #ifdef _WIN32
         shared_ext = ".dll";
 #endif
-
         std::string module_path_so = module_path + "modules/" + src + "/" + module_name + shared_ext;
-
         std::string msys2prefix;
 #ifdef _WIN32
         msys2prefix = std::getenv("MSYSTEM_PREFIX");
@@ -913,7 +910,6 @@ namespace mxvm {
             msys2prefix = "";
         }
 #endif
-
         std::string module_src = msys2prefix+include_path + src + "/" + src + ".mxvm";
         std::fstream file;
         file.open(module_src, std::ios::in);
