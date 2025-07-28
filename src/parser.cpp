@@ -908,7 +908,7 @@ namespace mxvm {
         msys2prefix = std::getenv("MSYSTEM_PREFIX");
         size_t pos = msys2prefix.find("/msys64/");
         if (pos != std::string::npos) {
-            msys2prefix = mys2prefix.substr(0, pos + 8); 
+            msys2prefix = msys2prefix.substr(0, pos + 8); 
         }
 #endif
 
