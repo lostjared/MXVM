@@ -612,7 +612,7 @@ namespace mxvm {
                 throw mx::Exception("Could not validate variables/functions\n");
             }
             
-            if(program->object == false && mxvm::html_mode) {
+            if(mxvm::html_mode) {
                 std::fstream ofile;
                 ofile.open(ast->name + ".html", std::ios::out);
                 if(ofile.is_open()) {
