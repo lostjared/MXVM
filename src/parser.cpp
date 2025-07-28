@@ -903,7 +903,10 @@ namespace mxvm {
         std::string shared_ext = ".so";
 #ifdef _WIN32
         shared_ext = ".dll";
+#elif defined(__APPLE__)
+        shared_ext = ".dylib";
 #endif
+
         std::string module_path_so = module_path + "modules/" + src + "/" + module_name + shared_ext;
         std::string msys2prefix;
 #ifdef _WIN32
