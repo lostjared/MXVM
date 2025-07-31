@@ -1,0 +1,19 @@
+
+program Comments {
+
+    section object {
+        ReadFile
+    } section data {
+        string value = "test"
+    }
+
+    section code {
+    start:
+        call ReadFile.readFile
+        print ReadFile.output, ReadFile.buffer
+        print value
+    stop:
+        free ReadFile.buffer
+        done
+    }
+}

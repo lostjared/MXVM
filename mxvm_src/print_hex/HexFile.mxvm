@@ -1,4 +1,4 @@
-object HexFile {
+mobject HexFile {
 
     section module { io  }
 

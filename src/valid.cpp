@@ -20,308 +20,246 @@ namespace mxvm {
         scanner.scan();
         std::unordered_map<std::string, std::string> labels;
         collect_labels(labels);
-        next(); 
-        if(match("program")) {
+
+        auto skipSeparators = [&]() {
+            while (true) {
+                if (!token) break;
+                if (match("\n") || match(";") || token->getTokenValue().rfind("//", 0) == 0) {
+                    if (!next()) break;
+                    continue;
+                }
+                break;
+            }
+        };
+
+        next();
+        skipSeparators();
+        if (match("program")) {
             next();
-        } 
-        else {
+        } else {
             require("object");
             next();
         }
-        require(types::TokenType::TT_ID); next();
-        require("{"); next();
+
+        skipSeparators();
+        require(types::TokenType::TT_ID);
+        next();
+        skipSeparators();
+        require("{");
+        next();
 
         std::unordered_map<std::string, Variable> vars;
-        vars["stdout"] = Variable();
-        vars["stdout"].var_name = "stdout";
-        vars["stdin"] = Variable();
-        vars["stdin"].var_name = "stdin";
-        vars["stderr"] = Variable();
-        vars["stderr"].var_name = "stderr";
+        for (auto &name : { "stdout", "stdin", "stderr" }) {
+            vars[name] = Variable();
+            vars[name].var_name = name;
+        }
 
-        while (token->getTokenValue() != "}") {
-            require("section"); next();
+        skipSeparators();
+        while (!match("}")) {
+            skipSeparators();
+            require("section");
+            next();
+            skipSeparators();
             require(types::TokenType::TT_ID);
-            std::string sectionName = token->getTokenValue(); next();
-            require("{"); next();
+            std::string sectionName = token->getTokenValue();
+            next();
+            skipSeparators();
+            require("{");
+            next();
 
-            if(sectionName == "module" || sectionName == "object") {
-                while(token->getTokenValue() != "}") {
-                    if(token->getTokenType() == types::TokenType::TT_ID) {
+            if (sectionName == "module" || sectionName == "object") {
+                skipSeparators();
+                while (!match("}")) {
+                    skipSeparators();
+                    if (match(types::TokenType::TT_ID)) {
                         next();
-                        if(match(",")) {
+                        skipSeparators();
+                        if (match(",")) {
                             next();
                             continue;
-                        } else if(match("}")) {
-                            next();
-                            break;
                         }
-                    } else {
-                        throw mx::Exception("Requires " + sectionName + " name on line: " + std::to_string(token->getLine()));
+                        continue;
                     }
+                    break;
                 }
+                skipSeparators();
+                require("}");
+                next();
             }
-            else if (sectionName == "data")  {
-                while (token->getTokenValue() != "}") {
-                    if (token->getTokenType() == types::TokenType::TT_ID &&
-                        (token->getTokenValue() == "int" || token->getTokenValue() == "string" || token->getTokenValue() == "float" || token->getTokenValue() == "ptr" || token->getTokenValue() == "byte"))
+            else if (sectionName == "data") {
+                skipSeparators();
+                while (!match("}")) {
+                    skipSeparators();
+                    if (match(types::TokenType::TT_ID) &&
+                        (token->getTokenValue() == "int" ||
+                        token->getTokenValue() == "string" ||
+                        token->getTokenValue() == "float" ||
+                        token->getTokenValue() == "ptr" ||
+                        token->getTokenValue() == "byte"))
                     {
-                        Variable value;
                         std::string vtype = token->getTokenValue();
-
-                        next(); 
-
-                        require(types::TokenType::TT_ID); 
-                        value.var_name = token->getTokenValue();
-                        vars[value.var_name] = value;
                         next();
-                        if(match(",") && vtype == "string") {
-                            next();
-                             if(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX)) {
-                                next();
-                                continue;
-                             } else {
-                                throw mx::Exception("Syntax Error: string buffer, requires number for size on line " + std::to_string(token->getLine()));
-                             }
-                        } else {
-                            require("="); next();
-                            if(match("-"))
-                                next();
+                        skipSeparators();
 
-                            if(vtype == "byte") {   
-                                if(vtype == "byte" && (token->getTokenType() == types::TokenType::TT_HEX || token->getTokenType() == types::TokenType::TT_NUM)) {
-                                    int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
-                                    if(value < 0 || value > 0xFF) {
-                                        throw mx::Exception("Syntax Error: byte must be a valid byte 0-255 on line: " + std::to_string(token->getLine()));                               
-                                    }
-                                } else if(vtype == "byte"  && token->getTokenType() != types::TokenType::TT_HEX  && token->getTokenType() != types::TokenType::TT_NUM) {
-                                    throw mx::Exception("Syntax Error: byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
-                                }
+                        require(types::TokenType::TT_ID);
+                        std::string vname = token->getTokenValue();
+                        vars[vname].var_name = vname;
+                        next();
+                        skipSeparators();
+
+                        if (match(",") && vtype == "string") {
+                            next();
+                            skipSeparators();
+                            if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX)) {
                                 next();
-                            } else if (token->getTokenValue() == "null"  || token->getTokenType() == types::TokenType::TT_NUM ||
-                                token->getTokenType() == types::TokenType::TT_HEX ||
-                                token->getTokenType() == types::TokenType::TT_STR) {
-                                next();
+                                skipSeparators();
+                                continue;
                             } else {
-                                throw mx::Exception(
-                                    "Syntax Error: Expected value for variable, found: " + token->getTokenValue() +
-                                    " at line " + std::to_string(token->getLine())
-                                );
+                                throw mx::Exception("Syntax Error: string buffer requires number on line " + std::to_string(token->getLine()));
                             }
                         }
-                    }
-                    else if (token->getTokenValue() == "\n" || token->getTokenValue() == ";") {
+
+                        require("=");
                         next();
+                        skipSeparators();
+                        if (match("-")) {
+                            next();
+                            skipSeparators();
+                        }
+
+                        if (vtype == "byte") {
+                            if (!(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX))) {
+                                throw mx::Exception("Syntax Error: byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
+                            }
+                            int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
+                            if (value < 0 || value > 0xFF) {
+                                throw mx::Exception("Syntax Error: byte out of range 0-255 on line: " + std::to_string(token->getLine()));
+                            }
+                            next();
+                            skipSeparators();
+                        } else if (vtype == "string") {
+                            require(types::TokenType::TT_STR);
+                            next();
+                            skipSeparators();
+                        } else if (token->getTokenValue() == "null" ||
+                                match(types::TokenType::TT_NUM) ||
+                                match(types::TokenType::TT_HEX) ||
+                                match(types::TokenType::TT_STR)) {
+                            next();
+                            skipSeparators();
+                        } else {
+                            throw mx::Exception("Syntax Error: Expected value for variable, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
+                        }
                     }
                     else {
-                        throw mx::Exception(
-                            "Syntax Error: Expected variable declaration, found: " + token->getTokenValue() +
-                            " at line " + std::to_string(token->getLine()));
+                        throw mx::Exception("Syntax Error: Expected variable declaration, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
                     }
                 }
-                require("}"); next();
+                skipSeparators();
+                require("}");
+                next();
             }
             else if (sectionName == "code") {
-                while (token->getTokenValue() != "}") {
-                    if (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
+                skipSeparators();
+                const std::vector<std::string> branchOps = {
+                    "call","jmp","je","jne","jg","jl","jge","jle","jz","jnz","ja","jb"
+                };
+                while (!match("}")) {
+                    skipSeparators();
+                    if (match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
+                        next();
+                        skipSeparators();
+                        require(types::TokenType::TT_ID);
+                        next();
+                        skipSeparators();
+                        require(":");
+                        next();
+                        continue;
+                    }
+                    if (match(types::TokenType::TT_ID) && peekIs(":")) {
+                        next();
                         next();
                         continue;
                     }
 
-                    if(match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
-                        next();
-                        if (match(types::TokenType::TT_ID) && peekIs(":")) {
-                            next();
-                            next();
-                            continue;
-                        } else {
-                            throw mx::Exception("Syntax Error: function must be followed by a label at l ine " + std::to_string(token->getLine()));
-                        }
-                    }  else {
-                        if (match(types::TokenType::TT_ID) && peekIs(":")) {
-                            next();
-                            next();
-                            continue;
-                        }
-                    }
-
-                    std::string instr;
-                                     
                     if (match(types::TokenType::TT_ID)) {
                         std::string op = token->getTokenValue();
-                        instr = op;
                         if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
-                            throw mx::Exception(
-                                "Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine())
-                            );
-                        }
-                        if(op == "ret" || op == "done") {
-                            next();
-                            continue;
-                        } else if(op == "call" || op == "jmp" || op == "je" || op == "jne" || op == "jg" || op == "jl" || op == "jge" || op == "jle" || op == "jz" || op == "jnz" || op == "ja" || op == "jb") {
-                            if(next()) {
-                                if(match(types::TokenType::TT_ID)) {
-                                    
-                                    
-                                     /*if(labels.find(label) == labels.end()) {
-                                        throw mx::Exception(
-                                            "Label not found: '" + label +
-                                            "' at line " + std::to_string(token->getLine()) 
-                                        );
-                                    }*/
-                                     
-                                    next();
-                                    if(match(".")) {
-                                        next();
-                                        next();
-                                    }
-                                } else {
-                                    throw mx::Exception(
-                                        "Instruction requires label at line " + std::to_string(token->getLine())
-                                    );
-                                }
-                            } else {
-                                throw mx::Exception("Instruction requires label");                
-                            }
-                            continue;
+                            throw mx::Exception("Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()));
                         }
                         next();
-                    }
-                    else {/*
-                        throw mx::Exception(
-                            "Syntax Error: Expected instruction or label, found: " + token->getTokenValue() +
-                            " at line " + std::to_string(token->getLine())
-                        );*/
-                        lbl_names.push_back(std::make_pair(token->getTokenValue(), *token));
-                    }
-                    
-                    bool firstOperand = true;
-                    while (true) {
-                        if (firstOperand) {
-                            if (match(types::TokenType::TT_ID)) {
-                                scan::TToken var_token = *token;
-                                std::string argName = token->getTokenValue();
-                                std::string object_name = "program";
-                                if(peekIs(".")) {
-                                    object_name = argName;
-                                    next();
-                                    argName = token->getTokenValue();
-                                
-                                }
-                                if ((instr != "invoke" && firstOperand == true)) {
-                                    var_names.push_back(std::make_pair(object_name, var_token));
-                                }
-                            }
+                        skipSeparators();
 
-                            if(match("-") && peekIs(types::TokenType::TT_NUM)) {
+                        if (op == "ret" || op == "done") {
+                            continue;
+                        }
+
+                        if (std::find(branchOps.begin(), branchOps.end(), op) != branchOps.end()) {
+                            require(types::TokenType::TT_ID);
+                            next();
+                            skipSeparators();
+                            if (match(".")) {
                                 next();
-                                if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
-                                    throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
+                                skipSeparators();
+                                require(types::TokenType::TT_ID);
+                                next();
+                                skipSeparators();
+                            }
+                            continue;
+                        }
+
+                        while (true) {
+                            skipSeparators();
+                            if (match(types::TokenType::TT_ID)) {
+                                std::string name = token->getTokenValue();
+                                next();
+                                skipSeparators();
+                                if (match(".")) {
+                                    next();
+                                    skipSeparators();
+                                    require(types::TokenType::TT_ID);
+                                    name += "." + token->getTokenValue();
+                                    next();
+                                    skipSeparators();
                                 }
+                                var_names.emplace_back(name, *token);
+                            } else if (match("-") && peekIs(types::TokenType::TT_NUM)) {
                                 next();
+                                next();
+                            } else if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) {
+                                next();
+                            } else {
                                 break;
                             }
 
-                            if(match("-") && peekIs(types::TokenType::TT_ID)) {
-                                throw mx::Exception("Syntax Error: use neg instruction on variable to negate on line: " + std::to_string(token->getLine()));
-                            }
-
-                            if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
-                                throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
-                            }
-
-                            if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
-                                break; 
-                            }
-
-                        } else {
-                            if (token->getTokenValue() != ",") {
-                                break; 
-                            }
-                            next(); 
-                            
-                            while (token->getTokenValue() == "\n" || token->getTokenValue() == ";" || token->getTokenValue().rfind("//", 0) == 0) {
+                            skipSeparators();
+                            if (match(",")) {
                                 next();
+                                continue;
                             }
-                            
-                            if(match("-") && peekIs(types::TokenType::TT_NUM)) {
-                                next();
-                                if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
-                                    throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
-                                }
-                                next();
-                                break;
-                            }
-
-                            if(match("-") && peekIs(types::TokenType::TT_ID)) {
-                                throw mx::Exception("Syntax Error: use neg instruction on variable to negate on line: " + std::to_string(token->getLine()));
-                            }
-
-
-                            if(match(types::TokenType::TT_NUM) && token->getTokenValue().find(".") != std::string::npos) {
-                                throw mx::Exception("Syntax Error: constant float values are not allowed in instructions use a variable. on line: " + std::to_string(token->getLine()));
-                            }
-
-
-                            if (!(match(types::TokenType::TT_ID) || match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR))) {
-                                throw mx::Exception(
-                                    "Syntax Error: Expected operand after comma at line " + std::to_string(token->getLine())
-                                );
-                            }
-
-                      
-                            if (match(types::TokenType::TT_ID)) {
-                                std::string argName = token->getTokenValue();
-                                std::string object_name = "program";
-                                if(peekIs(".")) {
-                                    object_name = argName;
-                                    next();
-                                    next();
-                                    argName = token->getTokenValue();
-                                }
-                                if (vars.find(argName) == vars.end()) {
-                                    /*throw mx::Exception(
-                                        "Syntax Error: Argument variable not defined: " + argName +
-                                        " at line " + std::to_string(token->getLine())
-                                    );*/
-
-                                    var_names.push_back(std::make_pair(object_name, *token));
-                                }
-                            }
+                            break;
                         }
-                        
-                        if (match(types::TokenType::TT_NUM)) {
-                            auto v = token->getTokenValue();
-                            if (v.find('e') != std::string::npos || v.find('.') != std::string::npos) {
-                                throw mx::Exception(
-                                    "Syntax Error: Invalid integer constant: " + v +
-                                    " at line " + std::to_string(token->getLine())
-                                );                            }
-                        }
-                        if (match(types::TokenType::TT_HEX)) {
-                            auto v = token->getTokenValue();
-                            if (!v.starts_with("0x") && !v.starts_with("0X")) {
-                                throw mx::Exception(
-                                    "Syntax Error: Invalid hex constant: " + v +
-                                    " at line " + std::to_string(token->getLine())
-                                );
-                            }
-                        }
-                        next(); 
-                        firstOperand = false;
+                        continue;
                     }
+
+                    lbl_names.emplace_back(token->getTokenValue(), *token);
+                    next();
                 }
-                require("}"); next();
+                skipSeparators();
+                require("}");
+                next();
             }
             else {
-                throw mx::Exception("Syntax Error: Unknown section: " + sectionName +
-                    " at line " + std::to_string(token->getLine())
-                );
+                throw mx::Exception("Syntax Error: Unknown section: " + sectionName + " at line " + std::to_string(token->getLine()));
             }
+            skipSeparators();
         }
+
+        skipSeparators();
         require("}");
         return true;
     }
+
 
     bool Validator::match(const std::string &m) {
         if(token->getTokenValue() != m)
