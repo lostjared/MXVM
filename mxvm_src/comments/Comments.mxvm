@@ -4,16 +4,35 @@ program Comments {
     section object {
         ReadFile
     } section data {
-        string value = "test"
+        byte value = 0
+        int index = 0
+        byte sign = 0x23
+        byte newline = 0xa
+        string print_out = "%c"
     }
 
     section code {
     start:
         call ReadFile.readFile
-        print ReadFile.output, ReadFile.buffer
-        print value
+    loop:
+            load value, ReadFile.buffer, index, 1
+            cmp value, 0
+            je stop
+
+            cmp value, sign
+            je skip
+            add index, 1
+            print print_out, value
+            jmp loop
+    skip:
+            add index, 1
+            load value, ReadFile.buffer,index, 1
+            cmp value, newline
+            add index, 1
+            je loop
+            jmp skip
     stop:
-        free ReadFile.buffer
-        done
+            free ReadFile.buffer
+            done
     }
 }

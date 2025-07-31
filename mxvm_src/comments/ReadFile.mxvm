@@ -1,6 +1,8 @@
+# this wil read file into a buffer
+# dont forget to free buffer
 object ReadFile {
 
-    section module { io }
+    section module { io } #io module
 
     section data {
         string file_name, 255
@@ -19,7 +21,6 @@ object ReadFile {
     function readFile:
         print prompt
         getline file_name
-        print file_name
         invoke fopen, file_name, file_mode
         return fptr
         cmp fptr,  0
@@ -33,7 +34,7 @@ object ReadFile {
         invoke fread, buffer, 1, file_size, fptr
         cmp buffer, 0
         je error_not_found
-        store zero_byte, buffer, file_size, 1
+        store zero_byte, buffer, file_size, 1 
     stop:
         invoke fclose, fptr
         ret
@@ -41,6 +42,5 @@ object ReadFile {
         invoke fprintf, stderr, file_err1
         exit 1
     }
-
-
 }
+
