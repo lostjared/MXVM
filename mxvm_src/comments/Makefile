@@ -9,7 +9,7 @@ SRC_MXVM=ReadFile.mxvm Comments.mxvm
 OBJ_S=$(SRC_MXVM:.mxvm=.s)
 OBJ_O=$(SRC_MXVM:.mxvm=.o)
 
-TARGET=print-hex
+TARGET=strip-py-comments
 
 .PHONY: all clean
 
