@@ -16,16 +16,14 @@ program Comments {
         call ReadFile.readFile
     loop:
             load value, ReadFile.buffer, index, 1
+            add index, 1
             cmp value, 0
             je stop
-
             cmp value, sign
             je skip
-            add index, 1
             print print_out, value
             jmp loop
     skip:
-            add index, 1
             load value, ReadFile.buffer,index, 1
             cmp value, newline
             add index, 1
