@@ -203,7 +203,6 @@ namespace mxvm {
         prog->object_external = true;
         prog->filename = path + src + ".mxvm";
         if(parser->generateProgramCode(parser_mode, prog)) {
-            std::cout << "Proram->name: " << program->name << "\n";
             program->objects.push_back(std::move(prog));
         }
         file.close();
