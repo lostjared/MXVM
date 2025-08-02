@@ -675,11 +675,28 @@ namespace mxvm {
             
             if (mode == Mode::MODE_COMPILE) {
                 std::set<std::string> generated_objects;
-                for (auto& obj : program->objects) {
-                    if (generated_objects.insert(obj->name).second) {
-                        generateObjectAssemblyFile(obj);
+
+            
+                std::function<void(std::unique_ptr<Program>&)> compileAllObjects;
+                compileAllObjects = 
+                    [&](std::unique_ptr<Program>& p) {
+                    if (!p) return;
+                    for (auto& obj : p->objects) {
+                        if (obj && generated_objects.find(obj->name) == generated_objects.end()) {
+                            generateObjectAssemblyFile(obj);
+                            generated_objects.insert(obj->name);
+                            if(html_mode) {
+                                std::ofstream htmlFile(obj->name + ".html");
+                                if(htmlFile.is_open()) {
+                                    generateDebugHTML(htmlFile, obj);
+                                    std::cout << "MXVM: Generated Debug HTML for: " << obj->name << "\n";
+                                }
+                            }
+                        }
+                        compileAllObjects(obj);
                     }
-                }
+                };
+                compileAllObjects(program);
             }
 
             if (program->object == false) { 

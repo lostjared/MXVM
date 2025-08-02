@@ -427,7 +427,7 @@ namespace mxvm {
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";
-        std::cout << "MXVM: Compiled: " << name << mainFunc << "\n";
+        std::cout << "MXVM: Compiled: " << name << ".s"  << mainFunc << "\n";
     }
 
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {

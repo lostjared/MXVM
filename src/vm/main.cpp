@@ -227,6 +227,11 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
                 program->generateCode(program->object, file);
+                std::ofstream  htmlFile(program->name + ".html");
+                if(htmlFile.is_open()) {
+                    parser.generateDebugHTML(htmlFile, program);
+                    std::cout << "MXVM: Generated Debug HTML for: " << program->name << "\n";
+                }
                 file.close();
             }
         } else {
