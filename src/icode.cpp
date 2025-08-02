@@ -39,13 +39,13 @@ namespace mxvm {
         add_variable("stdin", vstdin);
         add_variable("stderr", vstderr);
 
-        add_extern("string", "strlen");
-        add_extern("main", "printf");
-        add_extern("main", "calloc");
-        add_extern("main", "free");
-        add_extern("main", "exit");
-        add_extern("main", "atol");
-        add_extern("main", "atof");
+        add_extern("string", "strlen", true);
+        add_extern("main", "printf", true);
+        add_extern("main", "calloc", true);
+        add_extern("main", "free", true);
+        add_extern("main", "exit", true);
+        add_extern("main", "atol", true);
+        add_extern("main", "atof", true);
     }
 
     void Program::setArgs(const std::vector<std::string> &argv) {
@@ -146,17 +146,17 @@ namespace mxvm {
 
     void Base::add_global(const std::string &name, const Variable &v) {
         if(base != nullptr) {
-            if(base->vars.find(name) == base->vars.end()) {
-                base->vars[name] = v;
+            if(base->globals.find(name) == base->globals.end()) {
+                base->globals[name] = v;
             }
         }
     }
 
-    void Base::add_extern(const std::string &mod, const std::string &name) {
-        ExternalFunction f = {name, mod};
+    void Base::add_extern(const std::string &mod, const std::string &name, bool module) {
+        ExternalFunction f = {name, mod, module};
         auto it = std::find(external.begin(), external.end(),f);
         if(it == external.end())
-            external.push_back({name, mod});   
+            external.push_back({name, mod, module});   
     }
     
     void Base::add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name) {
@@ -307,6 +307,7 @@ namespace mxvm {
  
     }
 
+    
     void Program::generateCode(bool obj, std::ostream &out) {
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
@@ -318,46 +319,57 @@ namespace mxvm {
             var_names.push_back(v.first);
         }
         std::sort(var_names.begin(), var_names.end());
-        for(auto &v :  var_names) {
+        
+        for(auto &v : var_names) {\
+            std::string var_out_name = v;
             if(vars[v].type == VarType::VAR_INTEGER) {
-                out << "\t" << v << ": .quad " << vars[v].var_value.int_value << "\n";
+                out << "\t" << var_out_name << ": .quad " << vars[v].var_value.int_value << "\n";
                 continue;
             }
             if(vars[v].type == VarType::VAR_FLOAT) {
-                out << "\t" << v<< ": .double " << vars[v].var_value.float_value << "\n";
+                out << "\t" << var_out_name << ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
             }
             if(vars[v].type == VarType::VAR_BYTE) {
-                out << "\t" << v << ": .byte " <<  vars[v].var_value.int_value << "\n";
+                out << "\t" << var_out_name << ": .byte " << vars[v].var_value.int_value << "\n";
             }
         }
+        
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_EXTERN) {
-                out << "\t.extern "<< v << "\n";
-            } else if(vars[v].type != VarType::VAR_STRING) {
-                out << "\t.global " << v << "\n";
-            }
+                out << "\t.extern " << v << "\n";
+            } 
         }
+        
         out << ".section .rodata\n";
         for(auto &v : var_names) {
+            
+
             if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
-                out << "\t" << v << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
+                std::string var_out_name =v;
+                out << "\t" << var_out_name << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             } 
         }
 
         for(auto &v : var_names) {
-            if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
+            if(vars[v].is_global) {
                 out << "\t.global " << v << "\n";
             }
         }
 
         out << ".section .bss\n";
         for(auto &v : var_names) {
+            std::string var_out_name = v;
             if(vars[v].type == VarType::VAR_POINTER) {
-                out << "\t.comm " << v << ", 8\n";
+                out << "\t.comm " << var_out_name << ", 8\n";
             } else if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size > 0) {
-                out << "\t.comm " << v << ", " << vars[v].var_value.buffer_size << "\n";
+                out << "\t.comm " << var_out_name << ", " << vars[v].var_value.buffer_size << "\n";
+            }
+        }
+        if(base != nullptr) {
+            for(auto &v : this->base->globals) {
+                out << "\t.extern " << v.first << "\n";
             }
         }
         out << ".section .text\n";
@@ -368,7 +380,7 @@ namespace mxvm {
 
         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
-                out << "\t.global " << lbl.first << "\n";
+                out << "\t.global " << name << "_" << lbl.first << "\n";
             }
         }
         std::sort(external.begin(), external.end(), [](const ExternalFunction &a, const ExternalFunction &b) {
@@ -379,18 +391,12 @@ namespace mxvm {
 
 
         for(auto &e : external) {
-            out << "\t.extern " << e.name << "\n";
+            if(e.module == true)
+                out << "\t.extern " << e.name << "\n";
+            else
+                out << "\t.extern " << e.mod << "_" << e.name << "\n";
         }
-        
-        /*for(auto &o : this->objects) {
-            for(auto l : o->labels) {
-                if(l.second.second) {
-                    out << "\t.extern " << l.first << "\n";
-                }
-            }
-        }*/
-
-        // rest of text
+    
         if(this->object) 
             out << name << ":\n";
         else
@@ -398,15 +404,14 @@ namespace mxvm {
 
         out << "\tpush %rbp\n";
         out << "\tmov %rsp, %rbp\n";
-        // main function
-
+    
         bool done_found = false;
 
         for(size_t i = 0; i < inc.size(); ++i) {
             const Instruction &instr = inc[i];
             if(labels_.find(i) != labels_.end()) {
                 if(labels[labels_[i]].second == true) {
-                    out << labels_[i] << ":\n";
+                    out << name << "_" << labels_[i] << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
 
@@ -605,7 +610,21 @@ namespace mxvm {
 
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
-            out << "\tcall " << i.op1.op << "\n";
+            bool found_in_object = false;
+            for(auto &obj : objects) {
+                if(obj->isFunctionValid(i.op1.op)) {
+                    out << "\tcall " << obj->name << "_" << i.op1.op << "\n";
+                    found_in_object = true;
+                    break;
+                }
+            }
+            if(!found_in_object) {
+                if(this->object) {
+                    out << "\tcall " << name << "_" << i.op1.op << "\n";
+                } else {
+                    out << "\tcall " << i.op1.op << "\n";
+                }
+            }
         } else {
             throw mx::Exception("function label for call: " + i.op1.op + " not found.\n");
         }
@@ -1872,6 +1891,7 @@ namespace mxvm {
     }
 
     bool Program::isVariable(const std::string& name) {
+
         if(vars.find(name) != vars.end())
             return true;
 

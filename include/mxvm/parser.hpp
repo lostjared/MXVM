@@ -78,6 +78,7 @@ namespace mxvm {
     struct ExternalFunction {
         std::string name;
         std::string mod;
+        bool module;
         bool operator==(const ExternalFunction &f) {
             return (name == f.name && mod == f.mod);
         }

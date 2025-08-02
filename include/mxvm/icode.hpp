@@ -68,10 +68,11 @@ namespace mxvm {
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
         void add_global(const std::string &name, const Variable &v);
-        void add_extern(const std::string &mod, const std::string &name);
+        void add_extern(const std::string &mod, const std::string &name, bool module);
         void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
+        std::unordered_map<std::string, Variable> globals;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
         std::vector<ExternalFunction> external;
         std::unordered_map<std::string, RuntimeFunction> external_functions;

@@ -96,8 +96,12 @@ namespace mxvm {
                         token->getTokenValue() == "string" ||
                         token->getTokenValue() == "float" ||
                         token->getTokenValue() == "ptr" ||
-                        token->getTokenValue() == "byte"))
+                        token->getTokenValue() == "byte" ||
+                        token->getTokenValue() == "export"))
                     {
+                        if(token->getTokenValue() == "export")
+                            next();
+
                         std::string vtype = token->getTokenValue();
                         next();
                         skipSeparators();

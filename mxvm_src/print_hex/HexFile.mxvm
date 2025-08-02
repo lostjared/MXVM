@@ -26,14 +26,14 @@ object HexFile {
         string filename, 256
         string read_mode = "rb"
         int file_size = 0
-        string err_msg = "Error has occoured.\n"
+        export string err_msg = "Error has occoured.\n"
         string file_open_err = "File could not be opened..\n"
         byte character = 0
         byte dot_char = 46 
         string hex_value = "%02x "
         string prompt = "Enter filename: "
         int loop_index = 0
-        int mod_check = 0
+        export int mod_check = 0
         string newline = "\n"
         byte temp_char = 0
         string character_fmt = "%c"

@@ -59,7 +59,7 @@ namespace mxvm {
             if(m == Mode::MODE_INTERPRET)
                 program->add_runtime_extern(mod_name, mod_name1, "mxvm_" + mod_id + "_" + f.name, f.name);
             else 
-                program->add_extern(mod_name, f.name);
+                program->add_extern(mod_name, f.name,  true);
         }
         return true;
     }
@@ -177,8 +177,7 @@ namespace mxvm {
         }
     }
 
-    void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
-        
+   void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
         std::fstream file;
         std::string path;
         if(object_path.ends_with("/"))
@@ -192,23 +191,41 @@ namespace mxvm {
         }
         std::ostringstream stream;
         stream << file.rdbuf();
+        file.close();
+
         std::unique_ptr<Parser> parser(new Parser(stream.str()));
         parser->module_path = module_path;
         parser->object_path = object_path;
         parser->object_mode = true;
         parser->parser_mode = parser_mode;
         parser->scan();
-        std::unique_ptr<Program> prog(new Program());
-        prog->object = true;
-        prog->object_external = true;
-        prog->filename = path + src + ".mxvm";
-        if(parser->generateProgramCode(parser_mode, prog)) {
-            program->objects.push_back(std::move(prog));
-        }
-        file.close();
-    }
-        
 
+        auto ast = parser->parseAST();
+        if (!ast) return;
+
+        for (const auto& inlineObj : ast->inlineObjects) {
+            auto objProgram = std::make_unique<Program>();
+            objProgram->name = inlineObj->name;
+            objProgram->object = true;
+            objProgram->object_external = true;
+            objProgram->filename = path + src + ".mxvm";
+            for (const auto& section : inlineObj->sections) {
+                auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                if (!sectionNode) continue;
+                
+                if (sectionNode->type == SectionNode::DATA) {
+                    parser->processDataSection(sectionNode, objProgram);
+                } else if (sectionNode->type == SectionNode::CODE) {
+                    parser->processCodeSection(sectionNode, objProgram);
+                } else if (sectionNode->type == SectionNode::MODULE) {
+                    parser->processModuleSection(sectionNode, objProgram);
+                } else if (sectionNode->type == SectionNode::OBJECT) {
+                    parser->processObjectSection(sectionNode, objProgram);
+                }
+            }            
+            program->objects.push_back(std::move(objProgram));
+        }
+    }
     std::unique_ptr<SectionNode> Parser::parseSection(uint64_t& index) {
         index++; 
     
@@ -323,10 +340,18 @@ namespace mxvm {
     }
     
     std::unique_ptr<VariableNode> Parser::parseDataVariable(uint64_t& index) {
-        if (index >= scanner.size()) return nullptr;   
-        auto typeToken = this->operator[](index);
-        std::string typeStr = typeToken.getTokenValue();
+        if (index >= scanner.size()) return nullptr;
         
+        bool is_global = false;
+        auto token = this->operator[](index);
+        if (token.getTokenValue() == "export") {
+            is_global = true;
+            index++;
+            if (index >= scanner.size()) return nullptr;
+            token = this->operator[](index);
+        }
+        
+        std::string typeStr = token.getTokenValue();
         VarType varType;
         if (typeStr == "int") varType = VarType::VAR_INTEGER;
         else if (typeStr == "float") varType = VarType::VAR_FLOAT;
@@ -336,18 +361,14 @@ namespace mxvm {
         else if (typeStr == "byte") varType = VarType::VAR_BYTE;
         else return nullptr;
         
-        index++; 
-    
+        index++;
         if (index >= scanner.size()) return nullptr;
-        
         auto nameToken = this->operator[](index);
         if (nameToken.getTokenType() != types::TokenType::TT_ID) {
             return nullptr;
         }
-        
         std::string varName = nameToken.getTokenValue();
         index++;
-        
         
         if (index < scanner.size() && this->operator[](index).getTokenValue() == "=") {
             index++; 
@@ -368,25 +389,45 @@ namespace mxvm {
                             value = value.substr(1, value.length() - 2);
                         }
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, value);
+                        {
+                            auto node = std::make_unique<VariableNode>(varType, varName, value);
+                            node->is_global = is_global;
+                            return node;
+                        }
                         
                     case types::TokenType::TT_NUM:
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, add_op+value);
+                        {
+                            auto node = std::make_unique<VariableNode>(varType, varName, add_op+value);
+                            node->is_global = is_global;
+                            return node;
+                        }
                         
                     case types::TokenType::TT_HEX:
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, value);
+                        {
+                            auto node = std::make_unique<VariableNode>(varType, varName, value);
+                            node->is_global = is_global;
+                            return node;
+                        }
                         
                     case types::TokenType::TT_ID:
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, value);   
+                        {
+                            auto node = std::make_unique<VariableNode>(varType, varName, value);
+                            node->is_global = is_global;
+                            return node;
+                        }
                     default:
                         index++;
-                        return std::make_unique<VariableNode>(varType, varName, value);
+                        {
+                            auto node = std::make_unique<VariableNode>(varType, varName, value);
+                            node->is_global = is_global;
+                            return node;
+                        }
                 }
             }
-        } else if(index < scanner.size()  && this->operator[](index).getTokenValue() == "," && varType == VarType::VAR_STRING) {
+        } else if(index < scanner.size() && this->operator[](index).getTokenValue() == "," && varType == VarType::VAR_STRING) {
             index++;
             size_t buf_size = 0;
             if(index < scanner.size()) {
@@ -395,9 +436,14 @@ namespace mxvm {
             if(buf_size == 0) {
                 throw mx::Exception("string buffer: " + varName + " requires valid size");
             }
-            return std::make_unique<VariableNode>(varType, varName, buf_size);
+            auto node = std::make_unique<VariableNode>(varType, varName, buf_size);
+            node->is_global = is_global;
+            return node;
         }
-        return std::make_unique<VariableNode>(varType, varName);
+        
+        auto node = std::make_unique<VariableNode>(varType, varName);
+        node->is_global = is_global;
+        return node;
     }
     
     std::unique_ptr<InstructionNode> Parser::parseCodeInstruction(uint64_t& index) {
@@ -948,11 +994,11 @@ namespace mxvm {
         }
         out << "</table>\n";
 
-        // Recursive call for nested objects
         if (!objPtr->objects.empty()) {
             out << "<section>\n<h4>Nested Objects</h4>\n";
             for (const auto& nestedObj : objPtr->objects) {
-                printObjectHTML(out, nestedObj);
+                if(nestedObj && nestedObj->name != objPtr->name)
+                    printObjectHTML(out, nestedObj);
             }
             out << "</section>\n";
         }
@@ -966,6 +1012,7 @@ namespace mxvm {
                 Variable var;
                 var.type = variableNode->type;
                 var.var_name = variableNode->name;
+                var.is_global = variableNode->is_global;
                 
                 if (variableNode->hasInitializer) {
                     setVariableValue(var, variableNode->type, variableNode->initialValue);
@@ -1215,12 +1262,11 @@ namespace mxvm {
         for (const auto& [labelName, labelInfo] : objProgram->labels) {
             
             if(labelInfo.second && Program::base != nullptr)
-                Program::base->add_extern(objProgram->name, labelName);
+                Program::base->add_extern(objProgram->name, labelName, false);
         }
         
         for (const auto& [varName, var] : objProgram->vars) {
-            std::string externName = objProgram->name + "_" + varName;
-            //mainProgram->addExtern(externName);
+            Program::base->add_global(varName, var);
         }
     }
 }
