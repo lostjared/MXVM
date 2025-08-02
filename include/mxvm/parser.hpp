@@ -31,9 +31,40 @@ namespace mxvm {
 
     enum class Mode { MODE_INTERPRET, MODE_COMPILE };
 
+    class ModuleParser;
+
     class Parser {
+
     public:
+        friend class ModuleParser;
         explicit Parser(const std::string &source);
+        Parser(const Parser& other)
+        : source_file(other.source_file),
+            scanner(other.scanner),
+            validator(other.validator),
+            parser_mode(other.parser_mode),
+            module_path(other.module_path),
+            object_path(other.object_path),
+            include_path(other.include_path),
+            object_mode(other.object_mode),
+            object_name(other.object_name)
+        {}
+
+        Parser& operator=(const Parser& other) {
+            if (this != &other) {
+                source_file = other.source_file;
+                scanner = other.scanner;
+                validator = other.validator;
+                parser_mode = other.parser_mode;
+                module_path = other.module_path;
+                object_path = other.object_path;
+                include_path = other.include_path;
+                object_mode = other.object_mode;
+                object_name = other.object_name;
+            }
+            return *this;
+        }
+
         uint64_t scan();
         void parse();
         auto operator[](size_t pos);
@@ -45,16 +76,16 @@ namespace mxvm {
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);
         void generateObjectAssemblyFile(std::unique_ptr<Program>& objProgram);
         void registerObjectExterns(std::unique_ptr<Program>& mainProgram, const std::unique_ptr<Program>& objProgram);
+        std::string source_file;
+        scan::Scanner scanner;
+        Validator validator;
+        Mode parser_mode = Mode::MODE_INTERPRET;
         std::string module_path = ".";
         std::string object_path = ".";
         std::string include_path = "/usr/local/include/mxvm/modules";
         bool object_mode = false;
         std::string object_name;
-    private:
-        std::string source_file;
-        scan::Scanner scanner;
-        Validator validator;
-        Mode parser_mode = Mode::MODE_INTERPRET;        
+    private:     
         std::unique_ptr<SectionNode> parseSection(uint64_t& index);
         std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);
         std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t& index);
@@ -87,7 +118,28 @@ namespace mxvm {
 
     class ModuleParser {
     public:
-        explicit ModuleParser(const std::string &mod_name, const std::string &source);
+        ModuleParser(const Mode &m, const std::string &mod_name, const std::string &source);
+        
+        ModuleParser(const ModuleParser& other)
+            : functions(other.functions),
+            mod_name(other.mod_name),
+            scanner(other.scanner),
+            index(other.index),
+            token(other.token ? new scan::TToken(*other.token) : nullptr)
+        {}
+
+        ModuleParser& operator=(const ModuleParser& other) {
+            if (this != &other) {
+                functions = other.functions;
+                mod_name = other.mod_name;
+                scanner = other.scanner;
+                index = other.index;
+                if (token) delete token;
+                token = other.token ? new scan::TToken(*other.token) : nullptr;
+            }
+            return *this;
+        }
+
         uint64_t scan();
         bool parse();
         scan::TToken operator[](size_t pos);
@@ -104,6 +156,7 @@ namespace mxvm {
         scan::Scanner scanner;
         uint64_t index = 0;
         scan::TToken *token = nullptr;
+        Mode parser_mode;
     };
 }
 

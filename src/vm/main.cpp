@@ -227,12 +227,14 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
                 program->generateCode(program->object, file);
-                std::ofstream  htmlFile(program->name + ".html");
-                if(htmlFile.is_open()) {
-                    parser.generateDebugHTML(htmlFile, program);
-                    std::cout << "MXVM: Generated Debug HTML for: " << program->name << "\n";
+                if(mxvm::html_mode) {
+                    std::ofstream  htmlFile(program->name + ".html");
+                    if(htmlFile.is_open()) {
+                        parser.generateDebugHTML(htmlFile, program);
+                        std::cout << "MXVM: Generated Debug HTML for: " << program->name << "\n";
+                    }
+                    file.close();
                 }
-                file.close();
             }
         } else {
             std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
@@ -374,7 +376,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
     }
 
     if(mxvm::debug_mode) {
-        if(debug_output.is_open()) {
+        if(debug_output.is_open())  { 
             debug_output.close();
             std::cout << "MXVM: Generated debug information: debug_info.txt\n";
         }

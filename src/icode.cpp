@@ -73,7 +73,7 @@ namespace mxvm {
                 free(i.second.var_value.ptr_value);
                 i.second.var_value.ptr_value = nullptr;
                 if(debug_mode) {
-                    std::cout << "Released Pointer: " << i.first << "\n";
+                    std::cout << " Pointer: " << i.first << "\n";
                 }
             }
         }
@@ -173,6 +173,7 @@ namespace mxvm {
         if(mod_name.empty() || mod.empty() || func_name.empty() || name.empty()) {
             throw mx::Exception("External function missing information.");
         }
+    
         if(base != nullptr) {
             if(base->external_functions.find(name) == base->external_functions.end()) {
                 base->external_functions[name] = RuntimeFunction(mod, func_name);

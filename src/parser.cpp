@@ -13,7 +13,7 @@ namespace mxvm {
     bool instruct_mode = false;
     bool html_mode = false;
 
-    ModuleParser::ModuleParser(const std::string &m, const std::string &source) : mod_name(m), scanner(source) {}
+    ModuleParser::ModuleParser(const Mode &mode, const std::string &m, const std::string &source) : mod_name(m), scanner(source), parser_mode(mode) {}
     
     uint64_t ModuleParser::scan() {
         scanner.scan();
@@ -617,6 +617,7 @@ namespace mxvm {
     }
 
     bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
+        parser_mode = mode;
         try {
             if (!validator.validate(program->filename)) {
                 return false;
@@ -1072,9 +1073,9 @@ namespace mxvm {
         }
         std::ostringstream data;
         data << file.rdbuf();
-        ModuleParser mod_parser(src, data.str());
+        ModuleParser mod_parser(this->parser_mode, src, data.str());
         if(mod_parser.scan() > 0) {
-            if(mod_parser.parse() && mod_parser.generateProgramCode(parser_mode, src, module_path_so, program)) {
+            if(mod_parser.parse() && mod_parser.generateProgramCode(this->parser_mode, src, module_path_so, program)) {
                 return;
             } else {
                 throw mx::Exception("Error parsing module file.\n");
