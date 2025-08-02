@@ -7,7 +7,7 @@ object ReadFile {
     section data {
         string file_name, 255
         string file_mode = "rb"
-        ptr buffer = null
+        export ptr buffer = null
         string prompt = "Enter filename: "
         ptr fptr = null
         string  file_err1 = "Could not open File"

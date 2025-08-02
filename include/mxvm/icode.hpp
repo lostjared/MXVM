@@ -67,12 +67,13 @@ namespace mxvm {
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);
-        void add_global(const std::string &name, const Variable &v);
+        void add_global(const std::string &objname, const std::string &name, const Variable &v);
         void add_extern(const std::string &mod, const std::string &name, bool module);
         void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
+        std::string name;
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
-        std::unordered_map<std::string, Variable> globals;
+        std::unordered_map<std::string, std::pair<std::string, Variable>> globals;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
         std::vector<ExternalFunction> external;
         std::unordered_map<std::string, RuntimeFunction> external_functions;
@@ -89,7 +90,6 @@ namespace mxvm {
   
         Program(Program&& other) noexcept
         : Base(std::move(other)),
-            name(std::move(other.name)),
             filename(std::move(other.filename)),
             objects(std::move(other.objects)),
             object(other.object),
@@ -110,12 +110,14 @@ namespace mxvm {
             other.pc = 0;
             other.running = false;
             other.exitCode = 0;
+            for (auto& var_pair : vars) {
+               var_pair.second.obj_name = name;
+            }
         }
 
         Program& operator=(Program&& other) noexcept {
             if (this != &other) {
                 Base::operator=(std::move(other));
-                name = std::move(other.name);
                 filename = std::move(other.filename);
                 objects = std::move(other.objects);
                 object = other.object;
@@ -135,6 +137,9 @@ namespace mxvm {
                 other.pc = 0;
                 other.running = false;
                 other.exitCode = 0;
+                for (auto& var_pair : vars) {
+                   var_pair.second.obj_name = name;
+                }
             }
             return *this;
         }     
@@ -158,8 +163,7 @@ namespace mxvm {
         void flatten_inc(Program *root, Instruction &i);
         void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
         void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
-        
-        
+        std::string getMangledName(const std::string& var);
     private:
         size_t pc;  
         bool running;

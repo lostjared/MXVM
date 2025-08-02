@@ -65,6 +65,7 @@ namespace mxvm {
         bool hasInitializer;
         size_t buffer_size = 0;
         bool is_global = false;
+        std::string object;
 
         VariableNode(VarType varType, const std::string& varName) 
             : name(varName), type(varType), hasInitializer(false), buffer_size(0) {}

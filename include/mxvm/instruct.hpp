@@ -159,13 +159,14 @@ namespace mxvm {
         std::string var_name;
         Variable_Value var_value;
         bool is_global = false;
+        std::string obj_name;
         Variable() : type(VarType::VAR_NULL), var_name(), var_value() {}
         Variable(const std::string& name, const VarType &vtype, const Variable_Value &value)
         : type(vtype), var_name(name), var_value(value), is_global(false) {}
 
         
         Variable(const Variable& v)
-            : type(v.type), var_name(v.var_name), var_value(v.var_value), is_global(v.is_global) {}
+            : type(v.type), var_name(v.var_name), var_value(v.var_value), is_global(v.is_global), obj_name(v.obj_name) {}
 
         void setExtern(std::string name, void *value) {
             type = VarType::VAR_EXTERN;
@@ -182,6 +183,7 @@ namespace mxvm {
                 var_name = v.var_name;
                 var_value = v.var_value;
                 is_global = v.is_global;
+                obj_name = v.obj_name;
             }
             return *this;
         }

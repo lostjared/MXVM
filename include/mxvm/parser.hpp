@@ -49,6 +49,7 @@ namespace mxvm {
         std::string object_path = ".";
         std::string include_path = "/usr/local/include/mxvm/modules";
         bool object_mode = false;
+        std::string object_name;
     private:
         std::string source_file;
         scan::Scanner scanner;

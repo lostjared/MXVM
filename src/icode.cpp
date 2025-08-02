@@ -10,9 +10,19 @@
 
 namespace mxvm {
 
+    std::string Program::getMangledName(const std::string& var) {
+        if (!isVariable(var)) return var;
+        Variable& v = getVariable(var);
+        if (!v.obj_name.empty())
+            return v.obj_name + "_" + var;
+        else
+            return var;
+    }
+
         
     Base::Base(Base&& other) noexcept
-        : inc(std::move(other.inc))
+        : name(std::move(other.name))
+        , inc(std::move(other.inc))
         , vars(std::move(other.vars))
         , labels(std::move(other.labels))
         , external(std::move(other.external))
@@ -21,6 +31,7 @@ namespace mxvm {
 
     Base& Base::operator=(Base&& other) noexcept {
         if (this != &other) {
+            name = std::move(other.name);
             inc = std::move(other.inc);
             vars = std::move(other.vars);
             labels = std::move(other.labels);
@@ -140,14 +151,16 @@ namespace mxvm {
     }
 
     void Base::add_variable(const std::string &name, const Variable &v) {
-        if(vars.find(name) == vars.end())
+        if(vars.find(name) == vars.end()) {
             vars[name] = v;
+        }
     }
 
-    void Base::add_global(const std::string &name, const Variable &v) {
+    void Base::add_global(const std::string &objname,const std::string &name, const Variable &v) {
         if(base != nullptr) {
             if(base->globals.find(name) == base->globals.end()) {
-                base->globals[name] = v;
+                base->globals[name].second = v;
+                base->globals[name].first = objname;
             }
         }
     }
@@ -320,8 +333,17 @@ namespace mxvm {
         }
         std::sort(var_names.begin(), var_names.end());
         
-        for(auto &v : var_names) {\
-            std::string var_out_name = v;
+        for(auto &v : var_names) {
+            std::string var_out_name;
+            if(vars[v].is_global) {
+                var_out_name = v;
+            } else if(!vars[v].obj_name.empty()) {
+                var_out_name = vars[v].obj_name + "_" + v;
+            } else if(this->object) {
+                var_out_name = name + "_" + v;
+            } else {
+                var_out_name = v;
+            }
             if(vars[v].type == VarType::VAR_INTEGER) {
                 out << "\t" << var_out_name << ": .quad " << vars[v].var_value.int_value << "\n";
                 continue;
@@ -343,10 +365,17 @@ namespace mxvm {
         
         out << ".section .rodata\n";
         for(auto &v : var_names) {
-            
-
             if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
-                std::string var_out_name =v;
+                std::string var_out_name;
+                if(vars[v].is_global) {
+                    var_out_name = v;
+                } else if(!vars[v].obj_name.empty()) {
+                    var_out_name = vars[v].obj_name + "_" + v;
+                } else if(this->object) {
+                    var_out_name = name + "_" + v;
+                } else {
+                    var_out_name = v;
+                }
                 out << "\t" << var_out_name << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             } 
@@ -354,13 +383,22 @@ namespace mxvm {
 
         for(auto &v : var_names) {
             if(vars[v].is_global) {
-                out << "\t.global " << v << "\n";
+                out << "\t.global " << vars[v].obj_name << "_" << v << "\n";
             }
         }
 
         out << ".section .bss\n";
         for(auto &v : var_names) {
-            std::string var_out_name = v;
+            std::string var_out_name;
+            if(vars[v].is_global) {
+                var_out_name = vars[v].obj_name + "_" + v;
+            } else if(!vars[v].obj_name.empty()) {
+                var_out_name = vars[v].obj_name + "_" + v;
+            } else if(this->object) {
+                var_out_name = name + "_" + v;
+            } else {
+                var_out_name = v;
+            }
             if(vars[v].type == VarType::VAR_POINTER) {
                 out << "\t.comm " << var_out_name << ", 8\n";
             } else if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size > 0) {
@@ -388,7 +426,6 @@ namespace mxvm {
             return a.name < b.name;
             return a.mod < b.mod;
         });
-
 
         for(auto &e : external) {
             if(e.module == true)
@@ -561,7 +598,7 @@ namespace mxvm {
 
     void Program::gen_return(std::ostream &out, const Instruction &i) {
         if(isVariable(i.op1.op)) {
-            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else {
             throw mx::Exception("return requires variable\n");
         }
@@ -573,12 +610,12 @@ namespace mxvm {
             if(v.type == VarType::VAR_INTEGER) {
                 generateLoadVar(out, v.type, "%rcx", i.op1);
                 out << "\tnegq %rcx\n";
-                out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+                out << "\tmovq %rcx, " << getMangledName(i.op1.op) << "(%rip)\n";
             } else if(v.type == VarType::VAR_FLOAT) {
                 generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                 out << "\txorpd %xmm1, %xmm1\n";
                 out << "\tsubsd %xmm0, %xmm1\n";
-                out << "\tmovsd %xmm1, " << i.op1.op << "(%rip)\n";
+                out << "\tmovsd %xmm1, " << getMangledName(i.op1.op) << "(%rip)\n";
             } else {
                 throw mx::Exception("neg requires float or integer.");
             }
@@ -647,7 +684,7 @@ namespace mxvm {
                 if (sizeVar.type != VarType::VAR_INTEGER) {
                     throw mx::Exception("ALLOC size must be integer");
                 }
-                out << "\tmovq " << i.op2.op << "(%rip), %rsi\n";
+                out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rsi\n";
             } else {
                 out << "\tmovq $" << i.op2.op << ", %rsi\n";
             }
@@ -660,7 +697,7 @@ namespace mxvm {
                 if (countVar.type != VarType::VAR_INTEGER) {
                     throw mx::Exception("ALLOC count must be integer");
                 }
-                out << "\tmovq " << i.op3.op << "(%rip), %rdi\n";
+                out << "\tmovq " << getMangledName(i.op3.op) << "(%rip), %rdi\n";
             } else {
                 out << "\tmovq $" << i.op3.op << ", %rdi\n";
             }
@@ -669,7 +706,7 @@ namespace mxvm {
         }
         out << "\txor %rax, %rax\n"; 
         out << "\tcall calloc\n";
-        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
     }
 
     void Program::gen_free(std::ostream &out, const Instruction &i) {
@@ -680,7 +717,7 @@ namespace mxvm {
         if (v.type != VarType::VAR_POINTER) {
             throw mx::Exception("FREE argument must be a pointer");
         }
-        out << "\tmovq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tcall free\n";
     }
     void Program::gen_load(std::ostream &out, const Instruction &i) {
@@ -710,18 +747,18 @@ namespace mxvm {
         } else {
             out << "\txor %rcx, %rcx\n";
         }
-        out << "\tmovq " << i.op2.op << "(%rip), %rax\n";
+        out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
         out << "\timul $" << size << ", %rcx, %rcx\n";
         out << "\tadd %rcx, %rax\n";
         if (dest.type == VarType::VAR_INTEGER) {
             out << "\tmovq (%rax), %rdx\n";
-            out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n";
+            out << "\tmovq %rdx, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else if (dest.type == VarType::VAR_FLOAT) {
             out << "\tmovsd (%rax), %xmm0\n";
-            out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+            out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else if(dest.type == VarType::VAR_BYTE) {
             out << "\tmovb (%rax), %r8b\n";
-            out << "\tmovb %r8b, " << i.op1.op << "(%rip)\n";
+            out << "\tmovb %r8b, " << getMangledName(i.op1.op) << "(%rip)\n";
         } 
         else {
             throw mx::Exception("LOAD: unsupported destination type");
@@ -759,18 +796,18 @@ namespace mxvm {
            throw mx::Exception("STORE resize third argument of size count");
         }
 
-        out << "\tmovq " << i.op2.op << "(%rip), %rax\n";
+        out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
         out << "\timulq %rdx, %rcx\n";
         out << "\taddq %rcx, %rax\n";
 
         if (src.type == VarType::VAR_INTEGER) {
-            out << "\tmovq " << i.op1.op << "(%rip), %rdx\n";
+            out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdx\n";
             out << "\tmovq %rdx, (%rax)\n";
         } else if(src.type == VarType::VAR_BYTE) {
-            out << "\tmovb " << i.op1.op << "(%rip), %r8b\n";
+            out << "\tmovb " << getMangledName(i.op1.op) << "(%rip), %r8b\n";
             out << "\tmovb %r8b, (%rax)\n";
         } else if (src.type == VarType::VAR_FLOAT) {
-            out << "\tmovsd " << i.op1.op << "(%rip), %xmm0\n";
+            out << "\tmovsd " << getMangledName(i.op1.op) << "(%rip), %xmm0\n";
             out << "\tmovsd %xmm0, (%rax)\n";
         } else {
             throw mx::Exception("STORE: unsupported source type");
@@ -789,9 +826,9 @@ namespace mxvm {
         if (src.type != VarType::VAR_STRING) {
             throw mx::Exception("to_int: second argument must be a string variable");
         }
-        out << "\tleaq " << i.op2.op << "(%rip), %rdi\n";
+        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdi\n";
         out << "\tcall atol\n";
-        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
     }
 
     void Program::gen_to_float(std::ostream &out, const Instruction &i) {
@@ -806,9 +843,9 @@ namespace mxvm {
         if (src.type != VarType::VAR_STRING) {
             throw mx::Exception("to_float: second argument must be a string variable");
         }
-        out << "\tleaq " << i.op2.op << "(%rip), %rdi\n";
+        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdi\n";
         out << "\tcall atof\n";
-        out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+        out << "\tmovsd %xmm0, " <<getMangledName( i.op1.op) << "(%rip)\n";
     }
         
 
@@ -821,12 +858,12 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
                     out << "\tdivsd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("DIV: unsupported variable type");
                 }
@@ -841,12 +878,12 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
                     out << "\tdivsd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("DIV: unsupported variable type");
                 }
@@ -865,7 +902,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
                     out << "\tcqto\n"; // Sign-extend rax into rdx:rax for idivq
                     out << "\tidivq %rcx\n";
-                    out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n"; // store remainder
+                    out << "\tmovq %rdx, " << getMangledName(i.op1.op) << "(%rip)\n"; // store remainder
                 } else {
                     throw mx::Exception("MOD only supports integer variables");
                 }
@@ -880,7 +917,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
-                    out << "\tmovq %rdx, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rdx, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("MOD only supports integer variables");
                 }
@@ -899,17 +936,17 @@ namespace mxvm {
             throw mx::Exception("GETLINE destination must be a string buffer variable");
         }
         static int over_count = 0;
-        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n"; 
+        out << "\tleaq " << getMangledName(i.op1.op) << "(%rip), %rdi\n"; 
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n"; 
         out << "\tmovq stdin(%rip), %rdx\n"; 
         out << "\tcall fgets\n";
-        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tleaq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tcall strlen\n";
         out << "\tmovq %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
         out << "\tsub $1, %rcx\n";
-        out << "\tleaq " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tleaq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tmovb $0, (%rdi, %rcx, 1)\n";
         out << ".over" << over_count << ": \n";
         over_count++;
@@ -923,7 +960,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
                     out << "\t" << opc << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("Bitwise operations only supported for integer variables");
                 }
@@ -937,7 +974,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
                     out << "\t" << opc << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("Bitwise operations only supported for integer variables");
                 }
@@ -956,7 +993,7 @@ namespace mxvm {
                 }
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                 out << "\tnotq %rax\n";
-                out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
             } else {
                 throw mx::Exception("NOT instruction requires variable");
             }
@@ -969,10 +1006,10 @@ namespace mxvm {
         if (isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
             if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
-                out << "\tmovq " << i.op1.op << "(%rip), %rax\n";
+                out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
             } else if (v.type == VarType::VAR_STRING) {
-                out << "\tleaq " << i.op1.op << "(%rip), %rax\n";
+                out << "\tleaq " << getMangledName(i.op1.op) << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
             } else {
                 throw mx::Exception("PUSH only supports integer or pointer variables");
@@ -992,10 +1029,10 @@ namespace mxvm {
         Variable &v = getVariable(i.op1.op);
         if (v.type == VarType::VAR_INTEGER) {
             out << "\tpopq %rax\n";
-            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
             out << "\tpopq %rax\n";
-            out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+            out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else {
             throw mx::Exception("POP only supports integer or pointer variables");
         }
@@ -1011,7 +1048,7 @@ namespace mxvm {
         }
         generateLoadVar(out, dest.type, "%rax", i.op2);
         out << "\tmovq (%rsp, %rax, 8), " << "%rcx\n";
-        out << "\tmovq %rcx, " << i.op1.op << "(%rip)\n";
+        out << "\tmovq %rcx, " << getMangledName(i.op1.op) << "(%rip)\n";
     }
 
     void Program::gen_stack_store(std::ostream &out, const Instruction &i) {
@@ -1023,14 +1060,14 @@ namespace mxvm {
             throw mx::Exception("stack_store, requires second argument");
         }
         generateLoadVar(out, dest.type, "%rax", i.op2);
-        out << "\tmovq " << i.op1.op << "(%rip), %rcx\n";
+        out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rcx\n";
         out << "\tmovq %rcx, (%rsp, %rax, 8)\n";
     }
 
     void Program::gen_stack_sub(std::ostream &out, const Instruction &i) {
         if (!i.op1.op.empty()) {
             if (isVariable(i.op1.op)) {
-                out << "\tmovq " << i.op1.op << "(%rip), %rcx\n";
+                out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rcx\n";
             } else {
                 out << "\tmovq $" << i.op1.op << ", %rcx\n";
             }
@@ -1049,25 +1086,28 @@ namespace mxvm {
                 throw mx::Exception("Operand expected variable instead I found: " + op.op);
             }
             Variable &v = getVariable(op.op);
+
+          
+            
             std::string reg = getRegisterByIndex(r, v.type);
             switch(v.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovq " << v.obj_name << "_" << op.op << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovsd " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovsd " << v.obj_name << "_" << op.op << "(%rip), " << reg << "\n";
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
                     count = 0;
-                    out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tleaq " << v.obj_name << "_" << op.op << "(%rip), " << reg << "\n";
                 break;
                 case VarType::VAR_BYTE:
                     count = 0;
-                    out << "\tmovzbq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovzbq " << v.obj_name << "_"  << op.op << "(%rip), " << reg << "\n";
                 break;
                 default:
                 break;
@@ -1088,6 +1128,7 @@ namespace mxvm {
                 throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
             }
             Variable &v = getVariable(op.op);
+            
             if(v.type != type && type != VarType::VAR_INTEGER) {
                 std::ostringstream vartype;
                 vartype << v.type << " != " << type << "\n";  
@@ -1097,19 +1138,19 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-                    out << "\tmovq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovq "  << v.obj_name << "_"  << op.op << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
                 case VarType::VAR_BYTE:
-                    out << "\tmovzbq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovzbq " << v.obj_name << "_" << op.op << "(%rip), " << reg << "\n";
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovsd " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tmovsd " << v.obj_name << "_"  << op.op << "(%rip), " << reg << "\n";
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
                     count = 0;
-                    out << "\tleaq " << op.op << "(%rip), " << reg << "\n";
+                    out << "\tleaq " << v.obj_name << "_"  << op.op << "(%rip), " << reg << "\n";
                 break;
                 default:
                 break;
@@ -1137,7 +1178,7 @@ namespace mxvm {
 
     void Program::gen_print(std::ostream &out, const Instruction &i) {
         xmm_offset = 0;
-        out << "\tlea " << i.op1.op << "(%rip), %rdi\n";
+        out << "\tlea " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         std::vector<Operand> args;
         if (!i.op2.op.empty()) args.push_back(i.op2);
         if (!i.op3.op.empty()) args.push_back(i.op3);
@@ -1165,9 +1206,6 @@ namespace mxvm {
                 out << "\tpushq $" << args[idx].op << "\n";
             }
         }
-
-
-
         reg_count = 1;
         for(size_t z = 0; z < args.size() && reg_count < 6; ++z, ++reg_count) {
             total += generateLoadVar(out, reg_count, args[z]);
@@ -1248,13 +1286,13 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_EXTERN:
                 case VarType::VAR_POINTER:
-                out << "\tmovq " << op[0].op << "(%rip), %rdi\n";
+                out << "\tmovq " << getMangledName(op[0].op) << "(%rip), %rdi\n";
                 break;
                 case VarType::VAR_STRING:
-                out << "\tleaq " << op[0].op << "(%rip), %rdi\n";
+                out << "\tleaq " << getMangledName(op[0].op) << "(%rip), %rdi\n";
                 break;
                 case VarType::VAR_BYTE:
-                out << "\tmovzbq " << op[0].op << "(%rip), %rdi\n";
+                out << "\tmovzbq " << getMangledName(op[0].op) << "(%rip), %rdi\n";
                 break;
             default:
                 throw mx::Exception("Argument type not supported yet\n");
@@ -1313,32 +1351,32 @@ namespace mxvm {
                 switch(v.type) {
                     case VarType::VAR_INTEGER:
                         generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);    
-                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                     break;
                     case VarType::VAR_POINTER:
                     case VarType::VAR_EXTERN:
                         generateLoadVar(out, v.type, "%rax", i.op2);    
-                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                     break;
                     case VarType::VAR_FLOAT:
                         generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
-                        out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                        out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
                     break;
 
                     case VarType::VAR_STRING:
                         generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2);
-                        out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                     break;
                     case VarType::VAR_BYTE:
                         generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2);
-                        out << "\tmovb %al, " << i.op1.op << "(%rip)\n";
+                        out << "\tmovb %al, " << getMangledName(i.op1.op) << "(%rip)\n";
                     break;
                 default:
                     throw mx::Exception("type not supported for mov instruction.");
                 }
             } else {
                 if(i.op2.type == OperandType::OP_CONSTANT) {
-                    out << "\tmovq $" << i.op2.op << ", " << i.op1.op <<  "(%rip)\n";
+                    out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1.op) <<  "(%rip)\n";
                 }
             } 
         } else {
@@ -1356,12 +1394,12 @@ namespace mxvm {
                     if(arth == "mul")
                         arth = "imul";
                     out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
                     out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     // not im plement
                     throw mx::Exception("Variable type not impelmented for add function");
@@ -1378,12 +1416,12 @@ namespace mxvm {
                     if(arth == "mul")
                         arth = "imul";
                     out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out,VarType::VAR_FLOAT,"%xmm0", i.op2);
                     generateLoadVar(out,VarType::VAR_FLOAT, "%xmm1", i.op3);
                     out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << i.op1.op << "(%rip)\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1.op) << "(%rip)\n";
                 } else {
                     throw mx::Exception("Variable type not impelmented for add function");
                 }
@@ -1882,6 +1920,10 @@ namespace mxvm {
         if (it != vars.end()) {
             return it->second;
         }
+        auto g = globals.find(n);
+        if(g != globals.end()) {
+            return g->second.second;
+        }
         for(auto &o : objects) {
            if(o->isVariable(n)) {
                 return o->getVariable(n);         
@@ -1894,6 +1936,11 @@ namespace mxvm {
 
         if(vars.find(name) != vars.end())
             return true;
+
+            
+        if(globals.find(name) != globals.end())
+            return true;
+
 
         for(auto &o : objects)  {
             if(o->isVariable(name))

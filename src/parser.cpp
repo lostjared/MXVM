@@ -134,9 +134,11 @@ namespace mxvm {
                         declaration->object = false;
                         declaration->name =  name;
                         mainProgram = std::move(declaration);
+                        object_name = name;
                     } else {
                         declaration->object = true;
                         declaration->name = name;
+                        object_name = name;
                         allDeclarations.push_back(std::move(declaration));
                     }
                 }
@@ -147,6 +149,7 @@ namespace mxvm {
             mainProgram = std::make_unique<ProgramNode>();
             mainProgram->name = name;
             mainProgram->object = false;
+            object_name = name;
         }
         
         for (auto& obj : allDeclarations) {
@@ -654,6 +657,7 @@ namespace mxvm {
                     objProgram->object = true;
                     objProgram->object_external = false;
                     objProgram->filename = program->filename;
+                    object_name = inlineObj->name;
                     
                     for (const auto& section : inlineObj->sections) {
                         auto sectionNode = dynamic_cast<SectionNode*>(section.get());
@@ -697,6 +701,7 @@ namespace mxvm {
                     objProgram->object = true;
                     objProgram->object_external = false;
                     objProgram->filename = program->filename;
+                    object_name = inlineObj->name;
                     
                     for (const auto& section : inlineObj->sections) {
                         auto sectionNode = dynamic_cast<SectionNode*>(section.get());
@@ -1013,7 +1018,7 @@ namespace mxvm {
                 var.type = variableNode->type;
                 var.var_name = variableNode->name;
                 var.is_global = variableNode->is_global;
-                
+                var.obj_name = program->name;          
                 if (variableNode->hasInitializer) {
                     setVariableValue(var, variableNode->type, variableNode->initialValue);
                 } else {
@@ -1259,14 +1264,12 @@ namespace mxvm {
     
     void Parser::registerObjectExterns(std::unique_ptr<Program>& mainProgram, 
                                        const std::unique_ptr<Program>& objProgram) {
-        for (const auto& [labelName, labelInfo] : objProgram->labels) {
-            
+        for (const auto& [labelName, labelInfo] : objProgram->labels) {   
             if(labelInfo.second && Program::base != nullptr)
                 Program::base->add_extern(objProgram->name, labelName, false);
         }
-        
         for (const auto& [varName, var] : objProgram->vars) {
-            Program::base->add_global(varName, var);
+            Program::base->add_global(objProgram->name, varName, var);
         }
     }
 }
