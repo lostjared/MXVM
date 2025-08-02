@@ -1,4 +1,22 @@
-mobject HexFile {
+
+object PrintValue {
+
+    section module { io }
+    section data {
+        int x = 0
+        int y = 0
+        string hello = "Hello World"
+    }
+    section code {
+    function hello_world:
+        print hello
+        ret 
+    }
+}
+
+
+object HexFile {
+    section  object { PrintValue }
 
     section module { io  }
 

@@ -18,7 +18,6 @@ namespace mxvm {
         return oss.str();
     }
 
-    
     void SectionNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }
@@ -33,6 +32,7 @@ namespace mxvm {
         return oss.str();
     }
 
+    
     
     void InstructionNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);

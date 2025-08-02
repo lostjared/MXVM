@@ -5,6 +5,7 @@
 #include"mxvm/icode.hpp"
 #include<unordered_map>
 #include<fstream>
+#include<set>
 
 namespace mxvm {
 
@@ -115,59 +116,44 @@ namespace mxvm {
     }
 
     std::unique_ptr<ProgramNode> Parser::parseAST() {
-        auto program = std::make_unique<ProgramNode>();
-
+        std::unique_ptr<ProgramNode> mainProgram = nullptr;
+        std::vector<std::unique_ptr<ProgramNode>> allDeclarations;
+        std::string name;
         for (uint64_t i = 0; i < scanner.size(); ++i) {
             auto token = this->operator[](i);
-
-            if (token.getTokenValue() == "\n" || token.getTokenValue() == " ") {
-                continue;
-            }
-
             std::string tokenValue = token.getTokenValue();
+            
+            if(i+1 < scanner.size())
+                name = this->operator[](i+1).getTokenValue();
 
             if (tokenValue == "program" || tokenValue == "object") {
-                i++;
-                if (i < scanner.size()) {
-                    std::string program_name;
-                    auto nameToken = this->operator[](i);
-                    program_name = nameToken.getTokenValue();
-                    program->name = program_name; 
-                    program->object = (tokenValue == "program") ? false : true;
-                   if(program->object == false) 
-                        Program::root_name = program_name;     
 
-                }
-                i++;
-                if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {
-                    i++;                
-                    while (i < scanner.size()) {
-                        auto innerToken = this->operator[](i);
-                        std::string innerValue = innerToken.getTokenValue();
-                        if (innerValue == "}") {
-                            i++; 
-                            break;
-                        }
-                        if (innerValue == "section") {
-                            auto section = parseSection(i);
-                            if (section) {
-                                program->addSection(std::move(section));
-                            }
-                            continue;
-                        }
-                        i++;
+                auto declaration = parseProgramOrObject(i);
+                if (declaration) {
+                    if (tokenValue == "program") {
+                        declaration->object = false;
+                        declaration->name =  name;
+                        mainProgram = std::move(declaration);
+                    } else {
+                        declaration->object = true;
+                        declaration->name = name;
+                        allDeclarations.push_back(std::move(declaration));
                     }
-                }
-                break; 
-            }
-            else if (tokenValue == "section") {
-                auto section = parseSection(i);
-                if (section) {
-                    program->addSection(std::move(section));
                 }
             }
         }
-        return program;
+        
+        if (!mainProgram) {
+            mainProgram = std::make_unique<ProgramNode>();
+            mainProgram->name = name;
+            mainProgram->object = false;
+        }
+        
+        for (auto& obj : allDeclarations) {
+            mainProgram->addInlineObject(std::move(obj));
+        }
+        
+        return mainProgram;
     }
     
     std::unique_ptr<ObjectNode> Parser::parseObject(uint64_t &index) {
@@ -192,6 +178,7 @@ namespace mxvm {
     }
 
     void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
+        
         std::fstream file;
         std::string path;
         if(object_path.ends_with("/"))
@@ -201,7 +188,7 @@ namespace mxvm {
 
         file.open(path + src + ".mxvm", std::ios::in);
         if(!file.is_open()) {
-            throw mx::Exception("Could not open: " + path + src + ".mxvm");
+            return;
         }
         std::ostringstream stream;
         stream << file.rdbuf();
@@ -212,8 +199,11 @@ namespace mxvm {
         parser->parser_mode = parser_mode;
         parser->scan();
         std::unique_ptr<Program> prog(new Program());
-        program->object = true;
+        prog->object = true;
+        prog->object_external = true;
+        prog->filename = path + src + ".mxvm";
         if(parser->generateProgramCode(parser_mode, prog)) {
+            std::cout << "Proram->name: " << program->name << "\n";
             program->objects.push_back(std::move(prog));
         }
         file.close();
@@ -580,7 +570,7 @@ namespace mxvm {
 
     bool Parser::generateProgramCode(const Mode &mode, std::unique_ptr<Program> &program) {
         try {
-            if(!validator.validate()) {
+            if (!validator.validate(program->filename)) {
                 return false;
             }
         } catch (mx::Exception &e) {
@@ -589,44 +579,118 @@ namespace mxvm {
         }
         
         auto ast = parseAST();
-        if(ast) {
-            program->name = ast->name;
-            program->object = ast->object;
-
-            for (const auto& section : ast->sections) {
-                auto sectionNode = dynamic_cast<SectionNode*>(section.get());
-                if (!sectionNode) continue;
-                
-                if (sectionNode->type == SectionNode::DATA) {
-                    processDataSection(sectionNode, program);
-                } else if (sectionNode->type == SectionNode::CODE) {
-                    processCodeSection(sectionNode, program);
-                } else if(sectionNode->type == SectionNode::MODULE) {
-                    processModuleSection(sectionNode, program);
-                } else if(sectionNode->type == SectionNode::OBJECT) {
-                    processObjectSection(sectionNode, program);
-                }
-            }
-
-            if(!program->validateNames(validator)) {
-                throw mx::Exception("Could not validate variables/functions\n");
+        if (ast) {
+            
+            if (ast->sections.empty() && ast->inlineObjects.size() == 1) {
+                auto* temp = ast->inlineObjects[0].release();
+                ast.reset(temp);
             }
             
-            if(mxvm::html_mode) {
-                std::fstream ofile;
-                ofile.open(ast->name + ".html", std::ios::out);
-                if(ofile.is_open()) {
-                    if(generateDebugHTML(ofile, program)) {
-                        std::cout << "MXVM: Generated Debug Information: " << ast->name + ".html\n";
+            program->name = ast->name;
+            if(!ast->root_name.empty()) { 
+                program->root_name = ast->root_name;
+                program->name = ast->root_name;
+                program->object = false;
+            } else {
+                program->object = true;
+            }
+            
+             int objectCount = ast->inlineObjects.size();
+
+            if (program->object == false && objectCount > 0) {
+                
+                if (debug_mode) {
+                    std::cout << "File contains only objects (" << objectCount << " found)" << std::endl;
+                }
+                
+                for (const auto& inlineObj : ast->inlineObjects) {
+                    auto objProgram = std::make_unique<Program>();
+                    objProgram->name = inlineObj->name;
+                    objProgram->object = true;
+                    objProgram->object_external = false;
+                    objProgram->filename = program->filename;
+                    
+                    for (const auto& section : inlineObj->sections) {
+                        auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                        if (!sectionNode) continue;
+                        
+                        if (sectionNode->type == SectionNode::DATA) {
+                            processDataSection(sectionNode, objProgram);
+                        } else if (sectionNode->type == SectionNode::CODE) {
+                            processCodeSection(sectionNode, objProgram);
+                        } else if (sectionNode->type == SectionNode::MODULE) {
+                            processModuleSection(sectionNode, objProgram);
+                        } else if(sectionNode->type == SectionNode::OBJECT) {
+                            processObjectSection(sectionNode, objProgram);
+                        }
                     }
-                    ofile.close();
+                    
+                   program->objects.push_back(std::move(objProgram));
                 }
             }
-            return true;
-        }
-        return false;
-    }
+            else {
+                
+                for (const auto& section : ast->sections) {
+                    auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                    if (!sectionNode) continue;
+                        
+                    if (sectionNode->type == SectionNode::DATA) {
+                        processDataSection(sectionNode, program);
+                    } else if (sectionNode->type == SectionNode::CODE) {
+                        processCodeSection(sectionNode, program);
+                    } else if (sectionNode->type == SectionNode::MODULE) {
+                        processModuleSection(sectionNode, program);
+                    } else if (sectionNode->type == SectionNode::OBJECT) {
+                        processObjectSection(sectionNode, program);
+                    }
+                }
+                
+                
+                for (const auto& inlineObj : ast->inlineObjects) {
+                    auto objProgram = std::make_unique<Program>();
+                    objProgram->name = inlineObj->name;
+                    objProgram->object = true;
+                    objProgram->object_external = false;
+                    objProgram->filename = program->filename;
+                    
+                    for (const auto& section : inlineObj->sections) {
+                        auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                        if (!sectionNode) continue;
+                        
+                        if (sectionNode->type == SectionNode::DATA) {
+                            processDataSection(sectionNode, objProgram);
+                        } else if (sectionNode->type == SectionNode::CODE) {
+                            processCodeSection(sectionNode, objProgram);
+                        } else if (sectionNode->type == SectionNode::MODULE) {
+                            processModuleSection(sectionNode, objProgram);
+                        } else if (sectionNode->type == SectionNode::OBJECT) {
+                            processObjectSection(sectionNode, objProgram);
+                        }
+                    }
+                    
+                    registerObjectExterns(program, objProgram);
+                    program->objects.push_back(std::move(objProgram));
+                }
+            }
 
+            
+            if (mode == Mode::MODE_COMPILE) {
+                std::set<std::string> generated_objects;
+                for (auto& obj : program->objects) {
+                    if (generated_objects.insert(obj->name).second) {
+                        generateObjectAssemblyFile(obj);
+                    }
+                }
+            }
+
+            if (program->object == false) { 
+                if (!program->validateNames(validator)) {
+                    throw mx::Exception("Could not validate variables/functions\n");
+                }
+            }
+        }
+        return true;
+    }
     void Parser::collectObjectNames(std::vector<std::pair<std::string, std::string>> &names, const std::unique_ptr<Program> &program) {
         for (const auto& objPtr : program->objects) {
             if (!objPtr) continue;
@@ -1058,6 +1122,75 @@ namespace mxvm {
             if (it != labelMap.end()) {
                 operand.op_value = static_cast<int>(it->second);
             }
+        }
+    }
+
+    std::unique_ptr<ProgramNode> Parser::parseProgramOrObject(uint64_t& i) {
+        auto program = std::make_unique<ProgramNode>();
+        
+        std::string tokenValue = this->operator[](i).getTokenValue();
+        program->object = (tokenValue == "object");
+        i++; 
+        
+        if (i < scanner.size()) {
+            auto nameToken = this->operator[](i);
+            program->name = nameToken.getTokenValue();
+            if(program->object == false)
+                program->root_name = nameToken.getTokenValue();
+            i++;
+        }
+        
+        if (i < scanner.size() && this->operator[](i).getTokenValue() == "{") {
+            i++;
+            
+            while (i < scanner.size()) {
+                auto innerToken = this->operator[](i);
+                std::string innerValue = innerToken.getTokenValue();
+                
+                if (innerValue == "}") {
+                    i++;
+                    break;
+                }
+                
+                if (innerValue == "section") {
+                    auto section = parseSection(i);
+                    if (section) {
+                        program->addSection(std::move(section));
+                    }
+                    continue;
+                }
+                i++;
+            }
+        }
+        
+        return program;
+    }
+
+    void Parser::generateObjectAssemblyFile(std::unique_ptr<Program>& objProgram) {
+        std::string objectFileName = objProgram->name + ".s";
+        std::ofstream objectFile(objectFileName);
+        if (!objectFile.is_open()) {
+            throw mx::Exception("Could not create object assembly file: " + objectFileName);
+        }
+        objProgram->generateCode(objProgram->object, objectFile);
+        
+        objectFile.close();
+        if (debug_mode) {
+            std::cout << "Generated object assembly file: " << objectFileName << std::endl;
+        }
+    }
+    
+    void Parser::registerObjectExterns(std::unique_ptr<Program>& mainProgram, 
+                                       const std::unique_ptr<Program>& objProgram) {
+        for (const auto& [labelName, labelInfo] : objProgram->labels) {
+            
+            if(labelInfo.second && Program::base != nullptr)
+                Program::base->add_extern(objProgram->name, labelName);
+        }
+        
+        for (const auto& [varName, var] : objProgram->vars) {
+            std::string externName = objProgram->name + "_" + varName;
+            //mainProgram->addExtern(externName);
         }
     }
 }

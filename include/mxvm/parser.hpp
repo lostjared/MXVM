@@ -37,10 +37,14 @@ namespace mxvm {
         uint64_t scan();
         void parse();
         auto operator[](size_t pos);
+
         
+        std::unique_ptr<ProgramNode> parseProgramOrObject(uint64_t& index);
         std::unique_ptr<ProgramNode> parseAST();
         bool generateProgramCode(const Mode &m, std::unique_ptr<Program> &program);
-        bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);        
+        bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);
+        void generateObjectAssemblyFile(std::unique_ptr<Program>& objProgram);
+        void registerObjectExterns(std::unique_ptr<Program>& mainProgram, const std::unique_ptr<Program>& objProgram);
         std::string module_path = ".";
         std::string object_path = ".";
         std::string include_path = "/usr/local/include/mxvm/modules";

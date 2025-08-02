@@ -10,6 +10,26 @@
 
 namespace mxvm {
 
+        
+    Base::Base(Base&& other) noexcept
+        : inc(std::move(other.inc))
+        , vars(std::move(other.vars))
+        , labels(std::move(other.labels))
+        , external(std::move(other.external))
+        , external_functions(std::move(other.external_functions)) {
+    }
+
+    Base& Base::operator=(Base&& other) noexcept {
+        if (this != &other) {
+            inc = std::move(other.inc);
+            vars = std::move(other.vars);
+            labels = std::move(other.labels);
+            external = std::move(other.external);
+            external_functions = std::move(other.external_functions);
+        }
+        return *this;
+    }
+
     Program::Program() : pc(0), running(false) {
         Variable vstdout, vstdin, vstderr;
         vstdout.setExtern("stdout", stdout);
@@ -284,7 +304,7 @@ namespace mxvm {
             }
         }
         out << "\n";
-
+ 
     }
 
     void Program::generateCode(bool obj, std::ostream &out) {
@@ -357,17 +377,18 @@ namespace mxvm {
             return a.mod < b.mod;
         });
 
+
         for(auto &e : external) {
             out << "\t.extern " << e.name << "\n";
         }
-
-        for(auto &o : this->objects) {
+        
+        /*for(auto &o : this->objects) {
             for(auto l : o->labels) {
                 if(l.second.second) {
                     out << "\t.extern " << l.first << "\n";
                 }
             }
-        }
+        }*/
 
         // rest of text
         if(this->object) 
@@ -403,6 +424,10 @@ namespace mxvm {
             throw mx::Exception("Program missing done to signal completion.\n");
             
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
+        std::string mainFunc = " Object";
+        if(root_name == name)
+                mainFunc = " Program";
+        std::cout << "MXVM: Compiled: " << name << mainFunc << "\n";
     }
 
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {

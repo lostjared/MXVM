@@ -40,6 +40,7 @@ void process_arguments(Args *args);
 int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
 int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
+void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -189,7 +190,8 @@ int action_translate(std::string_view include_path, std::string_view object_path
     return 0;
 }
 
-int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output) {
+int translate_x64_linux(std::string_view include_path, std::string_view object_path, 
+                        std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
         std::string input_file(input);
@@ -204,28 +206,28 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
         mxvm::Parser parser(stream.str());
         parser.scan();
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        program->filename = input_file;
         program->setMainBase(program.get());
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.include_path =  include_path;
         if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
+            
+            
+            collectAndRegisterAllExterns(program);
+            
+            
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
             std::fstream file;
-
             if(program->root_name == program->name)
                 program->object = false;
             else
                 program->object = true;
-
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
                 program->generateCode(program->object, file);
                 file.close();
-                std::string mainFunc = " Object";
-                 if(program->root_name == program->name)
-                    mainFunc = " Program";
-                std::cout << "MXVM: Compiled: " << program_name << mainFunc << "\n";
             }
         } else {
             std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
@@ -314,6 +316,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
         if(!file.is_open()) {
             throw mx::Exception("Error could not open file: " + input_file);
         }
+        program->filename = input_file;
         std::ostringstream stream;
         stream << file.rdbuf();
         file.close();
@@ -375,5 +378,15 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
         std::cout << "MXVM: Program exited with: " << exitCode << "\n";
     }
     return exitCode;
+}
+
+void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program) {
+    for (const auto& obj : program->objects) {
+        for(auto &lbl : obj->labels) {
+            if(lbl.second.second)
+                mxvm::Program::base->add_extern(program->name, lbl.first);
+
+        }
+    }
 }
 

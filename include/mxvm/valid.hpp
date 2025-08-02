@@ -7,7 +7,7 @@ namespace mxvm {
     class Validator {
     public:
         Validator(const std::string &text) : scanner(text), index(0) {}
-        bool validate();
+        bool validate(const std::string &name);
         void collect_labels(std::unordered_map<std::string, std::string> &labels);
         bool match(const std::string &m);
         void require(const std::string &r);
@@ -16,6 +16,7 @@ namespace mxvm {
         bool next();
         bool peekIs(const std::string &s);
         bool peekIs(const types::TokenType &t);
+        std::string tokenTypeToString(types::TokenType t);
 
         std::vector<std::pair<std::string, scan::TToken>> var_names;
         std::vector<std::pair<std::string, scan::TToken>> lbl_names;
@@ -23,6 +24,7 @@ namespace mxvm {
         scan::Scanner scanner;
         uint64_t index;
         scan::TToken *token;
+        std::string filename;
         
     };
 }

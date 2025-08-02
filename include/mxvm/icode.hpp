@@ -60,6 +60,9 @@ namespace mxvm {
 
     class Base {
     public:
+        Base() = default;
+        Base(Base &&other) noexcept;
+        Base &operator=(Base &&other) noexcept;
         void setMainBase(Base *b) { base = b; }
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
@@ -81,13 +84,66 @@ namespace mxvm {
         friend class Parser;
         Program();
         ~Program();
-        
+    
+  
+        Program(Program&& other) noexcept
+        : Base(std::move(other)),
+            name(std::move(other.name)),
+            filename(std::move(other.filename)),
+            objects(std::move(other.objects)),
+            object(other.object),
+            pc(other.pc),
+            running(other.running),
+            exitCode(other.exitCode),
+            zero_flag(other.zero_flag),
+            less_flag(other.less_flag),
+            greater_flag(other.greater_flag),
+            xmm_offset(other.xmm_offset),
+            args(std::move(other.args)),
+            main_function(other.main_function),
+            object_external(other.object_external),
+            stack(std::move(other.stack)),
+            result(std::move(other.result)),
+            parent(other.parent)
+        {
+            other.pc = 0;
+            other.running = false;
+            other.exitCode = 0;
+        }
+
+        Program& operator=(Program&& other) noexcept {
+            if (this != &other) {
+                Base::operator=(std::move(other));
+                name = std::move(other.name);
+                filename = std::move(other.filename);
+                objects = std::move(other.objects);
+                object = other.object;
+                pc = other.pc;
+                running = other.running;
+                exitCode = other.exitCode;
+                zero_flag = other.zero_flag;
+                less_flag = other.less_flag;
+                greater_flag = other.greater_flag;
+                xmm_offset = other.xmm_offset;
+                args = std::move(other.args);
+                main_function = other.main_function;
+                object_external = other.object_external;
+                stack = std::move(other.stack);
+                result = std::move(other.result);
+                parent = other.parent;
+                other.pc = 0;
+                other.running = false;
+                other.exitCode = 0;
+            }
+            return *this;
+        }     
         void stop();
         int exec();
         void print(std::ostream &out);
         void post(std::ostream &out);
         int getExitCode() const { return exitCode; }
         std::string name;
+        std::string filename;
         void generateCode(bool obj, std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
         void memoryDump(std::ostream &out);
@@ -101,6 +157,8 @@ namespace mxvm {
         void flatten_inc(Program *root, Instruction &i);
         void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
         void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
+        
+        
     private:
         size_t pc;  
         bool running;
@@ -111,6 +169,8 @@ namespace mxvm {
         int xmm_offset = 0;
         std::vector<std::string> args;
         bool main_function;
+        bool object_external = false;
+        
     public:    
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
@@ -206,6 +266,7 @@ namespace mxvm {
         Variable variableFromOperand(const Operand &op);
         Stack stack;
         Operand result;
+        Program *parent = nullptr;
     };
 
     void except_assert(std::string reason, bool value);

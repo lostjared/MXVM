@@ -18,22 +18,6 @@ namespace mxvm {
         virtual std::string toString() const = 0;
     };
 
-    
-    class ProgramNode : public ASTNode {
-    public:
-        std::string name;
-        bool object = true;
-        std::vector<std::unique_ptr<ASTNode>> sections;
-        
-        void addSection(std::unique_ptr<ASTNode> section) {
-            sections.push_back(std::move(section));
-        }
-        
-        void accept(ASTVisitor& visitor) override;
-        std::string toString() const override;
-    };
-
-    
     class SectionNode : public ASTNode {
     public:
         enum SectionType { DATA, CODE, MODULE, OBJECT };
@@ -49,6 +33,28 @@ namespace mxvm {
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
     };
+
+    class ProgramNode : public ASTNode {
+    public:
+        std::string name;
+        bool object = false;
+        std::string root_name;
+        std::vector<std::unique_ptr<SectionNode>> sections;
+        std::vector<std::unique_ptr<ProgramNode>> inlineObjects; 
+
+        void addSection(std::unique_ptr<SectionNode> section) {
+            sections.push_back(std::move(section));
+        }
+
+        void addInlineObject(std::unique_ptr<ProgramNode> obj) {  
+            inlineObjects.push_back(std::move(obj));
+        }
+
+        virtual void accept(ASTVisitor &visitor) override;
+        virtual std::string toString() const override;
+    };
+        
+    
 
     
     class VariableNode : public ASTNode {

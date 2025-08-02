@@ -16,7 +16,8 @@ namespace mxvm {
         }
     }
 
-    bool Validator::validate() {
+    bool Validator::validate(const std::string &name) {
+        filename = name;
         scanner.scan();
         std::unordered_map<std::string, std::string> labels;
         collect_labels(labels);
@@ -24,7 +25,7 @@ namespace mxvm {
         auto skipSeparators = [&]() {
             while (true) {
                 if (!token) break;
-                if (match("\n") || match(";") || token->getTokenValue().rfind("//", 0) == 0) {
+                if ((match("\n")  && !match(types::TokenType::TT_STR)) || match(";") || token->getTokenValue().rfind("//", 0) == 0) {
                     if (!next()) break;
                     continue;
                 }
@@ -115,7 +116,7 @@ namespace mxvm {
                                 skipSeparators();
                                 continue;
                             } else {
-                                throw mx::Exception("Syntax Error: string buffer requires number on line " + std::to_string(token->getLine()));
+                                throw mx::Exception("Syntax Error in file '" + filename + "': string buffer requires number on line " + std::to_string(token->getLine()));
                             }
                         }
 
@@ -129,11 +130,11 @@ namespace mxvm {
 
                         if (vtype == "byte") {
                             if (!(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX))) {
-                                throw mx::Exception("Syntax Error: byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
+                                throw mx::Exception("Syntax Error in file '" + filename + "': byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
                             }
                             int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
                             if (value < 0 || value > 0xFF) {
-                                throw mx::Exception("Syntax Error: byte out of range 0-255 on line: " + std::to_string(token->getLine()));
+                                throw mx::Exception("Syntax Error in file '" + filename + "': byte out of range 0-255 on line: " + std::to_string(token->getLine()));
                             }
                             next();
                             skipSeparators();
@@ -148,11 +149,11 @@ namespace mxvm {
                             next();
                             skipSeparators();
                         } else {
-                            throw mx::Exception("Syntax Error: Expected value for variable, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
+                            throw mx::Exception("Syntax Error in file '" + filename + "': Expected value for variable, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
                         }
                     }
                     else {
-                        throw mx::Exception("Syntax Error: Expected variable declaration, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
+                        throw mx::Exception("Syntax Error in file '" + filename + "': Expected variable declaration, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
                     }
                 }
                 skipSeparators();
@@ -185,7 +186,7 @@ namespace mxvm {
                     if (match(types::TokenType::TT_ID)) {
                         std::string op = token->getTokenValue();
                         if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
-                            throw mx::Exception("Syntax Error: Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()));
+                            throw mx::Exception("Syntax Error in file '" + filename + "': Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()));
                         }
                         next();
                         skipSeparators();
@@ -250,7 +251,7 @@ namespace mxvm {
                 next();
             }
             else {
-                throw mx::Exception("Syntax Error: Unknown section: " + sectionName + " at line " + std::to_string(token->getLine()));
+                throw mx::Exception("Syntax Error in file '" + filename + "': Unknown section: " + sectionName + " at line " + std::to_string(token->getLine()));
             }
             skipSeparators();
         }
@@ -270,7 +271,7 @@ namespace mxvm {
     void Validator::require(const std::string &r) {
         if(r != token->getTokenValue()) 
             throw mx::Exception(
-                "Syntax Error: Required: " + r +
+                "Syntax Error in file '" + filename + "': Required: " + r +
                 " Found: " + token->getTokenValue() +
                 " at line " + std::to_string(token->getLine())
             );
@@ -285,15 +286,16 @@ namespace mxvm {
     void Validator::require(const types::TokenType &t) {
          if(t != token->getTokenType()) 
             throw mx::Exception(
-                "Syntax Error: Required: " + std::to_string(static_cast<int>(t)) +
+                "Syntax Error in file '" + filename + "': Required: " + tokenTypeToString(t) +
                 " instead found: " + token->getTokenValue() +
-                ":" + std::to_string(static_cast<int>(token->getTokenType())) +
+                ":" + tokenTypeToString(token ->getTokenType()) +
                 " at line " + std::to_string(token->getLine())
             );
     }
     
     bool Validator::next() {
-        while (index < scanner.size() && scanner[index].getTokenType() != types::TokenType::TT_STR && scanner[index].getTokenValue() == "\n") {
+
+        while (index < scanner.size() && scanner[index].getTokenType() != types::TokenType::TT_STR && (scanner[index].getTokenValue() == "\n" && scanner[index].getTokenType() == types::TokenType::TT_SYM)) {
             index++;
         }
         if (index < scanner.size()) {
@@ -309,5 +311,17 @@ namespace mxvm {
 
     bool Validator::peekIs(const types::TokenType &t) {
         return index < scanner.size() && scanner[index].getTokenType() == t;
+    }
+
+    std::string Validator::tokenTypeToString(types::TokenType t) {
+        switch (t) {
+            case types::TokenType::TT_ID: return "Identifier";
+            case types::TokenType::TT_NUM: return "Number";
+            case types::TokenType::TT_HEX: return "Hex";
+            case types::TokenType::TT_STR: return "String";
+            case types::TokenType::TT_SYM: return "Symbol";
+            default: return "Unknown";
+        }
+        return "";
     }
 }
