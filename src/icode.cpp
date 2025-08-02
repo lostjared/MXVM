@@ -157,12 +157,9 @@ namespace mxvm {
     }
 
     void Base::add_global(const std::string &objname,const std::string &name, const Variable &v) {
-        if(base != nullptr) {
-            if(base->globals.find(name) == base->globals.end()) {
-                base->globals[name].second = v;
-                base->globals[name].first = objname;
-            }
-        }
+        add_variable(name, v);
+        vars[name].is_global = true;
+        vars[name].obj_name = objname;
     }
 
     void Base::add_extern(const std::string &mod, const std::string &name, bool module) {
@@ -336,7 +333,7 @@ namespace mxvm {
         for(auto &v : var_names) {
             std::string var_out_name;
             if(vars[v].is_global) {
-                var_out_name = v;
+                var_out_name = getMangledName(v);
             } else if(!vars[v].obj_name.empty()) {
                 var_out_name = vars[v].obj_name + "_" + v;
             } else if(this->object) {
@@ -355,24 +352,21 @@ namespace mxvm {
             if(vars[v].type == VarType::VAR_BYTE) {
                 out << "\t" << var_out_name << ": .byte " << vars[v].var_value.int_value << "\n";
             }
-        }
-        
+        }    
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_EXTERN) {
                 out << "\t.extern " << v << "\n";
             } 
         }
-        
-        out << ".section .rodata\n";
         for(auto &v : var_names) {
             if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
                 std::string var_out_name;
                 if(vars[v].is_global) {
-                    var_out_name = v;
+                    var_out_name = getMangledName(v);
                 } else if(!vars[v].obj_name.empty()) {
-                    var_out_name = vars[v].obj_name + "_" + v;
+                    var_out_name = getMangledName(v);
                 } else if(this->object) {
-                    var_out_name = name + "_" + v;
+                    var_out_name = getMangledName(v);
                 } else {
                     var_out_name = v;
                 }
@@ -381,17 +375,48 @@ namespace mxvm {
             } 
         }
 
-        for(auto &v : var_names) {
-            if(vars[v].is_global) {
-                out << "\t.global " << vars[v].obj_name << "_" << v << "\n";
+        
+        if(base != nullptr) {
+            for(auto &v : var_names) {
+                VarType t = Base::base->vars[v].type;
+                if(Base::base->vars[v].is_global) {
+                    switch(t) {
+                        case VarType::VAR_BYTE:
+                        case VarType::VAR_FLOAT:
+                        case VarType::VAR_INTEGER:
+                            out << "\t.extern " << getMangledName(v) << "\n";
+                        break;
+                        default:
+                        break;
+                    }
+                }
+            }
+
+            if(object) {
+                for(auto &v : var_names) {
+                    VarType t = vars[v].type;
+                    if(vars[v].is_global) {
+                        switch(t) {
+                            case VarType::VAR_BYTE:
+                            case VarType::VAR_FLOAT:
+                            case VarType::VAR_INTEGER:
+                                out << "\t.global " << getMangledName(v) << "\n";
+                            break;
+                            default:
+                            break;
+                        }
+                        
+                    }
+                }
             }
         }
+
 
         out << ".section .bss\n";
         for(auto &v : var_names) {
             std::string var_out_name;
             if(vars[v].is_global) {
-                var_out_name = vars[v].obj_name + "_" + v;
+                var_out_name = getMangledName(v);
             } else if(!vars[v].obj_name.empty()) {
                 var_out_name = vars[v].obj_name + "_" + v;
             } else if(this->object) {
@@ -405,12 +430,24 @@ namespace mxvm {
                 out << "\t.comm " << var_out_name << ", " << vars[v].var_value.buffer_size << "\n";
             }
         }
+        
         if(base != nullptr) {
-            for(auto &v : this->base->globals) {
-                out << "\t.extern " << v.first << "\n";
+            for(auto &v : var_names) {
+                if(Base::base->vars[v].is_global && (vars[v].type == VarType::VAR_STRING || vars[v].type == VarType::VAR_POINTER))
+                    out << "\t.extern " << getMangledName(v) << "\n";
+            }
+
+            if(object) {
+                for(auto &v : var_names) {
+                    if(vars[v].is_global && (vars[v].type == VarType::VAR_STRING || vars[v].type == VarType::VAR_POINTER)) {
+                        out << "\t.global " << getMangledName(v) << "\n";
+                    }
+                }
             }
         }
+
         out << ".section .text\n";
+
         if(this->object)
             out << "\t.global " << name << "\n";
         else
@@ -650,17 +687,13 @@ namespace mxvm {
             bool found_in_object = false;
             for(auto &obj : objects) {
                 if(obj->isFunctionValid(i.op1.op)) {
-                    out << "\tcall " << obj->name << "_" << i.op1.op << "\n";
+                    out << "\tcall " << i.op1.object << "_" << i.op1.op << "\n";
                     found_in_object = true;
                     break;
                 }
             }
             if(!found_in_object) {
-                if(this->object) {
-                    out << "\tcall " << name << "_" << i.op1.op << "\n";
-                } else {
-                    out << "\tcall " << i.op1.op << "\n";
-                }
+                out << "\tcall " << i.op1.op << "\n";
             }
         } else {
             throw mx::Exception("function label for call: " + i.op1.op + " not found.\n");
@@ -1920,10 +1953,6 @@ namespace mxvm {
         if (it != vars.end()) {
             return it->second;
         }
-        auto g = globals.find(n);
-        if(g != globals.end()) {
-            return g->second.second;
-        }
         for(auto &o : objects) {
            if(o->isVariable(n)) {
                 return o->getVariable(n);         
@@ -1936,11 +1965,6 @@ namespace mxvm {
 
         if(vars.find(name) != vars.end())
             return true;
-
-            
-        if(globals.find(name) != globals.end())
-            return true;
-
 
         for(auto &o : objects)  {
             if(o->isVariable(name))

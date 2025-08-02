@@ -73,7 +73,6 @@ namespace mxvm {
         std::string name;
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
-        std::unordered_map<std::string, std::pair<std::string, Variable>> globals;
         std::unordered_map<std::string, std::pair<uint64_t, bool>> labels;
         std::vector<ExternalFunction> external;
         std::unordered_map<std::string, RuntimeFunction> external_functions;

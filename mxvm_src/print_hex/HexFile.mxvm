@@ -22,18 +22,18 @@ object HexFile {
 
     section data {
         ptr file_handle = null
-        ptr buffer = null
+        export ptr buffer = null
         string filename, 256
         string read_mode = "rb"
         int file_size = 0
-        export string err_msg = "Error has occoured.\n"
+        string err_msg = "Error has occoured.\n"
         string file_open_err = "File could not be opened..\n"
         byte character = 0
         byte dot_char = 46 
         string hex_value = "%02x "
         string prompt = "Enter filename: "
         int loop_index = 0
-        export int mod_check = 0
+        int mod_check = 0
         string newline = "\n"
         byte temp_char = 0
         string character_fmt = "%c"
@@ -43,7 +43,7 @@ object HexFile {
         ptr ascii_buf = null
         string space_str = "   "
         string ascii_fmt = "|%s|\n"
-        byte null_term = 0
+        export byte null_term = 0
     }
     
     section code {
