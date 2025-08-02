@@ -860,89 +860,103 @@ namespace mxvm {
         if (!program->objects.empty()) {
             out << "<section>\n<h2>Objects</h2>\n";
             for (const auto& objPtr : program->objects) {
-                if (!objPtr) continue;
-                out << "<div style=\"border:1px solid #ccc; margin-bottom:20px; padding:10px; background:#fafafa;\">";
-                out << "<h3>Object: " << objPtr->name << "</h3>\n";
-                out << "<b>Memory:</b><br><table><tr><th>Name</th><th>Type</th><th>Initial Value</th></tr>\n";
-                std::vector<std::pair<std::string, Variable>> objVars;
-                for (const auto& [name, var] : objPtr->vars) {
-                    objVars.push_back({name, var});
-                }
-                std::sort(objVars.begin(), objVars.end(), [](auto& a, auto& b) { return a.first < b.first; });
-                for (const auto& [name, var] : objVars) {
-                    out << "<tr><td>" << name << "</td><td>";
-                    switch (var.type) {
-                        case VarType::VAR_INTEGER: out << "int"; break;
-                        case VarType::VAR_FLOAT: out << "float"; break;
-                        case VarType::VAR_STRING: out << "string"; break;
-                        case VarType::VAR_POINTER: out << "ptr"; break;
-                        case VarType::VAR_LABEL: out << "label"; break;
-                        case VarType::VAR_ARRAY: out << "array"; break;
-                        case VarType::VAR_EXTERN: out << "external"; break;
-                        case VarType::VAR_BYTE: out << "byte"; break;
-                        default: out << "unknown"; break;
-                    }
-                    out << "</td><td>";
-                    switch (var.type) {
-                        case VarType::VAR_INTEGER: out << var.var_value.int_value; break;
-                        case VarType::VAR_FLOAT: out << var.var_value.float_value; break;
-                        case VarType::VAR_STRING: out << Program::escapeNewLines(var.var_value.str_value); break;
-                        case VarType::VAR_POINTER:
-                        case VarType::VAR_EXTERN:
-                            if (var.var_value.ptr_value == nullptr) {
-                                out << "null";
-                            } else {
-                                char ptrbuf[256];
-                                std::snprintf(ptrbuf, sizeof(ptrbuf), "%p", var.var_value.ptr_value);
-                                out << ptrbuf;
-                            }
-                            break;
-                        case VarType::VAR_LABEL: out << var.var_value.label_value; break;
-                        case VarType::VAR_BYTE: out << static_cast<unsigned int>(static_cast<unsigned char>(var.var_value.int_value)); break;
-                        default: out << ""; break;
-                    }
-                    out << "</td></tr>\n";
-                }
-                out << "</table><br>";
-
-                out << "<b>Instructions:</b><br><table><tr><th>Address</th><th>Instruction</th><th>Operands</th></tr>\n";
-                for (size_t addr = 0; addr < objPtr->inc.size(); ++addr) {
-                    const auto& instr = objPtr->inc[addr];
-                    out << "<tr><td class=\"addr\">0x" << std::uppercase << std::hex << addr << std::dec << "</td>";
-                    out << "<td class=\"inst\">" << instr.instruction << "</td><td>";
-                    std::vector<std::string> ops;
-                    if (!instr.op1.op.empty()) ops.push_back(instr.op1.op);
-                    if (!instr.op2.op.empty()) ops.push_back(instr.op2.op);
-                    if (!instr.op3.op.empty()) ops.push_back(instr.op3.op);
-                    for (const auto& vop : instr.vop) {
-                        if (!vop.op.empty()) ops.push_back(vop.op);
-                    }
-                    for (size_t i = 0; i < ops.size(); ++i) {
-                        out << ops[i];
-                        if (i + 1 < ops.size()) out << ", ";
-                    }
-                    out << "</td></tr>\n";
-                }
-                out << "</table><br>";
-
-                out << "<b>Labels:</b><br><table><tr><th>Address</th><th>Name</th></tr>\n";
-                std::vector<std::pair<std::string, std::pair<uint64_t, bool>>> objLbl;
-                for (const auto& [label, addr] : objPtr->labels) {
-                    objLbl.push_back({label, addr});
-                }
-                std::sort(objLbl.begin(), objLbl.end(), [](auto& a, auto& b) { return a.second.first < b.second.first; });
-                for (const auto& [label, addr] : objLbl) {
-                    std::string ltype = addr.second ? "<b>function</b> " : "";
-                    out << "<tr><td class=\"addr\">0x" << std::uppercase << std::hex << addr.first << std::dec << "</td><td>" << ltype << label << "</td></tr>\n";
-                }
-                out << "</table>\n";
-                out << "</div>\n";
+                printObjectHTML(out, objPtr);
             }
             out << "</section>\n";
         }
         out << "<footer style=\"text-align:center;padding:20px;color:#888;\">Generated by <b>MXVM</b></footer>\n";
         out << "</body>\n</html>\n";
         return true;
+    }
+
+        // Add this helper inside Parser::generateDebugHTML
+    void Parser::printObjectHTML(std::ostream &out, const std::unique_ptr<Program> &objPtr) {
+        if (!objPtr) return;
+        out << "<div style=\"border:1px solid #ccc; margin-bottom:20px; padding:10px; background:#fafafa;\">";
+        out << "<h3>Object: " << objPtr->name << "</h3>\n";
+        out << "<b>Memory:</b><br><table><tr><th>Name</th><th>Type</th><th>Initial Value</th></tr>\n";
+        std::vector<std::pair<std::string, Variable>> objVars;
+        for (const auto& [name, var] : objPtr->vars) {
+            objVars.push_back({name, var});
+        }
+        std::sort(objVars.begin(), objVars.end(), [](auto& a, auto& b) { return a.first < b.first; });
+        for (const auto& [name, var] : objVars) {
+            out << "<tr><td>" << name << "</td><td>";
+            switch (var.type) {
+                case VarType::VAR_INTEGER: out << "int"; break;
+                case VarType::VAR_FLOAT: out << "float"; break;
+                case VarType::VAR_STRING: out << "string"; break;
+                case VarType::VAR_POINTER: out << "ptr"; break;
+                case VarType::VAR_LABEL: out << "label"; break;
+                case VarType::VAR_ARRAY: out << "array"; break;
+                case VarType::VAR_EXTERN: out << "external"; break;
+                case VarType::VAR_BYTE: out << "byte"; break;
+                default: out << "unknown"; break;
+            }
+            out << "</td><td>";
+            switch (var.type) {
+                case VarType::VAR_INTEGER: out << var.var_value.int_value; break;
+                case VarType::VAR_FLOAT: out << var.var_value.float_value; break;
+                case VarType::VAR_STRING: out << Program::escapeNewLines(var.var_value.str_value); break;
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    if (var.var_value.ptr_value == nullptr) {
+                        out << "null";
+                    } else {
+                        char ptrbuf[256];
+                        std::snprintf(ptrbuf, sizeof(ptrbuf), "%p", var.var_value.ptr_value);
+                        out << ptrbuf;
+                    }
+                    break;
+                case VarType::VAR_LABEL: out << var.var_value.label_value; break;
+                case VarType::VAR_BYTE: out << static_cast<unsigned int>(static_cast<unsigned char>(var.var_value.int_value)); break;
+                default: out << ""; break;
+            }
+            out << "</td></tr>\n";
+        }
+        out << "</table><br>";
+
+        out << "<b>Instructions:</b><br><table><tr><th>Address</th><th>Instruction</th><th>Operands</th></tr>\n";
+        for (size_t addr = 0; addr < objPtr->inc.size(); ++addr) {
+            const auto& instr = objPtr->inc[addr];
+            out << "<tr><td class=\"addr\">0x" << std::uppercase << std::hex << addr << std::dec << "</td>";
+            out << "<td class=\"inst\">" << instr.instruction << "</td><td>";
+            std::vector<std::string> ops;
+            if (!instr.op1.op.empty()) ops.push_back(instr.op1.op);
+            if (!instr.op2.op.empty()) ops.push_back(instr.op2.op);
+            if (!instr.op3.op.empty()) ops.push_back(instr.op3.op);
+            for (const auto& vop : instr.vop) {
+                if (!vop.op.empty()) ops.push_back(vop.op);
+            }
+            for (size_t i = 0; i < ops.size(); ++i) {
+                out << ops[i];
+                if (i + 1 < ops.size()) out << ", ";
+            }
+            out << "</td></tr>\n";
+        }
+        out << "</table><br>";
+
+        out << "<b>Labels:</b><br><table><tr><th>Address</th><th>Name</th></tr>\n";
+        std::vector<std::pair<std::string, std::pair<uint64_t, bool>>> objLbl;
+        for (const auto& [label, addr] : objPtr->labels) {
+            objLbl.push_back({label, addr});
+        }
+        std::sort(objLbl.begin(), objLbl.end(), [](auto& a, auto& b) { return a.second.first < b.second.first; });
+        for (const auto& [label, addr] : objLbl) {
+            std::string ltype = addr.second ? "<b>function</b> " : "";
+            out << "<tr><td class=\"addr\">0x" << std::uppercase << std::hex << addr.first << std::dec << "</td><td>" << ltype << label << "</td></tr>\n";
+        }
+        out << "</table>\n";
+
+        // Recursive call for nested objects
+        if (!objPtr->objects.empty()) {
+            out << "<section>\n<h4>Nested Objects</h4>\n";
+            for (const auto& nestedObj : objPtr->objects) {
+                printObjectHTML(out, nestedObj);
+            }
+            out << "</section>\n";
+        }
+        out << "</div>\n";
     }
 
     void Parser::processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {

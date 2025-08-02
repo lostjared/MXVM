@@ -72,6 +72,7 @@ namespace mxvm {
         void setDefaultVariableValue(Variable& var, VarType type);
         void resolveLabelReference(Operand& operand, const std::unordered_map<std::string, size_t>& labelMap);
         void collectObjectNames(std::vector<std::pair<std::string, std::string>> &names, const std::unique_ptr<Program> &program);
+        void printObjectHTML(std::ostream &out, const std::unique_ptr<Program> &objPtr);
     };
 
     struct ExternalFunction {
