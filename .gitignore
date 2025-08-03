@@ -1,4 +1,6 @@
 *Zone*
 *DS_Store
 *.html
+*.txt
+*.s
 debug_info.txt
