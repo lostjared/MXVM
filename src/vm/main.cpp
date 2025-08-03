@@ -212,11 +212,7 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
         parser.object_path = std::string(object_path);
         parser.include_path =  include_path;
         if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
-            
-            
             collectAndRegisterAllExterns(program);
-            
-            
             std::string output_file(output);
             std::string program_name = output_file.empty() ? program->name + ".s" : output_file;
             std::fstream file;
@@ -304,7 +300,6 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
             std::cerr << "MXVM: Error could not open debug_info.txt\n";
         }
     }
-
     signal_program =  program.get();
 #ifndef _WIN32
     struct sigaction sa;
@@ -334,6 +329,9 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
         parser.object_path = std::string(object_path);
         parser.include_path = std::string(include_path);
         if(parser.generateProgramCode(mxvm::Mode::MODE_INTERPRET, program)) {
+            if(program->object) {
+                throw mx::Exception("Requires one program object to execute");
+            }
             program->flatten(program.get());
             exitCode = program->exec();
             
