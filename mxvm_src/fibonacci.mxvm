@@ -5,7 +5,7 @@ program Fibonacci {
         int b = 1
         int temp = 0
         int i = 2
-        string format = "%ld "
+        string format = "%lld "
         string newline = "\n"
         string ask = "How many numbers do you wish to output? "
         string range_error = "Number is out of range or negative for 64 bit integer\n"
