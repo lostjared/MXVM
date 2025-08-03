@@ -51,3 +51,8 @@ install(TARGETS mxvm_io mxvm_io_static
     LIBRARY DESTINATION lib/modules/io
     ARCHIVE DESTINATION lib/modules/io
 )
+if(WIN32)
+    install(TARGETS mxvm_io
+        RUNTIME DESTINATION lib/modules/io
+    )
+endif()

@@ -53,3 +53,9 @@ install(TARGETS mxvm_string mxvm_string_static
     LIBRARY DESTINATION lib/modules/string
     ARCHIVE DESTINATION lib/modules/string
 )
+
+if(WIN32)
+    install(TARGETS mxvm_string
+        RUNTIME DESTINATION lib/modules/strings
+    )
+endif()
