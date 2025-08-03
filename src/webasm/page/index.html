@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MXVM Debug Parser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            color: #e0e0e0;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: #222;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.2);
+            border: 1px solid #b71c1c;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #ff5252;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px #000;
+        }
+        
+        .header p {
+            color: #e57373;
+            font-size: 1.2rem;
+        }
+        
+        .input-section {
+            background: #181818;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
+            border: 1px solid #b71c1c;
+            overflow: hidden;
+        }
+        
+        .input-header {
+            background: #b71c1c;
+            color: #fff;
+            padding: 20px 30px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .input-content {
+            padding: 30px;
+        }
+        
+        #codeInput {
+            width: 100%;
+            height: 300px;
+            background: #222;
+            border: 1px solid #b71c1c;
+            border-radius: 10px;
+            padding: 15px;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+        }
+        
+        #codeInput:focus {
+            border-color: #ff5252;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.3);
+        }
+        
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: #b71c1c;
+            color: #fff;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(183, 28, 28, 0.3);
+        }
+        
+        .btn:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(183, 28, 28, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .output-section {
+            background: #181818;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
+            border: 1px solid #b71c1c;
+            overflow: hidden;
+        }
+        
+        .output-header {
+            background: #b71c1c;
+            color: #fff;
+            padding: 20px 30px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #output {
+            padding: 0;
+            background: #000;
+            color: #e0e0e0;
+            min-height: 200px;
+            overflow: auto;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #e57373;
+            font-style: italic;
+        }
+        
+        .error {
+            background: #2c1810;
+            border: 1px solid #d32f2f;
+            color: #ff8a80;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .example-link {
+            color: #ff5252;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .example-link:hover {
+            color: #ff8a80;
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+            
+            #codeInput {
+                height: 250px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 MXVM Debug Parser</h1>
+            <p>Paste your MXVM source code below to generate debug HTML output</p>
+        </div>
+        
+        <div class="input-section">
+            <div class="input-header">
+                <span>📝 MXVM Source Code</span>
+                <a href="#" class="example-link" onclick="loadExample()">Load Example</a>
+            </div>
+            <div class="input-content">
+                <textarea id="codeInput" placeholder="Enter your MXVM source code here...
+
+Example:
+program Hello {
+    section data { 
+        
+    }
+    section code {
+        done
+    }
+}
+"></textarea>
+                <div class="button-group">
+                    <button class="btn" onclick="parseCode()" id="parseBtn">
+                        🚀 Parse & Generate Debug HTML
+                    </button>
+                    <button class="btn" onclick="clearAll()">
+                        🗑️ Clear All
+                    </button>
+                    <button class="btn" onclick="copyOutput()">
+                        📋 Copy Output
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="output-section">
+            <div class="output-header">
+                <span>📊</span>
+                Debug HTML Output
+            </div>
+            <div id="output">
+                <div class="loading">
+                    Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.
+                </div>
+            </div>
+        </div>
+    </div>
+
+  <script src="mxvm.js"></script>
+<script>
+    let mxvmModule = null;
+    let debuggerInstance = null;
+
+    Module.onRuntimeInitialized = function() {
+        mxvmModule = Module;
+        debuggerInstance = new mxvmModule.MXVM_Debug();
+        document.getElementById('parseBtn').disabled = false;
+        document.getElementById('parseBtn').textContent = "🚀 Parse & Generate Debug HTML";
+    };
+
+    window.parseCode = function() {
+        const codeInput = document.getElementById('codeInput');
+        const output = document.getElementById('output');
+        const parseBtn = document.getElementById('parseBtn');
+        
+        if (!debuggerInstance) {
+            showError("WebAssembly module not loaded yet. Please wait...");
+            return;
+        }
+        
+        const code = codeInput.value.trim();
+        if (!code) {
+            showError("Please enter some MXVM code to parse.");
+            return;
+        }
+        
+        parseBtn.disabled = true;
+        parseBtn.textContent = "🔄 Parsing...";
+        output.innerHTML = '<div class="loading">Parsing MXVM code...</div>';
+        
+        try {
+            const htmlOutput = debuggerInstance.parseToHTML(code);
+            output.innerHTML = htmlOutput;
+        } catch (error) {
+            showError("Parsing failed: " + error.message);
+        } finally {
+            parseBtn.disabled = false;
+            parseBtn.textContent = "🚀 Parse & Generate Debug HTML";
+        }
+    };
+
+    window.showError = function(message) {
+        const output = document.getElementById('output');
+        output.innerHTML = `<div class="error">❌ ${message}</div>`;
+    };
+
+    window.clearAll = function() {
+        document.getElementById('codeInput').value = '';
+        document.getElementById('output').innerHTML = '<div class="loading">Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.</div>';
+    };
+
+    window.copyOutput = function() {
+        const output = document.getElementById('output');
+        const range = document.createRange();
+        range.selectNode(output);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        
+        try {
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = "✅ Copied!";
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        } catch (err) {
+            showError("Failed to copy to clipboard");
+        }
+    };
+
+    window.loadExample = function() {
+    const exampleCode = `program Comments {
+
+    section object { ReadFile } 
+    
+    section data {
+        byte value = 0
+        int index = 0
+        byte sign = 0x23 
+        byte newline = 0xa 
+        string print_out = "%c"
+        int skip = 0
+    }
+
+    section code {
+    start:
+            call ReadFile.readFile
+    loop:
+            load value, ReadFile.buffer, index, 1
+            add index, 1
+            cmp value, 0
+            je stop
+
+            cmp skip, 1
+            je check_newline
+
+            cmp value, sign
+            jne print_char
+            mov skip, 1
+            jmp check_newline
+
+    print_char:
+        print print_out, value
+
+    check_newline:
+        cmp value, newline
+        jne loop
+        mov skip, 0
+        jmp loop
+
+    stop:
+            free ReadFile.buffer
+            done
+    }
+}
+
+# this wil read file into a buffer
+# dont forget to free buffer
+object ReadFile {
+
+    section module { io } #io module
+
+    section data {
+        string file_name, 255
+        string file_mode = "rb"
+        export ptr buffer = null
+        string prompt = "Enter filename: "
+        ptr fptr = null
+        string  file_err1 = "Could not open File"
+        int file_size = 0
+        string output = "%s\\n"
+        int nfile_size = 0
+        byte zero_byte = 0
+    }
+
+    section code {
+    function readFile:
+        print prompt
+        getline file_name
+        invoke fopen, file_name, file_mode
+        return fptr
+        cmp fptr,  0
+        je error_not_found
+        invoke fsize, fptr
+        return file_size
+        mov nfile_size, file_size
+        add nfile_size, 1
+        alloc buffer, 1, nfile_size
+    read_buffer:
+        invoke fread, buffer, 1, file_size, fptr
+        cmp buffer, 0
+        je error_not_found
+        store zero_byte, buffer, file_size, 1 
+    stop:
+        invoke fclose, fptr
+        ret
+    error_not_found:
+        invoke fprintf, stderr, file_err1
+        exit 1
+    }
+}
+`;
+
+        document.getElementById('codeInput').value = exampleCode;
+    };
+
+    document.getElementById('codeInput').addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            window.parseCode();
+        }
+    });
+
+    document.getElementById('parseBtn').disabled = true;
+    document.getElementById('parseBtn').textContent = "⏳ Loading WebAssembly...";
+</script>
+</body>
+</html>
