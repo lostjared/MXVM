@@ -418,7 +418,6 @@ namespace mxvm {
             }
         }
         
-       
             for(auto &v : var_names) {
                 auto varx = getVariable(v); 
                 if(varx.is_global)
