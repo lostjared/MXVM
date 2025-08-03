@@ -12,17 +12,8 @@ OBJ_O=$(SRC_MXVM:.mxvm=.o)
 TARGET=strip-py-comments
 
 .PHONY: all clean
-
-%.s: %.mxvm
-	$(MXVMC) $< --path $(LIB_PATH) --object-path $(OBJ_PATH) --action translate
-
-%.o: %.s 
-	$(CC) $< -c -o $@
-
-all: $(TARGET)
-
-$(TARGET): $(OBJ_O)
-	$(CC) $(OBJ_O) -o $(TARGET) -L$(IO_MODULE_PATH) $(IO_LIB)
-
+all:
+	../../build/src/vm/mxvmc Comments.mxvm --path  $(LIB_PATH) --object-path $(OBJ_PATH) --action translate
+	$(CC) $(OBJ_S) -o $(TARGET)  -L$(IO_MODULE_PATH)  $(IO_LIB)
 clean:
 	rm -f $(OBJ_S) $(OBJ_O) $(TARGET)

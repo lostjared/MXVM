@@ -353,7 +353,7 @@ namespace mxvm {
             if (index >= scanner.size()) return nullptr;
             token = this->operator[](index);
         }
-        
+
         std::string typeStr = token.getTokenValue();
         VarType varType;
         if (typeStr == "int") varType = VarType::VAR_INTEGER;
@@ -363,10 +363,12 @@ namespace mxvm {
         else if (typeStr == "array") varType = VarType::VAR_ARRAY;
         else if (typeStr == "byte") varType = VarType::VAR_BYTE;
         else return nullptr;
+
         
         index++;
         if (index >= scanner.size()) return nullptr;
         auto nameToken = this->operator[](index);
+
         if (nameToken.getTokenType() != types::TokenType::TT_ID) {
             return nullptr;
         }
@@ -381,7 +383,6 @@ namespace mxvm {
                 add_op = "-";
                 index++;
             }
-
             if (index < scanner.size()) {
                 auto valueToken = this->operator[](index);
                 std::string value = valueToken.getTokenValue();
@@ -1018,15 +1019,15 @@ namespace mxvm {
                 Variable var;
                 var.type = variableNode->type;
                 var.var_name = variableNode->name;
-                var.is_global = variableNode->is_global;
-                var.obj_name = program->name;          
                 if (variableNode->hasInitializer) {
                     setVariableValue(var, variableNode->type, variableNode->initialValue);
                 } else {
                     setDefaultVariableValue(var, variableNode->type);
                 }
                 var.var_value.buffer_size = variableNode->buffer_size;
-                program->add_variable(var.var_name, var);
+                var.is_global = variableNode->is_global;
+                var.obj_name = program->name;      
+                program->add_variable(var.var_name, var);   
             }
         }
     }
@@ -1268,9 +1269,6 @@ namespace mxvm {
         for (const auto& [labelName, labelInfo] : objProgram->labels) {   
             if(labelInfo.second && Program::base != nullptr)
                 Program::base->add_extern(objProgram->name, labelName, false);
-        }
-        for (const auto& [varName, var] : objProgram->vars) {
-            Program::base->add_global(objProgram->name, varName, var);
         }
     }
 }

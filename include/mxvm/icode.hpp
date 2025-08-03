@@ -163,6 +163,7 @@ namespace mxvm {
         void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
         void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
         std::string getMangledName(const std::string& var);
+        Program *getObjectByName(const std::string &name);
     private:
         size_t pc;  
         bool running;

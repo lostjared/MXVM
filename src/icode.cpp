@@ -153,13 +153,12 @@ namespace mxvm {
     void Base::add_variable(const std::string &name, const Variable &v) {
         if(vars.find(name) == vars.end()) {
             vars[name] = v;
+        } else {
+            throw mx::Exception("Duplciate variable name: " + name);
         }
     }
 
     void Base::add_global(const std::string &objname,const std::string &name, const Variable &v) {
-        add_variable(name, v);
-        vars[name].is_global = true;
-        vars[name].obj_name = objname;
     }
 
     void Base::add_extern(const std::string &mod, const std::string &name, bool module) {
@@ -181,6 +180,15 @@ namespace mxvm {
             }
         }
     }
+    Program* Program::getObjectByName(const std::string& searchName) {
+        if (this->name == searchName) return this;
+        for (auto& obj : objects) {
+            Program* found = obj->getObjectByName(searchName);
+            if (found) return found;
+        }
+        return nullptr;
+    }
+  
 
     std::string Program::escapeNewLines(const std::string& input) {
         std::string result;
@@ -333,36 +341,39 @@ namespace mxvm {
         
         for(auto &v : var_names) {
             std::string var_out_name;
-            if(vars[v].is_global) {
+            auto varx = getVariable(v);
+            if(varx.is_global) {
                 var_out_name = getMangledName(v);
-            } else if(!vars[v].obj_name.empty()) {
+            } else if(!varx.obj_name.empty()) {
                 var_out_name = vars[v].obj_name + "_" + v;
             } else if(this->object) {
                 var_out_name = name + "_" + v;
             } else {
                 var_out_name = v;
             }
-            if(vars[v].type == VarType::VAR_INTEGER) {
+            if(varx.type == VarType::VAR_INTEGER) {
                 out << "\t" << var_out_name << ": .quad " << vars[v].var_value.int_value << "\n";
                 continue;
             }
-            if(vars[v].type == VarType::VAR_FLOAT) {
+            if(varx.type == VarType::VAR_FLOAT) {
                 out << "\t" << var_out_name << ": .double " << vars[v].var_value.float_value << "\n";
                 continue;
             }
-            if(vars[v].type == VarType::VAR_BYTE) {
+            if(varx.type == VarType::VAR_BYTE) {
                 out << "\t" << var_out_name << ": .byte " << vars[v].var_value.int_value << "\n";
             }
         }    
         for(auto &v : var_names) {
-            if(vars[v].type == VarType::VAR_EXTERN) {
+            auto varx = getVariable(v);
+            if(varx.type == VarType::VAR_EXTERN) {
                 out << "\t.extern " << v << "\n";
             } 
         }
         for(auto &v : var_names) {
-            if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size == 0) {
+            auto varx = getVariable(v);
+            if(varx.type == VarType::VAR_STRING && varx.var_value.buffer_size == 0) {
                 std::string var_out_name;
-                if(vars[v].is_global) {
+                if(varx.is_global) {
                     var_out_name = getMangledName(v);
                 } else if(!vars[v].obj_name.empty()) {
                     var_out_name = getMangledName(v);
@@ -379,8 +390,9 @@ namespace mxvm {
         
         if(base != nullptr) {
             for(auto &v : var_names) {
-                VarType t = Base::base->vars[v].type;
-                if(Base::base->vars[v].is_global) {
+                auto varx = getVariable(v);
+                auto t = varx.type;
+                if(varx.is_global) {
                     switch(t) {
                         case VarType::VAR_BYTE:
                         case VarType::VAR_FLOAT:
@@ -395,8 +407,9 @@ namespace mxvm {
 
             if(object) {
                 for(auto &v : var_names) {
-                    VarType t = vars[v].type;
-                    if(vars[v].is_global) {
+                    auto varx = getVariable(v);
+                    auto t = varx.type;
+                    if(varx.is_global) {
                         switch(t) {
                             case VarType::VAR_BYTE:
                             case VarType::VAR_FLOAT:
@@ -416,37 +429,39 @@ namespace mxvm {
         out << ".section .bss\n";
         for(auto &v : var_names) {
             std::string var_out_name;
-            if(vars[v].is_global) {
+            auto varx = getVariable(v);
+            if(varx.is_global) {
                 var_out_name = getMangledName(v);
-            } else if(!vars[v].obj_name.empty()) {
+            } else if(!varx.obj_name.empty()) {
                 var_out_name = vars[v].obj_name + "_" + v;
             } else if(this->object) {
                 var_out_name = name + "_" + v;
             } else {
                 var_out_name = v;
             }
-            if(vars[v].type == VarType::VAR_POINTER) {
+            if(varx.type == VarType::VAR_POINTER) {
                 out << "\t.comm " << var_out_name << ", 8\n";
-            } else if(vars[v].type == VarType::VAR_STRING && vars[v].var_value.buffer_size > 0) {
-                out << "\t.comm " << var_out_name << ", " << vars[v].var_value.buffer_size << "\n";
+            } else if(varx.type == VarType::VAR_STRING && varx.var_value.buffer_size > 0) {
+                out << "\t.comm " << var_out_name << ", " << varx.var_value.buffer_size << "\n";
             }
         }
         
-        if(base != nullptr) {
+       
             for(auto &v : var_names) {
-                if(Base::base->vars[v].is_global && (vars[v].type == VarType::VAR_STRING || vars[v].type == VarType::VAR_POINTER))
+                auto varx = getVariable(v); 
+                if(varx.is_global)
                     out << "\t.extern " << getMangledName(v) << "\n";
             }
 
             if(object) {
                 for(auto &v : var_names) {
-                    if(vars[v].is_global && (vars[v].type == VarType::VAR_STRING || vars[v].type == VarType::VAR_POINTER)) {
+                    auto varx = getVariable(v);
+                    if(varx.is_global && (varx.type == VarType::VAR_STRING || varx.type == VarType::VAR_POINTER)) {
                         out << "\t.global " << getMangledName(v) << "\n";
                     }
                 }
             }
-        }
-
+        
         out << ".section .text\n";
 
         if(this->object)
@@ -759,13 +774,12 @@ namespace mxvm {
             throw mx::Exception("LOAD destination must be a variable");
         }
         Variable &dest = getVariable(i.op1.op);
-
         if (!isVariable(i.op2.op)) {
             throw mx::Exception("LOAD source must be a pointer variable");
         }
         Variable &ptrVar = getVariable(i.op2.op);
         if (ptrVar.type != VarType::VAR_POINTER) {
-            throw mx::Exception("LOAD source must be a pointer");
+            throw mx::Exception("LOAD " + i.op2.op + " must be a pointer");
         }
         size_t size = (dest.type == VarType::VAR_FLOAT) ? sizeof(double) : sizeof(int64_t);
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
@@ -1950,14 +1964,18 @@ namespace mxvm {
     }
 
     Variable& Program::getVariable(const std::string& n) {
+        for (auto& obj : objects) {
+            Program* foundObj = obj->getObjectByName(obj->name);
+            if (foundObj) {
+                auto it2 = foundObj->vars.find(n);
+                if (it2 != foundObj->vars.end()) {
+                    return it2->second;
+                }
+            }
+        }
         auto it = vars.find(n);
         if (it != vars.end()) {
             return it->second;
-        }
-        for(auto &o : objects) {
-           if(o->isVariable(n)) {
-                return o->getVariable(n);         
-            }
         }
         throw mx::Exception("Variable not found: " + name + "." + n);
     }
