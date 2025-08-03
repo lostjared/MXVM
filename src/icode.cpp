@@ -211,8 +211,7 @@ namespace mxvm {
         return result;
     }
 
-    void Program::memoryDump(std::ostream &out) {
-
+  void Program::memoryDump(std::ostream &out) {
         out << "Current working directory: ";
         try {
             out << std::filesystem::current_path().string() << "\n";
@@ -220,112 +219,85 @@ namespace mxvm {
             out << "(unable to retrieve: " << e.what() << ")\n";
         }
 
-        out << "=== MEMORY DUMP for " << name << " ===\n";
-        if (vars.empty()) {
-            out << "  (no variables)\n";
-        } else {
-            out << std::left << std::setw(15) << "Name"
-                << std::setw(12) << "Type"
-                << std::setw(20) << "Value"
-                << std::setw(12) << "PtrSize"
-                << std::setw(12) << "PtrCount"
-                << std::setw(8) << "Owns"
-                << "\n";
-            out << std::string(79, '-') << "\n";
-            for (const auto &var : vars) {
-                out << std::setw(15) << var.first;
-                std::string typeStr;
-                switch (var.second.type) {
-                    case VarType::VAR_INTEGER: typeStr = "int"; break;
-                    case VarType::VAR_FLOAT: typeStr = "float"; break;
-                    case VarType::VAR_STRING: typeStr = "string"; break;
-                    case VarType::VAR_POINTER: typeStr = "ptr"; break;
-                    case VarType::VAR_LABEL: typeStr = "label"; break;
-                    case VarType::VAR_EXTERN: typeStr = "external"; break;
-                    case VarType::VAR_ARRAY: typeStr = "array"; break;
-                    case VarType::VAR_BYTE:  typeStr = "byte"; break;
-                    default: typeStr = "unknown"; break;
-                }
-                out << std::setw(12) << typeStr;
-                switch (var.second.type) {
-                    case VarType::VAR_INTEGER:
-                    case VarType::VAR_BYTE:
-                        out << std::setw(20) << var.second.var_value.int_value;
-                        break;
-                    case VarType::VAR_FLOAT:
-                        out << std::setw(20) << std::fixed << std::setprecision(6)
-                            << var.second.var_value.float_value;
-                        break;
-                    case VarType::VAR_STRING:
-                        out << std::setw(20) << ("\"" + Program::escapeNewLines(var.second.var_value.str_value) + "\"");
-                        break;
-                    case VarType::VAR_POINTER:
-                    case VarType::VAR_EXTERN:
-                        if (var.second.var_value.ptr_value == nullptr)
-                            out << std::setw(20) << "null";
-                        else {
-                            char ptr_buf[256];
-                            snprintf(ptr_buf, sizeof(ptr_buf), "%p", var.second.var_value.ptr_value);
-                            out << std::setw(20) << ptr_buf << std::dec;
-                        }
-                        break;
-                    case VarType::VAR_LABEL:
-                        out << std::setw(20) << var.second.var_value.label_value;
-                        break;
-                    default:
-                        out << std::setw(20) << var.second.var_value.int_value;
-                        break;
-                }
-                if (var.second.type == VarType::VAR_POINTER) {
-                    out << std::setw(12) << var.second.var_value.ptr_size
-                        << std::setw(12) << var.second.var_value.ptr_count
-                        << std::setw(8) << (var.second.var_value.owns ? "yes" : "no");
-                } else {
-                    out << std::setw(12) << "-"
-                        << std::setw(12) << "-"
-                        << std::setw(8) << "-";
-                }
-                out << "\n";
-            }
-        }
-        out << "\n";
-        out << "=== LABELS ===\n";
-        if (labels.empty()) {
-            out << "  (no labels)\n";
-        } else {
-            out << std::left << std::setw(20) << "Label"
-                << std::setw(10) << "Address"
-                << std::setw(10) << "Function"
-                << "\n";
-            out << std::string(40, '-') << "\n";
-            for (const auto &label : labels) {
-                out << std::setw(20) << label.first
-                    << std::setw(10) << label.second.first
-                    << std::setw(10) << (label.second.second ? "yes" : "no")
-                    << "\n";
-            }
-        }
-        out << "\n";
-        out << "=== EXTERNAL FUNCTIONS ===\n";
-        if (external_functions.empty()) {
-            out << "  (no external functions)\n";
-        } else {
-            out << std::left << std::setw(25) << "Name"
-                << std::setw(30) << "Module"
-                << std::setw(30) << "Function"
-                << "\n";
-            out << std::string(85, '-') << "\n";
-            for (const auto& ext : external_functions) {
-                out << std::setw(25) << ext.first
-                    << std::setw(30) << ext.second.mod_name
-                    << std::setw(30) << ext.second.fname
-                    << "\n";
-            }
-        }
-        out << "\n";
- 
-    }
 
+        std::function<void(Program*, std::ostream&, int)> dumpProgram;
+        dumpProgram = [&](Program* prog, std::ostream& out, int depth = 0) {
+            std::string indent(depth * 2, ' ');
+            out << indent << "=== MEMORY DUMP for " << prog->name << " ===\n";
+            if (prog->vars.empty()) {
+                out << indent << "  (no variables)\n";
+            } else {
+                out << indent << std::left << std::setw(15) << "Name"
+                    << std::setw(12) << "Type"
+                    << std::setw(20) << "Value"
+                    << std::setw(12) << "PtrSize"
+                    << std::setw(12) << "PtrCount"
+                    << std::setw(8) << "Owns"
+                    << "\n";
+                out << indent << std::string(79, '-') << "\n";
+                for (const auto &var : prog->vars) {
+                    out << indent << std::setw(15) << var.first;
+                    std::string typeStr;
+                    switch (var.second.type) {
+                        case VarType::VAR_INTEGER: typeStr = "int"; break;
+                        case VarType::VAR_FLOAT: typeStr = "float"; break;
+                        case VarType::VAR_STRING: typeStr = "string"; break;
+                        case VarType::VAR_POINTER: typeStr = "ptr"; break;
+                        case VarType::VAR_LABEL: typeStr = "label"; break;
+                        case VarType::VAR_EXTERN: typeStr = "external"; break;
+                        case VarType::VAR_ARRAY: typeStr = "array"; break;
+                        case VarType::VAR_BYTE:  typeStr = "byte"; break;
+                        default: typeStr = "unknown"; break;
+                    }
+                    out << std::setw(12) << typeStr;
+                    switch (var.second.type) {
+                        case VarType::VAR_INTEGER:
+                        case VarType::VAR_BYTE:
+                            out << std::setw(20) << var.second.var_value.int_value;
+                            break;
+                        case VarType::VAR_FLOAT:
+                            out << std::setw(20) << std::fixed << std::setprecision(6)
+                                << var.second.var_value.float_value;
+                            break;
+                        case VarType::VAR_STRING:
+                            out << std::setw(20) << ("\"" + Program::escapeNewLines(var.second.var_value.str_value) + "\"");
+                            break;
+                        case VarType::VAR_POINTER:
+                        case VarType::VAR_EXTERN:
+                            if (var.second.var_value.ptr_value == nullptr)
+                                out << std::setw(20) << "null";
+                            else {
+                                char ptr_buf[256];
+                                snprintf(ptr_buf, sizeof(ptr_buf), "%p", var.second.var_value.ptr_value);
+                                out << std::setw(20) << ptr_buf << std::dec;
+                            }
+                            break;
+                        case VarType::VAR_LABEL:
+                            out << std::setw(20) << var.second.var_value.label_value;
+                            break;
+                        default:
+                            out << std::setw(20) << var.second.var_value.int_value;
+                            break;
+                    }
+                    if (var.second.type == VarType::VAR_POINTER) {
+                        out << std::setw(12) << var.second.var_value.ptr_size
+                            << std::setw(12) << var.second.var_value.ptr_count
+                            << std::setw(8) << (var.second.var_value.owns ? "yes" : "no");
+                    } else {
+                        out << std::setw(12) << "-"
+                            << std::setw(12) << "-"
+                            << std::setw(8) << "-";
+                    }
+                    out << "\n";
+                }
+            }
+            out << "\n";
+            for (const auto& obj : prog->objects) {
+                if (obj) dumpProgram(obj.get(), out, depth + 1);
+            }
+        };
+        dumpProgram(this, out, 0);
+    }
     
     void Program::generateCode(bool obj, std::ostream &out) {
         std::unordered_map<int, std::string> labels_;
