@@ -486,8 +486,10 @@ namespace mxvm {
             generateInstruction(out, instr);
         }
         
-        if(this->object == false && done_found == false)
-            throw mx::Exception("Program missing done to signal completion.\n");
+        #ifndef __EMSCRIPTEN__
+            if(this->object == false && done_found == false)
+                throw mx::Exception("Program missing done to signal completion.\n");
+        #endif
             
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
         std::string mainFunc = " Object";

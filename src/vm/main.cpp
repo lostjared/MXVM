@@ -344,6 +344,13 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                     program->memoryDump(debug_output);
                 }
             }
+
+            if(mxvm::html_mode) {
+                std::cout << "MXVM: Generated " << program->name<< ".html\n";
+                std::ofstream fout(program->name + ".html");
+                parser.generateDebugHTML(fout, program);
+                fout.close();
+            }
         } else {
             std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);

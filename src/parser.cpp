@@ -633,10 +633,10 @@ namespace mxvm {
         auto ast = parseAST();
         if (ast) {
             
-            if (ast->sections.empty() && ast->inlineObjects.size() == 1) {
-                auto* temp = ast->inlineObjects[0].release();
-                ast.reset(temp);
-            }
+            //if (ast->sections.empty() && ast->inlineObjects.size() == 1) {
+              //  auto* temp = ast->inlineObjects[0].release();
+                //ast.reset(temp);
+            //}
             
             program->name = ast->name;
             if(!ast->root_name.empty()) { 
@@ -647,87 +647,50 @@ namespace mxvm {
                 program->object = true;
             }
             
-             int objectCount = ast->inlineObjects.size();
-
-            if (program->object == false && objectCount > 0) {
-                
-                if (debug_mode) {
-                    std::cout << "File contains only objects (" << objectCount << " found)" << std::endl;
-                }
-                
-                for (const auto& inlineObj : ast->inlineObjects) {
-                    auto objProgram = std::make_unique<Program>();
-                    objProgram->name = inlineObj->name;
-                    objProgram->object = true;
-                    objProgram->object_external = false;
-                    objProgram->filename = program->filename;
-                    object_name = inlineObj->name;
+            for (const auto& section : ast->sections) {
+                auto sectionNode = dynamic_cast<SectionNode*>(section.get());
+                if (!sectionNode) continue;
                     
-                    for (const auto& section : inlineObj->sections) {
-                        auto sectionNode = dynamic_cast<SectionNode*>(section.get());
-                        if (!sectionNode) continue;
-                        
-                        if (sectionNode->type == SectionNode::DATA) {
-                            processDataSection(sectionNode, objProgram);
-                        } else if (sectionNode->type == SectionNode::CODE) {
-                            processCodeSection(sectionNode, objProgram);
-                        } else if (sectionNode->type == SectionNode::MODULE) {
-                            processModuleSection(sectionNode, objProgram);
-                        } else if(sectionNode->type == SectionNode::OBJECT) {
-                            processObjectSection(sectionNode, objProgram);
-                        }
-                    }
-                    
-                   program->objects.push_back(std::move(objProgram));
+                if (sectionNode->type == SectionNode::DATA) {
+                    processDataSection(sectionNode, program);
+                } else if (sectionNode->type == SectionNode::CODE) {
+                    processCodeSection(sectionNode, program);
+                } else if (sectionNode->type == SectionNode::MODULE) {
+                    processModuleSection(sectionNode, program);
+                } else if (sectionNode->type == SectionNode::OBJECT) {
+                    processObjectSection(sectionNode, program);
                 }
             }
-            else {
+            
+            
+            for (const auto& inlineObj : ast->inlineObjects) {
+                auto objProgram = std::make_unique<Program>();
+                objProgram->name = inlineObj->name;
+                objProgram->object = true;
+                objProgram->object_external = false;
+                objProgram->filename = program->filename;
+                object_name = inlineObj->name;
                 
-                for (const auto& section : ast->sections) {
+                for (const auto& section : inlineObj->sections) {
                     auto sectionNode = dynamic_cast<SectionNode*>(section.get());
                     if (!sectionNode) continue;
-                        
+                    
                     if (sectionNode->type == SectionNode::DATA) {
-                        processDataSection(sectionNode, program);
+                        processDataSection(sectionNode, objProgram);
                     } else if (sectionNode->type == SectionNode::CODE) {
-                        processCodeSection(sectionNode, program);
+                        processCodeSection(sectionNode, objProgram);
                     } else if (sectionNode->type == SectionNode::MODULE) {
-                        processModuleSection(sectionNode, program);
+                        processModuleSection(sectionNode, objProgram);
                     } else if (sectionNode->type == SectionNode::OBJECT) {
-                        processObjectSection(sectionNode, program);
+                        processObjectSection(sectionNode, objProgram);
                     }
                 }
                 
-                
-                for (const auto& inlineObj : ast->inlineObjects) {
-                    auto objProgram = std::make_unique<Program>();
-                    objProgram->name = inlineObj->name;
-                    objProgram->object = true;
-                    objProgram->object_external = false;
-                    objProgram->filename = program->filename;
-                    object_name = inlineObj->name;
-                    
-                    for (const auto& section : inlineObj->sections) {
-                        auto sectionNode = dynamic_cast<SectionNode*>(section.get());
-                        if (!sectionNode) continue;
-                        
-                        if (sectionNode->type == SectionNode::DATA) {
-                            processDataSection(sectionNode, objProgram);
-                        } else if (sectionNode->type == SectionNode::CODE) {
-                            processCodeSection(sectionNode, objProgram);
-                        } else if (sectionNode->type == SectionNode::MODULE) {
-                            processModuleSection(sectionNode, objProgram);
-                        } else if (sectionNode->type == SectionNode::OBJECT) {
-                            processObjectSection(sectionNode, objProgram);
-                        }
-                    }
-                    
-                    registerObjectExterns(program, objProgram);
-                    program->objects.push_back(std::move(objProgram));
-                }
+                registerObjectExterns(program, objProgram);
+                program->objects.push_back(std::move(objProgram));
             }
-
             
+ 
             if (mode == Mode::MODE_COMPILE) {
                 std::set<std::string> generated_objects;
 
@@ -902,20 +865,19 @@ namespace mxvm {
                         <tbody>)";
             for (size_t i = 0; i < objPtr->inc.size(); ++i) {
                 const auto& instr = objPtr->inc[i];
-                out << R"(<tr>
-                            <td>)" << "0x" << std::hex << std::uppercase <<  i << std::dec << R"(</td>
-                            <td class="opcode">)" << "0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << R"(</td>
-                            <td class="opcode-name">)" << IncType[static_cast<int>(instr.instruction)] << R"(</td>
-                            <td class="operand">)" << instr.op1.op << R"(</td>
-                            <td class="operand">)" << instr.op2.op << R"(</td>
-                            <td class="operand">)" << instr.op3.op << R"(</td>
-                            <td class="operand">)";
+                out << "<tr>"
+                << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
+                << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
+                << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
+                << "<td class=\"operand\">" << instr.op1.op << "</td>"
+                << "<td class=\"operand\">" << instr.op2.op << "</td>"
+                << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                << "<td class=\"operand\">";
                 for (size_t j = 0; j < instr.vop.size(); ++j) {
                     if (j > 0) out << ", ";
                     out << instr.vop[j].op;
                 }
-                out << R"(</td>
-                            </tr>)";
+                out << "</td></tr>";
             }
             out << R"(</tbody>
                     </table>)";
@@ -1149,179 +1111,179 @@ namespace mxvm {
             </style>
 
         </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🔧 MXVM Debug Report</h1>
-                    <div class="subtitle">Program: <span style="color: blue; "><strong>)" << program->name << R"(</span></strong></div>
-                    <div class="stats">
-                        <div class="stat-card">
-                            <span class="number">)" << program->vars.size() << R"(</span>
-                            <span class="label">Variables</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="number">)" << program->inc.size() << R"(</span>
-                            <span class="label">Instructions</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="number">)" << program->objects.size() << R"(</span>
-                            <span class="label">Objects</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="number">)" << program->labels.size() << R"(</span>
-                            <span class="label">Labels</span>
-                        </div>
-                    </div>
-                </div>
+        <body>)";
+        
+            bool mainHasContent = !program->vars.empty() || !program->inc.empty() || !program->labels.empty();
+            bool hasObjects = !program->objects.empty();
 
-                <div class="section">
+            out << R"(
+                <div class="container">
+                    <div class="header">
+                        <h1>🔧 MXVM Debug Report</h1>
+                        <div class="subtitle">Program: <span style="color: blue;"><strong>)" << program->name << R"(</span></strong></div>
+                        <div class="stats">
+                            <div class="stat-card">
+                                <span class="number">)" << program->vars.size() << R"(</span>
+                                <span class="label">Variables</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="number">)" << program->inc.size() << R"(</span>
+                                <span class="label">Instructions</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="number">)" << program->objects.size() << R"(</span>
+                                <span class="label">Objects</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="number">)" << program->labels.size() << R"(</span>
+                                <span class="label">Labels</span>
+                            </div>
+                        </div>
+                    </div>)";
+
+            
+            if (mainHasContent) {
+            
+                out << R"(<div class="section">
                     <div class="section-header">
                         <span class="icon">📊</span>
                         Variables
                     </div>
                     <div class="section-content">)";
-
-            if (program->vars.empty()) {
-                out << R"(<div class="no-data">No variables defined</div>)";
-            } else {
-                out << R"(<div class="variables-grid">)";
-                for (const auto& var : program->vars) {
-                    out << R"(<div class="variable-card">
-                                <div class="variable-name">)" << var.first << R"(</div>
-                                <div class="variable-type">)";
-                    
-                    switch (var.second.type) {
-                        case VarType::VAR_INTEGER: out << "Integer"; break;
-                        case VarType::VAR_FLOAT: out << "Float"; break;
-                        case VarType::VAR_STRING: out << "String"; break;
-                        case VarType::VAR_POINTER: out << "Pointer"; break;
-                        case VarType::VAR_LABEL: out << "Label"; break;
-                        case VarType::VAR_EXTERN: out << "External"; break;
-                        case VarType::VAR_ARRAY: out << "Array"; break;
-                        case VarType::VAR_BYTE: out << "Byte"; break;
-                        default: out << "Unknown"; break;
+                
+                if (program->vars.empty()) {
+                    out << R"(<div class="no-data">No variables defined</div>)";
+                } else {
+                    out << R"(<div class="variables-grid">)";
+                    for (const auto& var : program->vars) {
+                        out << R"(<div class="variable-card">
+                            <div class="variable-name">)" << var.first << R"(</div>
+                            <div class="variable-type">)";
+                        
+                        switch (var.second.type) {
+                            case VarType::VAR_INTEGER: out << "Integer"; break;
+                            case VarType::VAR_FLOAT: out << "Float"; break;
+                            case VarType::VAR_STRING: out << "String"; break;
+                            case VarType::VAR_POINTER: out << "Pointer"; break;
+                            case VarType::VAR_LABEL: out << "Label"; break;
+                            case VarType::VAR_EXTERN: out << "External"; break;
+                            case VarType::VAR_ARRAY: out << "Array"; break;
+                            case VarType::VAR_BYTE: out << "Byte"; break;
+                            default: out << "Unknown"; break;
+                        }
+                        
+                        out << R"(</div>
+                            <div class="variable-value">)";
+                        
+                        switch (var.second.type) {
+                            case VarType::VAR_INTEGER:
+                            case VarType::VAR_BYTE:
+                                out << var.second.var_value.int_value;
+                                break;
+                            case VarType::VAR_FLOAT:
+                                out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
+                                break;
+                            case VarType::VAR_STRING:
+                                out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
+                                break;
+                            case VarType::VAR_POINTER:
+                            case VarType::VAR_EXTERN:
+                                if (var.second.var_value.ptr_value == nullptr)
+                                    out << "null";
+                                else
+                                    out << var.second.var_value.ptr_value;
+                                break;
+                            case VarType::VAR_LABEL:
+                                out << var.second.var_value.label_value;
+                                break;
+                            default:
+                                out << var.second.var_value.int_value;
+                                break;
+                        }
+                        
+                        out << R"(</div>
+                        </div>)";
                     }
-                    
-                    out << R"(</div>
-                                <div class="variable-value">)";
-                    
-                    switch (var.second.type) {
-                        case VarType::VAR_INTEGER:
-                        case VarType::VAR_BYTE:
-                            out << var.second.var_value.int_value;
-                            break;
-                        case VarType::VAR_FLOAT:
-                            out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
-                            break;
-                        case VarType::VAR_STRING:
-                            out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
-                            break;
-                        case VarType::VAR_POINTER:
-                        case VarType::VAR_EXTERN:
-                            if (var.second.var_value.ptr_value == nullptr)
-                                out << "null";
-                            else
-                                out << var.second.var_value.ptr_value;
-                            break;
-                        case VarType::VAR_LABEL:
-                            out << var.second.var_value.label_value;
-                            break;
-                        default:
-                            out << var.second.var_value.int_value;
-                            break;
-                    }
-                    
-                    out << R"(</div>
-                            </div>)";
+                    out << R"(</div>)";
                 }
-                out << R"(</div>)";
-            }
-
-            out << R"(
-                    </div>
+                out << R"(</div>
                 </div>)";
 
+                // Show Labels section
                 out << R"(<div class="section">
-                <div class="section-header"><span class="icon">🏷️</span> Labels</div>
-                <div class="section-content">)";
-            if (program->labels.empty()) {
-                out << R"(<div class="no-data">No labels defined</div>)";
-            } else {
-                out << R"(<table class="instructions-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Address</th>
-                            <th>Function</th>
-                        </tr>
-                    </thead>
-                    <tbody>)";
-                for (const auto& label : program->labels) {
-                    out << R"(<tr>
-                        <td>)" << label.first << R"(</td>
-                        <td>)" << "0x" << std::hex << label.second.first << std::dec << R"(</td>
-                        <td>)" << (label.second.second ? "true" : "false") << R"(</td>
-                    </tr>)";
+                    <div class="section-header"><span class="icon">🏷️</span> Labels</div>
+                    <div class="section-content">)";
+                if (program->labels.empty()) {
+                    out << R"(<div class="no-data">No labels defined</div>)";
+                } else {
+                    out << R"(<table class="instructions-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Function</th>
+                            </tr>
+                        </thead>
+                        <tbody>)";
+                    for (const auto& label : program->labels) {
+                        out << "<tr><td>" << label.first << "</td><td>0x" << std::hex << label.second.first << std::dec << R"(</td>
+                            <td>)" << (label.second.second ? "true" : "false") << R"(</td>
+                        </tr>)";
+                    }
+                    out << R"(</tbody>
+                    </table>)";
                 }
-                out << R"(</tbody>
-                </table>)";
-            }
-            out << R"(</div>
-            </div>)";
-                out << R"(
-                <div class="section">
+                out << R"(</div>
+                </div>)";
+
+                // Show Instructions section
+                out << R"(<div class="section">
                     <div class="section-header">
                         <span class="icon">⚙️</span>
                         Instructions
                     </div>
                     <div class="section-content">)";
 
-            if (program->inc.empty()) {
-                out << R"(<div class="no-data">No instructions defined</div>)";
-            } else {
-                out << R"(<table class="instructions-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Opcode</th>
-                                    <th>Instruction</th>
-                                    <th>Operand 1</th>
-                                    <th>Operand 2</th>
-                                    <th>Operand 3</th>
-                                    <th>Extra Operands</th>
-                                </tr>
-                            </thead>
-                            <tbody>)";
+                if (program->inc.empty()) {
+                    out << R"(<div class="no-data">No instructions defined</div>)";
+                } else {
+                    out << R"(<table class="instructions-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Opcode</th>
+                                <th>Instruction</th>
+                                <th>Operand 1</th>
+                                <th>Operand 2</th>
+                                <th>Operand 3</th>
+                                <th>Extra Operands</th>
+                            </tr>
+                        </thead>
+                        <tbody>)";
 
-                for (size_t i = 0; i < program->inc.size(); ++i) {
-                    const auto& instr = program->inc[i];
-                    out << R"(<tr>
-                                <td>)" << "0x" << std::hex << std::uppercase << i << std::dec << R"(</td>
-                                <td class="opcode">)" << "0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << R"(</td>
-                                <td class="opcode-name">)" << IncType[static_cast<int>(instr.instruction)] << R"(</td>
-                                <td class="operand">)" << instr.op1.op << R"(</td>
-                                <td class="operand">)" << instr.op2.op << R"(</td>
-                                <td class="operand">)" << instr.op3.op << R"(</td>
-                                <td class="operand">)";
-                    
-                    for (size_t j = 0; j < instr.vop.size(); ++j) {
-                        if (j > 0) out << ", ";
-                        out << instr.vop[j].op;
+                    for (size_t i = 0; i < program->inc.size(); ++i) {
+                        const auto& instr = program->inc[i];
+                        out << "<tr>"
+                        << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
+                        << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
+                        << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
+                        << "<td class=\"operand\">" << instr.op1.op << "</td>"
+                        << "<td class=\"operand\">" << instr.op2.op << "</td>"
+                        << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                        << "<td class=\"operand\">";
+                        for (size_t j = 0; j < instr.vop.size(); ++j) {
+                            if (j > 0) out << ", ";
+                            out << instr.vop[j].op;
+                        }
+                        out << "</td></tr>";
                     }
-                    
-                    out << R"(</td>
-                            </tr>)";
+                    out << R"(</tbody>
+                    </table>)";
                 }
-                out << R"(</tbody>
-                        </table>)";
+                out << R"(</div>
+                </div>)";
             }
 
-            out << R"(
-                    </div>
-                </div>)";
-
-            // Objects section
-            if (!program->objects.empty()) {
+            if (hasObjects) {
                 out << R"(<div class="section">
                     <div class="section-header">
                         <span class="icon">📦</span>
@@ -1340,12 +1302,12 @@ namespace mxvm {
             }
 
             out << R"(
-            </div>
-        </body>
-        </html>)";
+                </div>
+            </body>
+            </html>)";
 
             return true;
-        }
+            }
     void Parser::processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
         for (const auto& statement : sectionNode->statements) {
             auto variableNode = dynamic_cast<VariableNode*>(statement.get());
