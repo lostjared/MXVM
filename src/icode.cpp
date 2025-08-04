@@ -1585,6 +1585,7 @@ namespace mxvm {
                     break;
                 case MOD:
                     exec_mod(instr);
+                    break;
                 case PRINT:
                     exec_print(instr);
                     break;
