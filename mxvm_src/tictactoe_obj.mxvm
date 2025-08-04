@@ -5,8 +5,6 @@ program TicTacToe {
         string invalid_move = "Invalid move. That spot is taken or out of bounds.\n"
         string win_msg = "Player %c wins!\n"
         string draw_msg = "It's a draw!\n"
-        string row_fmt =  "%c | %c | %c\n"
-        string sep_line = "- + - + - \n"
         string input_buffer, 8
         string char_fmt = "%c"
         string newline = "\n"
@@ -89,19 +87,21 @@ program TicTacToe {
 object game_board {
     section data {
         ptr board = null
-        int turn = 0
-        int current_player = 0
-        int move = 0
-        int winner = 0
-        int P_EMPTY = 46
+        export int turn = 0
+        export int current_player = 0
+        export int move = 0
+        export int winner = 0
+        export int P_EMPTY = 46
         int i = 0
-        int temp = 0
+        export int temp = 0
         int v1 = 0
         int v2 = 0
         int v3 = 0
         int al = 0
         int bl = 0
         int cl = 0
+        string row_fmt =  "%c | %c | %c\n"
+        string sep_line = "- + - + - \n"
     }
 
     section code {
