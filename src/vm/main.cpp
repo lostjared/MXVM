@@ -224,12 +224,15 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
                 program->object = true;
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
-                program->generateCode(program->object, file);
+                std::ostringstream code_v;
+                program->generateCode(program->object, code_v);
+                program->assembly_code = code_v.str();
+                file << code_v.str();
                 if(mxvm::html_mode) {
                     std::ofstream  htmlFile(program->name + ".html");
                     if(htmlFile.is_open()) {
                         parser.generateDebugHTML(htmlFile, program);
-                        std::cout << Col("MXVM: Generated Debug HTML for:: ", mx::Color::BRIGHT_GREEN) << program->name << "\n";
+                        std::cout << Col("MXVM: Generated Debug HTML for: ", mx::Color::BRIGHT_GREEN) << program->name << "\n";
                     }
                     file.close();
                 }

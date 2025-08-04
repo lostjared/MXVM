@@ -78,6 +78,7 @@ namespace mxvm {
         std::unordered_map<std::string, RuntimeFunction> external_functions;
         static Base *base;
         static std::string root_name;
+        std::string assembly_code;
     };
 
     class Program : public Base {

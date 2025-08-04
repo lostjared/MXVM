@@ -492,6 +492,7 @@ namespace mxvm {
         #endif
             
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
+   
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";

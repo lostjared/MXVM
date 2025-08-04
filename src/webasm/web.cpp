@@ -32,11 +32,15 @@ public:
             std::unique_ptr<mxvm::Program> program(new mxvm::Program());
             mxvm::html_mode = true;
             if(parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
+                std::ostringstream code_v;
+                program->generateCode(program->object, code_v);
+                program->assembly_code = code_v.str();
                 collectAndRegisterAllExterns(program);
                 if(program->root_name == program->name)
                     program->object = false;
                 else
                     program->object = true;
+                program->assembly_code = code_v.str();
                 parser.generateDebugHTML(html, program);
             } else {
                 html << "Parse Error";

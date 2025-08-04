@@ -737,495 +737,104 @@ namespace mxvm {
     }
 
     void Parser::printObjectHTML(std::ostream &out, const std::unique_ptr<Program> &objPtr) {
-        out << R"(<div class="object-section">
-            <div class="object-title">Object: <span style="color: lime;"><sxtrong>)" << objPtr->name << R"(</span></strong></div>)";
-            out << R"(
-                <div class="stats" style="margin-bottom:30px;">
-                    <div class="stat-card">
-                        <span class="number">)" << objPtr->vars.size() << R"(</span>
-                        <span class="label">Variables</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="number">)" << objPtr->inc.size() << R"(</span>
-                        <span class="label">Instructions</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="number">)" << objPtr->labels.size() << R"(</span>
-                        <span class="label">Labels</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="number">)" << objPtr->objects.size() << R"(</span>
-                        <span class="label">Objects</span>
-                    </div>
-                </div>
-            )";
-            out << R"(
-            <div class="section">
-                <div class="section-header"><span class="icon">📊</span> Variables</div>
-                <div class="section-content">)";
-        if (objPtr->vars.empty()) {
-            out << R"(<div class="no-data">No variables defined</div>)";
-        } else {
-            out << R"(<div class="variables-grid">)";
-            for (const auto& var : objPtr->vars) {
-                out << R"(<div class="variable-card">
-                            <div class="variable-name">)" << var.first << R"(</div>
-                            <div class="variable-type">)";
-                switch (var.second.type) {
-                    case VarType::VAR_INTEGER: out << "Integer"; break;
-                    case VarType::VAR_FLOAT: out << "Float"; break;
-                    case VarType::VAR_STRING: out << "String"; break;
-                    case VarType::VAR_POINTER: out << "Pointer"; break;
-                    case VarType::VAR_LABEL: out << "Label"; break;
-                    case VarType::VAR_EXTERN: out << "External"; break;
-                    case VarType::VAR_ARRAY: out << "Array"; break;
-                    case VarType::VAR_BYTE: out << "Byte"; break;
-                    default: out << "Unknown"; break;
-                }
-                out << R"(</div>
-                            <div class="variable-value">)";
-                switch (var.second.type) {
-                    case VarType::VAR_INTEGER:
-                    case VarType::VAR_BYTE:
-                        out << var.second.var_value.int_value;
-                        break;
-                    case VarType::VAR_FLOAT:
-                        out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
-                        break;
-                    case VarType::VAR_STRING:
-                        out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
-                        break;
-                    case VarType::VAR_POINTER:
-                    case VarType::VAR_EXTERN:
-                        if (var.second.var_value.ptr_value == nullptr)
-                            out << "null";
-                        else
-                            out << var.second.var_value.ptr_value;
-                        break;
-                    case VarType::VAR_LABEL:
-                        out << var.second.var_value.label_value;
-                        break;
-                    default:
-                        out << var.second.var_value.int_value;
-                        break;
-                }
-                out << R"(</div>
-                            </div>)";
-            }
-            out << R"(</div>)";
-        }
-        out << R"(</div>
-            </div>)";
-            out << R"(<div class="section">
-                <div class="section-header"><span class="icon">🏷️</span> Labels</div>
-                <div class="section-content">)";
-            if (objPtr->labels.empty()) {
-                out << R"(<div class="no-data">No labels defined</div>)";
-            } else {
-                out << R"(<table class="instructions-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Address</th>
-                            <th>Function</th>
-                        </tr>
-                    </thead>
-                    <tbody>)";
-                for (const auto& label : objPtr->labels) {
-                    out << R"(<tr>
-                        <td>)" << label.first << R"(</td>
-                        <td>)" << "0x" << std::hex << label.second.first << std::dec << R"(</td>
-                        <td>)" << (label.second.second ? "true" : "false") << R"(</td>
-                    </tr>)";
-                }
-                out << R"(</tbody>
-                </table>)";
-            }
-            out << R"(</div>
-            </div>)";
-            out << R"(
-            <div class="section">
-                <div class="section-header"><span class="icon">⚙️</span> Instructions</div>
-                <div class="section-content">)";
-        if (objPtr->inc.empty()) {
-            out << R"(<div class="no-data">No instructions defined</div>)";
-        } else {
-            out << R"(<table class="instructions-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Opcode</th>
-                                <th>Instruction</th>
-                                <th>Operand 1</th>
-                                <th>Operand 2</th>
-                                <th>Operand 3</th>
-                                <th>Extra Operands</th>
-                            </tr>
-                        </thead>
-                        <tbody>)";
-            for (size_t i = 0; i < objPtr->inc.size(); ++i) {
-                const auto& instr = objPtr->inc[i];
-                out << "<tr>"
-                << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
-                << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
-                << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
-                << "<td class=\"operand\">" << instr.op1.op << "</td>"
-                << "<td class=\"operand\">" << instr.op2.op << "</td>"
-                << "<td class=\"operand\">" << instr.op3.op << "</td>"
-                << "<td class=\"operand\">";
-                for (size_t j = 0; j < instr.vop.size(); ++j) {
-                    if (j > 0) out << ", ";
-                    out << instr.vop[j].op;
-                }
-                out << "</td></tr>";
-            }
-            out << R"(</tbody>
-                    </table>)";
-        }
-        out << R"(</div>
-            </div>)";
-        if (!objPtr->objects.empty()) {
-            out << R"(<div class="section">
-                <div class="section-header"><span class="icon">📦</span> Nested Objects</div>
-                <div class="section-content">)";
-            for (const auto& nestedObj : objPtr->objects) {
-                if (nestedObj) {
-                    printObjectHTML(out, nestedObj);
-                }
-            }
-            out << R"(</div>
-            </div>)";
-        }
-        out << R"(</div>)";
-    }
-
-    bool Parser::generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program) {
-        out << R"(<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>MXVM Debug Report - )" << program->name << R"(</title>
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: #000;
-                    color: #e0e0e0;
-                    line-height: 1.6;
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    background: transparent;
-                }
-                .header {
-                    background: #222;
-                    border-radius: 15px;
-                    padding: 30px;
-                    margin-bottom: 30px;
-                    box-shadow: 0 8px 32px rgba(183, 28, 28, 0.2);
-                    border: 1px solid #b71c1c;
-                }
-                .header h1 {
-                    color: #ff5252;
-                    font-size: 2.5rem;
-                    margin-bottom: 10px;
-                    font-weight: 700;
-                    text-shadow: 1px 1px 2px #000;
-                }
-                .header .subtitle {
-                    color: #e57373;
-                    font-size: 1.2rem;
-                    margin-bottom: 20px;
-                }
-                .stats {
-                    display: flex;
-                    gap: 20px;
-                    flex-wrap: wrap;
-                }
-                .stat-card {
-                    background: #b71c1c;
-                    color: #fff;
-                    padding: 15px 25px;
-                    border-radius: 10px;
-                    text-align: center;
-                    min-width: 150px;
-                    box-shadow: 0 4px 15px rgba(183, 28, 28, 0.3);
-                }
-                .stat-card .number {
-                    font-size: 2rem;
-                    font-weight: bold;
-                    display: block;
-                }
-                .stat-card .label {
-                    font-size: 0.9rem;
-                    opacity: 0.9;
-                }
-                .section {
-                    background: #181818;
-                    border-radius: 15px;
-                    margin-bottom: 30px;
-                    box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
-                    border: 1px solid #b71c1c;
-                    overflow: hidden;
-                }
-                .section-header {
-                    background: #b71c1c;
-                    color: #fff;
-                    padding: 20px 30px;
-                    font-size: 1.4rem;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                }
-                .section-content {
-                    padding: 30px;
-                }
-                .variables-grid {
-                    display: grid;
-                    gap: 15px;
-                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                }
-                .variable-card {
-                    background: #222;
-                    border: 1px solid #b71c1c;
-                    border-radius: 10px;
-                    padding: 20px;
-                    color: #fff;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .variable-card:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 20px rgba(183, 28, 28, 0.2);
-                }
-                .variable-name {
-                    font-weight: 600;
-                    font-size: 1.1rem;
-                    color: #ff5252;
-                    margin-bottom: 8px;
-                }
-                .variable-type {
-                    display: inline-block;
-                    background: #b71c1c;
-                    color: #fff;
-                    padding: 4px 12px;
-                    border-radius: 20px;
-                    font-size: 0.8rem;
-                    font-weight: 500;
-                    margin-bottom: 10px;
-                }
-                .variable-value {
-                    font-family: 'Courier New', monospace;
-                    background: #181818;
-                    border: 1px solid #b71c1c;
-                    border-radius: 5px;
-                    padding: 10px;
-                    color: #e0e0e0;
-                    word-break: break-all;
-                }
-                .instructions-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    background: #222;
-                    border-radius: 10px;
-                    overflow: hidden;
-                    box-shadow: 0 2px 10px rgba(183, 28, 28, 0.1);
-                }
-                .instructions-table th {
-                    background: #b71c1c;
-                    color: #fff;
-                    padding: 15px;
-                    text-align: left;
-                    font-weight: 600;
-                }
-                .instructions-table td {
-                    padding: 12px 15px;
-                    border-bottom: 1px solid #b71c1c;
-                    color: #e0e0e0;
-                }
-                .instructions-table tr:nth-child(even) {
-                    background: #181818;
-                }
-                .instructions-table tr:hover {
-                    background: #2d2d2d;
-                }
-                .opcode {
-                    font-weight: 600;
-                    color: #ff5252;
-                }
-                .operand {
-                    font-family: 'Courier New', monospace;
-                    color: #e0e0e0;
-                }
-                .object-section {
-                    margin-left: 20px;
-                    border-left: 3px solid #b71c1c;
-                    padding-left: 20px;
-                }
-                .object-title {
-                    font-size: 1.2rem;
-                    font-weight: 600;
-                    color: #ff5252;
-                    margin-bottom: 15px;
-                    padding: 10px 15px;
-                    background: #222;
-                    border-radius: 8px;
-                    border-left: 4px solid #b71c1c;
-                }
-                .icon {
-                    width: 20px;
-                    height: 20px;
-                    display: inline-block;
-                }
-                .no-data {
-                    text-align: center;
-                    color: #e57373;
-                    font-style: italic;
-                    padding: 40px;
-                }
-                @media (max-width: 768px) {
-                    .container {
-                        padding: 10px;
-                    }
-                    .header h1 {
-                        font-size: 2rem;
-                    }
-                    .stats {
-                        justify-content: center;
-                    }
-                    .variables-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .instructions-table {
-                        font-size: 0.9rem;
-                    }
-                }
-            </style>
-
-        </head>
-        <body>)";
-        
-            bool mainHasContent = !program->vars.empty() || !program->inc.empty() || !program->labels.empty();
-            bool hasObjects = !program->objects.empty();
-
-            out << R"(
-                <div class="container">
-                    <div class="header">
-                        <h1>🔧 MXVM Debug Report</h1>
-                        <div class="subtitle">Program: <span style="color: blue;"><strong>)" << program->name << R"(</span></strong></div>
-                        <div class="stats">
-                            <div class="stat-card">
-                                <span class="number">)" << program->vars.size() << R"(</span>
-                                <span class="label">Variables</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="number">)" << program->inc.size() << R"(</span>
-                                <span class="label">Instructions</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="number">)" << program->objects.size() << R"(</span>
-                                <span class="label">Objects</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="number">)" << program->labels.size() << R"(</span>
-                                <span class="label">Labels</span>
-                            </div>
+            out << R"(<div class="object-section">
+                <div class="object-title">Object: <span style="color: lime;"><sxtrong>)" << objPtr->name << R"(</span></strong></div>)";
+                out << R"(
+                    <div class="stats" style="margin-bottom:30px;">
+                        <div class="stat-card">
+                            <span class="number">)" << objPtr->vars.size() << R"(</span>
+                            <span class="label">Variables</span>
                         </div>
-                    </div>)";
-
-            
-            if (mainHasContent) {
-            
-                out << R"(<div class="section">
-                    <div class="section-header">
-                        <span class="icon">📊</span>
-                        Variables
+                        <div class="stat-card">
+                            <span class="number">)" << objPtr->inc.size() << R"(</span>
+                            <span class="label">Instructions</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="number">)" << objPtr->labels.size() << R"(</span>
+                            <span class="label">Labels</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="number">)" << objPtr->objects.size() << R"(</span>
+                            <span class="label">Objects</span>
+                        </div>
                     </div>
+                )";
+                out << R"(
+                <div class="section">
+                    <div class="section-header"><span class="icon">📊</span> Variables</div>
                     <div class="section-content">)";
-                
-                if (program->vars.empty()) {
-                    out << R"(<div class="no-data">No variables defined</div>)";
-                } else {
-                    out << R"(<div class="variables-grid">)";
-                    for (const auto& var : program->vars) {
-                        out << R"(<div class="variable-card">
-                            <div class="variable-name">)" << var.first << R"(</div>
-                            <div class="variable-type">)";
-                        
-                        switch (var.second.type) {
-                            case VarType::VAR_INTEGER: out << "Integer"; break;
-                            case VarType::VAR_FLOAT: out << "Float"; break;
-                            case VarType::VAR_STRING: out << "String"; break;
-                            case VarType::VAR_POINTER: out << "Pointer"; break;
-                            case VarType::VAR_LABEL: out << "Label"; break;
-                            case VarType::VAR_EXTERN: out << "External"; break;
-                            case VarType::VAR_ARRAY: out << "Array"; break;
-                            case VarType::VAR_BYTE: out << "Byte"; break;
-                            default: out << "Unknown"; break;
-                        }
-                        
-                        out << R"(</div>
-                            <div class="variable-value">)";
-                        
-                        switch (var.second.type) {
-                            case VarType::VAR_INTEGER:
-                            case VarType::VAR_BYTE:
-                                out << var.second.var_value.int_value;
-                                break;
-                            case VarType::VAR_FLOAT:
-                                out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
-                                break;
-                            case VarType::VAR_STRING:
-                                out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
-                                break;
-                            case VarType::VAR_POINTER:
-                            case VarType::VAR_EXTERN:
-                                if (var.second.var_value.ptr_value == nullptr)
-                                    out << "null";
-                                else
-                                    out << var.second.var_value.ptr_value;
-                                break;
-                            case VarType::VAR_LABEL:
-                                out << var.second.var_value.label_value;
-                                break;
-                            default:
-                                out << var.second.var_value.int_value;
-                                break;
-                        }
-                        
-                        out << R"(</div>
-                        </div>)";
+            if (objPtr->vars.empty()) {
+                out << R"(<div class="no-data">No variables defined</div>)";
+            } else {
+                out << R"(<div class="variables-grid">)";
+                for (const auto& var : objPtr->vars) {
+                    out << R"(<div class="variable-card">
+                                <div class="variable-name">)" << var.first << R"(</div>
+                                <div class="variable-type">)";
+                    switch (var.second.type) {
+                        case VarType::VAR_INTEGER: out << "Integer"; break;
+                        case VarType::VAR_FLOAT: out << "Float"; break;
+                        case VarType::VAR_STRING: out << "String"; break;
+                        case VarType::VAR_POINTER: out << "Pointer"; break;
+                        case VarType::VAR_LABEL: out << "Label"; break;
+                        case VarType::VAR_EXTERN: out << "External"; break;
+                        case VarType::VAR_ARRAY: out << "Array"; break;
+                        case VarType::VAR_BYTE: out << "Byte"; break;
+                        default: out << "Unknown"; break;
                     }
-                    out << R"(</div>)";
+                    out << R"(</div>
+                                <div class="variable-value">)";
+                    switch (var.second.type) {
+                        case VarType::VAR_INTEGER:
+                        case VarType::VAR_BYTE:
+                            out << var.second.var_value.int_value;
+                            break;
+                        case VarType::VAR_FLOAT:
+                            out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
+                            break;
+                        case VarType::VAR_STRING:
+                            out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
+                            break;
+                        case VarType::VAR_POINTER:
+                        case VarType::VAR_EXTERN:
+                            if (var.second.var_value.ptr_value == nullptr)
+                                out << "null";
+                            else
+                                out << var.second.var_value.ptr_value;
+                            break;
+                        case VarType::VAR_LABEL:
+                            out << var.second.var_value.label_value;
+                            break;
+                        default:
+                            out << var.second.var_value.int_value;
+                            break;
+                    }
+                    out << R"(</div>
+                                </div>)";
                 }
-                out << R"(</div>
+                out << R"(</div>)";
+            }
+            out << R"(</div>
                 </div>)";
-
-                // Show Labels section
                 out << R"(<div class="section">
                     <div class="section-header"><span class="icon">🏷️</span> Labels</div>
                     <div class="section-content">)";
-                if (program->labels.empty()) {
+                if (objPtr->labels.empty()) {
                     out << R"(<div class="no-data">No labels defined</div>)";
                 } else {
                     out << R"(<table class="instructions-table">
                         <thead>
                             <tr>
                                 <th>Name</th>
+                                <th>Address</th>
                                 <th>Function</th>
                             </tr>
                         </thead>
                         <tbody>)";
-                    for (const auto& label : program->labels) {
-                        out << "<tr><td>" << label.first << "</td><td>0x" << std::hex << label.second.first << std::dec << R"(</td>
+                    for (const auto& label : objPtr->labels) {
+                        out << R"(<tr>
+                            <td>)" << label.first << R"(</td>
+                            <td>)" << "0x" << std::hex << label.second.first << std::dec << R"(</td>
                             <td>)" << (label.second.second ? "true" : "false") << R"(</td>
                         </tr>)";
                     }
@@ -1234,80 +843,527 @@ namespace mxvm {
                 }
                 out << R"(</div>
                 </div>)";
-
-                // Show Instructions section
-                out << R"(<div class="section">
-                    <div class="section-header">
-                        <span class="icon">⚙️</span>
-                        Instructions
-                    </div>
+                out << R"(
+                <div class="section">
+                    <div class="section-header"><span class="icon">⚙️</span> Instructions</div>
                     <div class="section-content">)";
+            if (objPtr->inc.empty()) {
+                out << R"(<div class="no-data">No instructions defined</div>)";
+            } else {
+                out << R"(<table class="instructions-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Opcode</th>
+                                    <th>Instruction</th>
+                                    <th>Operand 1</th>
+                                    <th>Operand 2</th>
+                                    <th>Operand 3</th>
+                                    <th>Extra Operands</th>
+                                </tr>
+                            </thead>
+                            <tbody>)";
+                for (size_t i = 0; i < objPtr->inc.size(); ++i) {
+                    const auto& instr = objPtr->inc[i];
+                    out << "<tr>"
+                    << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
+                    << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
+                    << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
+                    << "<td class=\"operand\">" << instr.op1.op << "</td>"
+                    << "<td class=\"operand\">" << instr.op2.op << "</td>"
+                    << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                    << "<td class=\"operand\">";
+                    for (size_t j = 0; j < instr.vop.size(); ++j) {
+                        if (j > 0) out << ", ";
+                        out << instr.vop[j].op;
+                    }
+                    out << "</td></tr>";
+                }
+                out << R"(</tbody>
+                        </table>)";
+            }
+            out << R"(</div>
+                </div>)";
+            if (!objPtr->objects.empty()) {
+                out << R"(<div class="section">
+                    <div class="section-header"><span class="icon">📦</span> Nested Objects</div>
+                    <div class="section-content">)";
+                for (const auto& nestedObj : objPtr->objects) {
+                    if (nestedObj) {
+                        printObjectHTML(out, nestedObj);
+                    }
+                }
+                out << R"(</div>
+                </div>)";
+            }
+                    out << R"(<div class="section">
+    <div class="section-header"><span class="icon">📝</span> Compiled Assembly</div>
+    <div class="section-content">
+        <textarea id="asm-)" << objPtr->name << R"(" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
+out << objPtr->assembly_code;
+out << R"(</textarea>
+        <div style="margin-top:10px;">)";
+out << "<button class=\"btn\" onclick=\"copyAsm('asm-" << objPtr->name << "')\">Copy</button>";
+out << "<button class=\"btn\" onclick=\"downloadAsm('asm-" << objPtr->name << "', '" << objPtr->name << ".s')\">Download</button>";
+out << R"(</div>
+    </div>
+</div>
+)";  
+        }
 
-                if (program->inc.empty()) {
-                    out << R"(<div class="no-data">No instructions defined</div>)";
-                } else {
-                    out << R"(<table class="instructions-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Opcode</th>
-                                <th>Instruction</th>
-                                <th>Operand 1</th>
-                                <th>Operand 2</th>
-                                <th>Operand 3</th>
-                                <th>Extra Operands</th>
-                            </tr>
-                        </thead>
-                        <tbody>)";
-
-                    for (size_t i = 0; i < program->inc.size(); ++i) {
-                        const auto& instr = program->inc[i];
-                        out << "<tr>"
-                        << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
-                        << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
-                        << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
-                        << "<td class=\"operand\">" << instr.op1.op << "</td>"
-                        << "<td class=\"operand\">" << instr.op2.op << "</td>"
-                        << "<td class=\"operand\">" << instr.op3.op << "</td>"
-                        << "<td class=\"operand\">";
-                        for (size_t j = 0; j < instr.vop.size(); ++j) {
-                            if (j > 0) out << ", ";
-                            out << instr.vop[j].op;
+        bool Parser::generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program) {
+            out << R"(<!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>MXVM Debug Report - )" << program->name << R"(</title>
+                    <style>
+                        * {
+                            margin: 0;
+                            padding: 0;
+                            box-sizing: border-box;
                         }
-                        out << "</td></tr>";
-                    }
-                    out << R"(</tbody>
-                    </table>)";
-                }
-                out << R"(</div>
-                </div>)";
-            }
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            background: #000;
+                            color: #e0e0e0;
+                            line-height: 1.6;
+                            min-height: 100vh;
+                        }
+                        .container {
+                            max-width: 1200px;
+                            margin: 0 auto;
+                            padding: 20px;
+                            background: transparent;
+                        }
+                        .header {
+                            background: #222;
+                            border-radius: 15px;
+                            padding: 30px;
+                            margin-bottom: 30px;
+                            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.2);
+                            border: 1px solid #b71c1c;
+                        }
+                        .header h1 {
+                            color: #ff5252;
+                            font-size: 2.5rem;
+                            margin-bottom: 10px;
+                            font-weight: 700;
+                            text-shadow: 1px 1px 2px #000;
+                        }
+                        .header .subtitle {
+                            color: #e57373;
+                            font-size: 1.2rem;
+                            margin-bottom: 20px;
+                        }
+                        .stats {
+                            display: flex;
+                            gap: 20px;
+                            flex-wrap: wrap;
+                        }
+                        .stat-card {
+                            background: #b71c1c;
+                            color: #fff;
+                            padding: 15px 25px;
+                            border-radius: 10px;
+                            text-align: center;
+                            min-width: 150px;
+                            box-shadow: 0 4px 15px rgba(183, 28, 28, 0.3);
+                        }
+                        .stat-card .number {
+                            font-size: 2rem;
+                            font-weight: bold;
+                            display: block;
+                        }
+                        .stat-card .label {
+                            font-size: 0.9rem;
+                            opacity: 0.9;
+                        }
+                        .section {
+                            background: #181818;
+                            border-radius: 15px;
+                            margin-bottom: 30px;
+                            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
+                            border: 1px solid #b71c1c;
+                            overflow: hidden;
+                        }
+                        .section-header {
+                            background: #b71c1c;
+                            color: #fff;
+                            padding: 20px 30px;
+                            font-size: 1.4rem;
+                            font-weight: 600;
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                        }
+                        .section-content {
+                            padding: 30px;
+                        }
+                        .variables-grid {
+                            display: grid;
+                            gap: 15px;
+                            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                        }
+                        .variable-card {
+                            background: #222;
+                            border: 1px solid #b71c1c;
+                            border-radius: 10px;
+                            padding: 20px;
+                            color: #fff;
+                            transition: transform 0.2s, box-shadow 0.2s;
+                        }
+                        .variable-card:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 20px rgba(183, 28, 28, 0.2);
+                        }
+                        .variable-name {
+                            font-weight: 600;
+                            font-size: 1.1rem;
+                            color: #ff5252;
+                            margin-bottom: 8px;
+                        }
+                        .variable-type {
+                            display: inline-block;
+                            background: #b71c1c;
+                            color: #fff;
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            font-size: 0.8rem;
+                            font-weight: 500;
+                            margin-bottom: 10px;
+                        }
+                        .variable-value {
+                            font-family: 'Courier New', monospace;
+                            background: #181818;
+                            border: 1px solid #b71c1c;
+                            border-radius: 5px;
+                            padding: 10px;
+                            color: #e0e0e0;
+                            word-break: break-all;
+                        }
+                        .instructions-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            background: #222;
+                            border-radius: 10px;
+                            overflow: hidden;
+                            box-shadow: 0 2px 10px rgba(183, 28, 28, 0.1);
+                        }
+                        .instructions-table th {
+                            background: #b71c1c;
+                            color: #fff;
+                            padding: 15px;
+                            text-align: left;
+                            font-weight: 600;
+                        }
+                        .instructions-table td {
+                            padding: 12px 15px;
+                            border-bottom: 1px solid #b71c1c;
+                            color: #e0e0e0;
+                        }
+                        .instructions-table tr:nth-child(even) {
+                            background: #181818;
+                        }
+                        .instructions-table tr:hover {
+                            background: #2d2d2d;
+                        }
+                        .opcode {
+                            font-weight: 600;
+                            color: #ff5252;
+                        }
+                        .operand {
+                            font-family: 'Courier New', monospace;
+                            color: #e0e0e0;
+                        }
+                        .object-section {
+                            margin-left: 20px;
+                            border-left: 3px solid #b71c1c;
+                            padding-left: 20px;
+                        }
+                        .object-title {
+                            font-size: 1.2rem;
+                            font-weight: 600;
+                            color: #ff5252;
+                            margin-bottom: 15px;
+                            padding: 10px 15px;
+                            background: #222;
+                            border-radius: 8px;
+                            border-left: 4px solid #b71c1c;
+                        }
+                        .btn {
+                            background: #b71c1c;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            margin-right: 10px;
+                            font-weight: 600;
+                            transition: background 0.2s;
+                        }
+                        .btn:hover {
+                            background: #ff5252;
+                        }
+                        .icon {
+                            width: 20px;
+                            height: 20px;
+                            display: inline-block;
+                        }
+                        .no-data {
+                            text-align: center;
+                            color: #e57373;
+                            font-style: italic;
+                            padding: 40px;
+                        }
+                        @media (max-width: 768px) {
+                            .container {
+                                padding: 10px;
+                            }
+                            .header h1 {
+                                font-size: 2rem;
+                            }
+                            .stats {
+                                justify-content: center;
+                            }
+                            .variables-grid {
+                                grid-template-columns: 1fr;
+                            }
+                            .instructions-table {
+                                font-size: 0.9rem;
+                            }
+                        }
+                    </style>
 
-            if (hasObjects) {
-                out << R"(<div class="section">
-                    <div class="section-header">
-                        <span class="icon">📦</span>
-                        Objects
+                </head>
+                <body>)";
+            
+                bool mainHasContent = !program->vars.empty() || !program->inc.empty() || !program->labels.empty();
+                bool hasObjects = !program->objects.empty();
+
+                out << R"(
+                    <div class="container">
+                        <div class="header">
+                            <h1>🔧 MXVM Debug Report</h1>
+                            <div class="subtitle">Program: <span style="color: blue;"><strong>)" << program->name << R"(</span></strong></div>
+                            <div class="stats">
+                                <div class="stat-card">
+                                    <span class="number">)" << program->vars.size() << R"(</span>
+                                    <span class="label">Variables</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="number">)" << program->inc.size() << R"(</span>
+                                    <span class="label">Instructions</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="number">)" << program->objects.size() << R"(</span>
+                                    <span class="label">Objects</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="number">)" << program->labels.size() << R"(</span>
+                                    <span class="label">Labels</span>
+                                </div>
+                            </div>
+                        </div>)";
+
+
+                if (mainHasContent) {
+                    out << R"(<div class="section">
+                        <div class="section-header">
+                            <span class="icon">📊</span>
+                            Variables
+                        </div>
+                        <div class="section-content">)";
+                    
+                    if (program->vars.empty()) {
+                        out << R"(<div class="no-data">No variables defined</div>)";
+                    } else {
+                        out << R"(<div class="variables-grid">)";
+                        for (const auto& var : program->vars) {
+                            out << R"(<div class="variable-card">
+                                <div class="variable-name">)" << var.first << R"(</div>
+                                <div class="variable-type">)";
+                            
+                            switch (var.second.type) {
+                                case VarType::VAR_INTEGER: out << "Integer"; break;
+                                case VarType::VAR_FLOAT: out << "Float"; break;
+                                case VarType::VAR_STRING: out << "String"; break;
+                                case VarType::VAR_POINTER: out << "Pointer"; break;
+                                case VarType::VAR_LABEL: out << "Label"; break;
+                                case VarType::VAR_EXTERN: out << "External"; break;
+                                case VarType::VAR_ARRAY: out << "Array"; break;
+                                case VarType::VAR_BYTE: out << "Byte"; break;
+                                default: out << "Unknown"; break;
+                            }
+                            
+                            out << R"(</div>
+                                <div class="variable-value">)";
+                            
+                            switch (var.second.type) {
+                                case VarType::VAR_INTEGER:
+                                case VarType::VAR_BYTE:
+                                    out << var.second.var_value.int_value;
+                                    break;
+                                case VarType::VAR_FLOAT:
+                                    out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
+                                    break;
+                                case VarType::VAR_STRING:
+                                    out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
+                                    break;
+                                case VarType::VAR_POINTER:
+                                case VarType::VAR_EXTERN:
+                                    if (var.second.var_value.ptr_value == nullptr)
+                                        out << "null";
+                                    else
+                                        out << var.second.var_value.ptr_value;
+                                    break;
+                                case VarType::VAR_LABEL:
+                                    out << var.second.var_value.label_value;
+                                    break;
+                                default:
+                                    out << var.second.var_value.int_value;
+                                    break;
+                            }
+                            
+                            out << R"(</div>
+                            </div>)";
+                        }
+                        out << R"(</div>)";
+                    }
+                    out << R"(</div>
+                    </div>)";
+
+                    // Show Labels section
+                    out << R"(<div class="section">
+                        <div class="section-header"><span class="icon">🏷️</span> Labels</div>
+                        <div class="section-content">)";
+                    if (program->labels.empty()) {
+                        out << R"(<div class="no-data">No labels defined</div>)";
+                    } else {
+                        out << R"(<table class="instructions-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Function</th>
+                                </tr>
+                            </thead>
+                            <tbody>)";
+                        for (const auto& label : program->labels) {
+                            out << "<tr><td>" << label.first << "</td><td>0x" << std::hex << label.second.first << std::dec << R"(</td>
+                                <td>)" << (label.second.second ? "true" : "false") << R"(</td>
+                            </tr>)";
+                        }
+                        out << R"(</tbody>
+                        </table>)";
+                    }
+                    out << R"(</div>
+                    </div>)";
+
+                    // Show Instructions section
+                    out << R"(<div class="section">
+                        <div class="section-header">
+                            <span class="icon">⚙️</span>
+                            Instructions
+                        </div>
+                        <div class="section-content">)";
+
+                    if (program->inc.empty()) {
+                        out << R"(<div class="no-data">No instructions defined</div>)";
+                    } else {
+                        out << R"(<table class="instructions-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Opcode</th>
+                                    <th>Instruction</th>
+                                    <th>Operand 1</th>
+                                    <th>Operand 2</th>
+                                    <th>Operand 3</th>
+                                    <th>Extra Operands</th>
+                                </tr>
+                            </thead>
+                            <tbody>)";
+
+                        for (size_t i = 0; i < program->inc.size(); ++i) {
+                            const auto& instr = program->inc[i];
+                            out << "<tr>"
+                            << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
+                            << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
+                            << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
+                            << "<td class=\"operand\">" << instr.op1.op << "</td>"
+                            << "<td class=\"operand\">" << instr.op2.op << "</td>"
+                            << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                            << "<td class=\"operand\">";
+                            for (size_t j = 0; j < instr.vop.size(); ++j) {
+                                if (j > 0) out << ", ";
+                                out << instr.vop[j].op;
+                            }
+                            out << "</td></tr>";
+
+                          
+                        }
+                        out << R"(</tbody>
+                        </table>)";
+                    }
+                    out << R"(<div class="section">
+                        <div class="section-header"><span class="icon">📝</span> Compiled Assembly</div>
+                        <div class="section-content">
+                            <textarea id="asm-main" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
+                    out << program->assembly_code;
+                    out << R"(</textarea>
+                            <div style="margin-top:10px;">)";
+                    out << "<button class=\"btn\" onclick=\"copyAsm('asm-main')\">Copy</button>";
+                    out << "<button class=\"btn\" onclick=\"downloadAsm('asm-main', '" << program->name << ".s')\">Download</button>";
+                    out << R"(</div>
+                        </div>
                     </div>
-                    <div class="section-content">)";
-                
-                for (const auto& obj : program->objects) {
-                    if (obj) {
-                        printObjectHTML(out, obj);
+                    )";                }
+
+                if (hasObjects) {
+                    out << R"(<div class="section">
+                        <div class="section-header">
+                            <span class="icon">📦</span>
+                            Objects
+                        </div>
+                        <div class="section-content">)";
+                    
+                    for (const auto& obj : program->objects) {
+                        if (obj) {
+                            printObjectHTML(out, obj);
+                        }
                     }
+                    
+                    out << R"(</div>
+                    </div>)";
                 }
-                
-                out << R"(</div>
-                </div>)";
-            }
 
-            out << R"(
-                </div>
-            </body>
-            </html>)";
+                out << R"(
+                    </div>)";
+                out << R"(
+                <script>
+                function copyAsm(id) {
+                    var textarea = document.getElementById(id);
+                    textarea.select();
+                    navigator.clipboard.writeText(textarea.value);
+                }
+                function downloadAsm(id, filename) {
+                    var textarea = document.getElementById(id);
+                    var blob = new Blob([textarea.value], {type: 'text/plain'});
+                    var link = document.createElement('a');
+                    link.href = window.URL.createObjectURL(blob);
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+                </script>
+                </body>
+                </html>
+                )";
+        return true;
+    }
 
-            return true;
-            }
     void Parser::processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program) {
         for (const auto& statement : sectionNode->statements) {
             auto variableNode = dynamic_cast<VariableNode*>(statement.get());
@@ -1552,8 +1608,11 @@ namespace mxvm {
         if (!objectFile.is_open()) {
             throw mx::Exception("Could not create object assembly file: " + objectFileName);
         }
-        objProgram->generateCode(objProgram->object, objectFile);
-        
+
+        std::ostringstream code_v;
+        objProgram->generateCode(objProgram->object, code_v);
+        objProgram->assembly_code = code_v.str();
+        objectFile << code_v.str();
         objectFile.close();
         if (debug_mode) {
             std::cout << "Generated object assembly file: " << objectFileName << std::endl;
