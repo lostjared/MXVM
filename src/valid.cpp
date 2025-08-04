@@ -23,14 +23,14 @@ namespace mxvm {
         collect_labels(labels);
 
         auto skipSeparators = [&]() {
-            while (true) {
+           /* while (true) {
                 if (!token) break;
-                if ((match("\n")  && !match(types::TokenType::TT_STR)) || match(";") || token->getTokenValue().rfind("//", 0) == 0) {
+                if ((match("\n")  && match(types::TokenType::TT_SYM))) {
                     if (!next()) break;
                     continue;
                 }
-                break;
-            }
+                break; 
+            }*/
         };
 
         next();
@@ -56,7 +56,7 @@ namespace mxvm {
         }
 
         skipSeparators();
-        while (!match("}")) {
+        while (token && !match("}")) {
             skipSeparators();
             require("section");
             next();
@@ -70,7 +70,7 @@ namespace mxvm {
 
             if (sectionName == "module" || sectionName == "object") {
                 skipSeparators();
-                while (!match("}")) {
+                while (token && !match("}")) {
                     skipSeparators();
                     if (match(types::TokenType::TT_ID)) {
                         next();
@@ -89,7 +89,7 @@ namespace mxvm {
             }
             else if (sectionName == "data") {
                 skipSeparators();
-                while (!match("}")) {
+                while (token && !match("}")) {
                     skipSeparators();
                     if (match(types::TokenType::TT_ID) &&
                         (token->getTokenValue() == "int" ||
@@ -169,7 +169,9 @@ namespace mxvm {
                 const std::vector<std::string> branchOps = {
                     "call","jmp","je","jne","jg","jl","jge","jle","jz","jnz","ja","jb"
                 };
-                while (!match("}")) {
+                while (token && !match("}")) {
+                    size_t old_index = index;
+
                     skipSeparators();
                     if (match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
                         next();
@@ -247,8 +249,14 @@ namespace mxvm {
                         continue;
                     }
 
-                    lbl_names.emplace_back(token->getTokenValue(), *token);
-                    next();
+                    // If we reach here, the token is not a recognized instruction, label, or function. It's a syntax error.
+                    else {
+                         throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
+                    }
+
+                    if (old_index == index) {
+                       if (!next()) break;
+                    }
                 }
                 skipSeparators();
                 require("}");
@@ -267,12 +275,16 @@ namespace mxvm {
 
 
     bool Validator::match(const std::string &m) {
+        if (!token) return false;
         if(token->getTokenValue() != m)
             return false;
         return true;
     }
 
     void Validator::require(const std::string &r) {
+        if (!token) {
+            throw mx::Exception("Syntax Error in file '" + filename + "': Required: " + r + " but reached end of file");
+        }
         if(r != token->getTokenValue()) 
             throw mx::Exception(
                 "Syntax Error in file '" + filename + "': Required: " + r +
@@ -282,12 +294,20 @@ namespace mxvm {
     }
 
     bool Validator::match(const types::TokenType &t) {
+
+        if(!token || index >= scanner.size())
+            return false;
+
         if(t != token->getTokenType())
             return false;
         return true;
     }
 
     void Validator::require(const types::TokenType &t) {
+        if(!token || index >= scanner.size()) {
+            throw mx::Exception("unexpected EOF");
+        }
+
          if(t != token->getTokenType()) 
             throw mx::Exception(
                 "Syntax Error in file '" + filename + "': Required: " + tokenTypeToString(t) +
@@ -298,14 +318,20 @@ namespace mxvm {
     }
     
     bool Validator::next() {
-
-        while (index < scanner.size() && scanner[index].getTokenType() != types::TokenType::TT_STR && (scanner[index].getTokenValue() == "\n" && scanner[index].getTokenType() == types::TokenType::TT_SYM)) {
+        // Skip all newlines
+        while (index < scanner.size() && 
+               scanner[index].getTokenValue() == "\n" && 
+               scanner[index].getTokenType() == types::TokenType::TT_SYM) {
             index++;
         }
+        
         if (index < scanner.size()) {
-            token = &scanner[index++];  
+            token = &scanner[index++];
             return true;
         }
+        
+        // We've reached the end
+        token = nullptr;
         return false;
     }
 
