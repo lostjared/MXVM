@@ -79,15 +79,18 @@ program TicTacToe {
         cmp winner, 1
         je x_wins
         print win_msg, P_O
+        call release
         done
 
     x_wins:
         print win_msg, P_X
+        call release
         done
 
     draw:
         call print_board
         print draw_msg
+        call release
         done
 
     function init_board:
@@ -203,6 +206,10 @@ program TicTacToe {
         mov winner, 2
         jmp check_line_done
     check_line_done:
+        ret
+
+    function release:
+        free board
         ret
     }
 }
