@@ -14,6 +14,16 @@
 #include<windows.h>
 #endif
 
+std::string Col(const std::string &col, std::string color) {
+    std::ostringstream o;
+    if(mx::color_)
+        o << color;
+    o << col;
+    if(mx::color_)
+        o << mx::Color::RESET;
+    return o.str();
+}
+
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
 
@@ -30,8 +40,8 @@ struct Args {
 
 template<typename T>
 void print_help(T &type) {
-    std::cout << "MXVM: Compiler/Interpreter v" << VERSION_INFO << "\n";
-    std::cout << "(C) 2025 LostSideDead Software\n";
+    std::cout << Col("MXVM: Compiler/Interpreter", mx::Color::BRIGHT_CYAN)  << VERSION_INFO << "\n";
+    std::cout << "(C) 2025 " << Col("LostSideDead Software", mx::Color::BRIGHT_BLUE) <<"\n";
     std::cout << "https://lostsidedead.biz\n";
     type.help(std::cout);
 }
@@ -128,16 +138,16 @@ Args proc_args(int argc, char **argv) {
             }
         }
     } catch(mx::ArgException<std::string> &exec) {
-        std::cerr << "MXVM: Command Line Argument Parsing Sytnax Error: "<< exec.text() << "\n";
+        std::cerr << Col("MXVM: ", mx::Color::RED) << "Command Line Argument Parsing Sytnax Error: "<< exec.text() << "\n";
         exit(EXIT_FAILURE);
     }
 
     if(args.source_file.empty()) {
-        std::cerr << "MXVM: Error source file required..\n";
+        std::cerr << Col("MXVM: Error ", mx::Color::RED) << "source file required..\n";
         exit(EXIT_FAILURE);
     }
     if(args.module_path.empty()) {
-        std::cerr << "MXVM: Errror: please set module path.\n";
+        std::cerr << Col("MXVM: Errror: ", mx::Color::RED) << "please set module path.\n";
         exit(EXIT_FAILURE);
     }
 
@@ -165,7 +175,7 @@ int main(int argc, char **argv) {
 void process_arguments(Args *args) { 
     int exitCode = 0;
     if(!std::filesystem::is_regular_file(args->source_file) || !std::filesystem::exists(args->source_file)) {
-        std::cerr << "MXVM: Error: input file: " << args->source_file << " does not exist or is not regular file.\n";
+        std::cerr << Col("MXVM: Error: ", mx::Color::RED) << "input file: " << args->source_file << " does not exist or is not regular file.\n";
         exit(EXIT_FAILURE);
     }
     if(args->action == vm_action::translate) {
@@ -175,7 +185,7 @@ void process_arguments(Args *args) {
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else {
-        std::cerr << "MXVM: Error invalid action/command\n";
+        std::cerr << Col("MXVM: Error ", mx::Color::RED) <<"invalid action/command\n";
         exit(EXIT_FAILURE);
     }
     exit(exitCode);
@@ -227,27 +237,27 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
                     std::ofstream  htmlFile(program->name + ".html");
                     if(htmlFile.is_open()) {
                         parser.generateDebugHTML(htmlFile, program);
-                        std::cout << "MXVM: Generated Debug HTML for: " << program->name << "\n";
+                        std::cout << Col("MXVM: Generated Debug HTML for:: ", mx::Color::BRIGHT_GREEN) << program->name << "\n";
                     }
                     file.close();
                 }
             }
         } else {
-            std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
+            std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << "Failed to generate intermedaite code" << "\n";
             exit(EXIT_FAILURE);
         }
     } catch(const mx::Exception &e) {
-        std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
-        std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
+        std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
         return EXIT_FAILURE;
     } catch(const std::exception &e) {
-        std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         return EXIT_FAILURE;
     }
     catch(...) {
-        std::cerr << "MXVM: Unknown Exception.\n";
+        std::cerr << Col("MXVM: ", mx::Color::RED) << "Unknown Exception.\n";
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
@@ -297,7 +307,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
     if(mxvm::debug_mode) {
         debug_output.open("debug_info.txt", std::ios::out);
         if(!debug_output.is_open()) {
-            std::cerr << "MXVM: Error could not open debug_info.txt\n";
+            std::cerr << Col("MXVM: Error ", mx::Color::RED) << "could not open debug_info.txt\n";
         }
     }
     signal_program =  program.get();
@@ -344,36 +354,36 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
             }
 
             if(mxvm::html_mode) {
-                std::cout << "MXVM: Generated " << program->name<< ".html\n";
+                std::cout << Col("MXVM: Generated ", mx::Color::BRIGHT_GREEN) << program->name<< ".html\n";
                 std::ofstream fout(program->name + ".html");
                 parser.generateDebugHTML(fout, program);
                 fout.close();
             }
         } else {
-            std::cerr << "MXVM: Error: Failed to generate intermediate code.\n";
+            std::cerr << Col("MXVM: Error: ", mx::Color::RED) <<"Failed to generate intermediate code.\n";
             exit(EXIT_FAILURE);
         }
     } catch(const mx::Exception &e) {
-        std::cerr << "MXVM: Exception: "<< e.what() << "\n";
+        std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
         }
     } catch(const std::runtime_error &e) {
-        std::cerr << "MXVM: Runtime Error: " << e.what() << "\n";
+        std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
         }
     } catch(const std::exception &e) {
-        std::cerr << "MXVM: Exception: " << e.what() << "\n";
+        std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
         }
     }  
     catch(...) {
-        std::cerr << "MXVM: Unknown Exception.\n";
+        std::cerr << Col("MXVM: ", mx::Color::RED)<< "Unknown Exception.\n";
         if(mxvm::debug_mode) {
             if(debug_output.is_open())
                 program->memoryDump(debug_output);
@@ -383,11 +393,11 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
     if(mxvm::debug_mode) {
         if(debug_output.is_open())  { 
             debug_output.close();
-            std::cout << "MXVM: Generated debug information: debug_info.txt\n";
+            std::cout << Col("MXVM: Generated: ", mx::Color::BRIGHT_GREEN) << "debug information: debug_info.txt\n";
         }
     }
     if(mxvm::debug_mode) {
-        std::cout << "MXVM: Program exited with: " << exitCode << "\n";
+        std::cout << Col("MXVM: ", mx::Color::RED) << "Program exited with: " << exitCode << "\n";
     }
     return exitCode;
 }
