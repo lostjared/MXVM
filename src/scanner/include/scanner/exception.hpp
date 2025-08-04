@@ -11,6 +11,7 @@
 #include<cstring>
 #include<cstdint>
 #include<unistd.h>
+#include<sstream>
 
 namespace mx {
 
@@ -60,6 +61,16 @@ namespace mx {
         return isatty(STDOUT_FILENO) && getenv("TERM") != nullptr;
     }
     inline bool color_ = terminal_supports_color();
+}
+
+inline std::string Col(const std::string &col, std::string color) {
+    std::ostringstream o;
+    if(mx::color_)
+        o << color;
+    o << col;
+    if(mx::color_)
+        o << mx::Color::RESET;
+    return o.str();
 }
 
 #endif

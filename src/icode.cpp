@@ -495,7 +495,7 @@ namespace mxvm {
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";
-        std::cout << "MXVM: Compiled: " << name << ".s"  << mainFunc << "\n";
+        std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << "\n";
     }
 
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {

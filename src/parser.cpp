@@ -707,7 +707,7 @@ namespace mxvm {
                                 std::ofstream htmlFile(obj->name + ".html");
                                 if(htmlFile.is_open()) {
                                     generateDebugHTML(htmlFile, obj);
-                                    std::cout << "MXVM: Generated Debug HTML for: " << obj->name << "\n";
+                                    std::cout << Col("MXVM: Generated ", mx::Color::BRIGHT_GREEN) << "Debug HTML for: " << obj->name << "\n";
                                 }
                             }
                         }

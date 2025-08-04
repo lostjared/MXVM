@@ -14,15 +14,7 @@
 #include<windows.h>
 #endif
 
-std::string Col(const std::string &col, std::string color) {
-    std::ostringstream o;
-    if(mx::color_)
-        o << color;
-    o << col;
-    if(mx::color_)
-        o << mx::Color::RESET;
-    return o.str();
-}
+
 
 enum class vm_action { null_action = 0, translate , interpret };
 enum class vm_target { x86_64_linux };
@@ -40,7 +32,7 @@ struct Args {
 
 template<typename T>
 void print_help(T &type) {
-    std::cout << Col("MXVM: Compiler/Interpreter", mx::Color::BRIGHT_CYAN)  << VERSION_INFO << "\n";
+    std::cout << Col("MXVM: Compiler/Interpreter ", mx::Color::BRIGHT_CYAN)  << "v" << VERSION_INFO << "\n";
     std::cout << "(C) 2025 " << Col("LostSideDead Software", mx::Color::BRIGHT_BLUE) <<"\n";
     std::cout << "https://lostsidedead.biz\n";
     type.help(std::cout);
