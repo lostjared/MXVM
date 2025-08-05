@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MXVM Debug Compiler</title>
-    <style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MXVM Debug Compiler</title>
+  <style>
         * {
             margin: 0;
             padding: 0;
@@ -204,133 +204,123 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔧 MXVM Debug Compiler</h1>
-            <p>Paste your MXVM source code below to generate debug HTML output</p>
+  <div class="container">
+    <div class="header">
+      <h1>🔧 MXVM Debug Compiler</h1>
+      <p>Paste your MXVM source code below to generate debug HTML & assembly</p>
+    </div>
+    <div class="input-section">
+      <div class="input-header">
+        <span>📝 MXVM Source Code</span>
+        <a href="#" class="example-link" onclick="loadExample()">Load Example</a>
+      </div>
+      <div class="input-content">
+        <textarea id="codeInput" placeholder="Enter your MXVM source code…"></textarea>
+        <div class="button-group">
+          <button class="btn" id="parseBtn" onclick="parseCode()" disabled>
+            🚀 Parse & Generate Debug HTML
+          </button>
+          <button class="btn" onclick="clearAll()">
+            🗑️ Clear All
+          </button>
+          <button class="btn" onclick="copyOutput()">
+            📋 Copy Output
+          </button>
+          <button class="btn" id="downloadZipBtn" disabled>
+            💾 Download Assembly ZIP
+          </button>
         </div>
-        
-        <div class="input-section">
-            <div class="input-header">
-                <span>📝 MXVM Source Code</span>
-                <a href="#" class="example-link" onclick="loadExample()">Load Example</a>
-            </div>
-            <div class="input-content">
-                <textarea id="codeInput" placeholder="Enter your MXVM source code here...
-
-Example:
-program Hello {
-    section data { 
-        
-    }
-    section code {
-        done
-    }
-}
-"></textarea>
-                <div class="button-group">
-                    <button class="btn" onclick="parseCode()" id="parseBtn">
-                        🚀 Parse & Generate Debug HTML
-                    </button>
-                    <button class="btn" onclick="clearAll()">
-                        🗑️ Clear All
-                    </button>
-                    <button class="btn" onclick="copyOutput()">
-                        📋 Copy Output
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="output-section">
-            <div class="output-header">
-                <span>📊</span>
-                Debug HTML Output
-            </div>
-            <div id="output">
-                <div class="loading">
-                    Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
-  <script src="mxvm.js?v=1.0"></script>
-<script>
-    let mxvmModule = null;
+    <div class="output-section">
+      <div class="output-header">
+        <span>📊</span> Debug HTML Output
+      </div>
+      <div id="output">
+        <div class="loading">
+          Enter MXVM code above and click “Parse & Generate Debug HTML” to see the output here.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSZip for ZIP functionality -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <!-- Your Emscripten MXVM module -->
+  <script src="mxvm.js?v=1.03"></script>
+  <script>
+    let mxvmModule       = null;
     let debuggerInstance = null;
 
-    Module.onRuntimeInitialized = function() {
-        mxvmModule = Module;
-        debuggerInstance = new mxvmModule.MXVM_Debug();
-        document.getElementById('parseBtn').disabled = false;
-        document.getElementById('parseBtn').textContent = "🚀 Parse & Generate Debug HTML";
+    Module.onRuntimeInitialized = () => {
+      mxvmModule       = Module;
+      debuggerInstance = new mxvmModule.MXVM_Debug();
+
+      document.getElementById('parseBtn').disabled       = false;
+      document.getElementById('downloadZipBtn').disabled = true;
+      document.getElementById('parseBtn').textContent    = "🚀 Parse & Generate Debug HTML";
     };
 
-    window.parseCode = function() {
-        const codeInput = document.getElementById('codeInput');
-        const output = document.getElementById('output');
-        const parseBtn = document.getElementById('parseBtn');
-        
-        if (!debuggerInstance) {
-            showError("WebAssembly module not loaded yet. Please wait...");
-            return;
-        }
-        
-        const code = codeInput.value.trim();
-        if (!code) {
-            showError("Please enter some MXVM code to parse.");
-            return;
-        }
-        
-        parseBtn.disabled = true;
-        parseBtn.textContent = "🔄 Parsing...";
-        output.innerHTML = '<div class="loading">Parsing MXVM code...</div>';
-        
-        try {
-            const htmlOutput = debuggerInstance.parseToHTML(code);
-            output.innerHTML = htmlOutput;
-        } catch (error) {
-            showError("Parsing failed: " + error.message);
-        } finally {
-            parseBtn.disabled = false;
-            parseBtn.textContent = "🚀 Parse & Generate Debug HTML";
-        }
-    };
+    function parseCode() {
+      const code    = document.getElementById('codeInput').value.trim();
+      const output  = document.getElementById('output');
+      const parseBtn = document.getElementById('parseBtn');
+      const zipBtn   = document.getElementById('downloadZipBtn');
 
-    window.showError = function(message) {
-        const output = document.getElementById('output');
-        output.innerHTML = `<div class="error">❌ ${message}</div>`;
-    };
+      if (!debuggerInstance) {
+        return showError("WebAssembly module not loaded yet. Please wait...");
+      }
+      if (!code) {
+        return showError("Please enter some MXVM code to parse.");
+      }
 
-    window.clearAll = function() {
-        document.getElementById('codeInput').value = '';
-        document.getElementById('output').innerHTML = '<div class="loading">Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.</div>';
-    };
+      parseBtn.disabled    = true;
+      zipBtn.disabled      = true;
+      parseBtn.textContent = "🔄 Parsing...";
+      output.innerHTML     = '<div class="loading">Parsing MXVM code…</div>';
 
-    window.copyOutput = function() {
-        const output = document.getElementById('output');
-        const range = document.createRange();
-        range.selectNode(output);
-        window.getSelection().removeAllRanges();
-        window.getSelection().addRange(range);
-        
-        try {
-            document.execCommand('copy');
-            window.getSelection().removeAllRanges();
-            const btn = event.target;
-            const originalText = btn.textContent;
-            btn.textContent = "✅ Copied!";
-            setTimeout(() => {
-                btn.textContent = originalText;
-            }, 2000);
-        } catch (err) {
-            showError("Failed to copy to clipboard");
-        }
-    };
+      try {
+        const html = debuggerInstance.parseToHTML(code);
+        output.innerHTML = html;
+        zipBtn.disabled = false;
+      } catch (err) {
+        showError("Parsing failed: " + err.message);
+      } finally {
+        parseBtn.disabled    = false;
+        parseBtn.textContent = "🚀 Parse & Generate Debug HTML";
+      }
+    }
 
-    window.loadExample = function() {
-    const exampleCode = `program TicTacToe {
+    function showError(msg) {
+      document.getElementById('output').innerHTML =
+        `<div class="error">❌ ${msg}</div>`;
+    }
+
+    function clearAll() {
+      document.getElementById('codeInput').value = '';
+      document.getElementById('output').innerHTML =
+        '<div class="loading">Enter MXVM code above and click “Parse & Generate Debug HTML” to see the output here.</div>';
+      document.getElementById('downloadZipBtn').disabled = true;
+    }
+
+    function copyOutput() {
+      const out = document.getElementById('output');
+      const range = document.createRange();
+      range.selectNode(out);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try {
+        document.execCommand('copy');
+        sel.removeAllRanges();
+      } catch {
+        showError("Failed to copy to clipboard");
+      }
+    }
+
+    function loadExample() {
+   const exampleCode = `program TicTacToe {
     section data {
         string welcome = "--- MXVM Tic-Tac-Toe ---\\n"
         string prompt = "Player %c, enter position (0-8): "
@@ -559,18 +549,55 @@ object game_board {
     }
 }
 `;
+      document.getElementById('codeInput').value = exampleCode;
+    }
 
-        document.getElementById('codeInput').value = exampleCode;
-    };
+   document.getElementById('downloadZipBtn')
+  .addEventListener('click', async () => {
+    const out = document.getElementById('output');
+    const areas = out.querySelectorAll('textarea[id^="asm-"]');
+    if (areas.length === 0) {
+      return showError("No assembly snippets found to zip.");
+    }
 
+    const titleElem = out.querySelector('.subtitle strong');
+    const progName = titleElem?.textContent || 'program';
+    const zip = new JSZip();
+
+    let asmFiles = [];
+    areas.forEach(ta => {
+      const id = ta.id;
+      let filename;
+      if (id === 'asm-main') {
+        filename = `${progName}.s`;
+      } else {
+        filename = `${id.slice(4)}.s`;
+      }
+      asmFiles.push(filename);
+      zip.file(filename, ta.value);
+    });
+
+    
+    const makefileContent = `all:\n\tgcc ${asmFiles.join(' ')} -o ${progName} -L/usr/local/lib/modules/io -lmxvm_io_static -L/usr/local/lib/modules/string -lmxvm_string_static\n`;
+    zip.file('Makefile', makefileContent);
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'mxvm_assembly.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+    
     document.getElementById('codeInput').addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
-            window.parseCode();
-        }
+      if (e.ctrlKey && e.key === 'Enter') {
+        parseCode();
+      }
     });
 
     document.getElementById('parseBtn').disabled = true;
     document.getElementById('parseBtn').textContent = "⏳ Loading WebAssembly...";
-</script>
+  </script>
 </body>
 </html>
