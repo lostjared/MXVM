@@ -62,6 +62,7 @@ namespace mxvm {
     public:
         Base() = default;
         Base(Base &&other) noexcept;
+        ~Base() = default;
         Base &operator=(Base &&other) noexcept;
         void setMainBase(Base *b) { base = b; }
         void add_instruction(const Instruction &i);
