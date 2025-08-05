@@ -202,6 +202,10 @@ int process_arguments(Args *args) {
                 file_ << compiler << " " << fname_.str() << " " << modules_archives.str() << " ";
                 std::cout << file_.str() << "\n";
                 FILE *fptr = popen(file_.str().c_str(), "r");
+                if(!fptr) {
+                    std::cerr << Col("MXVM: ", mx::Color::RED) << "  could not open up your system compiler are you sure it is there?";
+                    return EXIT_FAILURE;
+                }
                 while(!feof(fptr)) {
                     char buffer[256];
                     if(fgets(buffer, 255, fptr) != nullptr)
