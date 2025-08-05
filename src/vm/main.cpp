@@ -207,8 +207,8 @@ int process_arguments(Args *args) {
                     return EXIT_FAILURE;
                 }
                 while(!feof(fptr)) {
-                    char buffer[256];
-                    if(fgets(buffer, 255, fptr) != nullptr)
+                    char buffer[4096];
+                    if(fgets(buffer, 4095, fptr) != nullptr)
                         std::cout << buffer;
                 }
                 exitCode = pclose(fptr);
