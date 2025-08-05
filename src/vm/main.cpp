@@ -16,7 +16,7 @@
 
 
 
-enum class vm_action { null_action = 0, translate , interpret };
+enum class vm_action { null_action = 0, translate , interpret, compile };
 enum class vm_target { x86_64_linux };
 
 struct Args {
@@ -38,7 +38,7 @@ void print_help(T &type) {
     type.help(std::cout);
 }
 
-void process_arguments(Args *args);
+int process_arguments(Args *args);
 int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
 int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
@@ -66,13 +66,13 @@ Args proc_args(int argc, char **argv) {
     .addOptionSingleValue('p', "path")
     .addOptionDoubleValue(134, "path", "module path")
     .addOptionSingleValue('I', "include path")
-    .addOptionDoubleValue(137, "include", "include path");
+    .addOptionDoubleValue(137, "include", "include path")
     ;
+
 
     if(argc == 1) {
         print_help(argz);
     }
-
     mx::Argument<std::string> arg;
     int value = 0;
     try {
@@ -115,7 +115,10 @@ Args proc_args(int argc, char **argv) {
                         args.action = vm_action::translate;
                     } else if(arg.arg_value == "interpret") {
                         args.action = vm_action::interpret;
-                    } else {
+                    } else if(arg.arg_value == "compile")  {
+                        args.action = vm_action::compile;
+                    } 
+                    else {
                         throw mx::ArgException<std::string>("Error invalid action value");
                     }
                 break;
@@ -160,17 +163,44 @@ Args proc_args(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     Args args = proc_args(argc, argv);
-    process_arguments(&args);
-    return 0;
+    return process_arguments(&args);
 }
 
-void process_arguments(Args *args) { 
+int process_arguments(Args *args) { 
     int exitCode = 0;
     if(!std::filesystem::is_regular_file(args->source_file) || !std::filesystem::exists(args->source_file)) {
         std::cerr << Col("MXVM: Error: ", mx::Color::RED) << "input file: " << args->source_file << " does not exist or is not regular file.\n";
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
-    if(args->action == vm_action::translate) {
+
+
+    if(args->action == vm_action::compile) {
+        exitCode = action_translate(args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        if(exitCode == 0) {
+            if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
+                std::ostringstream fname_;
+                for(auto &f  : mxvm::Program::base->filenames){
+                    fname_ << f <<  " ";
+                }
+                fname_ << " -o " << mxvm::Program::base->root_name;
+                std::ostringstream file_;
+                std::string compiler = "cc";
+                const char *cc = getenv("CC");
+                if(cc != nullptr) {
+                    compiler = cc;
+                }
+                file_ << compiler << " " << fname_.str() << " -L" << args->module_path  << "/modules/io" << " -L"<< args->module_path << "/modules/string" << " -lmxvm_io_static -lmxvm_string_static";
+                std::cout << file_.str() << "\n";
+                FILE *fptr = popen(file_.str().c_str(), "r");
+                while(!feof(fptr)) {
+                    char buffer[256];
+                    if(fgets(buffer, 255, fptr) != nullptr)
+                        std::cout << buffer;
+                }
+                exitCode = pclose(fptr);
+            }
+        }
+    } else if(args->action == vm_action::translate) {
         exitCode = action_translate(args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
@@ -178,9 +208,9 @@ void process_arguments(Args *args) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else {
         std::cerr << Col("MXVM: Error ", mx::Color::RED) <<"invalid action/command\n";
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
-    exit(exitCode);
+    return exitCode;
 }
 
 int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
@@ -234,7 +264,11 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
                         parser.generateDebugHTML(htmlFile, program);
                         std::cout << Col("MXVM: Generated Debug HTML for: ", mx::Color::BRIGHT_GREEN) << program->name << "\n";
                     }
-                    file.close();
+                    htmlFile.close();
+                }
+                file.close();
+                if(mxvm::Program::base != nullptr) {
+                    mxvm::Program::base->add_filename(program->name + ".s");
                 }
             }
         } else {
@@ -356,7 +390,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
             }
         } else {
             std::cerr << Col("MXVM: Error: ", mx::Color::RED) <<"Failed to generate intermediate code.\n";
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";

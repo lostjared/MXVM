@@ -140,6 +140,7 @@ namespace mxvm {
     }
        
     Base *Base::base = nullptr;
+    std::vector<std::string> Base::filenames;
 
     void Base::add_instruction(const Instruction &i) {
         inc.push_back(i);
@@ -159,6 +160,15 @@ namespace mxvm {
     }
 
     void Base::add_global(const std::string &objname,const std::string &name, const Variable &v) {
+    }
+                                      
+    void Base::add_filename(const std::string &fname) {
+        if(base != nullptr) {
+            auto it = std::find(base->filenames.begin(), base->filenames.end(), fname);
+            if(it == base->filenames.end())  {
+                base->filenames.push_back(fname);
+            }
+        }
     }
 
     void Base::add_extern(const std::string &mod, const std::string &name, bool module) {

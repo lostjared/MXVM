@@ -1617,6 +1617,8 @@ out << R"(</div>
         if (debug_mode) {
             std::cout << "Generated object assembly file: " << objectFileName << std::endl;
         }
+        if(Program::base != nullptr)
+            Program::base->add_filename(objectFileName);
     }
     
     void Parser::registerObjectExterns(std::unique_ptr<Program>& mainProgram, 
