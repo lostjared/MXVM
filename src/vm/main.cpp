@@ -39,9 +39,9 @@ void print_help(T &type) {
 }
 
 int process_arguments(Args *args);
-int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_translate(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-int translate_x64_linux(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
+int translate_x64_linux(std::unique_ptr<mxvm::Program> &program,std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
 void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
 
 Args proc_args(int argc, char **argv) {
@@ -173,9 +173,10 @@ int process_arguments(Args *args) {
         return EXIT_FAILURE;
     }
 
+    std::unique_ptr<mxvm::Program> program(new mxvm::Program());
 
     if(args->action == vm_action::compile) {
-        exitCode = action_translate(args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
                 std::ostringstream fname_;
@@ -215,7 +216,7 @@ int process_arguments(Args *args) {
             }
         }
     } else if(args->action == vm_action::translate) {
-        exitCode = action_translate(args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
@@ -227,15 +228,15 @@ int process_arguments(Args *args) {
     return exitCode;
 }
 
-int action_translate(std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
+int action_translate(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
     switch(target) {
         case vm_target::x86_64_linux:
-            return translate_x64_linux(include_path, object_path, input, mod_path, output);
+            return translate_x64_linux(program, include_path, object_path, input, mod_path, output);
     }
     return 0;
 }
 
-int translate_x64_linux(std::string_view include_path, std::string_view object_path, 
+int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, 
                         std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
@@ -250,7 +251,7 @@ int translate_x64_linux(std::string_view include_path, std::string_view object_p
         file.close();
         mxvm::Parser parser(stream.str());
         parser.scan();
-        std::unique_ptr<mxvm::Program> program(new mxvm::Program());
+        
         program->filename = input_file;
         program->setMainBase(program.get());
         parser.module_path = std::string(mod_path);
