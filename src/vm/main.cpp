@@ -217,7 +217,6 @@ int action_translate(std::string_view include_path, std::string_view object_path
     switch(target) {
         case vm_target::x86_64_linux:
             return translate_x64_linux(include_path, object_path, input, mod_path, output);
-        break;
     }
     return 0;
 }
