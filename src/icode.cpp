@@ -49,8 +49,7 @@ namespace mxvm {
         add_variable("stdout", vstdout);
         add_variable("stdin", vstdin);
         add_variable("stderr", vstderr);
-
-        add_extern("string", "strlen", true);
+        add_extern("main", "strlen", true);
         add_extern("main", "printf", true);
         add_extern("main", "calloc", true);
         add_extern("main", "free", true);

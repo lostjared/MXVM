@@ -187,8 +187,9 @@ int process_arguments(Args *args) {
                 std::ostringstream modules_archives;
                 std::set<std::string> arch;
                 for(auto &m : mxvm::Program::base->external) {
-                    if(m.module == true && m.mod != "main")
+                    if(m.module == true && m.mod != "main" && m.name != "strlen") {
                         arch.insert(m.mod);
+                    }
                 }
                 for(auto &m: arch) {
                     modules_archives << args->module_path <<"/modules/"<<m << "/libmxvm_" << m << "_static.a ";
