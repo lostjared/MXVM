@@ -50,7 +50,7 @@ Args proc_args(int argc, char **argv) {
 
     argz.addOptionSingleValue('o', "output file")
     .addOptionSingleValue('a', "action")
-    .addOptionDoubleValue(128, "action", "action to take [translate,  interpret]")
+    .addOptionDoubleValue(128, "action", "action to take [translate, compile, interpret]")
     .addOptionSingleValue('t', "target")
     .addOptionDoubleValue(129, "target", "output target")
     .addOptionSingle('d', "debug mode")
