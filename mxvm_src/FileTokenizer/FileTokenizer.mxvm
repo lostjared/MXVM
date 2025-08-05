@@ -166,7 +166,7 @@ program FileTokenizer {
 
         # Allocate tokenizer’s working buffer (plus null)
         mov pos, ReadFile.file_size
-        add pos, one
+        add pos, 1
         alloc Tokenizer.t_buffer, 1, pos
 
         # Init token_buf
