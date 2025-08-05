@@ -161,191 +161,98 @@ object game_board {
     print row_fmt, v1, v2, v3
     ret
 
-    function check_win:
-    # — left column (Board[0][0], [0][1], [0][2])
-    load v1, board, 0, 8
-    load v2, board, 3, 8
-    load v3, board, 6, 8
-    cmp v1, P_X
-    jne cw1_2
-    cmp v2, P_X
-    jne cw1_2
-    cmp v3, P_X
-    jne cw1_2
-    mov winner, 1
-    ret
-  cw1_2:
-    cmp v1, P_O
-    jne cw2_2
-    cmp v2, P_O
-    jne cw2_2
-    cmp v3, P_O
-    jne cw2_2
-    mov winner, 2
-    ret
-  cw2_2:
+      function check_win:
+    # Row 0 (cells 0,1,2)
+    mov al, 0
+    mov bl, 1
+    mov cl, 2
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — top row (Board[0][0], [1][0], [2][0])
-    load v1, board, 0, 8
-    load v2, board, 1, 8
-    load v3, board, 2, 8
-    cmp v1, P_X
-    jne cw3_2
-    cmp v2, P_X
-    jne cw3_2
-    cmp v3, P_X
-    jne cw3_2
-    mov winner, 1
-    ret
-  cw3_2:
-    cmp v1, P_O
-    jne cw4_2
-    cmp v2, P_O
-    jne cw4_2
-    cmp v3, P_O
-    jne cw4_2
-    mov winner, 2
-    ret
-  cw4_2:
+    # Row 1 (cells 3,4,5)
+    mov al, 3
+    mov bl, 4
+    mov cl, 5
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — middle column (Board[0][1], [1][1], [2][1])
-    load v1, board, 1, 8
-    load v2, board, 4, 8
-    load v3, board, 7, 8
-    cmp v1, P_X
-    jne cw5_2
-    cmp v2, P_X
-    jne cw5_2
-    cmp v3, P_X
-    jne cw5_2
-    mov winner, 1
-    ret
-  cw5_2:
-    cmp v1, P_O
-    jne cw6_2
-    cmp v2, P_O
-    jne cw6_2
-    cmp v3, P_O
-    jne cw6_2
-    mov winner, 2
-    ret
-  cw6_2:
+    # Row 2 (cells 6,7,8)
+    mov al, 6
+    mov bl, 7
+    mov cl, 8
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — right column (Board[0][2], [1][2], [2][2])
-    load v1, board, 2, 8
-    load v2, board, 5, 8
-    load v3, board, 8, 8
-    cmp v1, P_X
-    jne cw7_2
-    cmp v2, P_X
-    jne cw7_2
-    cmp v3, P_X
-    jne cw7_2
-    mov winner, 1
-    ret
-  cw7_2:
-    cmp v1, P_O
-    jne cw8_2
-    cmp v2, P_O
-    jne cw8_2
-    cmp v3, P_O
-    jne cw8_2
-    mov winner, 2
-    ret
-  cw8_2:
+    # Col 0 (cells 0,3,6)
+    mov al, 0
+    mov bl, 3
+    mov cl, 6
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — middle row (Board[1][0], [1][1], [1][2])
-    load v1, board, 3, 8
-    load v2, board, 4, 8
-    load v3, board, 5, 8
-    cmp v1, P_X
-    jne cw9_2
-    cmp v2, P_X
-    jne cw9_2
-    cmp v3, P_X
-    jne cw9_2
-    mov winner, 1
-    ret
-  cw9_2:
-    cmp v1, P_O
-    jne cw10_2
-    cmp v2, P_O
-    jne cw10_2
-    cmp v3, P_O
-    jne cw10_2
-    mov winner, 2
-    ret
-  cw10_2:
+    # Col 1 (cells 1,4,7)
+    mov al, 1
+    mov bl, 4
+    mov cl, 7
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — bottom row (Board[2][0], [2][1], [2][2])
-    load v1, board, 6, 8
-    load v2, board, 7, 8
-    load v3, board, 8, 8
-    cmp v1, P_X
-    jne cw11_2
-    cmp v2, P_X
-    jne cw11_2
-    cmp v3, P_X
-    jne cw11_2
-    mov winner, 1
-    ret
-  cw11_2:
-    cmp v1, P_O
-    jne cw12_2
-    cmp v2, P_O
-    jne cw12_2
-    cmp v3, P_O
-    jne cw12_2
-    mov winner, 2
-    ret
-  cw12_2:
+    # Col 2 (cells 2,5,8)
+    mov al, 2
+    mov bl, 5
+    mov cl, 8
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — diagonal TL→BR (Board[0][0], [1][1], [2][2])
-    load v1, board, 0, 8
-    load v2, board, 4, 8
-    load v3, board, 8, 8
-    cmp v1, P_X
-    jne cw13_2
-    cmp v2, P_X
-    jne cw13_2
-    cmp v3, P_X
-    jne cw13_2
-    mov winner, 1
-    ret
-  cw13_2:
-    cmp v1, P_O
-    jne cw14_2
-    cmp v2, P_O
-    jne cw14_2
-    cmp v3, P_O
-    jne cw14_2
-    mov winner, 2
-    ret
-  cw14_2:
+    # Diagonal TL→BR (cells 0,4,8)
+    mov al, 0
+    mov bl, 4
+    mov cl, 8
+    call check_line
+    cmp winner, 0
+    jne done_check
 
-    # — diagonal TR→BL (Board[0][2], [1][1], [2][0])
-    load v1, board, 2, 8
-    load v2, board, 4, 8
-    load v3, board, 6, 8
-    cmp v1, P_X
-    jne cw15_2
-    cmp v2, P_X
-    jne cw15_2
-    cmp v3, P_X
-    jne cw15_2
-    mov winner, 1
-    ret
-  cw15_2:
-    cmp v1, P_O
-    jne cw_done
-    cmp v2, P_O
-    jne cw_done
-    cmp v3, P_O
-    jne cw_done
-    mov winner, 2
+    # Diagonal TR→BL (cells 2,4,6)
+    mov al, 2
+    mov bl, 4
+    mov cl, 6
+    call check_line
+
+  done_check:
     ret
 
-  cw_done:
+  function check_line:
+    load v1, board, al, 8
+    load v2, board, bl, 8
+    load v3, board, cl, 8
+
+    cmp v1, P_EMPTY
+    je  check_line_end
+    cmp v1, v2
+    jne check_line_end
+    cmp v1, v3
+    jne check_line_end
+
+    cmp v1, P_X
+    je  set_x
+    cmp v1, P_O
+    je  set_o
+
+  check_line_end:
+    ret
+
+  set_x:
+    mov winner, 1
+    ret
+
+  set_o:
+    mov winner, 2
     ret
 
 
