@@ -63,8 +63,7 @@ A typical `.mxvm` program:
 program MyApp {
   section data {
     int    counter = 0
-    string msg     = "Hello, MXVM!
-"
+    string msg     = "Hello, MXVM!\n"
   }
 
   section module { io, string }
