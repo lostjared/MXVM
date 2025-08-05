@@ -175,9 +175,10 @@ invoke strlen, mystr</code></pre>
       <pre><code>git clone https://github.com/yourname/MXVM.git
 cd MXVM
 mkdir build && cd build
-cmake .. && make</code></pre>
-      <p><strong>Interpreter:</strong> <code>./mxvmc ../mxvm_src/hello_world.mxvm --interpret</code></p>
-      <p><strong>Compile:</strong> <code>./mxvmc ../mxvm_src/fibonacci.mxvm --compile -o fib && ./fib</code></p>
+cmake .. && make && sudo make install
+</code></pre>
+      <p><strong>Interpreter:</strong> <code>mxvmc hello_world.mxvm --path /usr/local/lib --object-path . </code></p>
+      <p><strong>Compile:</strong> <code>mxvmc fibonacci.mxvm --path /usr/local/lib --object-path . --action translate</code></p>
     </section>
     <section>
       <h2>Contributing</h2>
