@@ -189,7 +189,7 @@ int process_arguments(Args *args) {
                 if(cc != nullptr) {
                     compiler = cc;
                 }
-                file_ << compiler << " " << fname_.str() << " -L" << args->module_path  << "/modules/io" << " -lmxvm_io_static -L"<< args->module_path << "/modules/string" << " -lmxvm_string_static";
+                file_ << compiler << " " << fname_.str() << " " << args->module_path  << "/modules/io/libmxvm_io_static.a " << args->module_path << "/modules/string/libmxvm_string_static.a " ;
                 std::cout << file_.str() << "\n";
                 FILE *fptr = popen(file_.str().c_str(), "r");
                 while(!feof(fptr)) {
