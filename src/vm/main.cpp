@@ -9,7 +9,7 @@
 #include<filesystem>
 #include<csignal>
 #include<vector>
-
+#include<set>
 #ifdef _WIN32
 #include<windows.h>
 #endif
@@ -184,12 +184,21 @@ int process_arguments(Args *args) {
                 }
                 fname_ << " -o " << mxvm::Program::base->root_name;
                 std::ostringstream file_;
+                std::ostringstream modules_archives;
+                std::set<std::string> arch;
+                for(auto &m : mxvm::Program::base->external) {
+                    if(m.module == true && m.mod != "main")
+                        arch.insert(m.mod);
+                }
+                for(auto &m: arch) {
+                    modules_archives << args->module_path <<"/modules/"<<m << "/libmxvm_" << m << "_static.a ";
+                }
                 std::string compiler = "cc";
                 const char *cc = getenv("CC");
                 if(cc != nullptr) {
                     compiler = cc;
                 }
-                file_ << compiler << " " << fname_.str() << " " << args->module_path  << "/modules/io/libmxvm_io_static.a " << args->module_path << "/modules/string/libmxvm_string_static.a " ;
+                file_ << compiler << " " << fname_.str() << " " << modules_archives.str() << " ";
                 std::cout << file_.str() << "\n";
                 FILE *fptr = popen(file_.str().c_str(), "r");
                 while(!feof(fptr)) {
