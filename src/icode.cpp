@@ -311,6 +311,7 @@ namespace mxvm {
         }
         std::sort(var_names.begin(), var_names.end());
         
+     
         for(auto &v : var_names) {
             std::string var_out_name;
             auto varx = getVariable(v);
@@ -361,6 +362,7 @@ namespace mxvm {
 
         
         if(base != nullptr) {
+            
             for(auto &v : var_names) {
                 auto varx = getVariable(v);
                 auto t = varx.type;
@@ -369,29 +371,10 @@ namespace mxvm {
                         case VarType::VAR_BYTE:
                         case VarType::VAR_FLOAT:
                         case VarType::VAR_INTEGER:
-                            out << "\t.extern " << getMangledName(v) << "\n";
+                            out << "\t.global " << getMangledName(v) << "\n";
                         break;
                         default:
                         break;
-                    }
-                }
-            }
-
-            if(object) {
-                for(auto &v : var_names) {
-                    auto varx = getVariable(v);
-                    auto t = varx.type;
-                    if(varx.is_global) {
-                        switch(t) {
-                            case VarType::VAR_BYTE:
-                            case VarType::VAR_FLOAT:
-                            case VarType::VAR_INTEGER:
-                                out << "\t.global " << getMangledName(v) << "\n";
-                            break;
-                            default:
-                            break;
-                        }
-                        
                     }
                 }
             }
@@ -417,13 +400,6 @@ namespace mxvm {
                 out << "\t.comm " << var_out_name << ", " << varx.var_value.buffer_size << "\n";
             }
         }
-        
-            for(auto &v : var_names) {
-                auto varx = getVariable(v); 
-                if(varx.is_global)
-                    out << "\t.extern " << getMangledName(v) << "\n";
-            }
-
             if(object) {
                 for(auto &v : var_names) {
                     auto varx = getVariable(v);
@@ -627,7 +603,7 @@ namespace mxvm {
         if(isVariable(i.op1.op)) {
             out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
         } else {
-            throw mx::Exception("return requires variable\n");
+            throw mx::Exception("return: " + i.op1.op + " requires variable\n");
         }
     }
     
@@ -752,9 +728,9 @@ namespace mxvm {
             throw mx::Exception("LOAD source must be a pointer variable");
         }
         Variable &ptrVar = getVariable(i.op2.op);
-        if (ptrVar.type != VarType::VAR_POINTER) {
-            throw mx::Exception("LOAD " + i.op2.op + " must be a pointer");
-        }
+        //if (ptrVar.type != VarType::VAR_POINTER && ptrVar.type != VarType::VAR_STRING) {
+          //  throw mx::Exception("LOAD " + i.op2.op + " must be a pointer");
+        //}
         size_t size = (dest.type == VarType::VAR_FLOAT) ? sizeof(double) : sizeof(int64_t);
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
@@ -769,7 +745,13 @@ namespace mxvm {
         } else {
             out << "\txor %rcx, %rcx\n";
         }
-        out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+
+        if(ptrVar.type == VarType::VAR_POINTER)
+            out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+        else if(ptrVar.type == VarType::VAR_STRING)
+            out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+        else throw mx::Exception("Load invalid type: " + i.op2.op);
+
         out << "\timul $" << size << ", %rcx, %rcx\n";
         out << "\tadd %rcx, %rax\n";
         if (dest.type == VarType::VAR_INTEGER) {
@@ -797,9 +779,9 @@ namespace mxvm {
             throw mx::Exception("STORE destination must be a pointer variable");
         }
         Variable &ptrVar = getVariable(i.op2.op);
-        if (ptrVar.type != VarType::VAR_POINTER) {
-            throw mx::Exception("STORE destination must be a pointer");
-        }
+        //if (ptrVar.type != VarType::VAR_POINTER) {
+         //   throw mx::Exception("STORE destination must be a pointer");
+       // }
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
                 Variable &v = getVariable(i.vop[0].op);
@@ -818,7 +800,13 @@ namespace mxvm {
            throw mx::Exception("STORE resize third argument of size count");
         }
 
-        out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+        if(ptrVar.type == VarType::VAR_POINTER)
+             out << "\tmovq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+        else if(ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0)
+            out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+        else    
+            throw mx::Exception ("STORE must be pointer or string buffer");
+
         out << "\timulq %rdx, %rcx\n";
         out << "\taddq %rcx, %rax\n";
 
@@ -1997,7 +1985,6 @@ namespace mxvm {
             var.var_value.type = VarType::VAR_STRING;
         }
     }
-
     void Program::addVariables(Variable& dest, Variable& src1, Variable& src2) {
         if (dest.type == VarType::VAR_INTEGER) {
             int64_t v1 = (src1.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1.var_value.float_value) : src1.var_value.int_value;
@@ -2075,10 +2062,14 @@ namespace mxvm {
         size_t size = 8;
         if (isVariable(instr.op2.op)) {
             Variable& ptrVar = getVariable(instr.op2.op);
-            if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
-                throw mx::Exception("LOAD source must be a valid pointer");
+            if (ptrVar.type != VarType::VAR_POINTER && ptrVar.type != VarType::VAR_STRING) {
+                throw mx::Exception("LOAD source must be a valid pointer/string buffer");
             }
-            ptr = ptrVar.var_value.ptr_value;
+            if(ptrVar.type == VarType::VAR_POINTER)
+                ptr = ptrVar.var_value.ptr_value;
+            else
+                ptr = ptrVar.var_value.str_value.data();
+
         } else {
             throw mx::Exception("LOAD source must be a pointer variable");
         }
@@ -2101,10 +2092,19 @@ namespace mxvm {
         } 
 
         Variable& ptrVar = getVariable(instr.op2.op);
-        if (index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name);
+
+
+
+        if (ptrVar.type == VarType::VAR_POINTER && index >= ptrVar.var_value.ptr_count) {
+            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.ptr_count));
         }
-        if (size > ptrVar.var_value.ptr_size) {
+        if (ptrVar.type == VarType::VAR_POINTER && size > ptrVar.var_value.ptr_size) {
+            throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
+        }
+        if (ptrVar.type == VarType::VAR_STRING && index >= ptrVar.var_value.str_value.length()) {
+            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.str_value.length()));
+        }
+        if (ptrVar.type == VarType::VAR_STRING && size > 1) {
             throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
         }
 
