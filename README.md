@@ -149,7 +149,6 @@ program MyApp {
 | Instruction     | Operands                 | Description                                         |
 |-----------------|--------------------------|-----------------------------------------------------|
 | `print`         | `fmt, args…`             | Print formatted output                              |
-| `string_print`  | `ptr`                    | Print NUL-terminated string                         |
 | `getline`       | `ptr`                    | Read a line from stdin into buffer                  |
 | `invoke`        | `func, args…`            | Call an external (module) function                  |
 | `call`          | `Module.Func`            | Call an internal MXVM function                      |
