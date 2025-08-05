@@ -195,7 +195,7 @@ MXVM-main/
 ## Building
 
 ```bash
-git clone https://github.com/yourname/MXVM.git
+git clone https://github.com/lostjared/MXVM.git
 cd MXVM
 mkdir build && cd build
 cmake ..
