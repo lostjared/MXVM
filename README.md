@@ -209,11 +209,15 @@ make
 
 - **Interpreter mode**  
   ```bash
-  mxvmc ../mxvm_src/hello_world.mxvm --path /usr/local/lib
+  mxvmc hello_world.mxvm --path /usr/local/lib
   ```
 - **Compile ➔ to Assemlby**  
   ```bash
-  mxvmc ../mxvm_src/fibonacci.mxvm --path /usr/local/lib --object-path . --action translate
+  mxvmc fibonacci.mxvm --path /usr/local/lib --object-path . --action translate
+  ```
+- **Compile ➔ to executable**  
+  ```bash
+  mxvmc fibonacci.mxvm --path /usr/local/lib --object-path . --action compile
   ```
 
 ---
