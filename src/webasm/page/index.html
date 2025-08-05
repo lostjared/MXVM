@@ -593,6 +593,15 @@ object game_board {
     document.getElementById('codeInput').addEventListener('keydown', function(e) {
       if (e.ctrlKey && e.key === 'Enter') {
         parseCode();
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const textarea = this;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        textarea.value = textarea.value.substring(0, start) + '\t' + textarea.value.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
       }
     });
 
