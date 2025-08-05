@@ -50,7 +50,7 @@ Args proc_args(int argc, char **argv) {
 
     argz.addOptionSingleValue('o', "output file")
     .addOptionSingleValue('a', "action")
-    .addOptionDoubleValue(128, "action", "action to take [translate, compile, interpret]")
+    .addOptionDoubleValue(128, "action", "action to take [translate,  interpret]")
     .addOptionSingleValue('t', "target")
     .addOptionDoubleValue(129, "target", "output target")
     .addOptionSingle('d', "debug mode")
@@ -189,7 +189,7 @@ int process_arguments(Args *args) {
                 if(cc != nullptr) {
                     compiler = cc;
                 }
-                file_ << compiler << " " << fname_.str() << " -L" << args->module_path  << "/modules/io" << " -L"<< args->module_path << "/modules/string" << " -lmxvm_io_static -lmxvm_string_static";
+                file_ << compiler << " " << fname_.str() << " -L" << args->module_path  << "/modules/io" << " -lmxvm_io_static -L"<< args->module_path << "/modules/string" << " -lmxvm_string_static";
                 std::cout << file_.str() << "\n";
                 FILE *fptr = popen(file_.str().c_str(), "r");
                 while(!feof(fptr)) {
