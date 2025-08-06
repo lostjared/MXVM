@@ -207,3 +207,29 @@ extern "C" void mxvm_io_fseek(mxvm::Program *program, std::vector<mxvm::Operand>
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
 }
+
+extern "C" int rand_number(int64_t);
+
+extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("rand_number requires one argument (size).");
+    }
+    int64_t rsize = 1;
+    if(program->isVariable(operand[0].op)) {
+        mxvm::Variable vsize = program->getVariable(operand[0].op);
+        if (vsize.type != mxvm::VarType::VAR_INTEGER) {
+            throw mx::Exception("rand_number argument must be integer (size).");
+        }
+    } else {
+
+        if(operand[0].type == mxvm::OperandType::OP_CONSTANT)
+                rsize = std::stoll(operand[0].op, nullptr, 0);
+        else 
+             throw mx::Exception ("rand_number expected variable or constant: " + operand[0].op);
+
+    }
+    int result = rand_number(rsize);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}

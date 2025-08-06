@@ -227,7 +227,6 @@ namespace mxvm {
         }
         return result;
     }
-
   void Program::memoryDump(std::ostream &out) {
         out << "Current working directory: ";
         try {
@@ -320,6 +319,7 @@ namespace mxvm {
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second.first] = l.first;
+            
         }
         out << ".section .data\n";
         std::vector<std::string> var_names;
@@ -463,17 +463,20 @@ namespace mxvm {
 
         for(size_t i = 0; i < inc.size(); ++i) {
             const Instruction &instr = inc[i];
-            if(labels_.find(i) != labels_.end()) {
-                if(labels[labels_[i]].second == true) {
-                    out << name << "_" << labels_[i] << ":\n";
+            for (auto l : labels) {
+                if(l.second.first == i && l.second.second) {
+                    out << name << "_" << l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
-
-                } else {
-                    out << "." << labels_[i] << ":\n";
+                    break;
                 }
-            } 
-
+            }            
+            for (auto l : labels) {
+                if(l.second.first == i && !l.second.second) {
+                    out << "." << l.first << ":\n";
+                    break;
+                }
+            }
             if(instr.instruction == DONE)
                 done_found = true;
             generateInstruction(out, instr);
@@ -789,13 +792,24 @@ namespace mxvm {
     }
 
     void Program::gen_store(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op)) {
-            throw mx::Exception("STORE source must be a variable");
+        uint64_t value = 0;
+        VarType  type;
+        bool is_const = false;
+      
+
+        if (!isVariable(i.op1.op) && i.op1.type == OperandType::OP_CONSTANT) {
+            value = std::stoll(i.op1.op, nullptr, 0);            
+            type =  VarType::VAR_INTEGER;
+            is_const = true;
+        } else {
+            Variable &src = getVariable(i.op1.op);
+            value = src.var_value.int_value;
+            type = src.type;
+            is_const = false;
         }
-        Variable &src = getVariable(i.op1.op);
 
         if (!isVariable(i.op2.op)) {
-            throw mx::Exception("STORE destination must be a pointer variable");
+            throw mx::Exception("STORE destination must be a pointer variable: " + i.op2.op);
         }
         Variable &ptrVar = getVariable(i.op2.op);
         //if (ptrVar.type != VarType::VAR_POINTER) {
@@ -809,7 +823,7 @@ namespace mxvm {
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rdx", i.vop[0]);
             }
         } else {
-            throw mx::Exception("STORE: requires allocaiton size 4th argument.");
+            out << "\tmovq $8, %rdx\n";
         }
 
         std::string idx_reg = "%rcx";
@@ -829,13 +843,17 @@ namespace mxvm {
         out << "\timulq %rdx, %rcx\n";
         out << "\taddq %rcx, %rax\n";
 
-        if (src.type == VarType::VAR_INTEGER) {
+        if(is_const == true) {
+            out << "\tmovq " << "$" << value << ", %rdx\n";
+            out << "\tmovq %rdx, (%rax)\n";
+        }
+        else if (type == VarType::VAR_INTEGER) {
             out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdx\n";
             out << "\tmovq %rdx, (%rax)\n";
-        } else if(src.type == VarType::VAR_BYTE) {
+        } else if(type == VarType::VAR_BYTE) {
             out << "\tmovb " << getMangledName(i.op1.op) << "(%rip), %r8b\n";
             out << "\tmovb %r8b, (%rax)\n";
-        } else if (src.type == VarType::VAR_FLOAT) {
+        } else if (type == VarType::VAR_FLOAT) {
             out << "\tmovsd " << getMangledName(i.op1.op) << "(%rip), %xmm0\n";
             out << "\tmovsd %xmm0, (%rax)\n";
         } else {
@@ -872,6 +890,7 @@ namespace mxvm {
         if (src.type != VarType::VAR_STRING) {
             throw mx::Exception("to_float: second argument must be a string variable");
         }
+        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdi\n";
         out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdi\n";
         out << "\tcall atof\n";
         out << "\tmovsd %xmm0, " <<getMangledName( i.op1.op) << "(%rip)\n";
@@ -1662,7 +1681,7 @@ namespace mxvm {
 
     void Program::exec_mov(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
-            std::cerr << "Error: MOV destination must be a variable, not a constant\n";
+            std::cerr << "Error: MOV destination: " + instr.op1.op + "  must be a variable, not a constant\n";
             return;
         }
         Variable& dest = getVariable(instr.op1.op);
@@ -1676,7 +1695,7 @@ namespace mxvm {
 
     void Program::exec_add(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
-            std::cerr << "Error: ADD destination must be a variable, not a constant\n";
+            std::cerr << "Error: ADD destination: " + instr.op1.op + " must be a variable, not a constant\n";
             return;
         }
         Variable& dest = getVariable(instr.op1.op);
@@ -2115,13 +2134,13 @@ namespace mxvm {
 
 
         if (ptrVar.type == VarType::VAR_POINTER && index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.ptr_count));
+            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " " + instr.op1.op  + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.ptr_count));
         }
         if (ptrVar.type == VarType::VAR_POINTER && size > ptrVar.var_value.ptr_size) {
             throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
         }
         if (ptrVar.type == VarType::VAR_STRING && index >= ptrVar.var_value.str_value.length()) {
-            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.str_value.length()));
+            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " " + instr.op1.op + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.str_value.length()));
         }
         if (ptrVar.type == VarType::VAR_STRING && size > 1) {
             throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
@@ -2167,18 +2186,25 @@ namespace mxvm {
     }
 
     void Program::exec_store(const Instruction& instr) {
-        if (!isVariable(instr.op1.op)) {
-            throw mx::Exception("STORE source must be a variable");
-            return;
+       
+        int64_t value = 0;
+        VarType type;
+        if(instr.op1.type == OperandType::OP_CONSTANT) {
+            value = std::stoll(instr.op1.op, nullptr, 0);
+            type = VarType::VAR_INTEGER;
         }
-        Variable& src = getVariable(instr.op1.op);
+        else {
+            Variable &src = getVariable(instr.op1.op);
+            value = src.var_value.int_value;
+            type = src.type;
+        }
         void* ptr = nullptr;
         size_t index = 0;
         size_t size = 8;
         if (isVariable(instr.op2.op)) {
             Variable& ptrVar = getVariable(instr.op2.op);
             if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
-                throw mx::Exception("STORE destination must be a valid pointer");
+                throw mx::Exception("STORE destination must be a valid pointer:  " + ptrVar.var_name);
             }
             ptr = ptrVar.var_value.ptr_value;
         } else {
@@ -2213,26 +2239,27 @@ namespace mxvm {
         }
 
         char* base = static_cast<char*>(ptr) + index * size;
-        switch (src.type) {
+        switch (type) {
             case VarType::VAR_INTEGER:
                 if (size == sizeof(int64_t)) {
-                    *reinterpret_cast<int64_t*>(base) = src.var_value.int_value;
+                    *reinterpret_cast<int64_t*>(base) = value;
                 } else if (size == sizeof(unsigned char)) {
-                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(src.var_value.int_value);
+                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(value);
                 } else {
                     throw mx::Exception("STORE: size mismatch for integer");
                 }
                 break;
             case VarType::VAR_BYTE:
                 if (size == sizeof(unsigned char)) {
-                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(src.var_value.int_value);
+                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(value);
                 } else {
                     throw mx::Exception("STORE: size mismatch for byte");
                 }
                 break;
             case VarType::VAR_FLOAT:
                 if (size == sizeof(double)) {
-                    *reinterpret_cast<double*>(base) = src.var_value.float_value;
+                    double float_value = getVariable(instr.op1.op).var_value.float_value;
+                    *reinterpret_cast<double*>(base) = float_value;
                 } else {
                     throw mx::Exception("STORE: size mismatch for float");
                 }

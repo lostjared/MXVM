@@ -304,19 +304,20 @@ namespace mxvm {
                         index++;
                     }
                 } else if (sectionType == SectionNode::CODE) {
-                    if(token.getTokenType() == types::TokenType::TT_ID && token.getTokenValue() == "function"  && index + 2 < scanner.size() && this->operator[](index + 1).getTokenType() == types::TokenType::TT_ID && this->operator[](index + 2).getTokenValue() == ":") {
-                        index++;
-                        auto label = parseLabel(index);
-                        if(label) {
-                            label->function = true;
-                            section->addStatement(std::move(label));
-                        }
-                    } else if (token.getTokenType() == types::TokenType::TT_ID && 
+                    if (token.getTokenType() == types::TokenType::TT_ID && 
                         index + 1 < scanner.size() && 
                         this->operator[](index + 1).getTokenValue() == ":") {
                         auto label = parseLabel(index);
                         if (label) {
                             section->addStatement(std::move(label));
+                        }
+                    } else if(token.getTokenType() == types::TokenType::TT_ID && token.getTokenValue() == "function"  && index + 2 < scanner.size() && this->operator[](index + 1).getTokenType() == types::TokenType::TT_ID && this->operator[](index + 2).getTokenValue() == ":") {
+                        index++;
+                        auto label = parseLabel(index);
+                        if(label) {
+                            label->function = true;
+                            section->addStatement(std::move(label));
+                            continue;
                         }
                     } else {
                         auto instruction = parseCodeInstruction(index);
