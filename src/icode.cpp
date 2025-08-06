@@ -143,7 +143,8 @@ namespace mxvm {
         }
         using FuncType = void(*)(Program *program, std::vector<Operand>&);
         FuncType f = reinterpret_cast<FuncType>(func);
-        f(program, operands);
+        if(f != nullptr)
+            f(program, operands);
     }
        
     Base *Base::base = nullptr;
@@ -3090,6 +3091,9 @@ namespace mxvm {
             throw mx::Exception("INVOKE: external function not found: " + instr.op1.op);
         }
         RuntimeFunction &fn = it->second;
+        if(!fn.func) {
+            throw mx::Exception("INVOKE: function: " + instr.op1.op + " not found");
+        }
         std::vector<Operand> args;
         if (!instr.op2.op.empty()) args.push_back(instr.op2);
         if (!instr.op3.op.empty()) args.push_back(instr.op3);
