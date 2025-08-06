@@ -737,11 +737,7 @@ namespace mxvm {
         if(!v.var_value.owns) {
             throw mx::Exception("You do not own the pointer: " + v.var_name + " cannot free");
         }
-
-        if(v.var_value.owns && v.var_value.released == true) {
-            throw mx::Exception("Possible double free of pointer: " + i.op1.op);
-        }
-
+        
         out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tcall free\n";
         v.var_value.released = true;
