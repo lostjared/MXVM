@@ -24,7 +24,7 @@ program Tetris {
         int piece_y       = 0
 
         int timer         = 0
-        int speed         = 120
+        int speed         = 350
         int tick          = 0
         int game_over     = 0
         int rand_seed     = 12345
