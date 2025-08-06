@@ -80,7 +80,7 @@ namespace mxvm {
                 free(i.second.var_value.ptr_value);
                 i.second.var_value.ptr_value = nullptr;
                 if(debug_mode) {
-                    std::cout << " Pointer: " << i.first << "\n";
+                    std::cerr << Col("MXVM: Warning ", mx::Color::RED) << "Possible Memory Leak, Pointer: " << name << "." << i.first << "\n";
                 }
             }
         }
@@ -725,8 +725,6 @@ namespace mxvm {
         out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
         Variable &var = getVariable(i.op1.op);
         var.var_value.owns = true;
-        var.var_value.released = false;
-        Program::base->add_allocated(name + "." + i.op1.op, var);
     }
 
     void Program::gen_free(std::ostream &out, const Instruction &i) {
@@ -739,9 +737,6 @@ namespace mxvm {
         }      
         out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tcall free\n";
-        auto it = Program::base->allocated.find(name + "." + i.op1.op);
-        if(it != Program::base->allocated.end())
-            it->second.var_value.released = true; 
     }
     void Program::gen_load(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) {
