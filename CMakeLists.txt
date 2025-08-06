@@ -21,6 +21,8 @@ else()
     set(DEBUG_MODE "Debug Mode")
 endif()
 
+option(WITH_SDL "Build with SDL module support" OFF)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -fPIC")
 
 include(CheckIncludeFileCXX)
@@ -112,6 +114,9 @@ if(NOT AR_EXECUTABLE)
 endif()
 add_subdirectory(src/scanner)
 
+if(WITH_SDL)
+    add_subdirectory(modules/sdl)
+endif()
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
@@ -136,4 +141,9 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 message(STATUS "CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "Mode: ${DEBUG_MODE}")
 message(STATUS "Set CMAKE_BUILD_TYPE to Debug/Release")
+if(WITH_SDL)
+    message(STATUS "Building with SDL Support")
+else()
+    message(STATUS "Building without SDL Support use -DWITH_SDL=ON")
+endif()
 
