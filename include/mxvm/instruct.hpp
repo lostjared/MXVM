@@ -95,6 +95,7 @@ namespace mxvm {
         VarType type;
         uint64_t buffer_size;
         bool owns = false;
+        bool released = false;
 
         Variable_Value(const Variable_Value& other)
             : str_value(other.str_value),
