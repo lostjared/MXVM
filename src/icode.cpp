@@ -2882,7 +2882,7 @@ namespace mxvm {
             std::string name = v.var_name;
             Variable &r = getVariable(result.op);
             if(v.type != r.type) {
-                throw mx::Exception("Invalid return type, type mismatch.\n");
+                throw mx::Exception("Invalid return type: " + instr.op1.op + " != "  + result.op  + " type mismatch.\n");
             }
             v = r;
             v.var_name = name;
