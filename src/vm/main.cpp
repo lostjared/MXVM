@@ -179,13 +179,6 @@ int process_arguments(Args *args) {
         exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
-
-                for(auto &v : mxvm::Program::base->allocated) {
-                    if(v.second.var_value.released == false) {
-                        std::cout << v.first <<"\n";
-                    }
-                }
-
                 std::ostringstream fname_;
                 for(auto &f  : mxvm::Program::base->filenames){
                     fname_ << f <<  " ";
