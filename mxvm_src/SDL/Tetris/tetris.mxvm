@@ -582,6 +582,8 @@ program Tetris {
     function quit:
         free board
         free pieces
+        invoke destroy_renderer, renderer_id
+        invoke destroy_window, window_id
         invoke quit
         exit 0
         ret
