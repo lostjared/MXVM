@@ -200,7 +200,17 @@ int process_arguments(Args *args) {
                 if(cc != nullptr) {
                     compiler = cc;
                 }
-                file_ << compiler << " " << fname_.str() << " " << modules_archives.str() << " ";
+                std::string ldflags;
+                const char *ldf = getenv("LDFLAGS");
+                if(ldf != nullptr) {
+                    ldflags = ldf;
+                }
+                const char *cflags_ = getenv("CFLAGS");
+                std::string cflags;
+                if(cflags_ != nullptr) {
+                    cflags = cflags_;
+                }
+                file_ << compiler << " " << cflags << " " << fname_.str() << " " << modules_archives.str() << " " << ldflags << " ";
                 std::cout << file_.str() << "\n";
                 FILE *fptr = popen(file_.str().c_str(), "r");
                 if(!fptr) {
