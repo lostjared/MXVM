@@ -41,6 +41,14 @@ namespace mxvm {
         return *this;
     }
 
+    std::unordered_map<std::string, Variable> Base::allocated;
+
+    void Base::add_allocated(const std::string &name, Variable &v) {
+        auto it = allocated.find(name);
+        if(it == allocated.end())
+            allocated[name] = v;
+    }
+
     Program::Program() : pc(0), running(false) {
         Variable vstdout, vstdin, vstderr;
         vstdout.setExtern("stdout", stdout);
@@ -476,12 +484,6 @@ namespace mxvm {
                 throw mx::Exception("Program missing done to signal completion.\n");
         #endif
         
-        for(auto &v : vars) {
-            if(v.second.var_value.owns && !v.second.var_value.released) {
-               std::cerr << Col("MXVM: Warning: ", mx::Color::RED) << " possible memory leak, you own: " << v.first << " but it never was released.\n"; 
-            }
-        }
-
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
    
         std::string mainFunc = " Object";
@@ -724,6 +726,7 @@ namespace mxvm {
         Variable &var = getVariable(i.op1.op);
         var.var_value.owns = true;
         var.var_value.released = false;
+        Program::base->add_allocated(name + "." + i.op1.op, var);
     }
 
     void Program::gen_free(std::ostream &out, const Instruction &i) {
@@ -733,14 +736,12 @@ namespace mxvm {
         Variable &v = getVariable(i.op1.op);
         if (v.type != VarType::VAR_POINTER) {
             throw mx::Exception("FREE argument must be a pointer");
-        }
-        if(!v.var_value.owns) {
-            throw mx::Exception("You do not own the pointer: " + v.var_name + " cannot free");
-        }
-        
+        }      
         out << "\tmovq " << getMangledName(i.op1.op) << "(%rip), %rdi\n";
         out << "\tcall free\n";
-        v.var_value.released = true;
+        auto it = Program::base->allocated.find(name + "." + i.op1.op);
+        if(it != Program::base->allocated.end())
+            it->second.var_value.released = true; 
     }
     void Program::gen_load(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) {

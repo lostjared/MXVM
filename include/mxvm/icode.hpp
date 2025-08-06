@@ -72,6 +72,7 @@ namespace mxvm {
         void add_extern(const std::string &mod, const std::string &name, bool module);
         void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
         void add_filename(const std::string &fname);
+        void add_allocated(const std::string &name, Variable &v);
         std::string name;
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
@@ -81,6 +82,7 @@ namespace mxvm {
         static Base *base;
         static std::string root_name;
         static std::vector<std::string> filenames;
+        static std::unordered_map<std::string, Variable> allocated;
         std::string assembly_code;
     };
 
