@@ -2,6 +2,8 @@
 #include<mxvm/icode.hpp>
 #include<vector>
 #include<string>
+#include<cstdlib>
+#include<ctime>
 
 extern "C" void mxvm_io_fopen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if(operand.size() == 2) {
@@ -208,7 +210,7 @@ extern "C" void mxvm_io_fseek(mxvm::Program *program, std::vector<mxvm::Operand>
     program->vars["%rax"].var_value.int_value = result;
 }
 
-extern "C" int rand_number(int64_t);
+
 
 extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
@@ -228,7 +230,8 @@ extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Op
              throw mx::Exception ("rand_number expected variable or constant: " + operand[0].op);
 
     }
-    int result = rand_number(rsize);
+    std::srand(std::time(0));
+    int result = std::rand()%rsize;
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;

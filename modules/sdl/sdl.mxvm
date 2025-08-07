@@ -67,4 +67,9 @@ module sdl {
     extern queue_audio
     extern get_queued_audio_size
     extern clear_queued_audio
+
+    extern init_text
+    extern quit_text
+    extern load_font
+    extern draw_text
 }

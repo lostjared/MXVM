@@ -8,7 +8,8 @@ static SDL_Texture** g_textures = NULL;
 static int64_t g_window_count = 0;
 static int64_t g_renderer_count = 0;
 static int64_t g_texture_count = 0;
-
+static TTF_Font** g_fonts = NULL;
+static int64_t g_font_count = 0;
 // Implementation
 int64_t init(void) {
     return SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == 0 ? 1 : 0;
@@ -348,3 +349,47 @@ void show_cursor(int64_t show) {
  -   SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE);
 }
 
+int64_t init_text(void) {
+    return TTF_Init() == 0 ? 1 : 0;
+}
+
+void quit_text(void) {
+    if (g_fonts) {
+        for (int64_t i = 0; i < g_font_count; ++i) {
+            if (g_fonts[i]) TTF_CloseFont(g_fonts[i]);
+        }
+        free(g_fonts);
+        g_fonts = NULL;
+        g_font_count = 0;
+    }
+    TTF_Quit();
+}
+
+int64_t load_font(const char* file, int64_t ptsize) {
+    TTF_Font* font = TTF_OpenFont(file, (int)ptsize);
+    if (!font) return -1;
+    g_fonts = realloc(g_fonts, sizeof(TTF_Font*) * (g_font_count + 1));
+    g_fonts[g_font_count] = font;
+    return g_font_count++;
+}
+
+void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
+    if (font_id < 0 || font_id >= g_font_count || !g_fonts[font_id]) return;
+
+    SDL_Color color = { (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a };
+    SDL_Surface* surface = TTF_RenderUTF8_Blended(g_fonts[font_id], text, color);
+    if (!surface) return;
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+    if (!texture) {
+        SDL_FreeSurface(surface);
+        return;
+    }
+
+    SDL_Rect dst = { (int)x, (int)y, surface->w, surface->h };
+    SDL_RenderCopy(g_renderers[renderer_id], texture, NULL, &dst);
+
+    SDL_DestroyTexture(texture);
+    SDL_FreeSurface(surface);
+}

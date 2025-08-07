@@ -8,6 +8,7 @@ find_package(SDL2 REQUIRED)
 if(NOT SDL2_FOUND)
     message(FATAL_ERROR "SDL2 library not found. Please install SDL2.")
 endif()
+find_package(SDL2_ttf REQUIRED)
 
 target_include_directories(mxvm_sdl
     PRIVATE ${SDL2_INCLUDE_DIRS}
@@ -15,8 +16,10 @@ target_include_directories(mxvm_sdl
 )
 target_link_libraries(mxvm_sdl
     PRIVATE ${SDL2_LIBRARIES}
+    SDL2_ttf
     mxvm
     mxvm_sdl_static
+
 )
 target_include_directories(mxvm_sdl_static
     PRIVATE ${SDL2_INCLUDE_DIRS}
@@ -24,6 +27,7 @@ target_include_directories(mxvm_sdl_static
 )
 target_link_libraries(mxvm_sdl_static
     PRIVATE ${SDL2_LIBRARIES}
+    SDL2_ttf
     mxvm
 )
 

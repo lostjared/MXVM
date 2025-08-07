@@ -906,3 +906,75 @@ extern "C" void mxvm_sdl_unlock_texture(mxvm::Program *program, std::vector<mxvm
     
     unlock_texture(texture_id);
 }
+
+extern "C" void mxvm_sdl_init_text(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = init_text();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_quit_text(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    quit_text();
+}
+
+extern "C" void mxvm_sdl_load_font(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_load_font requires 2 arguments (file, ptsize).");
+    }
+    std::string file;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            file = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            file = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        file = operand[0].op;
+    }
+    int64_t ptsize = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+
+    int64_t result = load_font(file.c_str(), ptsize);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_draw_text(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 9) {
+        throw mx::Exception("sdl_draw_text requires 9 arguments (renderer_id, font_id, text, x, y, r, g, b, a).");
+    }
+    int64_t renderer_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t font_id = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+
+    std::string text;
+    if (program->isVariable(operand[2].op)) {
+        mxvm::Variable &var = program->getVariable(operand[2].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            text = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            text = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        text = operand[2].op;
+    }
+
+    int64_t x = program->isVariable(operand[3].op) ?
+        program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
+    int64_t y = program->isVariable(operand[4].op) ?
+        program->getVariable(operand[4].op).var_value.int_value : operand[4].op_value;
+    int64_t r = program->isVariable(operand[5].op) ?
+        program->getVariable(operand[5].op).var_value.int_value : operand[5].op_value;
+    int64_t g = program->isVariable(operand[6].op) ?
+        program->getVariable(operand[6].op).var_value.int_value : operand[6].op_value;
+    int64_t b = program->isVariable(operand[7].op) ?
+        program->getVariable(operand[7].op).var_value.int_value : operand[7].op_value;
+    int64_t a = program->isVariable(operand[8].op) ?
+        program->getVariable(operand[8].op).var_value.int_value : operand[8].op_value;
+
+    draw_text(renderer_id, font_id, text.c_str(), x, y, r, g, b, a);
+}

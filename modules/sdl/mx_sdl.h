@@ -2,6 +2,7 @@
 #define __SDL2__H_
 
 #include "SDL.h"
+#include "SDL_ttf.h"
 #include <stdint.h>
 
 // Core SDL functions
@@ -85,5 +86,10 @@ void clear_queued_audio(void);
 int64_t update_texture(int64_t texture_id, const void* pixels, int64_t pitch);
 int64_t lock_texture(int64_t texture_id, void** pixels, int64_t* pitch);
 void unlock_texture(int64_t texture_id);
+
+int64_t init_text(void);
+void quit_text(void);
+int64_t load_font(const char* file, int64_t ptsize);
+void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a);
 
 #endif

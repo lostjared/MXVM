@@ -6,4 +6,5 @@ module io {
     extern fread
     extern fwrite
     extern fseek
+    extern rand_number
 }
