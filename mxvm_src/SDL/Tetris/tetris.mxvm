@@ -24,7 +24,7 @@ program Tetris {
         int piece_y       = 0
 
         int timer         = 0
-        int speed         = 350
+        int speed         = 50
         int tick          = 0
         int game_over     = 0
         int rand_seed     = 12345
@@ -52,6 +52,9 @@ program Tetris {
         int tx            = 0
         int ty            = 0
         int ts            = 0
+        int frame_start = 0
+        int frame_time = 0
+        int frame_delay = 16   
     }
 
     section code {
@@ -239,11 +242,28 @@ program Tetris {
 
     function gameLoop:
     gloop:
+        invoke get_ticks
+        return eax
+        mov frame_start, eax
+
         cmp game_over, 1
         je over
         call handleInput
         call update
         call render
+
+        invoke get_ticks
+        return eax
+        mov frame_time, eax
+        sub frame_time, frame_start
+
+        mov eax, frame_delay
+        sub eax, frame_time
+        cmp eax, 0
+        jle skip_delay
+        invoke delay, eax
+skip_delay:
+
         jmp gloop
     over:
         call resetGame
