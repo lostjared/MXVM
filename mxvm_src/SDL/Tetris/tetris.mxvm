@@ -278,7 +278,9 @@ skip_delay:
         je end_poll
         invoke get_event_type
         return eax
-        cmp eax, 768
+        cmp eax, 256      # SDL_QUIT
+        je quit_app
+        cmp eax, 768      # SDL_KEYDOWN
         jne input_loop
         invoke get_key_code
         return eax
