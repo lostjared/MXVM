@@ -3,6 +3,7 @@
 #include<cstring>
 #include<cstdarg>
 #include<cstdio>
+#include <cstdint> // Make sure this is included at the top
 extern "C" {
 #include"mx_sdl.h"
 }
@@ -95,6 +96,347 @@ extern "C" void mxvm_sdl_destroy_renderer(mxvm::Program *program, std::vector<mx
                           program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
     
    destroy_renderer(renderer_id);
+}
+
+// Window management functions
+extern "C" void mxvm_sdl_set_window_title(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_set_window_title requires 2 arguments (window_id, title).");
+    }
+    
+    int64_t window_id = program->isVariable(operand[0].op) ? 
+                        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    std::string title;
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &var = program->getVariable(operand[1].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            title = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            title = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        title = operand[1].op;
+    }
+    
+    set_window_title(window_id, title.c_str());
+}
+
+extern "C" void mxvm_sdl_set_window_position(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_set_window_position requires 3 arguments (window_id, x, y).");
+    }
+    
+    int64_t window_id = program->isVariable(operand[0].op) ? 
+                        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t x = program->isVariable(operand[1].op) ? 
+                program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t y = program->isVariable(operand[2].op) ? 
+                program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    
+    set_window_position(window_id, x, y);
+}
+
+extern "C" void mxvm_sdl_get_window_size(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_get_window_size requires 3 arguments (window_id, w_var, h_var).");
+    }
+    
+    int64_t window_id = program->isVariable(operand[0].op) ? 
+                        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    int64_t w, h;
+    get_window_size(window_id, &w, &h);
+    
+    // Store width in the second operand variable
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &w_var = program->getVariable(operand[1].op);
+        w_var.type = mxvm::VarType::VAR_INTEGER;
+        w_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        w_var.var_value.int_value = w;
+    }
+    
+    // Store height in the third operand variable
+    if (program->isVariable(operand[2].op)) {
+        mxvm::Variable &h_var = program->getVariable(operand[2].op);
+        h_var.type = mxvm::VarType::VAR_INTEGER;
+        h_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        h_var.var_value.int_value = h;
+    }
+}
+
+extern "C" void mxvm_sdl_set_window_fullscreen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_set_window_fullscreen requires 2 arguments (window_id, fullscreen).");
+    }
+    
+    int64_t window_id = program->isVariable(operand[0].op) ? 
+                        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t fullscreen = program->isVariable(operand[1].op) ? 
+                         program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    
+    set_window_fullscreen(window_id, fullscreen);
+}
+
+extern "C" void mxvm_sdl_get_renderer_output_size(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_get_renderer_output_size requires 3 arguments (renderer_id, w_var, h_var).");
+    }
+    
+    int64_t renderer_id = program->isVariable(operand[0].op) ? 
+                          program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    int64_t w, h;
+    get_renderer_output_size(renderer_id, &w, &h);
+    
+    // Store width in the second operand variable
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &w_var = program->getVariable(operand[1].op);
+        w_var.type = mxvm::VarType::VAR_INTEGER;
+        w_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        w_var.var_value.int_value = w;
+    }
+    
+    // Store height in the third operand variable
+    if (program->isVariable(operand[2].op)) {
+        mxvm::Variable &h_var = program->getVariable(operand[2].op);
+        h_var.type = mxvm::VarType::VAR_INTEGER;
+        h_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        h_var.var_value.int_value = h;
+    }
+}
+
+// Mouse functions
+extern "C" void mxvm_sdl_get_mouse_buttons(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_mouse_buttons();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_relative_mouse_x(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_relative_mouse_x();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_relative_mouse_y(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_relative_mouse_y();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_relative_mouse_buttons(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_relative_mouse_buttons();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_mouse_state(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_get_mouse_state requires 2 arguments (x_var, y_var).");
+    }
+    
+    int64_t x, y;
+    int64_t result = get_mouse_state(&x, &y);
+    
+    // Store x in the first operand variable
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &x_var = program->getVariable(operand[0].op);
+        x_var.type = mxvm::VarType::VAR_INTEGER;
+        x_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        x_var.var_value.int_value = x;
+    }
+    
+    // Store y in the second operand variable
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &y_var = program->getVariable(operand[1].op);
+        y_var.type = mxvm::VarType::VAR_INTEGER;
+        y_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        y_var.var_value.int_value = y;
+    }
+    
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_relative_mouse_state(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_get_relative_mouse_state requires 2 arguments (x_var, y_var).");
+    }
+    
+    int64_t x, y;
+    int64_t result = get_relative_mouse_state(&x, &y);
+    
+    // Store x in the first operand variable
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &x_var = program->getVariable(operand[0].op);
+        x_var.type = mxvm::VarType::VAR_INTEGER;
+        x_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        x_var.var_value.int_value = x;
+    }
+    
+    // Store y in the second operand variable
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &y_var = program->getVariable(operand[1].op);
+        y_var.type = mxvm::VarType::VAR_INTEGER;
+        y_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        y_var.var_value.int_value = y;
+    }
+    
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+// Keyboard functions
+extern "C" void mxvm_sdl_get_keyboard_state(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_get_keyboard_state requires 1 argument (numkeys_var).");
+    }
+    
+    int64_t numkeys;
+    int64_t result = get_keyboard_state(&numkeys);
+    
+    // Store numkeys in the operand variable
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &nk_var = program->getVariable(operand[0].op);
+        nk_var.type = mxvm::VarType::VAR_INTEGER;
+        nk_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        nk_var.var_value.int_value = numkeys;
+    }
+    
+    program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.ptr_value = (void*)result;
+}
+
+extern "C" void mxvm_sdl_is_key_pressed(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_is_key_pressed requires 1 argument (scancode).");
+    }
+    
+    int64_t scancode = program->isVariable(operand[0].op) ? 
+                       program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    int64_t result = is_key_pressed(scancode);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_num_keys(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_num_keys();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+// Clipboard functions
+extern "C" void mxvm_sdl_set_clipboard_text(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_set_clipboard_text requires 1 argument (text).");
+    }
+    
+    std::string text;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            text = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            text = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        text = operand[0].op;
+    }
+    
+    set_clipboard_text(text.c_str());
+}
+
+extern "C" void mxvm_sdl_get_clipboard_text(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    const char* result = get_clipboard_text();
+    // Store result as a string pointer in %rax
+    program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.ptr_value = (void*)result;
+}
+
+// Cursor functions
+extern "C" void mxvm_sdl_show_cursor(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_show_cursor requires 1 argument (show).");
+    }
+    
+    int64_t show = program->isVariable(operand[0].op) ? 
+                   program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    show_cursor(show);
+}
+
+// Surface functions
+extern "C" void mxvm_sdl_create_rgb_surface(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_create_rgb_surface requires 3 arguments (width, height, depth).");
+    }
+    
+    int64_t width = program->isVariable(operand[0].op) ? 
+                    program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t height = program->isVariable(operand[1].op) ? 
+                     program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t depth = program->isVariable(operand[2].op) ? 
+                    program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    
+    int64_t result = create_rgb_surface(width, height, depth);
+    program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.ptr_value = (void*)result;
+}
+
+extern "C" void mxvm_sdl_free_surface(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_free_surface requires 1 argument (surface_ptr).");
+    }
+    
+    int64_t surf_ptr = program->isVariable(operand[0].op) ? 
+                       program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    free_surface(surf_ptr);
+}
+
+extern "C" void mxvm_sdl_blit_surface(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 4) {
+        throw mx::Exception("sdl_blit_surface requires 4 arguments (src_ptr, dst_ptr, x, y).");
+    }
+    
+    int64_t src_ptr = program->isVariable(operand[0].op) ? 
+                      program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t dst_ptr = program->isVariable(operand[1].op) ? 
+                      program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t x = program->isVariable(operand[2].op) ? 
+                program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    int64_t y = program->isVariable(operand[3].op) ? 
+                program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
+    
+    int64_t result = blit_surface(src_ptr, dst_ptr, x, y);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+// Additional functions
+extern "C" void mxvm_sdl_free_wav(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_free_wav requires 1 argument (audio_buf).");
+    }
+    
+    int64_t audio_buf = program->isVariable(operand[0].op) ? 
+                        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    free_wav(audio_buf);
 }
 
 // SDL_PollEvent
@@ -357,10 +699,29 @@ extern "C" void mxvm_sdl_render_texture(mxvm::Program *program, std::vector<mxvm
    render_texture(renderer_id, texture_id, src_x, src_y, src_w, src_h, dst_x, dst_y, dst_w, dst_h);
 }
 
-// SDL_OpenAudio
+// Timing functions
+extern "C" void mxvm_sdl_get_ticks(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_ticks();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_delay(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_delay requires 1 argument (ms).");
+    }
+    
+    int64_t ms = program->isVariable(operand[0].op) ? 
+                 program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+   delay(ms);
+}
+
+// Audio functions
 extern "C" void mxvm_sdl_open_audio(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 4) {
-        throw mx::Exception("sdl_open_audio requires 4 arguments (frequency, format, channels, samples).");
+        throw mx::Exception("sdl_open_audio requires 4 arguments (freq, format, channels, samples).");
     }
     
     int64_t frequency = program->isVariable(operand[0].op) ? 
@@ -372,18 +733,16 @@ extern "C" void mxvm_sdl_open_audio(mxvm::Program *program, std::vector<mxvm::Op
     int64_t samples = program->isVariable(operand[3].op) ? 
                       program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
     
-    int64_t result =open_audio(frequency, format, channels, samples);
+    int64_t result = open_audio(frequency, format, channels, samples);
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
 }
 
-// SDL_CloseAudio
 extern "C" void mxvm_sdl_close_audio(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-   close_audio();
+    close_audio();
 }
 
-// SDL_PauseAudio
 extern "C" void mxvm_sdl_pause_audio(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("sdl_pause_audio requires 1 argument (pause_on).");
@@ -395,22 +754,155 @@ extern "C" void mxvm_sdl_pause_audio(mxvm::Program *program, std::vector<mxvm::O
    pause_audio(pause_on);
 }
 
-// SDL_GetTicks
-extern "C" void mxvm_sdl_get_ticks(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    int64_t result =get_ticks();
+extern "C" void mxvm_sdl_load_wav(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 4) {
+        throw mx::Exception("sdl_load_wav requires 4 arguments (file_path, audio_buf_var, audio_len_var, audio_spec_var).");
+    }
+    
+    std::string file_path;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            file_path = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            file_path = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        file_path = operand[0].op;
+    }
+    
+    int64_t audio_buf, audio_len, audio_spec;
+    int64_t result = load_wav(file_path.c_str(), &audio_buf, &audio_len, &audio_spec);
+    
+    // Store results in variables
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &buf_var = program->getVariable(operand[1].op);
+        buf_var.type = mxvm::VarType::VAR_INTEGER;
+        buf_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        buf_var.var_value.int_value = audio_buf;
+    }
+    
+    if (program->isVariable(operand[2].op)) {
+        mxvm::Variable &len_var = program->getVariable(operand[2].op);
+        len_var.type = mxvm::VarType::VAR_INTEGER;
+        len_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        len_var.var_value.int_value = audio_len;
+    }
+    
+    if (program->isVariable(operand[3].op)) {
+        mxvm::Variable &spec_var = program->getVariable(operand[3].op);
+        spec_var.type = mxvm::VarType::VAR_INTEGER;
+        spec_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        spec_var.var_value.int_value = audio_spec;
+    }
+    
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result;
 }
 
-// SDL_Delay
-extern "C" void mxvm_sdl_delay(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 1) {
-        throw mx::Exception("sdl_delay requires 1 argument (ms).");
+extern "C" void mxvm_sdl_queue_audio(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_queue_audio requires 2 arguments (data, len).");
     }
     
-    int64_t ms = program->isVariable(operand[0].op) ? 
-                 program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    void* data = nullptr;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_POINTER) {
+            data = var.var_value.ptr_value;
+        }
+    } else {
+        data = reinterpret_cast<void*>(static_cast<uintptr_t>(operand[0].op_value));
+    }
     
-   delay(ms);
+    int64_t len = program->isVariable(operand[1].op) ? 
+                  program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    
+    int64_t result = queue_audio(data, len);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_get_queued_audio_size(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    int64_t result = get_queued_audio_size();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_clear_queued_audio(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    clear_queued_audio();
+}
+
+// Texture functions
+extern "C" void mxvm_sdl_update_texture(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_update_texture requires 3 arguments (texture_id, pixels, pitch).");
+    }
+    
+    int64_t texture_id = program->isVariable(operand[0].op) ? 
+                         program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    void* pixels = nullptr;
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &var = program->getVariable(operand[1].op);
+        if (var.type == mxvm::VarType::VAR_POINTER) {
+            pixels = var.var_value.ptr_value;
+        }
+    } else {
+        pixels = reinterpret_cast<void*>(static_cast<uintptr_t>(operand[1].op_value));
+    }
+    
+    int64_t pitch = program->isVariable(operand[2].op) ? 
+                    program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    
+    int64_t result = update_texture(texture_id, pixels, pitch);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_lock_texture(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_lock_texture requires 3 arguments (texture_id, pixels_var, pitch_var).");
+    }
+    
+    int64_t texture_id = program->isVariable(operand[0].op) ? 
+                         program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    void* pixels;
+    int64_t pitch;
+    int64_t result = lock_texture(texture_id, &pixels, &pitch);
+    
+    // Store results in variables
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &pixels_var = program->getVariable(operand[1].op);
+        pixels_var.type = mxvm::VarType::VAR_POINTER;
+        pixels_var.var_value.type = mxvm::VarType::VAR_POINTER;
+        pixels_var.var_value.ptr_value = pixels;
+    }
+    
+    if (program->isVariable(operand[2].op)) {
+        mxvm::Variable &pitch_var = program->getVariable(operand[2].op);
+        pitch_var.type = mxvm::VarType::VAR_INTEGER;
+        pitch_var.var_value.type = mxvm::VarType::VAR_INTEGER;
+        pitch_var.var_value.int_value = pitch;
+    }
+    
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_sdl_unlock_texture(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_unlock_texture requires 1 argument (texture_id).");
+    }
+    
+    int64_t texture_id = program->isVariable(operand[0].op) ? 
+                         program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    unlock_texture(texture_id);
 }

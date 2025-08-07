@@ -1,4 +1,3 @@
-
 #include"mx_sdl.h"
 
 
@@ -124,6 +123,75 @@ void fill_rect(int64_t renderer_id, int64_t x, int64_t y, int64_t w, int64_t h) 
     }
 }
 
+// Texture functions
+int64_t create_texture(int64_t renderer_id, int64_t format, int64_t access, int64_t w, int64_t h) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
+    
+    SDL_Texture* texture = SDL_CreateTexture(g_renderers[renderer_id], (Uint32)format, (int)access, (int)w, (int)h);
+    if (!texture) return -1;
+    
+    g_textures = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    g_textures[g_texture_count] = texture;
+    return g_texture_count++;
+}
+
+void destroy_texture(int64_t texture_id) {
+    if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
+        SDL_DestroyTexture(g_textures[texture_id]);
+        g_textures[texture_id] = NULL;
+    }
+}
+
+int64_t load_texture(int64_t renderer_id, const char* file_path) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
+    
+    SDL_Surface* surface = SDL_LoadBMP(file_path);
+    if (!surface) return -1;
+    
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+    SDL_FreeSurface(surface);
+    if (!texture) return -1;
+    
+    g_textures = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    g_textures[g_texture_count] = texture;
+    return g_texture_count++;
+}
+
+void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int64_t src_y, int64_t src_w, int64_t src_h, int64_t dst_x, int64_t dst_y, int64_t dst_w, int64_t dst_h) {
+    if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id] &&
+        texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
+        
+        SDL_Rect src_rect = { (int)src_x, (int)src_y, (int)src_w, (int)src_h };
+        SDL_Rect dst_rect = { (int)dst_x, (int)dst_y, (int)dst_w, (int)dst_h };
+        
+        SDL_RenderCopy(g_renderers[renderer_id], g_textures[texture_id], &src_rect, &dst_rect);
+    }
+}
+
+int64_t update_texture(int64_t texture_id, const void* pixels, int64_t pitch) {
+    if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
+        return SDL_UpdateTexture(g_textures[texture_id], NULL, pixels, (int)pitch) == 0 ? 1 : 0;
+    }
+    return 0;
+}
+
+int64_t lock_texture(int64_t texture_id, void** pixels, int64_t* pitch) {
+    if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
+        int p;
+        int result = SDL_LockTexture(g_textures[texture_id], NULL, pixels, &p);
+        *pitch = p;
+        return result == 0 ? 1 : 0;
+    }
+    return 0;
+}
+
+void unlock_texture(int64_t texture_id) {
+    if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
+        SDL_UnlockTexture(g_textures[texture_id]);
+    }
+}
+
+// Timing functions
 int64_t get_ticks(void) {
     return SDL_GetTicks();
 }
@@ -131,3 +199,152 @@ int64_t get_ticks(void) {
 void delay(int64_t ms) {
     SDL_Delay((Uint32)ms);
 }
+
+// Audio functions
+int64_t open_audio(int64_t freq, int64_t format, int64_t channels, int64_t samples) {
+    SDL_AudioSpec wanted_spec;
+    wanted_spec.freq = (int)freq;
+    wanted_spec.format = (SDL_AudioFormat)format;
+    wanted_spec.channels = (Uint8)channels;
+    wanted_spec.samples = (Uint16)samples;
+    wanted_spec.callback = NULL;
+    wanted_spec.userdata = NULL;
+    
+    return SDL_OpenAudio(&wanted_spec, NULL) == 0 ? 1 : 0;
+}
+
+void close_audio(void) {
+    SDL_CloseAudio();
+}
+
+void pause_audio(int64_t pause_on) {
+    SDL_PauseAudio(pause_on ? 1 : 0);
+}
+
+int64_t load_wav(const char* file_path, int64_t* audio_buf, int64_t* audio_len, int64_t* audio_spec) {
+    SDL_AudioSpec spec;
+    Uint8* buf;
+    Uint32 len;
+    
+    if (SDL_LoadWAV(file_path, &spec, &buf, &len) == NULL) {
+        return 0;
+    }
+    
+    *audio_buf = (int64_t)buf;
+    *audio_len = len;
+    *audio_spec = (int64_t)&spec;
+    return 1;
+}
+
+void free_wav(int64_t audio_buf) {
+    if (audio_buf) {
+        SDL_FreeWAV((Uint8*)audio_buf);
+    }
+}
+
+int64_t queue_audio(const void* data, int64_t len) {
+    return SDL_QueueAudio(1, data, (Uint32)len) == 0 ? 1 : 0;
+}
+
+int64_t get_queued_audio_size(void) {
+    return SDL_GetQueuedAudioSize(1);
+}
+
+void clear_queued_audio(void) {
+    SDL_ClearQueuedAudio(1);
+}
+
+// Mouse functions (no pointers)
+int64_t get_mouse_buttons(void) {
+    int x, y;
+    return SDL_GetMouseState(&x, &y);
+}
+
+int64_t get_relative_mouse_x(void) {
+    int x, y;
+    SDL_GetRelativeMouseState(&x, &y);
+    return x;
+}
+
+int64_t get_relative_mouse_y(void) {
+    int x, y;
+    SDL_GetRelativeMouseState(&x, &y);
+    return y;
+}
+
+int64_t get_relative_mouse_buttons(void) {
+    int x, y;
+    return SDL_GetRelativeMouseState(&x, &y);
+}
+
+// Keyboard functions
+int64_t get_keyboard_state(int64_t* numkeys) {
+    int nk;
+    const Uint8* state = SDL_GetKeyboardState(&nk);
+    *numkeys = nk;
+    return (int64_t)state;
+}
+
+int64_t is_key_pressed(int64_t scancode) {
+    int numkeys;
+    const Uint8* state = SDL_GetKeyboardState(&numkeys);
+    if (scancode < 0 || scancode >= numkeys) return 0;
+    return state[scancode] ? 1 : 0;
+}
+
+int64_t get_num_keys(void) {
+    int numkeys;
+    SDL_GetKeyboardState(&numkeys);
+    return numkeys;
+}
+
+// Clipboard functions
+void set_clipboard_text(const char* text) {
+    SDL_SetClipboardText(text);
+}
+
+const char* get_clipboard_text(void) {
+    return SDL_GetClipboardText();
+}
+
+// Window management additions
+void set_window_title(int64_t window_id, const char* title) {
+    if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
+        SDL_SetWindowTitle(g_windows[window_id], title);
+    }
+}
+
+void set_window_position(int64_t window_id, int64_t x, int64_t y) {
+    if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
+        SDL_SetWindowPosition(g_windows[window_id], (int)x, (int)y);
+    }
+}
+
+void get_window_size(int64_t window_id, int64_t* w, int64_t* h) {
+    if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
+        int ww, hh;
+        SDL_GetWindowSize(g_windows[window_id], &ww, &hh);
+        *w = ww;
+        *h = hh;
+    }
+}
+
+void set_window_fullscreen(int64_t window_id, int64_t fullscreen) {
+    if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
+        SDL_SetWindowFullscreen(g_windows[window_id], fullscreen ? SDL_WINDOW_FULLSCREEN : 0);
+    }
+}
+
+void get_renderer_output_size(int64_t renderer_id, int64_t* w, int64_t* h) {
+    if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
+        int ww, hh;
+        SDL_GetRendererOutputSize(g_renderers[renderer_id], &ww, &hh);
+        *w = ww;
+        *h = hh;
+    }
+}
+
+void show_cursor(int64_t show) {
+ -   SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE);
+}
+
