@@ -78,6 +78,8 @@ add_library(mxvm SHARED
     src/parser.cpp
     src/instruct.cpp
     src/icode.cpp
+    src/icode_gen.cpp
+    src/icode_exec.cpp
     src/ast.cpp
     src/valid.cpp
     src/function.cpp
