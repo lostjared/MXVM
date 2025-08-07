@@ -446,7 +446,7 @@ skip_delay:
     draw_game:
         invoke set_draw_color, renderer_id, 0, 0, 0, 255
         invoke clear, renderer_id
-        invoke fill_rect, renderer_id, 0, 0, 400, 480
+        invoke fill_rect, renderer_id, 0, 0, 400, 800
         invoke snprintf, score_txt, 255,score_fmt, score
        
         mov y, 0
