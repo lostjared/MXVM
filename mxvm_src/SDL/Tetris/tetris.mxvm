@@ -2,7 +2,7 @@ program Tetris {
     section module { sdl, string, io }
 
     section data {
-        string title      = "MXVM SDL Tetris"
+        string title      = "MXVM Blocks"
         int win_x         = 100
         int win_y         = 100
         int win_w         = 400
@@ -61,6 +61,13 @@ program Tetris {
         string font_name = "font.ttf"
         string font_err = "Could not open font..\n"
         string score_fmt = "Score: %lld"
+
+        int start_texture = 0
+        int show_start = 1
+        int tw = 400
+        int th = 800
+        string blocks_bmp = "blocks.bmp"
+        string image_error = "Could not load: blocks.bmp\n"
         
     }
 
@@ -73,6 +80,10 @@ program Tetris {
         invoke rand_number, 5020281
         return rand_seed
         call init
+        cmp show_start, 1
+        jne skip_start_screen
+        call startScreen
+    skip_start_screen:
         call spawnPiece
         call gameLoop
         ret
@@ -83,6 +94,10 @@ program Tetris {
         return window_id
         invoke create_renderer, window_id, -1, 0
         return renderer_id
+        invoke load_texture, renderer_id, blocks_bmp
+        return start_texture
+        cmp start_texture, -1
+        je error_over
         invoke init_text
         invoke load_font, font_name, 20
         cmp font_id, -1
@@ -97,6 +112,10 @@ program Tetris {
         store 0, board, j
         add  j, 1
         jmp clear_loop
+    error_over:
+        print image_error
+        call quit
+        ret
 
     initPieces:
         alloc pieces, 8, 112
@@ -303,14 +322,40 @@ skip_delay:
         return eax
         mov k, eax
         cmp k, 27         # ESC to quit
-        je quit_app
-        cmp k, 97         # 'a' for left
+        je return_logo
+        cmp show_start, 1
+        jne skip_start
+        cmp k, 13
+        je enter_pressed
+        jmp input_loop
+    enter_pressed:  
+        mov show_start, 0
+        jmp input_loop
+    return_logo:
+        cmp show_start, 1
+        je stop_game
+        mov show_start, 1
+        jmp input_loop
+    stop_game:
+        call quit
+        ret
+    skip_start:
+      #  cmp k, 97         # 'a' for left
+     #   je moveLeft
+     #   cmp k, 115        # 's' for right
+     #   je moveRight
+     #   cmp k, 100        # 'd' for down
+     #   je doMoveDown
+     #   cmp k, 32         # space for rotate
+     #   je rotatePiece
+     # Arrow keys
+        cmp k, 1073741904 # Left Arrow
         je moveLeft
-        cmp k, 115        # 's' for right
+        cmp k, 1073741903 # Right Arrow
         je moveRight
-        cmp k, 100        # 'd' for down
+        cmp k, 1073741905 # Down Arrow
         je doMoveDown
-        cmp k, 32         # space for rotate
+        cmp k, 1073741906 # Up Arrow
         je rotatePiece
         jmp input_loop
     quit_app:
@@ -394,6 +439,11 @@ skip_delay:
         ret                # Now this ret belongs to moveDown
 
     function render:
+        cmp show_start, 1
+        jne draw_game
+        call startScreen
+        ret
+    draw_game:
         invoke set_draw_color, renderer_id, 0, 0, 0, 255
         invoke clear, renderer_id
         invoke snprintf, score_txt, 255,score_fmt, score
@@ -669,6 +719,13 @@ skip_delay:
         jmp reset_board_loop
     reset_board_done:
         call spawnPiece
+        ret
+
+    function startScreen:
+        invoke set_draw_color, renderer_id, 0, 0, 0, 255
+        invoke clear, renderer_id
+        invoke render_texture, renderer_id, start_texture, 0, 0, 400, 600, 0, 0, win_w, win_h
+        invoke present, renderer_id
         ret
 
     function quit:
