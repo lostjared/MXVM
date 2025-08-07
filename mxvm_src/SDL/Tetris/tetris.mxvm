@@ -391,7 +391,10 @@ skip_delay:
         add idx, x
         load v, board, idx
         cmp v, 0
-        je next_cell
+        jne draw_filled
+        call drawEmptyCell
+        jmp next_cell
+    draw_filled:
         call drawCell
     next_cell:
         add x, 1
@@ -442,6 +445,19 @@ skip_delay:
         mov k, 128
         add k, m
         invoke set_draw_color, renderer_id, m, j, k, 255
+        mov tx, x
+        mul tx, cell_size
+        mov ty, y
+        mul ty, cell_size
+        mov ts, cell_size
+        sub ts, 1
+        invoke fill_rect, renderer_id, tx, ty, ts, ts
+        mov rax, 0
+        ret
+
+    function drawEmptyCell:
+        # Draw a dark background for empty cells
+        invoke set_draw_color, renderer_id, 30, 30, 30, 255
         mov tx, x
         mul tx, cell_size
         mov ty, y
