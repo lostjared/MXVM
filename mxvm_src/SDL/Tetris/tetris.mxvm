@@ -1,5 +1,5 @@
 program Tetris {
-    section module { sdl }
+    section module { sdl, string, io }
 
     section data {
         string title      = "MXVM SDL Tetris"
@@ -55,6 +55,13 @@ program Tetris {
         int frame_start = 0
         int frame_time = 0
         int frame_delay = 16   
+        int score = 0
+        string score_txt, 256
+        int font_id   = 0
+        string font_name = "font.ttf"
+        string font_err = "Could not open font..\n"
+        string score_fmt = "Score: %lld"
+        
     }
 
     section code {
@@ -63,6 +70,8 @@ program Tetris {
         done
 
     function start_game:
+        invoke rand_number, 5020281
+        return rand_seed
         call init
         call spawnPiece
         call gameLoop
@@ -74,6 +83,10 @@ program Tetris {
         return window_id
         invoke create_renderer, window_id, -1, 0
         return renderer_id
+        invoke init_text
+        invoke load_font, font_name, 20
+        cmp font_id, -1
+        je font_error
         mov i, board_w
         mul i, board_h
         alloc board, 8, i
@@ -207,6 +220,10 @@ program Tetris {
         store 6,  pieces, 110
         store 9,  pieces, 111
         mov rax, window_id
+        ret
+    font_error:
+        print font_err
+        call quit
         ret
 
     function spawnPiece:
@@ -379,7 +396,8 @@ skip_delay:
     function render:
         invoke set_draw_color, renderer_id, 0, 0, 0, 255
         invoke clear, renderer_id
-
+        invoke snprintf, score_txt, 255,score_fmt, score
+       
         mov y, 0
     board_loop_y:
         cmp y, board_h
@@ -435,6 +453,7 @@ skip_delay:
         jmp piece_loop
 
     present:
+        invoke draw_text, renderer_id, font_id,score_txt,15, 15, 255 ,255,255, 255
         invoke present, renderer_id
         mov rax, 0
         ret
@@ -531,6 +550,7 @@ skip_delay:
     check_full:
         cmp k, 1
         jne next_line
+        add score, 10
         mov j, y
     shift_loop:
         cmp j, 0
@@ -619,12 +639,14 @@ skip_delay:
         ret
 
     function resetGame:
+        mov score, 0
         mov game_over, 0
         mov piece_x, 3
         mov piece_y, 0
         mov rotation, 0
         mov tick, 0
-        mov rand_seed, 12345
+        invoke rand_number, 12345
+        return rand_seed
         mov i, 0
     reset_board_loop:
         cmp i, board_w
@@ -652,6 +674,7 @@ skip_delay:
     function quit:
         free board
         free pieces
+        invoke quit_text
         invoke destroy_renderer, renderer_id
         invoke destroy_window, window_id
         invoke quit
