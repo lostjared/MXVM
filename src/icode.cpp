@@ -466,6 +466,7 @@ namespace mxvm {
             const Instruction &instr = inc[i];
             for (auto l : labels) {
                 if(l.second.first == i && l.second.second) {
+                    out << "\t.p2align 4, 0x90\n";
                     out << name << "_" << l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
@@ -608,15 +609,15 @@ namespace mxvm {
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
     }
-
     void Program::gen_done(std::ostream &out, const Instruction &i) {
-        gen_ret(out, i);
+        out << "\txor %eax, %eax\n";
+        out << "\tleave\n";
+        out << "\tret\n";
     }
 
     void Program::gen_ret(std::ostream &out, const Instruction &i) {
-        out << "\tmov $0, %rax\n";
-        out << "\tmov %rbp, %rsp\n";
-        out << "\tpop %rbp\n";
+        out << "\txor %eax, %eax\n";
+        out << "\tleave\n";
         out << "\tret\n";
     }
 
