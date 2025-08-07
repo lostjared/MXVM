@@ -616,7 +616,6 @@ namespace mxvm {
     }
 
     void Program::gen_ret(std::ostream &out, const Instruction &i) {
-        out << "\txor %eax, %eax\n";
         out << "\tleave\n";
         out << "\tret\n";
     }
