@@ -198,6 +198,7 @@ program Pong {
         # clear screen
         invoke set_draw_color, renderer_id, black, black, black, white
         invoke clear, renderer_id
+        invoke fill_rect, 0, 0, w, h
 
         # draw left paddle (filled white)
         invoke set_draw_color, renderer_id, white, white, white, white
