@@ -541,7 +541,10 @@ namespace mxvm {
                             value = this->operator[](index).getTokenValue();
                     }
 
-                    operand.op = value;
+                    if(operand.object.empty())
+                        operand.op = value;
+                    else
+                        operand.op = operand.object + "." + value;
                     operand.label = value;
                     operand.type = OperandType::OP_VARIABLE;
                     break;
@@ -768,7 +771,7 @@ namespace mxvm {
                 )";
                 out << R"(
                 <div class="section">
-                    <div class="section-header"><span class="icon">📊</span> Variables</div>
+                    <div class="section-header"><span class="icon">≡ƒôè</span> Variables</div>
                     <div class="section-content">)";
             if (objPtr->vars.empty()) {
                 out << R"(<div class="no-data">No variables defined</div>)";
@@ -824,7 +827,7 @@ namespace mxvm {
             out << R"(</div>
                 </div>)";
                 out << R"(<div class="section">
-                    <div class="section-header"><span class="icon">🏷️</span> Labels</div>
+                    <div class="section-header"><span class="icon">≡ƒÅ╖∩╕Å</span> Labels</div>
                     <div class="section-content">)";
                 if (objPtr->labels.empty()) {
                     out << R"(<div class="no-data">No labels defined</div>)";
@@ -852,7 +855,7 @@ namespace mxvm {
                 </div>)";
                 out << R"(
                 <div class="section">
-                    <div class="section-header"><span class="icon">⚙️</span> Instructions</div>
+                    <div class="section-header"><span class="icon">ΓÜÖ∩╕Å</span> Instructions</div>
                     <div class="section-content">)";
             if (objPtr->inc.empty()) {
                 out << R"(<div class="no-data">No instructions defined</div>)";
@@ -893,7 +896,7 @@ namespace mxvm {
                 </div>)";
             if (!objPtr->objects.empty()) {
                 out << R"(<div class="section">
-                    <div class="section-header"><span class="icon">📦</span> Nested Objects</div>
+                    <div class="section-header"><span class="icon">≡ƒôª</span> Nested Objects</div>
                     <div class="section-content">)";
                 for (const auto& nestedObj : objPtr->objects) {
                     if (nestedObj) {
@@ -904,7 +907,7 @@ namespace mxvm {
                 </div>)";
             }
                     out << R"(<div class="section">
-    <div class="section-header"><span class="icon">📝</span> Compiled Assembly</div>
+    <div class="section-header"><span class="icon">≡ƒô¥</span> Compiled Assembly</div>
     <div class="section-content">
         <textarea id="asm-)" << objPtr->name << R"(" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
 out << objPtr->assembly_code;
@@ -1152,7 +1155,7 @@ out << R"(</div>
                 out << R"(
                     <div class="container">
                         <div class="header">
-                            <h1>🔧 MXVM Debug Report</h1>
+                            <h1>≡ƒöº MXVM Debug Report</h1>
                             <div class="subtitle">Program: <span style="color: blue;"><strong>)" << program->name << R"(</span></strong></div>
                             <div class="stats">
                                 <div class="stat-card">
@@ -1178,7 +1181,7 @@ out << R"(</div>
                 if (mainHasContent) {
                     out << R"(<div class="section">
                         <div class="section-header">
-                            <span class="icon">📊</span>
+                            <span class="icon">≡ƒôè</span>
                             Variables
                         </div>
                         <div class="section-content">)";
@@ -1243,7 +1246,7 @@ out << R"(</div>
 
                     // Show Labels section
                     out << R"(<div class="section">
-                        <div class="section-header"><span class="icon">🏷️</span> Labels</div>
+                        <div class="section-header"><span class="icon">≡ƒÅ╖∩╕Å</span> Labels</div>
                         <div class="section-content">)";
                     if (program->labels.empty()) {
                         out << R"(<div class="no-data">No labels defined</div>)";
@@ -1270,7 +1273,7 @@ out << R"(</div>
                     // Show Instructions section
                     out << R"(<div class="section">
                         <div class="section-header">
-                            <span class="icon">⚙️</span>
+                            <span class="icon">ΓÜÖ∩╕Å</span>
                             Instructions
                         </div>
                         <div class="section-content">)";
@@ -1314,7 +1317,7 @@ out << R"(</div>
                         </table>)";
                     }
                     out << R"(<div class="section">
-                        <div class="section-header"><span class="icon">📝</span> Compiled Assembly</div>
+                        <div class="section-header"><span class="icon">≡ƒô¥</span> Compiled Assembly</div>
                         <div class="section-content">
                             <textarea id="asm-main" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
                     out << program->assembly_code;
@@ -1330,7 +1333,7 @@ out << R"(</div>
                 if (hasObjects) {
                     out << R"(<div class="section">
                         <div class="section-header">
-                            <span class="icon">📦</span>
+                            <span class="icon">≡ƒôª</span>
                             Objects
                         </div>
                         <div class="section-content">)";
@@ -1377,7 +1380,7 @@ out << R"(</div>
             if (variableNode) {
                 Variable var;
                 var.type = variableNode->type;
-                var.var_name = variableNode->name;
+                var.var_name = program->name + "." + variableNode->name;
                 if (variableNode->hasInitializer) {
                     setVariableValue(var, variableNode->type, variableNode->initialValue);
                 } else {
@@ -1386,7 +1389,7 @@ out << R"(</div>
                 var.var_value.buffer_size = variableNode->buffer_size;
                 var.is_global = variableNode->is_global;
                 var.obj_name = program->name;      
-                program->add_variable(var.var_name, var);   
+                program->add_variable(var.var_name, var);  
             }
         }
     }

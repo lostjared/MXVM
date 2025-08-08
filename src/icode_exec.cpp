@@ -9,10 +9,58 @@ namespace mxvm {
     }
 
     void Program::flatten_inc(Program *root, Instruction &i) {
+        
+        if (root != this) {
+            auto qualifyVar = [&](Operand &op) {
+                if (op.op.empty()) return;
+                if (op.type != OperandType::OP_VARIABLE) return;
+                if (!op.object.empty()) return; 
+                if (op.op.find('.') != std::string::npos) return; 
+                
+                std::string qualified = this->name + "." + op.op;
+                if (vars.find(qualified) != vars.end()) {
+                    op.object = this->name;
+                    op.label = op.op;
+                    op.op = qualified;
+                }
+            };
+
+            auto qualifyLabel = [&](Operand &op) {
+                if (op.op.empty()) return;
+                if (op.op.find('.') != std::string::npos) return; 
+                if (labels.find(op.op) != labels.end()) {
+                    op.object = this->name;
+                    op.label = op.op;
+                    op.op = this->name + "." + op.op;
+                }
+            };
+
+            Instruction ci = i; 
+            qualifyVar(ci.op1);
+            qualifyVar(ci.op2);
+            qualifyVar(ci.op3);
+            for (auto &vo : ci.vop) qualifyVar(vo);
+
+            switch (ci.instruction) {
+                case CALL: case JMP: case JE: case JNE: case JL: case JLE:
+                case JG: case JGE: case JZ: case JNZ: case JA: case JB:
+                    qualifyLabel(ci.op1);
+                    break;
+                default:
+                    break;
+            }
+            root->add_instruction(ci);
+            return;
+        }
         root->add_instruction(i);
     }
 
     void Program::flatten_label(Program *root, int64_t offset, const std::string &label, bool func) {
+
+        if (root != this) {
+            root->add_label(this->name + "." + label, offset, func);
+            return;
+        }
         root->add_label(label, offset, func);
     }
 
@@ -43,6 +91,9 @@ namespace mxvm {
     }
 
     int Program::exec() {
+
+        this->add_standard();
+
         if (inc.empty()) {
             std::cerr << "No instructions to execute\n";
             return EXIT_FAILURE;
@@ -480,15 +531,44 @@ namespace mxvm {
     }
 
     Variable& Program::getVariable(const std::string& n) {
-        auto it = vars.find(n);
-        if (it != vars.end()) {
-            return it->second;
+        auto rax_pos = n.find("%");
+        if(rax_pos != std::string::npos) {
+            auto dot = n.find(".");
+            if(dot != std::string::npos) {
+                std::string n_ = n.substr(dot+1);
+                auto e = vars.find(n_);
+                if(e != vars.end())
+                    return e->second;
+            } else {
+                auto e = vars.find(n);
+                if(e != vars.end())
+                    return e->second;
+            }
         }
+        auto pos = n.find(".");
+        if(pos == std::string::npos) {
+            auto it = vars.find(name + "." + n);
+            if (it != vars.end()) {
+                return it->second;
+            }
+        }
+        else {
+            auto it = vars.find(n);
+            if(it != vars.end())
+                return it->second;
+        }
+
         if(Program::base != nullptr) {
             for(auto &obj : Base::base->object_map) {
-                auto it = obj.second->vars.find(n);
-                if(it != obj.second->vars.end())
-                    return it->second;                
+                if(pos == std::string::npos) {
+                    auto it = obj.second->vars.find(name + "." + n);
+                    if(it != obj.second->vars.end())
+                        return it->second;
+                } else {
+                    auto it = obj.second->vars.find(n);
+                    if(it != obj.second->vars.end())
+                        return it->second;                
+                }
             }
         }
         throw mx::Exception("Variable not found: " + name + "." + n);
@@ -496,8 +576,12 @@ namespace mxvm {
 
     bool Program::isVariable(const std::string& n) {
 
-          if(vars.find(n) != vars.end())
+        auto rax_pos = n.find("%");
+
+        if(rax_pos != std::string::npos) {
             return true;
+        }
+
 
         if(Program::base != nullptr) {
             for(auto &obj : Base::base->object_map) {
@@ -505,8 +589,19 @@ namespace mxvm {
                 if(it != obj.second->vars.end()) {
                     return true;
                 }
+
+                it = obj.second->vars.find(name + "." + n);
+                if(it != obj.second->vars.end())
+                    return true;
             }
         }
+
+        if(vars.find(name + "." + n) != vars.end())
+            return true;
+
+        if(vars.find(n) != vars.end())
+            return true;
+
         return false;
     }
 
@@ -519,8 +614,7 @@ namespace mxvm {
                         throw mx::Exception("Syntax Error: Argument variable not defined: Object: " + variable.first +  " variable: " + variable.second.getTokenValue() +" at line " + std::to_string(variable.second.getLine()));
                     }               
                 }
-            }
-        }
+            }}
         return true;
     }
 
@@ -588,21 +682,20 @@ namespace mxvm {
             int64_t v2 = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
             if (v2 != 0) {
                 dest.var_value.int_value = v1 / v2;
-                dest.var_value.type = VarType::VAR_INTEGER;
             } else {
-                std::cerr << "Division by zero error\n";
-                stop();
+                // Safe behavior: set 0 on div-by-zero and continue
+                dest.var_value.int_value = 0;
             }
+            dest.var_value.type = VarType::VAR_INTEGER;
         } else if (dest.type == VarType::VAR_FLOAT) {
             double v1 = (src1.type == VarType::VAR_INTEGER) ? static_cast<double>(src1.var_value.int_value) : src1.var_value.float_value;
             double v2 = (src2.type == VarType::VAR_INTEGER) ? static_cast<double>(src2.var_value.int_value) : src2.var_value.float_value;
             if (v2 != 0.0) {
                 dest.var_value.float_value = v1 / v2;
-                dest.var_value.type = VarType::VAR_FLOAT;
             } else {
-                std::cerr << "Division by zero error\n";
-                stop();
+                dest.var_value.float_value = 0.0;
             }
+            dest.var_value.type = VarType::VAR_FLOAT;
         }
     }
 
@@ -937,11 +1030,10 @@ namespace mxvm {
             int64_t v1 = (src1->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1->var_value.float_value) : src1->var_value.int_value;
             int64_t v2 = (src2->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2->var_value.float_value) : src2->var_value.int_value;
             if (v2 == 0) {
-                std::cerr << "Division by zero error in MOD\n";
-                stop();
-                return;
+                dest.var_value.int_value = 0; // safe modulo by zero => 0
+            } else {
+                dest.var_value.int_value = v1 % v2;
             }
-            dest.var_value.int_value = v1 % v2;
             dest.var_value.type = VarType::VAR_INTEGER;
         } else {
             std::cerr << "MOD only supports integer types\n";

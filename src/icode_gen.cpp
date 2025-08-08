@@ -3,6 +3,7 @@
 namespace mxvm {
 
     void Program::generateCode(bool obj, std::ostream &out) {
+        this->add_standard();
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second.first] = l.first;
@@ -618,13 +619,26 @@ namespace mxvm {
                 if (v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\tcmpq $0, %rcx\n";
+                    out << "\tje 1f\n";
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txor %eax, %eax\n";
+                    out << "2:\n";
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                    out << "\txorpd %xmm2, %xmm2\n";
+                    out << "\tucomisd %xmm2, %xmm1\n";
+                    out << "\tje 1f\n";
                     out << "\tdivsd %xmm1, %xmm0\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txorpd %xmm0, %xmm0\n";
+                    out << "2:\n";
                     out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
                     throw mx::Exception("DIV: unsupported variable type");
@@ -638,13 +652,26 @@ namespace mxvm {
                 if (v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\tcmpq $0, %rcx\n";
+                    out << "\tje 1f\n";
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txor %eax, %eax\n";
+                    out << "2:\n";
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
+                    out << "\txorpd %xmm2, %xmm2\n";
+                    out << "\tucomisd %xmm2, %xmm1\n";
+                    out << "\tje 1f\n";
                     out << "\tdivsd %xmm1, %xmm0\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txorpd %xmm0, %xmm0\n";
+                    out << "2:\n";
                     out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
                     throw mx::Exception("DIV: unsupported variable type");
@@ -662,8 +689,14 @@ namespace mxvm {
                 if (v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    out << "\tcmpq $0, %rcx\n";
+                    out << "\tje 1f\n";
                     out << "\tcqto\n"; 
                     out << "\tidivq %rcx\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txor %edx, %edx\n";
+                    out << "2:\n";
                     out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n"; 
                 } else {
                     throw mx::Exception("MOD only supports integer variables");
@@ -677,8 +710,14 @@ namespace mxvm {
                 if (v.type == VarType::VAR_INTEGER) {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    out << "\tcmpq $0, %rcx\n";
+                    out << "\tje 1f\n";
                     out << "\tcqto\n";
                     out << "\tidivq %rcx\n";
+                    out << "\tjmp 2f\n";
+                    out << "1:\n";
+                    out << "\txor %edx, %edx\n";
+                    out << "2:\n";
                     out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
                     throw mx::Exception("MOD only supports integer variables");

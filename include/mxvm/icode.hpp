@@ -151,6 +151,8 @@ namespace mxvm {
             }
             return *this;
         }     
+
+        void add_standard();
         void stop();
         int exec();
         void print(std::ostream &out);
