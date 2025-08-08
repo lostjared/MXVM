@@ -371,7 +371,7 @@ namespace mxvm {
             bool found_in_object = false;
             for(auto &obj : objects) {
                 if(obj->isFunctionValid(i.op1.op)) {
-                    out << "\tcall " << obj->name << "_" << i.op1.op << "\n";
+                    out << "\tcall " << getMangledName(i.op1) << "\n";
                     found_in_object = true;
                     break;
                 }
