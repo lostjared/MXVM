@@ -18,4 +18,4 @@ mxvm.js: $(OBJ_FILES)
 	em++ $(CXXFLAGS) $(OBJ_FILES) -o mxvm.js -lembind -sNO_DISABLE_EXCEPTION_CATCHING --preload-file ./include/io/io.mxvm --preload-file ./include/string/string.mxvm --preload-file ./include/sdl/sdl.mxvm
 
 clean:
-	rm -f *.o *.wasm *.js
+	rm -f *.o *.wasm *.js *.data
