@@ -10,8 +10,8 @@ object ReadFile {
         ptr    fptr          = null
         string file_err1     = "Could not open file: %s\n"
         int    nfile_size    = 0
-        byte   zero_byte     = 0
-    }
+        export byte   zero_byte     = 0
+ }
 
     section code {
         function readFile:
@@ -158,13 +158,15 @@ program FileTokenizer {
         byte  ch         = 0
         byte  newline    = 10   # ASCII '\n'
         byte  null_byte  = 0
+	int temp = 0
+	int idx = 0
     }
 
     section code {
         # Read the file into ReadFile.f_buffer, set ReadFile.file_size
         call ReadFile.readFile
 
-        # Allocate tokenizer’s working buffer (plus null)
+        # Allocate tokenizerâ€™s working buffer (plus null)
         mov pos, ReadFile.file_size
         add pos, 1
         alloc Tokenizer.t_buffer, 1, pos
@@ -227,8 +229,8 @@ program FileTokenizer {
         jmp copy_tail
 
       after_tail_copy:
-        store zero,        Tokenizer.t_buffer, temp, 1
-        call            Tokenizer.tokenize
+        store ReadFile.zero_byte,Tokenizer.t_buffer, temp, 1
+        call Tokenizer.tokenize
 
     icleanup:
         call Tokenizer.cleanup
