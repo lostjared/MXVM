@@ -15,6 +15,7 @@ namespace mxvm {
     bool instruct_mode = false;
     bool html_mode = false;
 
+
     ModuleParser::ModuleParser(const Mode &mode, const std::string &m, const std::string &source) : mod_name(m), scanner(source), parser_mode(mode) {}
     
     uint64_t ModuleParser::scan() {
@@ -688,7 +689,12 @@ namespace mxvm {
                 }
                 
                 registerObjectExterns(program, objProgram);
+               
+                if(Program::base != nullptr && objProgram->object)
+                    Program::base->add_object(objProgram->name, objProgram.get());
+
                 program->objects.push_back(std::move(objProgram));
+                
             }
             
  

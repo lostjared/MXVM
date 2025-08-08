@@ -73,6 +73,7 @@ namespace mxvm {
         void add_runtime_extern(const std::string &mod_name, const std::string &mod, const std::string &func_name, const std::string &name);
         void add_filename(const std::string &fname);
         void add_allocated(const std::string &name, Variable &v);
+        void add_object(const std::string &name, Program *prog);
         std::string name;
         std::vector<Instruction> inc;
         std::unordered_map<std::string, Variable> vars;
@@ -83,7 +84,9 @@ namespace mxvm {
         static std::string root_name;
         static std::vector<std::string> filenames;
         static std::unordered_map<std::string, Variable> allocated;
+        static std::unordered_map<std::string, Program *> object_map;
         std::string assembly_code;
+        
     };
 
     class Program : public Base {
@@ -169,6 +172,7 @@ namespace mxvm {
         void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
         void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
         std::string getMangledName(const std::string& var);
+        std::string getMangledName(const Operand &op);
         Program *getObjectByName(const std::string &name);
     private:
         size_t pc;  

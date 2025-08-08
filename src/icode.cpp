@@ -10,6 +10,8 @@
 
 namespace mxvm {
 
+    std::unordered_map<std::string, Program *> Base::object_map;
+
     std::string Program::getMangledName(const std::string& var) {
         if (!isVariable(var)) return var;
         Variable& v = getVariable(var);
@@ -19,7 +21,12 @@ namespace mxvm {
             return var;
     }
 
-        
+    std::string Program::getMangledName(const Operand &op) {
+        if(!op.object.empty())
+            return op.object + "_" + op.op;
+        return getMangledName(op.op);
+    }
+
     Base::Base(Base&& other) noexcept
         : name(std::move(other.name))
         , inc(std::move(other.inc))
@@ -74,6 +81,14 @@ namespace mxvm {
         object = obj;
     }
 
+    void Base::add_object(const std::string &name, Program *prog) {
+        if(base != nullptr) {
+            auto it = base->object_map.find(name);
+            if(it == base->object_map.end())
+                base->object_map[name] = prog;
+        }
+    }
+
     Program::~Program() {
         for(auto &i : vars) {
             if(i.second.var_value.ptr_value != nullptr && i.second.var_value.owns) {
@@ -102,13 +117,42 @@ namespace mxvm {
     }
 
     bool Program::isFunctionValid(const std::string &f) {
-        auto lbl = labels.find(f);
-        if(lbl != labels.end() && lbl->second.second)
-            return true;
-        for(auto &o : objects) {
-            if(o->isFunctionValid(f))
-                return true;
+
+        auto dot = f.find('.');
+        if (dot != std::string::npos) {
+            std::string objName = f.substr(0, dot);
+            std::string lblName = f.substr(dot + 1);
+            if (Program* obj = getObjectByName(objName)) {
+                auto it = obj->labels.find(lblName);
+                if (it != obj->labels.end()) {
+                    return true; 
+                }
+            }
+            return false;
         }
+
+        for(auto &o : objects) {
+            Program *program = o->getObjectByName(o->name);
+            if(program) {
+                bool b = program->isFunctionValid(f);
+                if(b)
+                    return true;
+            }
+        }
+
+        auto it = labels.find(f);
+        if(it != labels.end() && it->second.second)
+            return true;
+
+
+        if(Program::base != nullptr) {
+            for(auto &o :  Base::base->object_map) {
+                auto it = o.second->labels.find(f);
+                if(it != o.second->labels.end() && it->second.second)
+                    return true;
+            }
+        }
+
         return false;
     }
 

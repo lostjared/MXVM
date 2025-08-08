@@ -480,31 +480,33 @@ namespace mxvm {
     }
 
     Variable& Program::getVariable(const std::string& n) {
-        for (auto& obj : objects) {
-            Program* foundObj = obj->getObjectByName(obj->name);
-            if (foundObj) {
-                auto it2 = foundObj->vars.find(n);
-                if (it2 != foundObj->vars.end()) {
-                    return it2->second;
-                }
-            }
-        }
         auto it = vars.find(n);
         if (it != vars.end()) {
             return it->second;
         }
+        if(Program::base != nullptr) {
+            for(auto &obj : Base::base->object_map) {
+                auto it = obj.second->vars.find(n);
+                if(it != obj.second->vars.end())
+                    return it->second;                
+            }
+        }
         throw mx::Exception("Variable not found: " + name + "." + n);
     }
 
-    bool Program::isVariable(const std::string& name) {
-
-        if(vars.find(name) != vars.end())
+    bool Program::isVariable(const std::string& n) {
+        if(Program::base != nullptr) {
+            for(auto &obj : Base::base->object_map) {
+                auto it = obj.second->vars.find(n);
+                if(it != obj.second->vars.end()) {
+                    return true;
+                }
+            }
+        }
+    
+        if(vars.find(n) != vars.end())
             return true;
 
-        for(auto &o : objects)  {
-            if(o->isVariable(name))
-                return true;
-        }
         return false;
     }
 

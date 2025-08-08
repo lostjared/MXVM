@@ -25,12 +25,14 @@ namespace mxvm {
     struct Variable;
     struct Operand;
 
+
     extern bool debug_mode;
     extern bool instruct_mode;
     extern bool html_mode;
 
     enum class Mode { MODE_INTERPRET, MODE_COMPILE };
 
+      
     class ModuleParser;
 
     class Parser {
@@ -68,7 +70,6 @@ namespace mxvm {
         uint64_t scan();
         void parse();
         auto operator[](size_t pos);
-
         
         std::unique_ptr<ProgramNode> parseProgramOrObject(uint64_t& index);
         std::unique_ptr<ProgramNode> parseAST();

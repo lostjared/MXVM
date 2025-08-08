@@ -175,6 +175,7 @@ int process_arguments(Args *args) {
 
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
     program->setMainBase(program.get());
+
     if(args->action == vm_action::compile) {
         exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
         if(exitCode == 0) {
@@ -300,6 +301,7 @@ int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_vie
         }
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
+        program->memoryDump(std::cout);
         return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
         std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
