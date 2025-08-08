@@ -657,7 +657,7 @@ object Game {
         call Render.start_screen
     skip_start:
         call Pieces.spawn_piece
-        call Game.loop
+        call loop
         ret
 
     function loop:
@@ -670,7 +670,7 @@ object Game {
         call Input.handle
         cmp GameState.show_start, 1
         je skip_update
-        call Game.update
+        call update
     skip_update:
         call Render.render
         invoke get_ticks
@@ -685,7 +685,8 @@ object Game {
     skip_delay:
         jmp gloop
     over:
-        call Game.reset
+        
+        call reset
         jmp gloop
         ret
 
@@ -694,7 +695,7 @@ object Game {
         cmp GameState.tick, GameState.speed
         jl end_upd
         mov GameState.tick, 0
-        call Game.move_down
+        call move_down
     end_upd:
         mov GameState.rax, 0
         ret

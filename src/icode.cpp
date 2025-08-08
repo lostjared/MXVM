@@ -19,6 +19,9 @@ namespace mxvm {
             std::replace(sym.begin(), sym.end(), '.', '_');
             return sym;
         }
+
+
+
         if (!isVariable(var)) return var;
         Variable& v = getVariable(var);
         if (!v.obj_name.empty())
@@ -27,6 +30,15 @@ namespace mxvm {
     }
 
     std::string Program::getMangledName(const Operand &op) {
+
+        auto pos = op.op.find(".");
+        if(pos == std::string::npos) {
+            auto it = labels.find(op.op);
+            if(it != labels.end()) {
+                return name + "_" + op.op;
+            }
+        }
+
         if(!op.object.empty()) {
             if(!op.label.empty())
                 return op.object + "_" + op.label;
