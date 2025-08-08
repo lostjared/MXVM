@@ -495,6 +495,10 @@ namespace mxvm {
     }
 
     bool Program::isVariable(const std::string& n) {
+
+          if(vars.find(n) != vars.end())
+            return true;
+
         if(Program::base != nullptr) {
             for(auto &obj : Base::base->object_map) {
                 auto it = obj.second->vars.find(n);
@@ -503,10 +507,6 @@ namespace mxvm {
                 }
             }
         }
-    
-        if(vars.find(n) != vars.end())
-            return true;
-
         return false;
     }
 
