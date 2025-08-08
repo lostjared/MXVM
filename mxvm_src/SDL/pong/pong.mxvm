@@ -40,8 +40,8 @@ program Pong {
         int delta         = 0
         
         # Movement speed
-        int move_speed    = 8
-        int ai_speed      = 3
+        int move_speed    = 12
+        int ai_speed      = 12
     }
 
     section code {
@@ -83,12 +83,12 @@ program Pong {
         return rax
         cmp rax, 27    # SDLK_ESCAPE
         je quit
-        cmp rax, 119   # SDLK_w (up)
+        cmp rax, 1073741906
         jne check_down
         sub paddle1_y, move_speed
         jmp next_event
     check_down:
-        cmp rax, 115   # SDLK_s (down)
+        cmp rax, 1073741905
         jne next_event
         add paddle1_y, move_speed
     next_event:
@@ -198,7 +198,7 @@ program Pong {
         # clear screen
         invoke set_draw_color, renderer_id, black, black, black, white
         invoke clear, renderer_id
-        invoke fill_rect, 0, 0, w, h
+        invoke fill_rect, renderer_id, 0, 0, w, h
 
         # draw left paddle (filled white)
         invoke set_draw_color, renderer_id, white, white, white, white
