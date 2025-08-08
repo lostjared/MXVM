@@ -369,19 +369,9 @@ namespace mxvm {
     
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
-            bool found_in_object = false;
-            for(auto &obj : objects) {
-                if(obj->isFunctionValid(i.op1.op)) {
-                    out << "\tcall " << getMangledName(i.op1) << "\n";
-                    found_in_object = true;
-                    break;
-                }
-            }
-            if(!found_in_object) {
-                out << "\tcall " << name << "_" << i.op1.op << "\n";
-            }
+            out << "\tcall " << getMangledName(i.op1) << "\n";
         } else {
-            throw mx::Exception("function label for call: " + i.op1.op + " not found.\n");
+            throw mx::Exception("Function " + i.op1.op + " not found!");
         }
     }
 

@@ -129,46 +129,29 @@ namespace mxvm {
             }
         }
     }
-
-    bool Program::isFunctionValid(const std::string &f) {
-
-        auto dot = f.find('.');
-        if (dot != std::string::npos) {
-            std::string objName = f.substr(0, dot);
-            std::string lblName = f.substr(dot + 1);
-            if (Program* obj = getObjectByName(objName)) {
-                auto it = obj->labels.find(lblName);
-                if (it != obj->labels.end()) {
-                    return true; 
-                }
+    bool Program::isFunctionValid(const std::string& label) {   
+        auto dot_pos = label.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string obj_name = label.substr(0, dot_pos);
+            std::string func_name = label.substr(dot_pos + 1);
+        
+            auto it = object_map.find(obj_name);
+            if (it != object_map.end() && it->second != nullptr) {
+                Program* obj_prog = it->second;
+                auto label_it = obj_prog->labels.find(func_name);
+                return label_it != obj_prog->labels.end() && label_it->second.second; // second==true means function
             }
             return false;
         }
-
-        for(auto &o : objects) {
-            Program *program = o->getObjectByName(o->name);
-            if(program) {
-                bool b = program->isFunctionValid(f);
-                if(b)
-                    return true;
-            }
-        }
-
-        auto it = labels.find(f);
-        if(it != labels.end() && it->second.second)
+    
+        auto it = labels.find(label);
+        if (it != labels.end() && it->second.second) {
             return true;
-
-
-        if(Program::base != nullptr) {
-            for(auto &o :  Base::base->object_map) {
-                auto it = o.second->labels.find(f);
-                if(it != o.second->labels.end() && it->second.second)
-                    return true;
-            }
         }
-
+    
         return false;
     }
+
 
     std::unordered_map<std::string, void *> RuntimeFunction::handles;
     std::string Base::root_name;
@@ -299,6 +282,20 @@ namespace mxvm {
         dumpProgram = [&](Program* prog, std::ostream& out, int depth = 0) {
             std::string indent(depth * 2, ' ');
             out << indent << "=== MEMORY DUMP for " << prog->name << " ===\n";
+            if (!prog->labels.empty()) {
+                out << indent << "  Labels:\n";
+                out << indent << "    " << std::left << std::setw(20) << "Name"
+                    << std::setw(12) << "Address"
+                    << std::setw(10) << "IsFunc"
+                    << "\n";
+                out << indent << "    " << std::string(42, '-') << "\n";
+                for (const auto& label : prog->labels) {
+                    out << indent << "    " << std::setw(20) << label.first
+                        << std::setw(12) << label.second.first
+                        << std::setw(10) << (label.second.second ? "yes" : "no")
+                        << "\n";
+                }
+            }
             if (prog->vars.empty()) {
                 out << indent << "  (no variables)\n";
             } else {

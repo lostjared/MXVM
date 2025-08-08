@@ -166,7 +166,6 @@ namespace mxvm {
         void setArgs(const std::vector<std::string> &argv);
         void setObject(bool obj);
         std::vector<std::unique_ptr<Program>> objects;
-        bool isFunctionValid(const std::string &f);
         bool object = false;
         bool validateNames(Validator &v);
         void flatten(Program *program);
@@ -176,6 +175,8 @@ namespace mxvm {
         std::string getMangledName(const std::string& var);
         std::string getMangledName(const Operand &op);
         Program *getObjectByName(const std::string &name);
+        bool isFunctionValid(const std::string& label);
+        //std::string resolveFunctionSymbol(const std::string& label);
     private:
         size_t pc;  
         bool running;

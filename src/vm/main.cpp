@@ -301,16 +301,28 @@ int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_vie
         }
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
+        if(mxvm::debug_mode) {
+            program->memoryDump(std::cerr);
+        }
         return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
         std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
+        if(mxvm::debug_mode) {
+            program->memoryDump(std::cerr);
+        }
         return EXIT_FAILURE;
     } catch(const std::exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
+        if(mxvm::debug_mode) {
+            program->memoryDump(std::cerr);
+        }
         return EXIT_FAILURE;
     }
     catch(...) {
         std::cerr << Col("MXVM: ", mx::Color::RED) << "Unknown Exception.\n";
+        if(mxvm::debug_mode) {
+            program->memoryDump(std::cerr);
+        }
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
