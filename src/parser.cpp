@@ -229,6 +229,12 @@ namespace mxvm {
                     parser->processObjectSection(sectionNode, objProgram);
                 }
             }            
+            
+            if(Program::base != nullptr && objProgram->object)
+                    Program::base->add_object(objProgram->name, objProgram.get());
+
+            registerObjectExterns(program, objProgram);
+
             program->objects.push_back(std::move(objProgram));
         }
     }
@@ -1638,5 +1644,15 @@ out << R"(</div>
             if(labelInfo.second && Program::base != nullptr)
                 Program::base->add_extern(objProgram->name, labelName, false);
         }
+
+        for (const auto& ext : objProgram->external) {
+            if (Program::base != nullptr)
+                Program::base->add_extern(ext.mod, ext.name, true);
+        }
+
+        for (const auto& child : objProgram->objects) {
+            if (child)
+                registerObjectExterns(mainProgram, child);
+        }   
     }
 }
