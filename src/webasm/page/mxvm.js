@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmppvpev1o3.js
+// include: /tmp/tmpkai9sbrg.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -215,21 +215,21 @@ Module['FS_createPath']("/include", "string", true, true);
 
   })();
 
-// end include: /tmp/tmppvpev1o3.js
-// include: /tmp/tmp0nbi5ncp.js
+// end include: /tmp/tmpkai9sbrg.js
+// include: /tmp/tmp56a51u06.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmp0nbi5ncp.js
-// include: /tmp/tmpb9eg9hfw.js
+  // end include: /tmp/tmp56a51u06.js
+// include: /tmp/tmpmtfq_5ep.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmpb9eg9hfw.js
+  // end include: /tmp/tmpmtfq_5ep.js
 
 
 var arguments_ = [];
@@ -7124,6 +7124,17 @@ function invoke_iid(index,a1,a2) {
   }
 }
 
+function invoke_viiji(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3,a4);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
 function invoke_vij(index,a1,a2) {
   var sp = stackSave();
   try {
@@ -7166,17 +7177,6 @@ function invoke_ji(index,a1) {
     if (!(e instanceof EmscriptenEH)) throw e;
     _setThrew(1, 0);
     return 0n;
-  }
-}
-
-function invoke_viiji(index,a1,a2,a3,a4) {
-  var sp = stackSave();
-  try {
-    getWasmTableEntry(index)(a1,a2,a3,a4);
-  } catch(e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
   }
 }
 
