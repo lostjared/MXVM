@@ -668,7 +668,10 @@ object Game {
         cmp GameState.game_over, 1
         je over
         call Input.handle
+        cmp GameState.show_start, 1
+        je skip_update
         call Game.update
+    skip_update:
         call Render.render
         invoke get_ticks
         return GameState.eax
