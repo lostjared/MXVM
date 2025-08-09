@@ -165,7 +165,18 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
         SDL_Rect src_rect = { (int)src_x, (int)src_y, (int)src_w, (int)src_h };
         SDL_Rect dst_rect = { (int)dst_x, (int)dst_y, (int)dst_w, (int)dst_h };
         
-        SDL_RenderCopy(g_renderers[renderer_id], g_textures[texture_id], &src_rect, &dst_rect);
+        SDL_Rect *rc1 = &src_rect;
+
+        if(src_x == -1 || src_y == -1 && src_w == -1 && src_h == -1) {
+            rc1 = NULL;
+        }
+
+        SDL_Rect *dst_rc =    &dst_rect;
+        if(dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
+            dst_rc = NULL;
+        }
+
+        SDL_RenderCopy(g_renderers[renderer_id], g_textures[texture_id],rc1,dst_rc);
     }
 }
 

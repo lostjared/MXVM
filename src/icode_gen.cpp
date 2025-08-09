@@ -142,7 +142,6 @@ namespace mxvm {
             for (auto l : labels) {
                 if(l.second.first == i && !l.second.second) {
                     out << "." << l.first << ":\n";
-                    break;
                 }
             }
             if(instr.instruction == DONE)
@@ -1038,7 +1037,7 @@ namespace mxvm {
         if(!i.op1.op.empty()) {
             auto pos = labels.find(i.op1.op);
             if(pos == labels.end()) {
-                throw mx::Exception("Jump instruction msut have valid label.");
+                throw mx::Exception("Jump instruction must have valid label: " + i.op1.op);
             }
             const char* mnem = nullptr;
             switch (i.instruction) {
@@ -1058,7 +1057,7 @@ namespace mxvm {
             }
             out << "\t" << mnem << " ." << i.op1.op << "\n";
         } else {
-            throw mx::Exception("Jump instruction must have label");
+            throw mx::Exception("Jump instruction must have label: " + i.op1.op);
         }
     }
 
