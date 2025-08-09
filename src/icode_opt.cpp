@@ -147,14 +147,14 @@ namespace mxvm {
             
             if (std::regex_match(lines[i], m, re_add_one)) {
                 const std::string reg = m[1].str();
-                out.push_back("\tinc" + reg.substr(1, 1) + " " + reg);
+                out.push_back("\tinc " + reg.substr(1, 1) + " " + reg);
                 continue;
             }
 
             
             if (std::regex_match(lines[i], m, re_sub_one)) {
                 const std::string reg = m[1].str();
-                out.push_back("\tdec" + reg.substr(1, 1) + " " + reg);
+                out.push_back("\tdec " + reg.substr(1, 1) + " " + reg);
                 continue;
             }
 
