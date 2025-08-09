@@ -1630,6 +1630,7 @@ out << R"(</div>
         objProgram->generateCode(objProgram->object, code_v);
         objProgram->assembly_code = code_v.str();
         std::string opt_code = objProgram->gen_optimize(objProgram->assembly_code);
+        objProgram->assembly_code = opt_code;
         objectFile << opt_code;
         objectFile.close();
         if (debug_mode) {

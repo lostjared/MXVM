@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmp06v0l1qd.js
+// include: /tmp/tmp9s68rclv.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -215,21 +215,21 @@ Module['FS_createPath']("/include", "string", true, true);
 
   })();
 
-// end include: /tmp/tmp06v0l1qd.js
-// include: /tmp/tmplbcylxmc.js
+// end include: /tmp/tmp9s68rclv.js
+// include: /tmp/tmp0e4n3ttf.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmplbcylxmc.js
-// include: /tmp/tmpsk5awfi3.js
+  // end include: /tmp/tmp0e4n3ttf.js
+// include: /tmp/tmpoutdpjzl.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmpsk5awfi3.js
+  // end include: /tmp/tmpoutdpjzl.js
 
 
 var arguments_ = [];
@@ -6892,6 +6892,8 @@ var wasmImports = {
   /** @export */
   invoke_iiiiiiii,
   /** @export */
+  invoke_iiiiiiiiii,
+  /** @export */
   invoke_iiiiiiiiiii,
   /** @export */
   invoke_iiiiiiiiiiii,
@@ -7161,6 +7163,17 @@ function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
   var sp = stackSave();
   try {
     getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+  }
+}
+
+function invoke_iiiiiiiiii(index,a1,a2,a3,a4,a5,a6,a7,a8,a9) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2,a3,a4,a5,a6,a7,a8,a9);
   } catch(e) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;

@@ -41,6 +41,7 @@ public:
                     program->object = true;
                 program->generateCode(program->object, code_v);
                 program->assembly_code = code_v.str();
+                program->assembly_code = program->gen_optimize(program->assembly_code);
                 parser.generateDebugHTML(html, program);
             } else {
                 html << "Parse Error";
