@@ -80,6 +80,7 @@ add_library(mxvm SHARED
     src/icode.cpp
     src/icode_gen.cpp
     src/icode_exec.cpp
+    src/icode_opt.cpp
     src/ast.cpp
     src/valid.cpp
     src/function.cpp

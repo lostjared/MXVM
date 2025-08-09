@@ -163,6 +163,7 @@ namespace mxvm {
         std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << "\n";
     }
 
+
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {
         switch(i.instruction) {
             case ADD:

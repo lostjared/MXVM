@@ -1629,7 +1629,8 @@ out << R"(</div>
         std::ostringstream code_v;
         objProgram->generateCode(objProgram->object, code_v);
         objProgram->assembly_code = code_v.str();
-        objectFile << code_v.str();
+        std::string opt_code = objProgram->gen_optimize(objProgram->assembly_code);
+        objectFile << opt_code;
         objectFile.close();
         if (debug_mode) {
             std::cout << "Generated object assembly file: " << objectFileName << std::endl;

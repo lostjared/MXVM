@@ -225,6 +225,7 @@ namespace mxvm {
         void gen_invoke(std::ostream &out, const Instruction &i);
         void gen_return(std::ostream &out, const Instruction &i);
         void gen_neg(std::ostream &out, const Instruction &i);
+        std::string gen_optimize(const std::string  &code);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);

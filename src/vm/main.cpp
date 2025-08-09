@@ -281,7 +281,8 @@ int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_vie
                 std::ostringstream code_v;
                 program->generateCode(program->object, code_v);
                 program->assembly_code = code_v.str();
-                file << code_v.str();
+                std::string opt_code = program->gen_optimize(program->assembly_code);
+                file << opt_code;
                 if(mxvm::html_mode) {
                     std::ofstream  htmlFile(program->name + ".html");
                     if(htmlFile.is_open()) {
