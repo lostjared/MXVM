@@ -1,6 +1,6 @@
 program PuzzleGame {
     section module { sdl, string, io }
-    section object { SDLCore, GameState, Grid, Piece, Game, Input, Engine }
+    section object { SDLCore, GameState, Grid, Piece, Game, Input, Engine, Text }
 
     section code {
     start:
@@ -51,6 +51,7 @@ object SDLCore {
   function begin_frame:
     invoke set_draw_color, renderer_id, 0, 0, 0, 255
     invoke clear, renderer_id
+    invoke fill_rect, renderer_id, 0, 0, w, h
     ret
 
   function end_frame:
@@ -234,7 +235,7 @@ object Grid {
     cg_loop:
         cmp idx, bytes
         jge cg_done
-        store zero_byte, buf, idx, 1
+        store 0, buf, idx, 8
         add idx, 1
         jmp cg_loop
     cg_done:
@@ -1060,8 +1061,9 @@ object Engine {
 
     function set_piece:
         cmp Piece.y, 0
-        jne sp_place
+        jg sp_place
         mov GameState.game_over, 1
+        call Game.new_game
         ret
     sp_place:
         # b0 at (x, y)
@@ -1143,29 +1145,10 @@ object Engine {
         mov SDLCore.tmp_tex, GameState.bg_tex
         call SDLCore.copy_texture_full
     skbg:
-
         call Grid.draw_grid
         call draw_piece
-
-        cmp GameState.game_over, 1
-        jne drawn
-        add GameState.flash_t, 1
-        mov rr, GameState.flash_t
-        and rr, 31
-        cmp rr, 0
-        jne noblink
-        xor GameState.flash_on, 1
-    noblink:
-        cmp GameState.flash_on, 1
-        jne drawn
-        invoke set_draw_color, SDLCore.renderer_id, 0, 0, 0, 255
-        invoke fill_rect, SDLCore.renderer_id, 325, 150, 575, 35
-        invoke rand_number, 255
-        return rr
-        invoke set_draw_color, SDLCore.renderer_id, rr, rr, rr, 255
-        invoke fill_rect, SDLCore.renderer_id, 335, 150, 555, 35
-
     drawn:
+        call Text.draw_score
         call SDLCore.end_frame
         ret
 
@@ -1205,6 +1188,8 @@ object Game {
 
     section module { string }
 
+    section object { Text }
+
     section data { 
         string title = "Puzzle Game [MXVM Edition]"
     }
@@ -1229,6 +1214,7 @@ object Game {
         invoke get_ticks
         return GameState.ticks
         mov GameState.time_tx, 0
+        call Text.init
         ret
 
     function new_game:
@@ -1245,8 +1231,50 @@ object Game {
         jl sk1
         invoke destroy_texture, GameState.bg_tex
     sk1:
+        call Text.release
         call SDLCore.shutdown
         invoke quit
+        ret
+    }
+}
+
+object Text {
+    section module { string }
+
+    section data {
+        export int x = 120
+        export int y = 15
+        string prefix = "Score: %lld"
+        string font_found_err = "Could not find: font.ttf\n"
+        string scorebuf, 256
+        string font_name = "font.ttf"
+        int fnt = -1
+    }
+
+    section code {
+    function init:
+        invoke init_text
+        invoke load_font, font_name, 24
+        return fnt
+        cmp fnt, 0
+        jl fnt_err
+        ret
+    fnt_err:
+        print font_found_err
+        ret
+    function release:
+        invoke quit_text
+        ret
+
+    function draw_score:
+        cmp fnt, 0
+        jl font_err
+        invoke snprintf, scorebuf, 255, prefix, GameState.score
+        # draw at (x,y)
+        invoke draw_text,SDLCore.renderer_id,fnt,scorebuf, x, y, 255, 255, 255, 255
+        ret
+    font_err:
+        print font_found_err
         ret
     }
 }
