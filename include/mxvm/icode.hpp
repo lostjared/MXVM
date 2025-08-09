@@ -64,7 +64,7 @@ namespace mxvm {
         Base(Base &&other) noexcept;
         ~Base() = default;
         Base &operator=(Base &&other) noexcept;
-        void setMainBase(Base *b) { base = b; }
+        void setMainBase(Base *b) { Base::base = b; }
         void add_instruction(const Instruction &i);
         void add_label(const std::string &name, uint64_t address, bool f);
         void add_variable(const std::string &name, const Variable &v);

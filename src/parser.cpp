@@ -948,7 +948,8 @@ out << R"(</div>
                             min-height: 100vh;
                         }
                         .container {
-                            max-width: 1200px;
+                            width: 100%;
+                            max-width: 100vw;
                             margin: 0 auto;
                             padding: 20px;
                             background: transparent;
