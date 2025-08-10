@@ -1,7 +1,6 @@
 program PuzzleGame {
     section module { sdl, string, io }
     section object { SDLCore, GameState, Grid, Piece, Game, Input, Engine, Text }
-
     section code {
     start:
         call Game.init
@@ -17,18 +16,15 @@ object SDLCore {
   section data {
     export string title = "MXVM SDL App"
     export string text_buffer, 1024
-    export int x = 100
-    export int y = 100
+    export int x = 250
+    export int y = 250
     export int w = 1440
     export int h = 1080
     export int flags = 0
-
     export int window_id   = 0
     export int renderer_id = 0
-
     export int last_event_type = 0
     export int last_key_code   = 0
-
     export int tmp_tex  = 0
     export int tmp_int  = 0
   }
@@ -97,14 +93,11 @@ object GameState {
         export int game_over  = 0
         export int game_speed = 1000
         export int score      = 0
-
         export int bg_tex     = -1
         export string bg_file = "bg.bmp"
-
         export int ticks   = 0
         export int time_tx = 0
         export int nticks  = 0
-
         export int flash_t = 0
         export int flash_on = 0
     }
@@ -118,7 +111,6 @@ object Piece {
         export int x = 0
         export int y = 0
         export int mode = 0
-
         int t0 = 0
         int t1 = 0
         int t2 = 0
@@ -131,12 +123,10 @@ object Piece {
         return rtmp
         mov b0, rtmp
         add b0, 1
-
         invoke rand_number, 6
         return rtmp
         mov b1, rtmp
         add b1, 1
-
         invoke rand_number, 6
         return rtmp
         mov b2, rtmp
@@ -176,44 +166,33 @@ object Grid {
         export int off_y = 125
         export int cell_w = 96
         export int cell_h = 48
-
         export ptr buf = null
         export int buf_len = 0   # number of cells (w*h)
-
         export int color_r = 0
         export int color_g = 0
         export int color_b = 0
-
         int bytes = 0
         int idx = 0
         int bytes_rt = 0
         int max_off = 0
-
-
         # args/shared for at_index/get/set
         export int ax = 0
         export int ay = 0
         int idx_calc = 0
-
         export int get_o = 0
         export int get_v = 0
-
         int set_o = 0
         export int set_val = 0
-
         byte zero_byte = 0
-
         # draw temporaries
         int rect_x = 0
         int rect_y = 0
         int rect_w = 0
         int rect_h = 0
-
         int draw_x = 0
         int draw_y = 0
         int draw_w = 0
         int draw_h = 0
-
         int loop_x = 0
         int loop_y = 0
         export int c = 0
@@ -370,7 +349,6 @@ object Input {
         export int KEY_D = 100
         export int KEY_W = 119
         export int KEY_S = 115
-
         export int down_held = 0
     }
 
@@ -1197,8 +1175,8 @@ object Game {
     section code {
     function init:
         invoke strncpy,SDLCore.text_buffer, title, 256
-        mov SDLCore.x, -1
-        mov SDLCore.y, -1
+        mov SDLCore.x, 100
+        mov SDLCore.y, 100
         mov SDLCore.w, 1440
         mov SDLCore.h, 1080
         call SDLCore.init
