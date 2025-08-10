@@ -176,6 +176,7 @@ namespace mxvm {
             var_value.ptr_count = 0;
             var_value.ptr_size = 0;
             var_value.owns = false;
+            var_name = name;
         }
         
         Variable& operator=(const Variable& v) {

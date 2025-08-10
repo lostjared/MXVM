@@ -13,20 +13,42 @@ namespace mxvm {
     std::unordered_map<std::string, Program *> Base::object_map;
 
     std::string Program::getMangledName(const std::string& var) {
-        auto dot_pos = var.find('.') ;
+#ifdef __APPLE__
+        if(var == "stderr")
+            return "___stderrp@GOTPCREL";
+        if(var == "stdin")
+            return "___stdinp@GOTPCREL";
+        if(var == "stdout")
+            return "___stdoutp@GOTPCREL";
+#endif
+        auto dot_pos = var.find('.');
         if (dot_pos != std::string::npos) {
             std::string sym = var;
             std::replace(sym.begin(), sym.end(), '.', '_');
+#ifdef __APPLE
+            return "_" + sym;
+#else
             return sym;
+#endif
         }
 
 
 
         if (!isVariable(var)) return var;
         Variable& v = getVariable(var);
+        
         if (!v.obj_name.empty())
+#ifdef __APPLE__
+            return "_" + v.obj_name + "_" + var;
+#else
             return v.obj_name + "_" + var;
+#endif
+        
+#ifdef __APPLE__
+        return "_" + var;
+#else
         return var;
+#endif
     }
 
     std::string Program::getMangledName(const Operand &op) {
@@ -41,10 +63,19 @@ namespace mxvm {
 
         if(!op.object.empty()) {
             if(!op.label.empty())
-                return op.object + "_" + op.label;
+#ifdef __APPLE__
+                return "_" + op.object + "_" + op.label;
+#else
+            return op.object + "_" + op.label;
+#endif
+            
             std::string sym = op.op;
             std::replace(sym.begin(), sym.end(), '.', '_');
+#ifdef __APPLE__
+            return "_" + sym;
+#else
             return sym;
+#endif
         }
         return getMangledName(op.op);
     }
@@ -91,12 +122,24 @@ namespace mxvm {
 
     void Program::add_standard() {
         Variable vstdout, vstdin, vstderr;
+#ifndef __APPLE__
         vstdout.setExtern("stdout", stdout);
         vstdin.setExtern("stdin", stdin);
         vstderr.setExtern("stderr", stderr);
         add_variable(name + "." + std::string("stdout"), vstdout);
         add_variable(name + "." + std::string("stdin"), vstdin);
         add_variable(name + "." + std::string("stderr"), vstderr);
+#else
+        
+        vstdout.setExtern("___stdoutp", stdout);
+        vstdin.setExtern("___stdinp", stdin);
+        vstderr.setExtern("___stderrp", stderr);
+        add_variable(name + "." + std::string("stdout"), vstdout);
+        add_variable(name + "." + std::string("stdin"), vstdin);
+        add_variable(name + "." + std::string("stderr"), vstderr);
+        
+#endif
+        
     }
 
     void Program::setArgs(const std::vector<std::string> &argv) {

@@ -2,6 +2,27 @@
 
 namespace mxvm {
 
+    static std::string getPlatformSymbolName(const std::string &name) {
+        
+#ifdef __APPLE__
+        
+        if(name == "stdin")
+            return "___stdinp";
+        if(name == "stderr")
+            return "___stderrp";
+        if(name == "stdout")
+            return "___stdoutp";
+        
+        if(!name.empty() && name[0] != '_')
+            return "_" + name;
+        else
+            return name;
+#else
+        return name;        // ELF/Linux, no underscore
+#endif
+    }
+
+
     void Program::generateCode(bool obj, std::ostream &out) {
         this->add_standard();
         std::unordered_map<int, std::string> labels_;
@@ -9,7 +30,12 @@ namespace mxvm {
             labels_[l.second.first] = l.first;
             
         }
+        
+#ifdef __APPLE__
+        out << ".section __DATA, __data\n";
+#else
         out << ".section .data\n";
+#endif
         std::vector<std::string> var_names;
         for(auto &v : vars) {
             var_names.push_back(v.first);
@@ -18,7 +44,7 @@ namespace mxvm {
         
      
         for(auto &v : var_names) {
-            const std::string var_out_name = getMangledName(v);
+            const std::string var_out_name = getPlatformSymbolName(getMangledName(v));
             auto varx = getVariable(v);
             if(varx.type == VarType::VAR_INTEGER) {
                 out << "\t" << var_out_name << ": .quad " << vars[v].var_value.int_value << "\n";
@@ -34,14 +60,22 @@ namespace mxvm {
         }    
         for(auto &v : var_names) {
             auto varx = getVariable(v);
-            if(varx.type == VarType::VAR_EXTERN) {
-                out << "\t.extern " << v << "\n";
-            } 
+            //if(varx.type == VarType::VAR_EXTERN) {
+                //out << "\t.extern " << getPlatformSymbolName(getMangledName(v)) << "\n";
+           // }
         }
+        
+#ifndef __APPLE__
+        out << "\t.extern " << getPlatformSymbolName("stderr") << "\n";
+        out << "\t.extern " << getPlatformSymbolName("stdin") << "\n";
+        out << "\t.extern " << getPlatformSymbolName("stdout") << "\n";
+#endif
+        
+        
         for(auto &v : var_names) {
             auto varx = getVariable(v);
             if(varx.type == VarType::VAR_STRING && varx.var_value.buffer_size == 0) {
-                const std::string var_out_name = getMangledName(v);
+                const std::string var_out_name = getPlatformSymbolName(getMangledName(v));
                 out << "\t" << var_out_name << ": .asciz " << "\"" << escapeNewLines(vars[v].var_value.str_value) << "\"\n";
                 continue;
             } 
@@ -58,7 +92,7 @@ namespace mxvm {
                         case VarType::VAR_BYTE:
                         case VarType::VAR_FLOAT:
                         case VarType::VAR_INTEGER:
-                            out << "\t.global " << getMangledName(v) << "\n";
+                            out << "\t.global " << getPlatformSymbolName(getMangledName(v)) << "\n";
                         break;
                         default:
                         break;
@@ -67,36 +101,42 @@ namespace mxvm {
             }
         }
 
-
+#ifdef __APPLE__
+        out << ".section __DATA,__bss\n";
+#else
         out << ".section .bss\n";
+#endif
         for(auto &v : var_names) {
             const std::string var_out_name = getMangledName(v);
             auto varx = getVariable(v);
             if(varx.type == VarType::VAR_POINTER) {
-                out << "\t.comm " << var_out_name << ", 8\n";
+                out << "\t.comm " << getPlatformSymbolName(var_out_name) << ", 8\n";
             } else if(varx.type == VarType::VAR_STRING && varx.var_value.buffer_size > 0) {
-                out << "\t.comm " << var_out_name << ", " << varx.var_value.buffer_size << "\n";
+                out << "\t.comm " << getPlatformSymbolName(var_out_name) << ", " << varx.var_value.buffer_size << "\n";
             }
         }
             if(object) {
                 for(auto &v : var_names) {
                     auto varx = getVariable(v);
                     if(varx.is_global && (varx.type == VarType::VAR_STRING || varx.type == VarType::VAR_POINTER)) {
-                        out << "\t.global " << getMangledName(v) << "\n";
+                        out << "\t.global " << getPlatformSymbolName(getMangledName(v)) << "\n";
                     }
                 }
             }
-        
+#ifdef __APPLE__
+        out << ".section __TEXT, __text\n";
+#else
         out << ".section .text\n";
+#endif
 
         if(this->object)
-            out << "\t.global " << name << "\n";
+            out << "\t.global " << getPlatformSymbolName(name) << "\n";
         //else
         //    out << "\t.global main\n";
 
         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
-                out << "\t.global " << name << "_" << lbl.first << "\n";
+                out << "\t.global " << getPlatformSymbolName(name + "_" + lbl.first) << "\n";
             }
         }
         std::sort(external.begin(), external.end(), [](const ExternalFunction &a, const ExternalFunction &b) {
@@ -107,22 +147,23 @@ namespace mxvm {
 
         for(auto &e : external) {
             if(e.module == true)
-                out << "\t.extern " << e.name << "\n";
+                out << "\t.extern " << getPlatformSymbolName(e.name) << "\n";
             else
-                out << "\t.extern " << e.mod << "_" << e.name << "\n";
+                out << "\t.extern " << getPlatformSymbolName(e.mod + "_" + e.name) << "\n";
         }
     
-        if(this->object) 
-        {
+        if(this->object) {
             out << "\t.p2align 4, 0x90\n";
-            out << name << ":\n";
+            out << getPlatformSymbolName(name) << ":\n";
         }
-         else
-        {
+        else {
             out << "\t.p2align 4, 0x90\n";
-            out << ".global main\n";
+            out << ".global " << getPlatformSymbolName("main") << "\n";
+            
+#ifndef __APPLE__
             out << ".type main, @function\n";
-            out << "main:\n";
+#endif
+            out << getPlatformSymbolName("main") << ":\n";
         }
 
         out << "\tpush %rbp\n";
@@ -135,7 +176,7 @@ namespace mxvm {
             for (auto l : labels) {
                 if(l.second.first == i && l.second.second) {
                     out << "\t.p2align 4, 0x90\n";
-                    out << name << "_" << l.first << ":\n";
+                    out << getPlatformSymbolName(name + "_" + l.first) << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
                     break;
@@ -155,8 +196,9 @@ namespace mxvm {
             if(this->object == false && done_found == false)
                 throw mx::Exception("Program missing done to signal completion.\n");
         #endif
-        
+#ifndef __APPLE__
         out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
+#endif
    
         std::string mainFunc = " Object";
         if(root_name == name)
@@ -362,7 +404,7 @@ namespace mxvm {
         }
 
         out << "\txor %eax, %eax\n";
-        out << "\tcall " << name << "\n";
+        out << "\tcall " << getPlatformSymbolName(name) << "\n";
 
         if (stack_args || needs_dummy) {
             out << "\tadd $" << ((stack_args + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
@@ -371,7 +413,7 @@ namespace mxvm {
     
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
-            out << "\tcall " << getMangledName(i.op1) << "\n";
+            out << "\tcall " << getPlatformSymbolName(getMangledName(i.op1)) << "\n";
         } else {
             throw mx::Exception("Function " + i.op1.op + " not found!");
         }
@@ -414,7 +456,7 @@ namespace mxvm {
         } else {
             out << "\tmovq $1, %rdi\n";
         }
-        out << "\tcall calloc\n";
+        out << "\tcall " << getPlatformSymbolName("calloc") << "\n";
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
         Variable &var = getVariable(i.op1.op);
         var.var_value.owns = true;
@@ -429,7 +471,7 @@ namespace mxvm {
             throw mx::Exception("FREE argument must be a pointer");
         }      
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdi\n";
-        out << "\tcall free\n";
+        out << "\tcall " << getPlatformSymbolName("free") << "\n";
     }
     void Program::gen_load(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) {
@@ -599,7 +641,7 @@ namespace mxvm {
             throw mx::Exception("to_float: second argument must be a string variable");
         }
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
-        out << "\tcall atof\n";
+        out << "\tcall " << getPlatformSymbolName("atof") << "\n";
         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
     }
         
@@ -731,10 +773,10 @@ namespace mxvm {
         static int over_count = 0;
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n";
-        out << "\tmovq stdin(%rip), %rdx\n";
-        out << "\tcall fgets\n";
+        out << "\tmovq "<<  getPlatformSymbolName("stdin") << "(%rip), %rdx\n";
+        out << "\tcall " << getPlatformSymbolName("fgets") << "\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
-        out << "\tcall strlen\n";
+        out << "\tcall " << getPlatformSymbolName("strlen") << "\n";
         out << "\tmovq %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
@@ -886,6 +928,15 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
+#ifdef ___APPLE__
+                    std::cout << op.op << "###\n";
+                    if(op.op == "stderr" || op.op == "stdin" || op.op == "stdout") {
+                        out << "\tleaq " << getMangledName(op) << ", (%rip)" << reg  << "\n";
+                        out << "\tmovq (" << reg << "), " << reg << "\n";
+                        break;
+                    }
+#endif
+
                     out << "\tmovq " << getMangledName(op) << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
@@ -1028,7 +1079,7 @@ namespace mxvm {
         } else {
             out << "\tmovb $" << total << ", %al\n";
         }
-        out << "\tcall printf\n";
+        out << "\tcall " << getPlatformSymbolName("printf") << "\n";
         if (stack_args || needs_dummy) {
             out << "\tadd $" << ((stack_args + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
         }
