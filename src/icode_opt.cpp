@@ -267,8 +267,8 @@ namespace mxvm {
                 continue;
             }
             if (std::regex_search(line, m, re_stdout_access)) {
-                std::string r = m[1].str();
-                out.push_back("\tmovq ___stdout@GOTPCREL(%rip), " + r);
+               std::string r = m[1].str();
+                out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), " + r);
                 out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
