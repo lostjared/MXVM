@@ -527,7 +527,7 @@ object Engine {
         cmp Grid.c, 1
         je c1
         cmp Grid.c, 2
-        je c2
+        je c2x
         cmp Grid.c, 3
         je c3
         cmp Grid.c, 4
@@ -554,7 +554,7 @@ object Engine {
         mov Grid.color_b, 0
         ret
 
-    c2:
+    c2x:
         mov Grid.color_r, 0
         mov Grid.color_g, 0
         mov Grid.color_b, 255
