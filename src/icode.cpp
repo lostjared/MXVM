@@ -18,6 +18,10 @@ namespace mxvm {
             std::string sym = var;
             std::replace(sym.begin(), sym.end(), '.', '_');
 #ifdef __APPLE
+
+            if(var == "stdout" || var == "stdin" || var == "stderr")
+                return var;
+
             return "_" + sym;
 #else
             return sym;
@@ -56,6 +60,10 @@ namespace mxvm {
         if(!op.object.empty()) {
             if(!op.label.empty())
 #ifdef __APPLE__
+
+                if(op.op == "stdout" || op.op == "stderr" || op.op == "stdin")
+                    return op.op;
+
                 return "_" + op.object + "_" + op.label;
 #else
             return op.object + "_" + op.label;
