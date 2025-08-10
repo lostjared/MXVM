@@ -262,19 +262,19 @@ namespace mxvm {
             std::smatch m;
             if (std::regex_search(line, m, re_stdin_access)) {
                 std::string r = m[1].str();
-                out.push_back("\tmovq ___stdinp(%rip), " + r);
+                out.push_back("\tmovq ___stdinp@GOTPCREAL(%rip), " + r);
                 out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
             if (std::regex_search(line, m, re_stdout_access)) {
                 std::string r = m[1].str();
-                out.push_back("\tmovq ___stdoutp(%rip), " + r);
+                out.push_back("\tmovq ___stdout@GOTPCREAL(%rip), " + r);
                 out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
             if (std::regex_search(line, m, re_stderr_access)) {
                 std::string r = m[1].str();
-                out.push_back("\tmovq ___stderrp(%rip), " + r);
+                out.push_back("\tmovq ___stderrp@GOTPCREAL(%rip), " + r);
                 out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
