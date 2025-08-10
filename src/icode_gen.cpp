@@ -91,8 +91,8 @@ namespace mxvm {
 
         if(this->object)
             out << "\t.global " << name << "\n";
-        else
-            out << "\t.global main\n";
+        //else
+        //    out << "\t.global main\n";
 
         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
@@ -120,6 +120,8 @@ namespace mxvm {
          else
         {
             out << "\t.p2align 4, 0x90\n";
+            out << ".global main\n";
+            out << ".type main, @function\n";
             out << "main:\n";
         }
 

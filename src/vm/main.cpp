@@ -180,12 +180,53 @@ int process_arguments(Args *args) {
         exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
-                std::ostringstream fname_;
-                for(auto &f  : mxvm::Program::base->filenames){
-                    fname_ << f <<  " ";
+                std::vector<std::string> object_files;
+                std::string assembler = "as";
+                const char *as_env = getenv("AS");
+                if(as_env != nullptr) {
+                    assembler = as_env;
                 }
-                fname_ << " -o " << mxvm::Program::base->root_name;
-                std::ostringstream file_;
+                
+                std::string asflags;
+                const char *asf = getenv("ASFLAGS");
+                if(asf != nullptr) {
+                    asflags = asf;
+                }
+                
+                for(auto &f : mxvm::Program::base->filenames) {
+                    std::string obj_file = f;
+                    size_t pos = obj_file.rfind(".s");
+                    if(pos != std::string::npos) {
+                        obj_file.replace(pos, 2, ".o");
+                    } else {
+                        obj_file += ".o";
+                    }
+                    
+                    std::ostringstream as_cmd;
+                    as_cmd << assembler << " " << asflags << " " << f << " -o " << obj_file;
+                    std::cout << as_cmd.str() << "\n";
+                    
+                    int as_result = system(as_cmd.str().c_str());
+                    if(as_result != 0) {
+                        std::cerr << Col("MXVM: ", mx::Color::RED) << "Assembly failed\n";
+                        return EXIT_FAILURE;
+                    }
+                    
+                    object_files.push_back(obj_file);
+                }
+                
+                
+                std::string linker = "cc";
+                const char *cc_env = getenv("CC");
+                if(cc_env != nullptr) {
+                    linker = cc_env;
+                }
+                std::string ldflags;
+                const char *ldf = getenv("LDFLAGS");
+                if(ldf != nullptr) {
+                    ldflags = ldf;
+                }
+                
                 std::ostringstream modules_archives;
                 std::set<std::string> arch;
                 for(auto &m : mxvm::Program::base->external) {
@@ -193,37 +234,31 @@ int process_arguments(Args *args) {
                         arch.insert(m.mod);
                     }
                 }
+                
                 for(auto &m: arch) {
-                    modules_archives << args->module_path <<"/modules/"<<m << "/libmxvm_" << m << "_static.a ";
+                    modules_archives << args->module_path << "/modules/" << m << "/libmxvm_" << m << "_static.a ";
                 }
-                std::string compiler = "cc";
-                const char *cc = getenv("CC");
-                if(cc != nullptr) {
-                    compiler = cc;
+                
+                
+                std::ostringstream cc_cmd;
+                cc_cmd << linker << " ";
+                
+                
+                for(auto &obj : object_files) {
+                    cc_cmd << obj << " ";
                 }
-                std::string ldflags;
-                const char *ldf = getenv("LDFLAGS");
-                if(ldf != nullptr) {
-                    ldflags = ldf;
-                }
-                const char *cflags_ = getenv("CFLAGS");
-                std::string cflags;
-                if(cflags_ != nullptr) {
-                    cflags = cflags_;
-                }
-                file_ << compiler << " " << cflags << " " << fname_.str() << " " << modules_archives.str() << " " << ldflags << " ";
-                std::cout << file_.str() << "\n";
-                FILE *fptr = popen(file_.str().c_str(), "r");
-                if(!fptr) {
-                    std::cerr << Col("MXVM: ", mx::Color::RED) << "  could not open up your system compiler are you sure it is there?";
+                
+                
+                cc_cmd << modules_archives.str() << " "
+                       << ldflags << " "
+                       << "-o " << mxvm::Program::base->root_name;
+
+                std::cout << cc_cmd.str() << "\n";
+                int cc_result = system(cc_cmd.str().c_str());
+                if(cc_result != 0) {
+                    std::cerr << Col("MXVM: ", mx::Color::RED) << "Linking failed\n";
                     return EXIT_FAILURE;
                 }
-                while(!feof(fptr)) {
-                    char buffer[4096];
-                    if(fgets(buffer, 4095, fptr) != nullptr)
-                        std::cout << buffer;
-                }
-                exitCode = pclose(fptr);
             }
         }
     } else if(args->action == vm_action::translate) {
