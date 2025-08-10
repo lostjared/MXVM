@@ -13,14 +13,6 @@ namespace mxvm {
     std::unordered_map<std::string, Program *> Base::object_map;
 
     std::string Program::getMangledName(const std::string& var) {
-#ifdef __APPLE__
-        if(var == "stderr")
-            return "___stderrp@GOTPCREL";
-        if(var == "stdin")
-            return "___stdinp@GOTPCREL";
-        if(var == "stdout")
-            return "___stdoutp@GOTPCREL";
-#endif
         auto dot_pos = var.find('.');
         if (dot_pos != std::string::npos) {
             std::string sym = var;
