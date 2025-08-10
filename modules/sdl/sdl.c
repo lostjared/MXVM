@@ -10,7 +10,7 @@ static int64_t g_renderer_count = 0;
 static int64_t g_texture_count = 0;
 static TTF_Font** g_fonts = NULL;
 static int64_t g_font_count = 0;
-// Implementation
+
 int64_t init(void) {
     return SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == 0 ? 1 : 0;
 }
@@ -357,7 +357,7 @@ void get_renderer_output_size(int64_t renderer_id, int64_t* w, int64_t* h) {
 }
 
 void show_cursor(int64_t show) {
- -   SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE);
+    SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE);
 }
 
 int64_t init_text(void) {
@@ -403,4 +403,44 @@ void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x
 
     SDL_DestroyTexture(texture);
     SDL_FreeSurface(surface);
+}
+
+int64_t create_rgb_surface(int64_t width, int64_t height, int64_t depth) {
+    SDL_Surface* s = NULL;
+    int w = (int)width, h = (int)height, d = (int)depth;
+
+    if (d == 32) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
+    else if (d == 24) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
+    else if (d == 16) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 16, SDL_PIXELFORMAT_RGB565);
+    else return 0;
+
+    return (int64_t)s;
+}
+
+void free_surface(int64_t surf_ptr) {
+    if (surf_ptr) SDL_FreeSurface((SDL_Surface*)surf_ptr);
+}
+
+int64_t blit_surface(int64_t src_ptr, int64_t dst_ptr, int64_t x, int64_t y) {
+    if (!src_ptr || !dst_ptr) return 0;
+    SDL_Surface* src = (SDL_Surface*)src_ptr;
+    SDL_Surface* dst = (SDL_Surface*)dst_ptr;
+    SDL_Rect dst_rc = { (int)x, (int)y, 0, 0 };
+    return SDL_BlitSurface(src, NULL, dst, &dst_rc) == 0 ? 1 : 0;
+}
+
+int64_t get_mouse_state(int64_t* x, int64_t* y) {
+    int ix, iy;
+    Uint32 m = SDL_GetMouseState(&ix, &iy);
+    if (x) *x = ix;
+    if (y) *y = iy;
+    return (int64_t)m;
+}
+
+int64_t get_relative_mouse_state(int64_t* x, int64_t* y) {
+    int ix, iy;
+    Uint32 m = SDL_GetRelativeMouseState(&ix, &iy);
+    if (x) *x = ix;
+    if (y) *y = iy;
+    return (int64_t)m;
 }

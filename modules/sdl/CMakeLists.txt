@@ -12,11 +12,12 @@ find_package(SDL2_ttf REQUIRED)
 
 target_include_directories(mxvm_sdl
     PRIVATE ${SDL2_INCLUDE_DIRS}
+    ${SDL2_TTF_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(mxvm_sdl
     PRIVATE ${SDL2_LIBRARIES}
-    SDL2_ttf
+    ${SDL2_TTF_LIBRARIES}
     mxvm
     mxvm_sdl_static
 
