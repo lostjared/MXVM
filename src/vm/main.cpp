@@ -28,6 +28,7 @@ struct Args {
     vm_action action = vm_action::null_action;
     vm_target target = vm_target::x86_64_linux;
     std::vector<std::string> argv;
+    mxvm::Platform platform = mxvm::Platform::LINUX;
 };
 
 template<typename T>
@@ -39,9 +40,9 @@ void print_help(T &type) {
 }
 
 int process_arguments(Args *args);
-int action_translate(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-int translate_x64_linux(std::unique_ptr<mxvm::Program> &program,std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
+int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program,std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
 void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
 
 Args proc_args(int argc, char **argv) {
@@ -52,7 +53,7 @@ Args proc_args(int argc, char **argv) {
     .addOptionSingleValue('a', "action")
     .addOptionDoubleValue(128, "action", "action to take [translate,  interpret]")
     .addOptionSingleValue('t', "target")
-    .addOptionDoubleValue(129, "target", "output target")
+    .addOptionDoubleValue(129, "target", "output target: [linux, macos]")
     .addOptionSingle('d', "debug mode")
     .addOptionDouble(130, "debug", "debug mode")
     .addOptionSingle('i', "instruction trace mode")
@@ -124,7 +125,12 @@ Args proc_args(int argc, char **argv) {
                 break;
                 case 't':
                 case 129:
-                // set target
+                
+                if(arg.arg_value == "macos")
+                    args.platform = mxvm::Platform::DARWIN;
+                else
+                    args.platform = mxvm::Platform::LINUX;
+
                 break;
                 default:
                 case '-':
@@ -175,94 +181,155 @@ int process_arguments(Args *args) {
 
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
     program->setMainBase(program.get());
-
+    program->platform = args->platform;
     if(args->action == vm_action::compile) {
-        exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->platform, program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
-                std::vector<std::string> object_files;
-                std::string assembler = "as";
-                const char *as_env = getenv("AS");
-                if(as_env != nullptr) {
-                    assembler = as_env;
-                }
-                
-                std::string asflags;
-                const char *asf = getenv("ASFLAGS");
-                if(asf != nullptr) {
-                    asflags = asf;
-                }
-                
-                for(auto &f : mxvm::Program::base->filenames) {
-                    std::string obj_file = f;
-                    size_t pos = obj_file.rfind(".s");
-                    if(pos != std::string::npos) {
-                        obj_file.replace(pos, 2, ".o");
-                    } else {
-                        obj_file += ".o";
+                if(args->platform == mxvm::Platform::LINUX) {
+                    std::vector<std::string> object_files;
+                    std::string assembler = "as";
+                    const char *as_env = getenv("AS");
+                    if(as_env != nullptr) {
+                        assembler = as_env;
                     }
                     
-                    std::ostringstream as_cmd;
-                    as_cmd << assembler << " " << asflags << " " << f << " -o " << obj_file;
-                    std::cout << as_cmd.str() << "\n";
+                    std::string asflags;
+                    const char *asf = getenv("ASFLAGS");
+                    if(asf != nullptr) {
+                        asflags = asf;
+                    }
                     
-                    int as_result = system(as_cmd.str().c_str());
-                    if(as_result != 0) {
-                        std::cerr << Col("MXVM: ", mx::Color::RED) << "Assembly failed\n";
+                    for(auto &f : mxvm::Program::base->filenames) {
+                        std::string obj_file = f;
+                        size_t pos = obj_file.rfind(".s");
+                        if(pos != std::string::npos) {
+                            obj_file.replace(pos, 2, ".o");
+                        } else {
+                            obj_file += ".o";
+                        }
+                        std::ostringstream as_cmd;
+                        as_cmd << assembler << " " << asflags << " " << f << " -o " << obj_file;
+                        std::cout << as_cmd.str() << "\n";
+                        
+                        int as_result = system(as_cmd.str().c_str());
+                        if(as_result != 0) {
+                            std::cerr << Col("MXVM: ", mx::Color::RED) << "Assembly failed\n";
+                            return EXIT_FAILURE;
+                        }                 
+                        object_files.push_back(obj_file);
+                    }
+                    
+                    std::string linker = "cc";
+                    const char *cc_env = getenv("CC");
+                    if(cc_env != nullptr) {
+                        linker = cc_env;
+                    }
+                    std::string ldflags;
+                    const char *ldf = getenv("LDFLAGS");
+                    if(ldf != nullptr) {
+                        ldflags = ldf;
+                    }
+                    
+                    std::ostringstream modules_archives;
+                    std::set<std::string> arch;
+                    for(auto &m : mxvm::Program::base->external) {
+                        if(m.module == true && m.mod != "main" && m.name != "strlen") {
+                            arch.insert(m.mod);
+                        }
+                    }
+                    
+                    for(auto &m: arch) {
+                        modules_archives << args->module_path << "/modules/" << m << "/libmxvm_" << m << "_static.a ";
+                    }
+                    
+                    std::ostringstream cc_cmd;
+                    cc_cmd << linker << " ";
+                    
+                    
+                    for(auto &obj : object_files) {
+                        cc_cmd << obj << " ";
+                    }
+                    
+                    
+                    cc_cmd << modules_archives.str() << " "
+                        << ldflags << " "
+                        << "-o " << mxvm::Program::base->root_name;
+
+                    std::cout << cc_cmd.str() << "\n";
+                    int cc_result = system(cc_cmd.str().c_str());
+                    if(cc_result != 0) {
+                        std::cerr << Col("MXVM: ", mx::Color::RED) << "Linking failed\n";
+                        return EXIT_FAILURE;
+                    
+                    }
+                }
+                else if(args->platform == mxvm::Platform::DARWIN) {
+                    std::vector<std::string> object_files;
+                    std::string clang = "clang";
+                    const char *clang_env = getenv("CLANG");
+                    if(clang_env != nullptr) {
+                        clang = clang_env;
+                    }
+                    std::string cflags;
+                    const char *cflags_env = getenv("CFLAGS");
+                    if(cflags_env != nullptr) {
+                        cflags = cflags_env;
+                    }
+                    // Compile each .s file to .o with clang -c
+                    for(auto &f : mxvm::Program::base->filenames) {
+                        std::string obj_file = f;
+                        size_t pos = obj_file.rfind(".s");
+                        if(pos != std::string::npos) {
+                            obj_file.replace(pos, 2, ".o");
+                        } else {
+                            obj_file += ".o";
+                        }
+                        std::ostringstream clang_cmd;
+                        clang_cmd << clang << " -c " << cflags << " " << f << " -o " << obj_file;
+                        std::cout << clang_cmd.str() << "\n";
+                        int clang_result = system(clang_cmd.str().c_str());
+                        if(clang_result != 0) {
+                            std::cerr << Col("MXVM: ", mx::Color::RED) << "Assembly failed\n";
+                            return EXIT_FAILURE;
+                        }
+                        object_files.push_back(obj_file);
+                    }
+                    // Link all .o files with clang
+                    std::string ldflags;
+                    const char *ldf = getenv("LDFLAGS");
+                    if(ldf != nullptr) {
+                        ldflags = ldf;
+                    }
+                    std::ostringstream modules_archives;
+                    std::set<std::string> arch;
+                    for(auto &m : mxvm::Program::base->external) {
+                        if(m.module == true && m.mod != "main" && m.name != "strlen") {
+                            arch.insert(m.mod);
+                        }
+                    }
+                    for(auto &m: arch) {
+                        modules_archives << args->module_path << "/modules/" << m << "/libmxvm_" << m << "_static.a ";
+                    }
+                    std::ostringstream clang_link_cmd;
+                    clang_link_cmd << clang << " ";
+                    for(auto &obj : object_files) {
+                        clang_link_cmd << obj << " ";
+                    }
+                    clang_link_cmd << modules_archives.str() << " "
+                        << ldflags << " "
+                        << "-o " << mxvm::Program::base->root_name;
+                    std::cout << clang_link_cmd.str() << "\n";
+                    int clang_link_result = system(clang_link_cmd.str().c_str());
+                    if(clang_link_result != 0) {
+                        std::cerr << Col("MXVM: ", mx::Color::RED) << "Linking failed\n";
                         return EXIT_FAILURE;
                     }
-                    
-                    object_files.push_back(obj_file);
-                }
-                
-                
-                std::string linker = "cc";
-                const char *cc_env = getenv("CC");
-                if(cc_env != nullptr) {
-                    linker = cc_env;
-                }
-                std::string ldflags;
-                const char *ldf = getenv("LDFLAGS");
-                if(ldf != nullptr) {
-                    ldflags = ldf;
-                }
-                
-                std::ostringstream modules_archives;
-                std::set<std::string> arch;
-                for(auto &m : mxvm::Program::base->external) {
-                    if(m.module == true && m.mod != "main" && m.name != "strlen") {
-                        arch.insert(m.mod);
-                    }
-                }
-                
-                for(auto &m: arch) {
-                    modules_archives << args->module_path << "/modules/" << m << "/libmxvm_" << m << "_static.a ";
-                }
-                
-                
-                std::ostringstream cc_cmd;
-                cc_cmd << linker << " ";
-                
-                
-                for(auto &obj : object_files) {
-                    cc_cmd << obj << " ";
-                }
-                
-                
-                cc_cmd << modules_archives.str() << " "
-                       << ldflags << " "
-                       << "-o " << mxvm::Program::base->root_name;
-
-                std::cout << cc_cmd.str() << "\n";
-                int cc_result = system(cc_cmd.str().c_str());
-                if(cc_result != 0) {
-                    std::cerr << Col("MXVM: ", mx::Color::RED) << "Linking failed\n";
-                    return EXIT_FAILURE;
                 }
             }
         }
     } else if(args->action == vm_action::translate) {
-        exitCode = action_translate(program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->platform, program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
@@ -274,15 +341,11 @@ int process_arguments(Args *args) {
     return exitCode;
 }
 
-int action_translate(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
-    switch(target) {
-        case vm_target::x86_64_linux:
-            return translate_x64_linux(program, include_path, object_path, input, mod_path, output);
-    }
-    return 0;
+int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
+        return translate_x64(platform, program, include_path, object_path, input, mod_path, output);
 }
 
-int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, 
+int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, 
                         std::string_view input, std::string_view mod_path, std::string_view output) {
     try {
 
@@ -296,6 +359,7 @@ int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_vie
         stream << file.rdbuf();
         file.close();
         mxvm::Parser parser(stream.str());
+        parser.platform = platform;
         parser.scan();
         
         program->filename = input_file;
@@ -314,9 +378,9 @@ int translate_x64_linux(std::unique_ptr<mxvm::Program> &program, std::string_vie
             file.open(program_name, std::ios::out);
             if(file.is_open()) {
                 std::ostringstream code_v;
-                program->generateCode(program->object, code_v);
+                program->generateCode(platform, program->object, code_v);
                 program->assembly_code = code_v.str();
-                std::string opt_code = program->gen_optimize(program->assembly_code);
+                std::string opt_code = program->gen_optimize(program->assembly_code, mxvm::Platform::LINUX);
                 file << opt_code;
                 if(mxvm::html_mode) {
                     std::ofstream  htmlFile(program->name + ".html");

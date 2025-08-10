@@ -31,7 +31,7 @@ namespace mxvm {
     extern bool html_mode;
 
     enum class Mode { MODE_INTERPRET, MODE_COMPILE };
-
+    enum class Platform { LINUX, DARWIN };
       
     class ModuleParser;
 
@@ -49,7 +49,8 @@ namespace mxvm {
             object_path(other.object_path),
             include_path(other.include_path),
             object_mode(other.object_mode),
-            object_name(other.object_name)
+            object_name(other.object_name),
+            platform{other.platform}
         {}
 
         Parser& operator=(const Parser& other) {
@@ -63,6 +64,7 @@ namespace mxvm {
                 include_path = other.include_path;
                 object_mode = other.object_mode;
                 object_name = other.object_name;
+                platform = other.platform;
             }
             return *this;
         }
@@ -86,6 +88,7 @@ namespace mxvm {
         std::string include_path = "/usr/local/include/mxvm/modules";
         bool object_mode = false;
         std::string object_name;
+        Platform platform;
     private:     
         std::unique_ptr<SectionNode> parseSection(uint64_t& index);
         std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);

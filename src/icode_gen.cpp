@@ -2,40 +2,30 @@
 
 namespace mxvm {
 
-    static std::string getPlatformSymbolName(const std::string &name) {
-        
-#ifdef __APPLE__
-        
-        if(name == "stdin")
-            return "___stdinp";
-        if(name == "stderr")
-            return "___stderrp";
-        if(name == "stdout")
-            return "___stdoutp";
-        
-        if(!name.empty() && name[0] != '_')
-            return "_" + name;
-        else
-            return name;
-#else
-        return name;        // ELF/Linux, no underscore
-#endif
+    std::string Program::getPlatformSymbolName(const std::string &name) {
+        if(platform == Platform::DARWIN) {
+            if(!name.empty() && name[0] != '_')
+                return "_" + name;
+            else
+                return name;
+        }
+        return name;        
     }
 
 
-    void Program::generateCode(bool obj, std::ostream &out) {
+    void Program::generateCode(const Platform &platform, bool obj, std::ostream &out) {
         this->add_standard();
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second.first] = l.first;
             
         }
-        
-#ifdef __APPLE__
-        out << ".section __DATA, __data\n";
-#else
-        out << ".section .data\n";
-#endif
+                
+        if(platform == Platform::DARWIN)
+                out << ".section __DATA, __data\n";
+        else
+                out << ".section .data\n";
+                
         std::vector<std::string> var_names;
         for(auto &v : vars) {
             var_names.push_back(v.first);
@@ -64,12 +54,12 @@ namespace mxvm {
                 //out << "\t.extern " << getPlatformSymbolName(getMangledName(v)) << "\n";
            // }
         }
-        
-#ifndef __APPLE__
-        out << "\t.extern " << getPlatformSymbolName("stderr") << "\n";
-        out << "\t.extern " << getPlatformSymbolName("stdin") << "\n";
-        out << "\t.extern " << getPlatformSymbolName("stdout") << "\n";
-#endif
+                
+        if(platform == Platform::LINUX) {
+                out << "\t.extern " << getPlatformSymbolName("stderr") << "\n";
+                out << "\t.extern " << getPlatformSymbolName("stdin") << "\n";
+                out << "\t.extern " << getPlatformSymbolName("stdout") << "\n";
+        }
         
         
         for(auto &v : var_names) {
@@ -101,11 +91,11 @@ namespace mxvm {
             }
         }
 
-#ifdef __APPLE__
-        out << ".section __DATA,__bss\n";
-#else
-        out << ".section .bss\n";
-#endif
+        if(platform == Platform::DARWIN)
+                out << ".section __DATA,__bss\n";
+        else
+                out << ".section .bss\n";
+
         for(auto &v : var_names) {
             const std::string var_out_name = getMangledName(v);
             auto varx = getVariable(v);
@@ -123,11 +113,11 @@ namespace mxvm {
                     }
                 }
             }
-#ifdef __APPLE__
-        out << ".section __TEXT, __text\n";
-#else
-        out << ".section .text\n";
-#endif
+            if(platform == Platform::DARWIN)
+                    out << ".section __TEXT, __text\n";
+            else
+                    out << ".section .text\n";
+
 
         if(this->object)
             out << "\t.global " << getPlatformSymbolName(name) << "\n";
@@ -196,14 +186,14 @@ namespace mxvm {
             if(this->object == false && done_found == false)
                 throw mx::Exception("Program missing done to signal completion.\n");
         #endif
-#ifndef __APPLE__
-        out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
-#endif
+        if(platform == Platform::LINUX)
+            out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
+
    
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";
-        std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << "\n";
+        std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << " platform: " << ((platform == Platform::LINUX) ? "Linux": "macOS") << "\n";
     }
 
 

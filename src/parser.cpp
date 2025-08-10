@@ -204,6 +204,7 @@ namespace mxvm {
         parser->object_path = object_path;
         parser->object_mode = true;
         parser->parser_mode = parser_mode;
+        parser->platform = platform;
         parser->scan();
 
         auto ast = parser->parseAST();
@@ -215,6 +216,7 @@ namespace mxvm {
             objProgram->object = true;
             objProgram->object_external = true;
             objProgram->filename = path + src + ".mxvm";
+            objProgram->platform = platform;
             for (const auto& section : inlineObj->sections) {
                 auto sectionNode = dynamic_cast<SectionNode*>(section.get());
                 if (!sectionNode) continue;
@@ -680,7 +682,9 @@ namespace mxvm {
                 objProgram->object = true;
                 objProgram->object_external = false;
                 objProgram->filename = program->filename;
+                objProgram->platform = platform;
                 object_name = inlineObj->name;
+
                 
                 for (const auto& section : inlineObj->sections) {
                     auto sectionNode = dynamic_cast<SectionNode*>(section.get());
@@ -1628,9 +1632,9 @@ out << R"(</div>
         }
 
         std::ostringstream code_v;
-        objProgram->generateCode(objProgram->object, code_v);
+        objProgram->generateCode(platform, objProgram->object, code_v);
         objProgram->assembly_code = code_v.str();
-        std::string opt_code = objProgram->gen_optimize(objProgram->assembly_code);
+        std::string opt_code = objProgram->gen_optimize(objProgram->assembly_code, platform);
         objProgram->assembly_code = opt_code;
         objectFile << opt_code;
         objectFile.close();

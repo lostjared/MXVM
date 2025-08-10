@@ -113,7 +113,8 @@ namespace mxvm {
             object_external(other.object_external),
             stack(std::move(other.stack)),
             result(std::move(other.result)),
-            parent(other.parent)
+            parent(other.parent),
+            platform(other.platform)
         {
             other.pc = 0;
             other.running = false;
@@ -148,6 +149,7 @@ namespace mxvm {
                 for (auto& var_pair : vars) {
                    var_pair.second.obj_name = name;
                 }
+                platform = other.platform;
             }
             return *this;
         }     
@@ -160,7 +162,8 @@ namespace mxvm {
         int getExitCode() const { return exitCode; }
         std::string name;
         std::string filename;
-        void generateCode(bool obj, std::ostream &out);
+        std::string getPlatformSymbolName(const std::string &name);
+        void generateCode(const Platform  &platform, bool obj, std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
         void memoryDump(std::ostream &out);
         void setArgs(const std::vector<std::string> &argv);
@@ -225,7 +228,9 @@ namespace mxvm {
         void gen_invoke(std::ostream &out, const Instruction &i);
         void gen_return(std::ostream &out, const Instruction &i);
         void gen_neg(std::ostream &out, const Instruction &i);
-        std::string gen_optimize(const std::string  &code);
+        std::string gen_optimize(const std::string  &code, const Platform &platform);
+        std::string optimize_darwin(const std::string &code);
+        std::string optimize_core(const std::string &code);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
@@ -286,6 +291,7 @@ namespace mxvm {
         Stack stack;
         Operand result;
         Program *parent = nullptr;
+        Platform platform;
     };
 
     void except_assert(std::string reason, bool value);

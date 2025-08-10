@@ -63,6 +63,7 @@ std::ostream &operator<<(std::ostream &out, const enum Inc &i);
 namespace mxvm {
 
     enum class OperandType { OP_CONSTANT, OP_VARIABLE };
+    
 
     struct Operand {
         std::string label;
