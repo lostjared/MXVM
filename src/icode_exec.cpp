@@ -605,14 +605,17 @@ namespace mxvm {
         return false;
     }
 
-    bool Program::validateNames(Validator &v) {
-        for(auto &variable :  v.var_names) {
-            auto it = vars.find(variable.second.getTokenValue());
+    bool Program::validateNames(Validator& v) {
+        for(auto &variable : v.var_names) {
+            auto it = vars.find(variable.second->getTokenValue()); 
             if(it == vars.end()) {
                 for(auto &o : objects) {
-                    if(o->name == variable.first && !o->isVariable(variable.second.getTokenValue())) {
-                        throw mx::Exception("Syntax Error: Argument variable not defined: Object: " + variable.first +  " variable: " + variable.second.getTokenValue() +" at line " + std::to_string(variable.second.getLine()));
-                    }               
+                    if(o->name == variable.first && !o->isVariable(variable.second->getTokenValue())) {
+                        throw mx::Exception("Syntax Error: Argument variable not defined: Object: " + 
+                            variable.first + " variable: " + 
+                            variable.second->getTokenValue() + // Use -> instead of .
+                            " at line " + std::to_string(variable.second->getLine())); // Use -> instead of .
+                    }
                 }
             }}
         return true;

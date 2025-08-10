@@ -1,17 +1,221 @@
 #include "mxvm/valid.hpp"
 #include "scanner/exception.hpp"
 #include "mxvm/instruct.hpp"
-#include<algorithm>
+#include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
+#include <climits>
 
 namespace mxvm {
+
+    static inline bool isImmediate(const OpKind k) {
+        return k==OpKind::Num || k==OpKind::Hex || k==OpKind::Str;
+    }
+
+    static const std::unordered_map<std::string, OpSpec> kOpSpecs = {
+        {"mov",   {"mov",   {OpKind::Id, OpKind::Any}}},
+        {"load",  {"load",  {OpKind::Id, OpKind::Id, OpKind::Any}}},
+        {"store", {"store", {OpKind::Any, OpKind::Id, OpKind::Any}}},
+        {"add",   {"add",   {OpKind::Id, OpKind::Any}}},
+        {"sub",   {"sub",   {OpKind::Id, OpKind::Any}}},
+        {"mul",   {"mul",   {OpKind::Id, OpKind::Any}}},
+        {"div",   {"div",   {OpKind::Id, OpKind::Any}}},
+        {"or",    {"or",    {OpKind::Id, OpKind::Any}}},
+        {"and",   {"and",   {OpKind::Id, OpKind::Any}}},
+        {"xor",   {"xor",   {OpKind::Id, OpKind::Any}}},
+        {"not",   {"not",   {OpKind::Id}}},
+        {"neg",   {"neg",   {OpKind::Id}}},
+        {"mod",   {"mod",   {OpKind::Id, OpKind::Any}}},
+        {"cmp",   {"cmp",   {OpKind::Any, OpKind::Any}}},
+        {"jmp",   {"jmp",   {OpKind::Label}}},
+        {"je",    {"je",    {OpKind::Label}}},
+        {"jne",   {"jne",   {OpKind::Label}}},
+        {"jl",    {"jl",    {OpKind::Label}}},
+        {"jle",   {"jle",   {OpKind::Label}}},
+        {"jg",    {"jg",    {OpKind::Label}}},
+        {"jge",   {"jge",   {OpKind::Label}}},
+        {"jz",    {"jz",    {OpKind::Label}}},
+        {"jnz",   {"jnz",   {OpKind::Label}}},
+        {"ja",    {"ja",    {OpKind::Label}}},
+        {"jb",    {"jb",    {OpKind::Label}}},
+        {"print", {"print", {OpKind::Any}}},
+        {"string_print", {"string_print", {OpKind::Any}}},
+        {"exit",  {"exit",  {}, VArity::AnyTail, 0, 1}},
+        {"alloc", {"alloc", {OpKind::Id, OpKind::Any, OpKind::Any}}},
+        {"free",  {"free",  {OpKind::Id}}},
+        {"getline", {"getline", {OpKind::Id}}},
+        {"push",  {"push",  {OpKind::Any}}},
+        {"pop",   {"pop",   {OpKind::Id}}},
+        {"stack_load",  {"stack_load",  {OpKind::Id, OpKind::Any}}},
+        {"stack_store", {"stack_store", {OpKind::Any, OpKind::Any}}},
+        {"stack_sub",   {"stack_sub",   {OpKind::Any}}},
+        {"call",  {"call",  {OpKind::Label}}},
+        {"ret",   {"ret",   {}}},
+        {"done",  {"done",  {}}},
+        {"to_int",   {"to_int",   {OpKind::Id, OpKind::Any}}},
+        {"to_float", {"to_float", {OpKind::Id, OpKind::Any}}},
+        {"invoke", {"invoke", {OpKind::Id}, VArity::ArgsTail}},
+        {"return", {"return", {OpKind::Id}}}
+    };
+
+    static bool isIdLike(OpKind k) { return k==OpKind::Id || k==OpKind::Member; }
+
+    ParsedOp Validator::parseOperand() {
+        if (!token) throw mx::Exception("Syntax Error in '" + filename + "': Unexpected EOF parsing operand");
+        ParsedOp n;
+        if (match(types::TokenType::TT_ID)) {
+            std::string a = token->getTokenValue();
+            const scan::TToken* at = token;
+            next();
+            if (match(".")) {
+                next();
+                require(types::TokenType::TT_ID);
+                a += "." + token->getTokenValue();
+                n.kind = OpKind::Member;
+                n.text = a;
+                n.at = at;
+                next();
+                return n;
+            }
+            n.kind = OpKind::Id;
+            n.text = a;
+            n.at = at;
+            return n;
+        }
+        if (match("-") && peekIs(types::TokenType::TT_NUM)) { next(); }
+        if (match(types::TokenType::TT_NUM)) { n.kind=OpKind::Num; n.text=token->getTokenValue(); n.at=token; next(); return n; }
+        if (match(types::TokenType::TT_HEX)) { n.kind=OpKind::Hex; n.text=token->getTokenValue(); n.at=token; next(); return n; }
+        if (match(types::TokenType::TT_STR)) { n.kind=OpKind::Str; n.text=token->getTokenValue(); n.at=token; next(); return n; }
+        throw mx::Exception("Syntax Error in '" + filename + "': invalid operand '" + token->getTokenValue() + "' at line " + std::to_string(token->getLine()));
+    }
+
+    std::vector<ParsedOp> Validator::parseOperandList() {
+        std::vector<ParsedOp> out;
+        while (token && !match("}") && !match("\n")) {
+            out.push_back(parseOperand());
+            if (match(",")) { next(); continue; }
+            break;
+        }
+        return out;
+    }
 
     void Validator::collect_labels(std::unordered_map<std::string, std::string> &labels) {
         for (size_t i = 0; i < scanner.size(); ++i) {
             const auto &tok = scanner[i];
             if (tok.getTokenType() == types::TokenType::TT_ID) {
                 if (i + 1 < scanner.size() && scanner[i + 1].getTokenValue() == ":") {
-                    labels[tok.getTokenValue()] = tok.getTokenValue(); 
+                    labels[tok.getTokenValue()] = tok.getTokenValue();
                 }
+            }
+        }
+    }
+
+    static std::vector<UseVar> usedVars;
+    static std::vector<UseLabel> usedLabels;
+
+    void Validator::validateAgainstSpec(
+        const std::string& op,
+        const std::vector<ParsedOp>& ops,
+        const std::unordered_map<std::string, Variable>& vars,
+        const std::unordered_map<std::string, std::string>& labels,
+        std::vector<UseVar>& usedVarsRef,
+        std::vector<UseLabel>& usedLabelsRef)
+    {
+        auto it = kOpSpecs.find(op);
+        if (it==kOpSpecs.end()) {
+            throw mx::Exception("Syntax Error in '"+filename+"': Unknown instruction '"+op+"'");
+        }
+        const OpSpec& spec = it->second;
+
+        int minArgs = (spec.minArgs>=0)?spec.minArgs:(int)spec.fixed.size();
+        int maxArgs = (spec.maxArgs>=0)?spec.maxArgs:(spec.varPolicy==VArity::None?(int)spec.fixed.size():INT32_MAX);
+
+        if ((int)ops.size() < minArgs || (int)ops.size() > maxArgs) {
+            throw mx::Exception("Syntax Error in '"+filename+"': '"+op+"' expects "
+                + std::to_string(minArgs) + ((maxArgs==INT32_MAX)?"..∞":".."+std::to_string(maxArgs))
+                + " operands; found " + std::to_string(ops.size()));
+        }
+
+        auto kindOk = [&](OpKind want, OpKind got) {
+            if (want==OpKind::Any) return true;
+            if (want==OpKind::Label) return got==OpKind::Id || got==OpKind::Member || got==OpKind::Label;
+            if (want==OpKind::Id) return got==OpKind::Id || got==OpKind::Member;
+            return want==got;
+        };
+
+        for (size_t i=0;i<spec.fixed.size() && i<ops.size();++i) {
+            if (!kindOk(spec.fixed[i], ops[i].kind)) {
+                throw mx::Exception("Syntax Error in '"+filename+"': '"+op+"' operand "
+                    + std::to_string((int)i+1) + " has wrong kind");
+            }
+        }
+
+        if (spec.varPolicy==VArity::ArgsTail) {
+            for (size_t i=spec.fixed.size(); i<ops.size(); ++i) {
+                if (!(isImmediate(ops[i].kind) || isIdLike(ops[i].kind))) {
+                    throw mx::Exception("Syntax Error in '"+filename+"': '"+op+"' extra args must be Id/Imm");
+                }
+            }
+        }
+
+        auto pushVar = [&](const ParsedOp& p){
+            if (isIdLike(p.kind)) {
+                if (p.kind == OpKind::Id && p.text.find('.') == std::string::npos) {
+                    if (!vars.count(p.text)) {
+                        std::string msg = "Syntax Error in '" + filename + "': Undefined variable '" + p.text + "'";
+                        if (p.at) {
+                            msg += " at line " + std::to_string(p.at->getLine());
+                        }
+                        throw mx::Exception(msg);
+                    }
+                }
+                usedVarsRef.push_back({p.text, p.at});
+            }
+        };
+        auto pushLabel = [&](const ParsedOp& p){ 
+            if (p.text.find('.') == std::string::npos) {
+                usedLabelsRef.push_back({p.text, p.at}); 
+            }
+        };
+
+        if (op=="jmp"||op=="je"||op=="jne"||op=="jl"||op=="jle"||op=="jg"||op=="jge"||op=="jz"||op=="jnz"||op=="ja"||op=="jb") {
+            if (!ops.empty()) pushLabel(ops[0]);
+        }
+        if (op=="call") {
+            if (!ops.empty()) pushLabel(ops[0]);
+        }
+
+        if (op=="mov" || op=="pop" || op=="stack_load" || op=="alloc" || op=="getline" || 
+            op=="return" || op=="not" || op=="neg" || op=="to_int" || op=="to_float")
+        {
+            if (!ops.empty() && isIdLike(ops[0].kind)) pushVar(ops[0]);
+        }
+
+        if (op=="add" || op=="sub" || op=="mul" || op=="div" || op=="or" || op=="and" || 
+            op=="xor" || op=="mod" || op=="cmp")
+        {
+            if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]);
+            if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]);
+        }
+
+        if (op=="load") {
+            if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]); 
+            if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]); 
+        }
+
+        
+        if (op=="store") {
+            if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]); 
+            if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]); 
+        }
+
+        if (op=="free") {
+            if (!ops.empty() && isIdLike(ops[0].kind)) pushVar(ops[0]);
+        }
+        
+        if (op=="invoke") {
+            for (size_t i=1; i<ops.size(); ++i) {
+                if (isIdLike(ops[i].kind)) pushVar(ops[i]);
             }
         }
     }
@@ -22,16 +226,7 @@ namespace mxvm {
         std::unordered_map<std::string, std::string> labels;
         collect_labels(labels);
 
-        auto skipSeparators = [&]() {
-           /* while (true) {
-                if (!token) break;
-                if ((match("\n")  && match(types::TokenType::TT_SYM))) {
-                    if (!next()) break;
-                    continue;
-                }
-                break; 
-            }*/
-        };
+        auto skipSeparators = [&]() { };
 
         next();
         skipSeparators();
@@ -50,10 +245,13 @@ namespace mxvm {
         next();
 
         std::unordered_map<std::string, Variable> vars;
-        for (auto &name : { "stdout", "stdin", "stderr" }) {
-            vars[name] = Variable();
-            vars[name].var_name = name;
+        for (auto &n : { "stdout", "stdin", "stderr" }) {
+            vars[n] = Variable();
+            vars[n].var_name = n;
         }
+
+        usedVars.clear();
+        usedLabels.clear();
 
         skipSeparators();
         while (token && !match("}")) {
@@ -75,10 +273,7 @@ namespace mxvm {
                     if (match(types::TokenType::TT_ID)) {
                         next();
                         skipSeparators();
-                        if (match(",")) {
-                            next();
-                            continue;
-                        }
+                        if (match(",")) { next(); continue; }
                         continue;
                     }
                     break;
@@ -99,8 +294,7 @@ namespace mxvm {
                         token->getTokenValue() == "byte" ||
                         token->getTokenValue() == "export"))
                     {
-                        if(token->getTokenValue() == "export")
-                            next();
+                        if(token->getTokenValue() == "export") next();
 
                         std::string vtype = token->getTokenValue();
                         next();
@@ -127,10 +321,7 @@ namespace mxvm {
                         require("=");
                         next();
                         skipSeparators();
-                        if (match("-")) {
-                            next();
-                            skipSeparators();
-                        }
+                        if (match("-")) { next(); skipSeparators(); }
 
                         if (vtype == "byte") {
                             if (!(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX))) {
@@ -166,9 +357,6 @@ namespace mxvm {
             }
             else if (sectionName == "code") {
                 skipSeparators();
-                const std::vector<std::string> branchOps = {
-                    "call","jmp","je","jne","jg","jl","jge","jle","jz","jnz","ja","jb"
-                };
                 while (token && !match("}")) {
                     size_t old_index = index;
 
@@ -198,64 +386,20 @@ namespace mxvm {
                         skipSeparators();
 
                         if (op == "ret" || op == "done") {
+                            std::vector<ParsedOp> emptyOps;
+                            validateAgainstSpec(op, emptyOps, vars, labels, usedVars, usedLabels);
                             continue;
                         }
 
-                        if (std::find(branchOps.begin(), branchOps.end(), op) != branchOps.end()) {
-                            require(types::TokenType::TT_ID);
-                            next();
-                            skipSeparators();
-                            if (match(".")) {
-                                next();
-                                skipSeparators();
-                                require(types::TokenType::TT_ID);
-                                next();
-                                skipSeparators();
-                            }
-                            continue;
-                        }
-
-                        while (true) {
-                            skipSeparators();
-                            if (match(types::TokenType::TT_ID)) {
-                                std::string name = token->getTokenValue();
-                                next();
-                                skipSeparators();
-                                if (match(".")) {
-                                    next();
-                                    skipSeparators();
-                                    require(types::TokenType::TT_ID);
-                                    name += "." + token->getTokenValue();
-                                    next();
-                                    skipSeparators();
-                                }
-                                var_names.emplace_back(name, *token);
-                            } else if (match("-") && peekIs(types::TokenType::TT_NUM)) {
-                                next();
-                                next();
-                            } else if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) {
-                                next();
-                            } else {
-                                break;
-                            }
-
-                            skipSeparators();
-                            if (match(",")) {
-                                next();
-                                continue;
-                            }
-                            break;
-                        }
+                        auto ops = parseOperandList();
+                        validateAgainstSpec(op, ops, vars, labels, usedVars, usedLabels);
                         continue;
-                    }
-
-                    // If we reach here, the token is not a recognized instruction, label, or function. It's a syntax error.
-                    else {
-                         throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
+                    } else {
+                        throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
                     }
 
                     if (old_index == index) {
-                       if (!next()) break;
+                        if (!next()) break;
                     }
                 }
                 skipSeparators();
@@ -270,67 +414,62 @@ namespace mxvm {
 
         skipSeparators();
         require("}");
+
+        for (auto &u : usedLabels) {
+            if (!labels.count(u.name)) {
+                throw mx::Exception("Syntax Error in '" + filename + "': Undefined label '" + u.name + "' at line " + std::to_string(u.at->getLine()));
+            }
+        }
         return true;
     }
 
-
     bool Validator::match(const std::string &m) {
         if (!token) return false;
-        if(token->getTokenValue() != m)
-            return false;
+        if(token->getTokenValue() != m) return false;
         return true;
     }
 
     void Validator::require(const std::string &r) {
         if (!token) {
-            throw mx::Exception("Syntax Error in file '" + filename + "': Required: " + r + " but reached end of file");
+            throw mx::Exception("Syntax Error in '" + filename + "': Required: " + r + " but reached end of file");
         }
-        if(r != token->getTokenValue()) 
+        if(r != token->getTokenValue())
             throw mx::Exception(
-                "Syntax Error in file '" + filename + "': Required: " + r +
+                "Syntax Error in '" + filename + "': Required: " + r +
                 " Found: " + token->getTokenValue() +
                 " at line " + std::to_string(token->getLine())
             );
     }
 
     bool Validator::match(const types::TokenType &t) {
-
-        if(!token || index >= scanner.size())
-            return false;
-
-        if(t != token->getTokenType())
-            return false;
+        if(!token || index >= scanner.size()) return false;
+        if(t != token->getTokenType()) return false;
         return true;
     }
 
     void Validator::require(const types::TokenType &t) {
         if(!token || index >= scanner.size()) {
-            throw mx::Exception("unexpected EOF");
+            throw mx::Exception("Syntax Error in '" + filename + "': unexpected EOF");
         }
-
-         if(t != token->getTokenType()) 
+        if(t != token->getTokenType())
             throw mx::Exception(
-                "Syntax Error in file '" + filename + "': Required: " + tokenTypeToString(t) +
+                "Syntax Error in '" + filename + "': Required: " + tokenTypeToString(t) +
                 " instead found: " + token->getTokenValue() +
                 ":" + tokenTypeToString(token ->getTokenType()) +
                 " at line " + std::to_string(token->getLine())
             );
     }
-    
+
     bool Validator::next() {
-        // Skip all newlines
-        while (index < scanner.size() && 
-               scanner[index].getTokenValue() == "\n" && 
-               scanner[index].getTokenType() == types::TokenType::TT_SYM) {
+        while (index < scanner.size() &&
+            scanner[index].getTokenValue() == "\n" &&
+            scanner[index].getTokenType() == types::TokenType::TT_SYM) {
             index++;
         }
-        
         if (index < scanner.size()) {
             token = &scanner[index++];
             return true;
         }
-        
-        // We've reached the end
         token = nullptr;
         return false;
     }
@@ -352,6 +491,10 @@ namespace mxvm {
             case types::TokenType::TT_SYM: return "Symbol";
             default: return "Unknown";
         }
-        return "";
+    }
+
+
+    Validator::Validator(const std::string &source) : scanner(source) {
+
     }
 }
