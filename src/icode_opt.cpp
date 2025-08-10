@@ -264,13 +264,12 @@ namespace mxvm {
                 std::string r = m[1].str();
                 out.push_back("\tmovq ___stdinp@GOTPCREL(%rip), " + r);
                 out.push_back("\tmovq (" + r + "), " + r);
+                continue;
             }
             if (std::regex_search(line, m, re_stdout_access)) {
-               std::string r = m[1].str();
-                out.push_back("\tpush %rax");
-                out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), " + std::string("%rax"));
-                out.push_back("\tmovq (%rax), " + r);
-                out.push_back("\tpop %rax\n");
+                std::string r = m[1].str();
+                out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), " + r);
+                out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
             if (std::regex_search(line, m, re_stderr_access)) {
@@ -309,4 +308,4 @@ namespace mxvm {
 
         return join_lines(final_lines);
     }
-} 
+}
