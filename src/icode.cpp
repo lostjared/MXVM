@@ -123,11 +123,11 @@ namespace mxvm {
         add_variable(name + "." + std::string("stderr"), vstderr);
 #else
         
-        vstdout.setExtern("___stdoutp", stdout);
-        vstdin.setExtern("___stdinp", stdin);
-        vstderr.setExtern("___stderrp", stderr);
+        vstdout.setExtern("stdout", stdout);
+        vstdin.setExtern("_stdin", stdin);
+        vstderr.setExtern("stderr", stderr);
         add_variable(name + "." + std::string("stdout"), vstdout);
-        add_variable(name + "." + std::string("stdin"), vstdin);
+        add_variable(name +vvv "." + std::string("stdin"), vstdin);
         add_variable(name + "." + std::string("stderr"), vstderr);
         
 #endif
