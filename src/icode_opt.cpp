@@ -278,7 +278,13 @@ namespace mxvm {
                 out.push_back("\tmovq (" + r + "), " + r);
                 continue;
             }
-
+#ifdef ___APPLE__
+                 
+#endif#ifdef ___APPLE__
+                 
+#endif#ifdef ___APPLE__
+                 
+#endif
             line = darwin_prefix_calls(line, macos_functions);
             out.push_back(line);
         }
