@@ -763,7 +763,7 @@ namespace mxvm {
         static int over_count = 0;
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n";
-        out << "\tmovq "<<  getPlatformSymbolName("stdin") << "(%rip), %rdx\n";
+        out << "\tmovq "<<  "stdin" << "(%rip), %rdx\n";
         out << "\tcall " << getPlatformSymbolName("fgets") << "\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tcall " << getPlatformSymbolName("strlen") << "\n";
@@ -918,14 +918,6 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-#ifdef ___APPLE__
-                    std::cout << op.op << "###\n";
-                    if(op.op == "stderr" || op.op == "stdin" || op.op == "stdout") {
-                        out << "\tleaq " << getMangledName(op) << ", (%rip)" << reg  << "\n";
-                        out << "\tmovq (" << reg << "), " << reg << "\n";
-                        break;
-                    }
-#endif
 
                     out << "\tmovq " << getMangledName(op) << "(%rip), " << reg << "\n";
                     count = 0;
