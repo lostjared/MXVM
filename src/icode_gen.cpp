@@ -120,7 +120,7 @@ namespace mxvm {
 
 
         if(this->object)
-            out << "\t.global " << getPlatformSymbolName(name) << "\n";
+            out << "\t.global " << name << "\n";
         //else
         //    out << "\t.global main\n";
 
@@ -144,7 +144,7 @@ namespace mxvm {
     
         if(this->object) {
             out << "\t.p2align 4, 0x90\n";
-            out << getPlatformSymbolName(name) << ":\n";
+            out << name << ":\n";
         }
         else {
             out << "\t.p2align 4, 0x90\n";
