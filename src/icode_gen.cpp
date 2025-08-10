@@ -82,7 +82,7 @@ namespace mxvm {
                         case VarType::VAR_BYTE:
                         case VarType::VAR_FLOAT:
                         case VarType::VAR_INTEGER:
-                            out << "\t.global " << getPlatformSymbolName(getMangledName(v)) << "\n";
+                            out << "\t.global " << getMangledName(v) << "\n";
                         break;
                         default:
                         break;
@@ -97,19 +97,19 @@ namespace mxvm {
                 out << ".section .bss\n";
 
         for(auto &v : var_names) {
-            const std::string var_out_name = getMangledName(v);
+            const std::string var_out_name = getPlatformSymbolName(getMangledName(v));
             auto varx = getVariable(v);
             if(varx.type == VarType::VAR_POINTER) {
-                out << "\t.comm " << getPlatformSymbolName(var_out_name) << ", 8\n";
+                out << "\t.comm " << var_out_name << ", 8\n";
             } else if(varx.type == VarType::VAR_STRING && varx.var_value.buffer_size > 0) {
-                out << "\t.comm " << getPlatformSymbolName(var_out_name) << ", " << varx.var_value.buffer_size << "\n";
+                out << "\t.comm " << var_out_name << ", " << varx.var_value.buffer_size << "\n";
             }
         }
             if(object) {
                 for(auto &v : var_names) {
                     auto varx = getVariable(v);
                     if(varx.is_global && (varx.type == VarType::VAR_STRING || varx.type == VarType::VAR_POINTER)) {
-                        out << "\t.global " << getPlatformSymbolName(getMangledName(v)) << "\n";
+                        out << "\t.global " << getMangledName(v) << "\n";
                     }
                 }
             }
@@ -126,7 +126,7 @@ namespace mxvm {
 
         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
-                out << "\t.global " << getPlatformSymbolName(name + "_" + lbl.first) << "\n";
+                out << "\t.global " << name + "_" + lbl.first << "\n";
             }
         }
         std::sort(external.begin(), external.end(), [](const ExternalFunction &a, const ExternalFunction &b) {
