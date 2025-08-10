@@ -279,10 +279,24 @@ namespace mxvm {
                 continue;
             }
     
-            std::regex re_single_stdout(R"(_stdout\(%rip\))", std::regex::icase);
+            std::regex re_single_stdout(R"(^\s*movq?\s+_stdout\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
             if (std::regex_search(line, m, re_single_stdout)) {
-                std::string r = m[1].str();
+                std::string r = m[1].str();  
                 out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), %rax");
+                out.push_back("\tmovq (%rax), " + r);
+                continue;
+            }
+            std::regex re_single_stderr(R"(^\s*movq?\s+_stderr\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
+            if (std::regex_search(line, m, re_single_stderr)) {
+                std::string r = m[1].str();  
+                out.push_back("\tmovq ___stderrp@GOTPCREL(%rip), %rax");
+                out.push_back("\tmovq (%rax), " + r);
+                continue;
+            }
+            std::regex re_single_stdin(R"(^\s*movq?\s+_stdin\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
+            if (std::regex_search(line, m, re_single_stdin)) {
+                std::string r = m[1].str();  
+                out.push_back("\tmovq ___stdinp@GOTPCREL(%rip), %rax");
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
             }
