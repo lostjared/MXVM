@@ -29,7 +29,6 @@ namespace mxvm {
         return std::regex_search(line, re_label);
     }
 
-    // Shared optimization pass (platform-agnostic)
     static std::vector<std::string> opt_core_lines(const std::vector<std::string>& lines) {
         std::regex re_mov_imm(R"(^\s*mov[a-z]*\s+\$(-?\d+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_bin_op(R"(^\s*((?:add|sub|and|or|xor|cmp)[a-z]*)\s+(\%[a-z0-9]+|\$-?[0-9]+)\s*,\s*(\%[a-z0-9]+)\s*(?:([#;].*))?$)", std::regex::icase);
@@ -54,7 +53,6 @@ namespace mxvm {
 
             std::smatch m;
 
-            // Redundant store+load of the same register
             if (i + 1 < lines.size() && std::regex_match(lines[i], m, re_mem_store)) {
                 const std::string store_reg = trim(m[1].str());
                 const std::string store_mem = trim(m[2].str());
@@ -63,21 +61,19 @@ namespace mxvm {
                     const std::string load_mem = trim(m2[1].str());
                     const std::string load_reg = trim(m2[2].str());
                     if (store_reg == load_reg && store_mem == load_mem) {
-                        out.push_back(lines[i]); // keep store
-                        ++i;                     // drop load
+                        out.push_back(lines[i]); 
+                        ++i;                     
                         continue;
                     }
                 }
             }
 
-            // cmp $0, %reg -> test %reg, %reg
             if (std::regex_match(lines[i], m, re_cmp_zero)) {
                 const std::string reg = m[1].str();
                 out.push_back("\ttest " + reg + ", " + reg);
                 continue;
             }
 
-            // mem->%rax then %rax->mem, preserve %rax
             if (std::regex_match(lines[i], m, re_mov_mem_to_rax)) {
                 const std::string mem_loc = m[1].str();
                 if (i + 1 < lines.size()) {
@@ -94,7 +90,6 @@ namespace mxvm {
                 }
             }
 
-            // mul by 3,5,9 -> lea patterns
             if (std::regex_match(lines[i], m, re_mul_pow2)) {
                 const int imm = std::stoi(m[1].str());
                 const std::string src_reg = m[2].str();
@@ -112,7 +107,6 @@ namespace mxvm {
                 }
             }
 
-            // Redundant load-store elimination
             if (std::regex_match(lines[i], m, re_mem_load_store)) {
                 const std::string mem_loc = m[1].str();
                 const std::string reg = m[2].str();
@@ -122,15 +116,14 @@ namespace mxvm {
                         const std::string store_reg = m2[1].str();
                         const std::string store_mem = m2[2].str();
                         if (reg == store_reg && trim(mem_loc) == trim(store_mem)) {
-                            ++i; // drop store
-                            out.push_back(lines[i]); // keep load
+                            ++i; 
+                            out.push_back(lines[i]); 
                             continue;
                         }
                     }
                 }
             }
 
-            // add/sub $1 -> inc/dec
             if (std::regex_match(lines[i], m, re_add_one)) {
                 const std::string reg = m[1].str();
                 out.push_back("\tinc " + reg);
@@ -142,7 +135,6 @@ namespace mxvm {
                 continue;
             }
 
-            // mov $0, %reg -> xor %reg, %reg; fold imm into next op
             if (std::regex_match(lines[i], m, re_mov_imm)) {
                 const std::string imm = m[1].str();
                 const std::string reg = m[2].str();
@@ -168,7 +160,6 @@ namespace mxvm {
                 }
             }
 
-            // Register move folding into next op
             if (std::regex_match(lines[i], m, re_mov_reg)) {
                 const std::string src_reg = m[1].str();
                 const std::string dst_reg = m[2].str();
@@ -194,7 +185,7 @@ namespace mxvm {
         return out;
     }
 
-    // Helper: prefix call/jmp targets with '_' where needed (no lambda regex_replace)
+
     static std::string darwin_prefix_calls(const std::string& line,
                                            const std::unordered_set<std::string>& macos_functions) {
         static const std::regex re_call(R"(\b(call|jmp)\s+([_A-Za-z][_A-Za-z0-9]*)\b)");
@@ -210,7 +201,7 @@ namespace mxvm {
 
             result.append(line, last, pos - last);
 
-            std::string piece = m.str(); // e.g. "call foo"
+            std::string piece = m.str(); 
             if (fn == "main" || macos_functions.count(fn)) {
                 const auto fnpos = piece.rfind(fn);
                 if (fnpos != std::string::npos) piece.replace(fnpos, fn.size(), "_" + fn);
@@ -223,7 +214,6 @@ namespace mxvm {
         return result;
     }
 
-    // macOS-specific post-pass
     static std::vector<std::string> opt_darwin_lines(const std::vector<std::string>& lines) {
         std::vector<std::string> out;
         out.reserve(lines.size());
@@ -296,14 +286,12 @@ namespace mxvm {
         return out;
     }
 
-    // Linux-specific post-pass (currently passthrough)
+
     static std::vector<std::string> opt_linux_lines(const std::vector<std::string>& lines) {
         return lines;
     }
 
-    // Dispatcher
     std::string Program::gen_optimize(const std::string &code, const Platform &platform) {
-        // Split input into lines
         std::vector<std::string> lines;
         {
             std::istringstream stream(code);

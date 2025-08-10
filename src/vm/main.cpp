@@ -276,7 +276,7 @@ int process_arguments(Args *args) {
                     if(cflags_env != nullptr) {
                         cflags = cflags_env;
                     }
-                    // Compile each .s file to .o with clang -c
+                    
                     for(auto &f : mxvm::Program::base->filenames) {
                         std::string obj_file = f;
                         size_t pos = obj_file.rfind(".s");
@@ -295,7 +295,7 @@ int process_arguments(Args *args) {
                         }
                         object_files.push_back(obj_file);
                     }
-                    // Link all .o files with clang
+                    
                     std::string ldflags;
                     const char *ldf = getenv("LDFLAGS");
                     if(ldf != nullptr) {
