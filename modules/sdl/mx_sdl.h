@@ -2,8 +2,12 @@
 #define __SDL2__H_
 
 #include "SDL.h"
-#include "SDL_ttf.h"
+#include "SDL2/SDL_ttf.h"
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Core SDL functions
 int64_t init(void);
@@ -91,5 +95,10 @@ int64_t init_text(void);
 void quit_text(void);
 int64_t load_font(const char* file, int64_t ptsize);
 void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif

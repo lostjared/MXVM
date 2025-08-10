@@ -4,9 +4,8 @@
 #include<cstdarg>
 #include<cstdio>
 #include <cstdint> // Make sure this is included at the top
-extern "C" {
 #include"mx_sdl.h"
-}
+
 // SDL_Init
 extern "C" void mxvm_sdl_init(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     int64_t result = init();
