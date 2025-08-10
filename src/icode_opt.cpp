@@ -279,14 +279,13 @@ namespace mxvm {
                 continue;
             }
     
-            /*// Also catch references using standard variable names with single underscore
             std::regex re_single_stdout(R"(_stdout\(%rip\))", std::regex::icase);
             if (std::regex_search(line, m, re_single_stdout)) {
                 std::string r = m[1].str();
                 out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), %rax");
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
-            }*/
+            }
 
             line = darwin_prefix_calls(line, macos_functions);
             out.push_back(line);
