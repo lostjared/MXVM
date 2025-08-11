@@ -37,6 +37,7 @@ namespace mxvm {
     private:
         std::string filename;
         scan::Scanner scanner;
+        std::string source;
         size_t index = 0;
         const scan::TToken* token = nullptr;
         std::string current_function;
@@ -68,7 +69,6 @@ namespace mxvm {
         void collect_labels(std::unordered_map<std::string, std::string> &labels);
         ParsedOp parseOperand();
         std::vector<ParsedOp> parseOperandList();
-        std::unordered_map<std::string, Variable> vars;
     };
 }
 

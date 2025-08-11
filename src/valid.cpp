@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <climits>
+#include <sstream>
 
 namespace mxvm {
 
@@ -12,20 +13,38 @@ namespace mxvm {
         return k==OpKind::Num || k==OpKind::Hex || k==OpKind::Str;
     }
 
+    static bool has_semicolon(const std::string& s) {
+        bool in_str = false, escaped = false;
+        for (size_t i = 0; i < s.size(); ++i) {
+            char c = s[i];
+            if (!in_str) {
+                if (c == '#') break;
+                if (c == '/' && i + 1 < s.size() && s[i + 1] == '/') break;
+                if (c == '"') { in_str = true; continue; }
+                if (c == ';') return true;
+            } else {
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\') { escaped = true; continue; }
+                if (c == '"') { in_str = false; continue; }
+            }
+        }
+        return false;
+    }
+
     static const std::unordered_map<std::string, OpSpec> kOpSpecs = {
         {"mov",   {"mov",   {OpKind::Id, OpKind::Any}}},
-        {"load",  {"load",  {OpKind::Id, OpKind::Id, OpKind::Any}}},
-        {"store", {"store", {OpKind::Any, OpKind::Id, OpKind::Any}}},
-        {"add",   {"add",   {OpKind::Id, OpKind::Any}}},
-        {"sub",   {"sub",   {OpKind::Id, OpKind::Any}}},
-        {"mul",   {"mul",   {OpKind::Id, OpKind::Any}}},
-        {"div",   {"div",   {OpKind::Id, OpKind::Any}}},
-        {"or",    {"or",    {OpKind::Id, OpKind::Any}}},
-        {"and",   {"and",   {OpKind::Id, OpKind::Any}}},
-        {"xor",   {"xor",   {OpKind::Id, OpKind::Any}}},
+        {"load",  {"load",  {OpKind::Id, OpKind::Id, OpKind::Any}, VArity::None, 3, 4}},
+        {"store", {"store", {OpKind::Any, OpKind::Id, OpKind::Any}, VArity::None, 3, 4}},
+        {"add",   {"add",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"sub",   {"sub",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"mul",   {"mul",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"div",   {"div",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"or",    {"or",    {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"and",   {"and",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
+        {"xor",   {"xor",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
         {"not",   {"not",   {OpKind::Id}}},
         {"neg",   {"neg",   {OpKind::Id}}},
-        {"mod",   {"mod",   {OpKind::Id, OpKind::Any}}},
+        {"mod",   {"mod",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
         {"cmp",   {"cmp",   {OpKind::Any, OpKind::Any}}},
         {"jmp",   {"jmp",   {OpKind::Label}}},
         {"je",    {"je",    {OpKind::Label}}},
@@ -91,9 +110,22 @@ namespace mxvm {
 
     std::vector<ParsedOp> Validator::parseOperandList() {
         std::vector<ParsedOp> out;
-        while (token && !match("}") && !match("\n")) {
+        while (token && !match("}")) {
+            size_t operand_line = token->getLine();            
             out.push_back(parseOperand());
-            if (match(",")) { next(); continue; }
+            if (match(",")) { 
+                next(); 
+                if (token && token->getLine() != operand_line) {
+                    throw mx::Exception("Syntax Error in file '" + filename + "': Operands must be on the same line");
+                }
+                continue;
+            }
+            
+            if (token && token->getLine() == operand_line && 
+                !token->getTokenValue().empty()) {
+                throw mx::Exception("Syntax Error in file '" + filename + "': Multiple items or missing comma between operands on line " + 
+                    std::to_string(operand_line));
+            }
             break;
         }
         return out;
@@ -110,9 +142,7 @@ namespace mxvm {
         }
     }
 
-    static std::vector<UseVar> usedVars;
-    static std::vector<UseLabel> usedLabels;
-
+    
     void Validator::validateAgainstSpec(
         const std::string& op,
         const std::vector<ParsedOp>& ops,
@@ -196,17 +226,20 @@ namespace mxvm {
         {
             if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]);
             if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]);
+            if (ops.size() >= 3 && isIdLike(ops[2].kind)) pushVar(ops[2]);
         }
 
         if (op=="load") {
             if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]); 
             if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]); 
+            if (ops.size() >= 3 && isIdLike(ops[2].kind)) pushVar(ops[2]);
         }
 
         
         if (op=="store") {
             if (ops.size() >= 1 && isIdLike(ops[0].kind)) pushVar(ops[0]); 
-            if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]); 
+            if (ops.size() >= 2 && isIdLike(ops[1].kind)) pushVar(ops[1]);
+            if (ops.size() >= 3 && isIdLike(ops[2].kind)) pushVar(ops[2]);
         }
 
         if (op=="free") {
@@ -223,202 +256,322 @@ namespace mxvm {
     bool Validator::validate(const std::string &name) {
         filename = name;
         scanner.scan();
-        std::unordered_map<std::string, std::string> labels;
-        collect_labels(labels);
+        next(); // Initialize the first token
 
-        auto skipSeparators = [&]() { };
+        while (token) { // Loop until all tokens are consumed
+            std::unordered_map<std::string, std::string> labels;
+            std::vector<UseVar> usedVars;
+            std::vector<UseLabel> usedLabels;
 
-        next();
-        skipSeparators();
-        if (match("program")) {
-            next();
-        } else {
-            require("object");
-            next();
-        }
+            collect_labels(labels);
 
-        skipSeparators();
-        require(types::TokenType::TT_ID);
-        next();
-        skipSeparators();
-        require("{");
-        next();
+            std::vector<std::string> lines;
+            {
+                std::istringstream code_info(source);
+                std::string l;
+                while (std::getline(code_info, l)) {
+                    lines.push_back(l);
+                }
+            }
 
-        std::unordered_map<std::string, Variable> vars;
-        for (auto &n : { "stdout", "stdin", "stderr" }) {
-            vars[n] = Variable();
-            vars[n].var_name = n;
-        }
+            std::vector<std::pair<int,int>> code_ranges; 
+            {
+                bool seen_section = false;
+                bool section_is_code = false;
+                bool in_code = false;
+                int  brace_depth = 0;
+                int  range_start = -1;
+                for (size_t i = 0; i < scanner.size(); ++i) {
+                    const auto &t = scanner[i];
+                    if (!in_code) {
+                        if (t.getTokenType() == types::TokenType::TT_ID && t.getTokenValue() == "section") {
+                            seen_section = true;
+                            section_is_code = false;
+                            continue;
+                        }
+                        if (seen_section && t.getTokenType() == types::TokenType::TT_ID) {
+                            section_is_code = (t.getTokenValue() == "code");
+                            continue;
+                        }
+                        if (section_is_code && t.getTokenValue() == "{") {
+                            in_code = true;
+                            brace_depth = 1;
+                            range_start = t.getLine(); 
+                            seen_section = false;
+                            section_is_code = false;
+                            continue;
+                        }
+                    } else {
+                        if (t.getTokenValue() == "{") {
+                            ++brace_depth;
+                        } else if (t.getTokenValue() == "}") {
+                            --brace_depth;
+                            if (brace_depth == 0) {
+                                int range_end = t.getLine();
+                                code_ranges.emplace_back(range_start, range_end);
+                                in_code = false;
+                            }
+                        }
+                    }
+                }
+            }
 
-        usedVars.clear();
-        usedLabels.clear();
+            for (const auto& pr : code_ranges) {
+                const int start = std::max(1, pr.first);
+                const int end   = pr.second;
+                for (int line = start; line <= end; ++line) {
+                    const int idx = line - 1;
+                    if (idx < 0 || idx >= static_cast<int>(lines.size())) continue;
+                    const std::string& text = lines[idx];
+                    if (has_semicolon(text)) {
+                        throw mx::Exception(
+                            "Syntax Error in file '" + filename +
+                            "': Semicolons are not allowed in code section at line " +
+                            std::to_string(line) + ": '" + text + "'"
+                        );
+                    }
+                }
+            }
 
-        skipSeparators();
-        while (token && !match("}")) {
+            std::unordered_map<int,int> line_instruction_count;
+            auto is_in_code = [&](int line)->bool {
+                for (const auto &pr : code_ranges) {
+                    if (line >= pr.first && line <= pr.second) return true;
+                }
+                return false;
+            };
+            for (size_t i = 0; i < scanner.size(); ++i) {
+                const auto &tok = scanner[i];
+                const int line = tok.getLine();
+                if (!is_in_code(line)) continue;
+                if (tok.getTokenType() != types::TokenType::TT_ID) continue;
+
+                if (i + 1 < scanner.size() && scanner[i + 1].getTokenValue() == ":") {
+                    continue;
+                }
+                if (tok.getTokenValue() == "function") {
+                    continue;
+                }
+                if (std::find(IncType.begin(), IncType.end(), tok.getTokenValue()) != IncType.end()) {
+                    line_instruction_count[line]++;
+                }
+            }
+            for (const auto &kv : line_instruction_count) {
+                const int line_num = kv.first;
+                const int count = kv.second;
+                if (count > 1) {
+                    const int idx = line_num - 1; 
+                    const std::string line_text =
+                        (idx >= 0 && idx < static_cast<int>(lines.size())) ? lines[idx] : std::string("<unknown>");
+                    throw mx::Exception("Syntax Error in file '" + filename +
+                        "': Multiple instructions on same line at line " +
+                        std::to_string(line_num) + ": '" + line_text + "'");
+                }
+            }
+
+            auto skipSeparators = [&]() { while(token && match("\n")) { next(); } };
+
             skipSeparators();
-            require("section");
-            next();
+            if (!token) break; // End of file
+
+            if (match("program")) {
+                next();
+            } else {
+                require("object");
+                next();
+            }
+
             skipSeparators();
             require(types::TokenType::TT_ID);
-            std::string sectionName = token->getTokenValue();
             next();
             skipSeparators();
             require("{");
             next();
 
-            if (sectionName == "module" || sectionName == "object") {
-                skipSeparators();
-                while (token && !match("}")) {
-                    skipSeparators();
-                    if (match(types::TokenType::TT_ID)) {
-                        next();
-                        skipSeparators();
-                        if (match(",")) { next(); continue; }
-                        continue;
-                    }
-                    break;
-                }
-                skipSeparators();
-                require("}");
-                next();
+            std::unordered_map<std::string, Variable> vars;
+            for (auto &n : { "stdout", "stdin", "stderr" }) {
+                vars[n] = Variable();
+                vars[n].var_name = n;
             }
-            else if (sectionName == "data") {
+
+            skipSeparators();
+            while (token && !match("}")) {
                 skipSeparators();
-                while (token && !match("}")) {
+                require("section");
+                next();
+                skipSeparators();
+                require(types::TokenType::TT_ID);
+                std::string sectionName = token->getTokenValue();
+                next();
+                skipSeparators();
+                require("{");
+                next();
+
+                if (sectionName == "module" || sectionName == "object") {
                     skipSeparators();
-                    if (match(types::TokenType::TT_ID) &&
-                        (token->getTokenValue() == "int" ||
-                        token->getTokenValue() == "string" ||
-                        token->getTokenValue() == "float" ||
-                        token->getTokenValue() == "ptr" ||
-                        token->getTokenValue() == "byte" ||
-                        token->getTokenValue() == "export"))
-                    {
-                        if(token->getTokenValue() == "export") next();
-
-                        std::string vtype = token->getTokenValue();
-                        next();
+                    while (token && !match("}")) {
                         skipSeparators();
-
-                        require(types::TokenType::TT_ID);
-                        std::string vname = token->getTokenValue();
-                        vars[vname].var_name = vname;
-                        next();
-                        skipSeparators();
-
-                        if (match(",") && vtype == "string") {
+                        if (match(types::TokenType::TT_ID)) {
                             next();
                             skipSeparators();
-                            if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX)) {
+                            if (match(",")) { next(); continue; }
+                            continue;
+                        }
+                        break;
+                    }
+                    skipSeparators();
+                    require("}");
+                    next();
+                }
+                else if (sectionName == "data") {
+                    skipSeparators();
+                    while (token && !match("}")) {
+                        skipSeparators();
+                        if (match(types::TokenType::TT_ID) &&
+                            (token->getTokenValue() == "int" ||
+                            token->getTokenValue() == "string" ||
+                            token->getTokenValue() == "float" ||
+                            token->getTokenValue() == "ptr" ||
+                            token->getTokenValue() == "byte" ||
+                            token->getTokenValue() == "export"))
+                        {
+                            if(token->getTokenValue() == "export") next();
+
+                            std::string vtype = token->getTokenValue();
+                            next();
+                            skipSeparators();
+
+                            require(types::TokenType::TT_ID);
+                            std::string vname = token->getTokenValue();
+                            vars[vname].var_name = vname;
+                            next();
+                            skipSeparators();
+
+                            if (match(",") && vtype == "string") {
                                 next();
                                 skipSeparators();
-                                continue;
+                                if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX)) {
+                                    next();
+                                    skipSeparators();
+                                    continue;
+                                } else {
+                                    throw mx::Exception("Syntax Error in file '" + filename + "': string buffer requires number on line " + std::to_string(token->getLine()));
+                                }
+                            }
+
+                            require("=");
+                            next();
+                            skipSeparators();
+                            if (match("-")) { next(); skipSeparators(); }
+
+                            if (vtype == "byte") {
+                                if (!(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX))) {
+                                    throw mx::Exception("Syntax Error in file '" + filename + "': byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
+                                }
+                                int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
+                                if (value < 0 || value > 0xFF) {
+                                    throw mx::Exception("Syntax Error in file '" + filename + "': byte out of range 0-255 on line: " + std::to_string(token->getLine()));
+                                }
+                                next();
+                                skipSeparators();
+                            } else if (vtype == "string") {
+                                require(types::TokenType::TT_STR);
+                                next();
+                                skipSeparators();
+                            } else if (token->getTokenValue() == "null" ||
+                                    match(types::TokenType::TT_NUM) ||
+                                    match(types::TokenType::TT_HEX) ||
+                                    match(types::TokenType::TT_STR)) {
+                                next();
+                                skipSeparators();
                             } else {
-                                throw mx::Exception("Syntax Error in file '" + filename + "': string buffer requires number on line " + std::to_string(token->getLine()));
+                                throw mx::Exception("Syntax Error in file '" + filename + "': Expected value for variable, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
                             }
                         }
-
-                        require("=");
-                        next();
-                        skipSeparators();
-                        if (match("-")) { next(); skipSeparators(); }
-
-                        if (vtype == "byte") {
-                            if (!(match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX))) {
-                                throw mx::Exception("Syntax Error in file '" + filename + "': byte must be a valid byte value integer 0-255 on line " + std::to_string(token->getLine()));
-                            }
-                            int64_t value = std::stoll(token->getTokenValue(), nullptr, 0);
-                            if (value < 0 || value > 0xFF) {
-                                throw mx::Exception("Syntax Error in file '" + filename + "': byte out of range 0-255 on line: " + std::to_string(token->getLine()));
-                            }
-                            next();
-                            skipSeparators();
-                        } else if (vtype == "string") {
-                            require(types::TokenType::TT_STR);
-                            next();
-                            skipSeparators();
-                        } else if (token->getTokenValue() == "null" ||
-                                match(types::TokenType::TT_NUM) ||
-                                match(types::TokenType::TT_HEX) ||
-                                match(types::TokenType::TT_STR)) {
-                            next();
-                            skipSeparators();
-                        } else {
-                            throw mx::Exception("Syntax Error in file '" + filename + "': Expected value for variable, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
+                        else {
+                            throw mx::Exception("Syntax Error in file '" + filename + "': Expected variable declaration, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
                         }
                     }
-                    else {
-                        throw mx::Exception("Syntax Error in file '" + filename + "': Expected variable declaration, found: " + token->getTokenValue() + " at line " + std::to_string(token->getLine()));
-                    }
-                }
-                skipSeparators();
-                require("}");
-                next();
-            }
-            else if (sectionName == "code") {
-                skipSeparators();
-                while (token && !match("}")) {
-                    size_t old_index = index;
-
                     skipSeparators();
-                    if (match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
-                        next();
+                    require("}");
+                    next();
+                }
+                else if (sectionName == "code") {
+                    skipSeparators();
+                    
+                    while (token && !match("}")) {
+                        size_t old_index = index;
                         skipSeparators();
-                        require(types::TokenType::TT_ID);
-                        next();
-                        skipSeparators();
-                        require(":");
-                        next();
-                        continue;
-                    }
-                    if (match(types::TokenType::TT_ID) && peekIs(":")) {
-                        next();
-                        next();
-                        continue;
-                    }
-
-                    if (match(types::TokenType::TT_ID)) {
-                        std::string op = token->getTokenValue();
-                        if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
-                            throw mx::Exception("Syntax Error in file '" + filename + "': Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()));
+                        
+                        if (token && token->getTokenValue() == ";") {
+                            throw mx::Exception("Syntax Error in file '" + filename + 
+                                "': Semicolons not allowed in code section at line " + 
+                                std::to_string(token->getLine()));
                         }
-                        next();
-                        skipSeparators();
-
-                        if (op == "ret" || op == "done") {
-                            std::vector<ParsedOp> emptyOps;
-                            validateAgainstSpec(op, emptyOps, vars, labels, usedVars, usedLabels);
+                        
+                        if (match(types::TokenType::TT_ID) && token->getTokenValue() == "function") {
+                            next();
+                            skipSeparators();
+                            require(types::TokenType::TT_ID);
+                            next();
+                            skipSeparators();
+                            require(":");
+                            next();
+                            continue;
+                        }
+                        
+                        if (match(types::TokenType::TT_ID) && peekIs(":")) {
+                            next(); 
+                            next(); 
                             continue;
                         }
 
-                        auto ops = parseOperandList();
-                        validateAgainstSpec(op, ops, vars, labels, usedVars, usedLabels);
-                        continue;
-                    } else {
-                        throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
-                    }
+                        if (match(types::TokenType::TT_ID)) {
+                            std::string op = token->getTokenValue();
+                            if (std::find(IncType.begin(), IncType.end(), op) == IncType.end()) {
+                                throw mx::Exception("Syntax Error in file '" + filename + "': Unknown instruction '" + op + "' at line " + std::to_string(token->getLine()));
+                            }
+                            next();
+                            skipSeparators();
 
-                    if (old_index == index) {
-                        if (!next()) break;
+                            if (op == "ret" || op == "done") {
+                                std::vector<ParsedOp> emptyOps;
+                                validateAgainstSpec(op, emptyOps, vars, labels, usedVars, usedLabels);
+                                continue;
+                            }
+
+                            auto ops = parseOperandList();
+                            validateAgainstSpec(op, ops, vars, labels, usedVars, usedLabels);
+                            continue;
+                        } else {
+                            throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
+                        }
+
+                        if (old_index == index) {
+                            if (!next()) break;
+                        }
                     }
+                    
+                    skipSeparators();
+                    require("}");
+                    next();
+                }
+                else {
+                    throw mx::Exception("Syntax Error in file '" + filename + "': Unknown section: " + sectionName + " at line " + std::to_string(token->getLine()));
                 }
                 skipSeparators();
-                require("}");
-                next();
             }
-            else {
-                throw mx::Exception("Syntax Error in file '" + filename + "': Unknown section: " + sectionName + " at line " + std::to_string(token->getLine()));
-            }
+
             skipSeparators();
-        }
+            require("}");
+            next(); // Consume the closing brace of the object/program
 
-        skipSeparators();
-        require("}");
-
-        for (auto &u : usedLabels) {
-            if (!labels.count(u.name)) {
-                throw mx::Exception("Syntax Error in '" + filename + "': Undefined label '" + u.name + "' at line " + std::to_string(u.at->getLine()));
+            for (auto &u : usedLabels) {
+                if (!labels.count(u.name)) {
+                    throw mx::Exception("Syntax Error in '" + filename + "': Undefined label '" + u.name + "' at line " + std::to_string(u.at->getLine()));
+                }
             }
+            skipSeparators(); // Prepare for the next object/program or EOF
         }
         return true;
     }
@@ -494,7 +647,7 @@ namespace mxvm {
     }
 
 
-    Validator::Validator(const std::string &source) : scanner(source) {
+    Validator::Validator(const std::string &source_) : scanner(source_), source(source_) {
 
     }
 }

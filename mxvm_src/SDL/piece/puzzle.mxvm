@@ -1181,7 +1181,7 @@ object Game {
         mov SDLCore.h, 1080
         call SDLCore.init
 
-        invoke strncpy SDLCore.text_buffer, GameState.bg_file, 256
+        invoke strncpy, SDLCore.text_buffer, GameState.bg_file, 256
         call SDLCore.load_texture_path
         mov GameState.bg_tex, SDLCore.tmp_tex
 

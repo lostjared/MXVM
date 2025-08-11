@@ -205,14 +205,14 @@ object Engine {
     function init:
         call SDLCore.init
 
-        invoke strncpy SDLCore.path, GameState.blocks_bmp, 1024
+        invoke strncpy, SDLCore.path, GameState.blocks_bmp, 1024
         call SDLCore.load_texture_path
         mov GameState.start_texture, SDLCore.ret_i
         cmp GameState.start_texture, -1
         je tex_error
 
         call SDLCore.init_text
-        invoke strncpy SDLCore.path, GameState.font_name, 1024
+        invoke strncpy, SDLCore.path, GameState.font_name, 1024
         call SDLCore.load_font_path
         mov GameState.font_id, SDLCore.ret_i
         cmp GameState.font_id, -1
@@ -399,11 +399,11 @@ object Board {
         mov GameState.j, 0
     cl_loop:
         cmp GameState.j, GameState.i
-        jge done
+        jge completed
         store 0, GameState.board, GameState.j
         add GameState.j, 1
         jmp cl_loop
-    done:
+    completed:
         ret
 
     function lock_piece:
@@ -806,7 +806,7 @@ object Render {
     jmp ploop
 
   present:
-    invoke strncpy SDLCore.text, GameState.score_txt, 255
+    invoke strncpy, SDLCore.text, GameState.score_txt, 255
     mov SDLCore.t_x, 15
     mov SDLCore.t_y, 15
     mov SDLCore.tr, 255
