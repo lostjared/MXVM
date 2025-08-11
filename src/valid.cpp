@@ -480,7 +480,6 @@ namespace mxvm {
                                 next();
                                 skipSeparators();
                             } else if (vtype == "string") {
-                                std::cout <<  token->getTokenValue() << "\n";
                                 require(types::TokenType::TT_STR);
                                 next();
                                 skipSeparators();

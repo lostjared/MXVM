@@ -324,6 +324,7 @@ namespace mxvm {
 
         auto core = opt_core_lines(lines);
 
+        
         std::vector<std::string> final_lines =
             (platform == Platform::DARWIN) ? opt_darwin_lines(core)
                                            : opt_linux_lines(core);

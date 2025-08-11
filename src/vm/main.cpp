@@ -380,7 +380,7 @@ int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program>
                 std::ostringstream code_v;
                 program->generateCode(platform, program->object, code_v);
                 program->assembly_code = code_v.str();
-                std::string opt_code = program->gen_optimize(program->assembly_code, mxvm::Platform::LINUX);
+                std::string opt_code = program->gen_optimize(program->assembly_code, platform);
                 file << opt_code;
                 if(mxvm::html_mode) {
                     std::ofstream  htmlFile(program->name + ".html");

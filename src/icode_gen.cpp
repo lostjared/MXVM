@@ -148,12 +148,12 @@ namespace mxvm {
         }
         else {
             out << "\t.p2align 4, 0x90\n";
-            out << ".global " << getPlatformSymbolName("main") << "\n";
+            out << ".global " << "main" << "\n";
             
 #ifndef __APPLE__
             out << ".type main, @function\n";
 #endif
-            out << getPlatformSymbolName("main") << ":\n";
+            out << "main" << ":\n";
         }
 
         out << "\tpush %rbp\n";
@@ -614,7 +614,7 @@ namespace mxvm {
             throw mx::Exception("to_int: second argument must be a string variable");
         }
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
-        out << "\tcall atol\n";
+        out << "\tcall " << getPlatformSymbolName("atol") << "\n";
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
@@ -763,7 +763,7 @@ namespace mxvm {
         static int over_count = 0;
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n";
-        out << "\tmovq "<<  "stdin" << "(%rip), %rdx\n";
+        out << "\tmovq "<<  getPlatformSymbolName("stdin") << "(%rip), %rdx\n";
         out << "\tcall " << getPlatformSymbolName("fgets") << "\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tcall " << getPlatformSymbolName("strlen") << "\n";
