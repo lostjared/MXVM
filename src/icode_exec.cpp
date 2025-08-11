@@ -9,7 +9,6 @@ namespace mxvm {
     }
 
     void Program::flatten_inc(Program *root, Instruction &i) {
-        
         if (root != this) {
             auto qualifyVar = [&](Operand &op) {
                 if (op.op.empty()) return;
@@ -24,7 +23,6 @@ namespace mxvm {
                     op.op = qualified;
                 }
             };
-
             auto qualifyLabel = [&](Operand &op) {
                 if (op.op.empty()) return;
                 if (op.op.find('.') != std::string::npos) return; 
@@ -34,13 +32,11 @@ namespace mxvm {
                     op.op = this->name + "." + op.op;
                 }
             };
-
             Instruction ci = i; 
             qualifyVar(ci.op1);
             qualifyVar(ci.op2);
             qualifyVar(ci.op3);
             for (auto &vo : ci.vop) qualifyVar(vo);
-
             switch (ci.instruction) {
                 case CALL: case JMP: case JE: case JNE: case JL: case JLE:
                 case JG: case JGE: case JZ: case JNZ: case JA: case JB:

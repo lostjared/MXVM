@@ -32,8 +32,6 @@ namespace mxvm {
         return oss.str();
     }
 
-    
-    
     void InstructionNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }
@@ -54,7 +52,7 @@ namespace mxvm {
     
     std::string VariableNode::toString() const {
         std::ostringstream oss;
-        oss << "Variable: " << name << " (type: " << static_cast<int>(type) << ")";
+        oss << "Variable: " << name << " (type: " << type << ")";
         if (hasInitializer) {
             oss << " = " << initialValue;
         }

@@ -536,27 +536,35 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
-            if(debug_output.is_open())
+            if(debug_output.is_open()) {
+                program->print(debug_output);
                 program->memoryDump(debug_output);
+            }
         }
     } catch(const std::runtime_error &e) {
         std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
-            if(debug_output.is_open())
+            if(debug_output.is_open()) {
+                program->print(debug_output);
                 program->memoryDump(debug_output);
+            }
         }
     } catch(const std::exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
-            if(debug_output.is_open())
+            if(debug_output.is_open()) {
+                program->print(debug_output);
                 program->memoryDump(debug_output);
+            }
         }
     }  
     catch(...) {
         std::cerr << Col("MXVM: ", mx::Color::RED)<< "Unknown Exception.\n";
         if(mxvm::debug_mode) {
-            if(debug_output.is_open())
+            if(debug_output.is_open()) {
+                program->print(debug_output);
                 program->memoryDump(debug_output);
+            }
         }
     }
 
