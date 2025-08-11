@@ -29,6 +29,8 @@ struct Args {
     vm_target target = vm_target::x86_64_linux;
     std::vector<std::string> argv;
     mxvm::Platform platform = mxvm::Platform::LINUX;
+    int platform_argc = 0;
+    char ** platform_argv = nullptr;
 };
 
 template<typename T>
@@ -40,15 +42,16 @@ void print_help(T &type) {
 }
 
 int process_arguments(Args *args);
-int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target);
+int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args);
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
-int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program,std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output);
+int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args);
 void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
 
 Args proc_args(int argc, char **argv) {
     Args args;
     mx::Argz<std::string> argz(argc, argv);
-
+    args.platform_argc = argc;
+    args.platform_argv = argv;
     argz.addOptionSingleValue('o', "output file")
     .addOptionSingleValue('a', "action")
     .addOptionDoubleValue(128, "action", "action to take [translate,  interpret]")
@@ -69,7 +72,6 @@ Args proc_args(int argc, char **argv) {
     .addOptionSingleValue('I', "include path")
     .addOptionDoubleValue(137, "include", "include path")
     ;
-
 
     if(argc == 1) {
         print_help(argz);
@@ -183,7 +185,7 @@ int process_arguments(Args *args) {
     program->setMainBase(program.get());
     program->platform = args->platform;
     if(args->action == vm_action::compile) {
-        exitCode = action_translate(args->platform, program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->platform, program, args);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
                 if(args->platform == mxvm::Platform::LINUX) {
@@ -193,7 +195,6 @@ int process_arguments(Args *args) {
                     if(as_env != nullptr) {
                         assembler = as_env;
                     }
-                    
                     std::string asflags;
                     const char *asf = getenv("ASFLAGS");
                     if(asf != nullptr) {
@@ -329,7 +330,7 @@ int process_arguments(Args *args) {
             }
         }
     } else if(args->action == vm_action::translate) {
-        exitCode = action_translate(args->platform, program, args->include_path, args->object_path, args->source_file, args->module_path, args->output_file, args->target);
+        exitCode = action_translate(args->platform, program, args);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
         exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
@@ -341,12 +342,16 @@ int process_arguments(Args *args) {
     return exitCode;
 }
 
-int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, std::string_view input, std::string_view mod_path, std::string_view output, vm_target &target) {
-        return translate_x64(platform, program, include_path, object_path, input, mod_path, output);
+int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args) {
+        return translate_x64(platform, program, args);
 }
 
-int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, std::string_view include_path, std::string_view object_path, 
-                        std::string_view input, std::string_view mod_path, std::string_view output) {
+int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args) {
+    std::string_view include_path = args->include_path;
+    std::string_view object_path = args->object_path;
+    std::string_view input = args->source_file;
+    std::string_view mod_path = args->module_path;
+    std::string_view output = args->output_file;
     try {
 
         std::string input_file(input);
