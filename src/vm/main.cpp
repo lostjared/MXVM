@@ -407,18 +407,21 @@ int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program>
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
+            program->print(std::cerr);
             program->memoryDump(std::cerr);
         }
         return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
         std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
+            program->print(std::cerr);
             program->memoryDump(std::cerr);
         }
         return EXIT_FAILURE;
     } catch(const std::exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
+            program->print(std::cerr);
             program->memoryDump(std::cerr);
         }
         return EXIT_FAILURE;
@@ -426,6 +429,7 @@ int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program>
     catch(...) {
         std::cerr << Col("MXVM: ", mx::Color::RED) << "Unknown Exception.\n";
         if(mxvm::debug_mode) {
+            program->print(std::cerr);
             program->memoryDump(std::cerr);
         }
         return EXIT_FAILURE;

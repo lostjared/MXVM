@@ -644,13 +644,7 @@ namespace mxvm {
         }
         
         auto ast = parseAST();
-        if (ast) {
-            
-            //if (ast->sections.empty() && ast->inlineObjects.size() == 1) {
-              //  auto* temp = ast->inlineObjects[0].release();
-                //ast.reset(temp);
-            //}
-            
+        if (ast) {        
             program->name = ast->name;
             if(!ast->root_name.empty()) { 
                 program->root_name = ast->root_name;

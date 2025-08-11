@@ -1571,79 +1571,7 @@ namespace mxvm {
     }
 
      void Program::print(std::ostream &out) {
-        out << "=== VARIABLES ===\n";
-        if (vars.empty()) {
-            out << "  (no variables)\n";
-        } else {
-            out << std::left << std::setw(15) << "Name" 
-                << std::setw(12) << "Type" 
-                << std::setw(20) << "Value" << "\n";
-            out << std::string(47, '-') << "\n";
-            
-            for (const auto &var : vars) {
-                out << std::setw(15) << var.first;
-                
-                std::string typeStr;
-                switch (var.second.type) {
-                    case VarType::VAR_INTEGER: typeStr = "int"; break;
-                    case VarType::VAR_FLOAT: typeStr = "float"; break;
-                    case VarType::VAR_STRING: typeStr = "string"; break;
-                    case VarType::VAR_POINTER: typeStr = "ptr"; break;
-                    case VarType::VAR_LABEL: typeStr = "label"; break;
-                    case VarType::VAR_EXTERN: typeStr = "external"; break;
-                    case VarType::VAR_ARRAY: typeStr = "array"; break;
-                    case VarType::VAR_BYTE:  typeStr = "byte"; break;
-                    default: typeStr = "unknown"; break;
-                }
-                out << std::setw(12) << typeStr;
-                
-                switch (var.second.var_value.type) {
-                    case VarType::VAR_INTEGER:
-                        out << std::setw(20) << var.second.var_value.int_value;
-                        break;
-                    case VarType::VAR_FLOAT:
-                        out << std::setw(20) << std::fixed << std::setprecision(2) 
-                            << var.second.var_value.float_value;
-                        break;
-                    case VarType::VAR_STRING:
-                        out << std::setw(20) << ("\"" + var.second.var_value.str_value + "\"");
-                        break;
-                    case VarType::VAR_POINTER:
-                        if(var.second.var_value.ptr_value == nullptr)
-                            out << "null";
-                        else {
-                            out << std::setw(20) << std::hex << "0x" 
-                            << reinterpret_cast<uintptr_t>(var.second.var_value.ptr_value) << std::dec;
-                        }
-                        break;
-                    case VarType::VAR_LABEL:
-                        out << std::setw(20) << var.second.var_value.label_value;
-                        break;
-                    default:
-                        out << std::setw(20) << "(uninitialized)";
-                        break;
-                }
-                out << "\n";
-            }
-        }
-
-        out << "\n";
-
-        out << "=== LABELS ===\n";
-        if (labels.empty()) {
-            out << "  (no labels)\n";
-        } else {
-            out << std::left << std::setw(20) << "Label" 
-                << std::setw(10) << "Address" << "\n";
-            out << std::string(30, '-') << "\n";
-            
-            for (const auto &label : labels) {
-                out << std::setw(20) << label.first 
-                    << std::setw(10) << label.second.first << "\n";
-            }
-        }
-        out << "\n";
-
+        out << "Debug Information..\n";
         out << "=== INSTRUCTIONS ===\n";
         if (inc.empty()) {
             out << "  (no instructions)\n";
@@ -1658,22 +1586,15 @@ namespace mxvm {
             
             for (size_t i = 0; i < inc.size(); ++i) {
                 const auto &instr = inc[i];
-                
-                
                 out << std::setw(10) << i;
-                
-                
                 if (instr.instruction >= 0 && instr.instruction < static_cast<int>(IncType.size())) {
                     out << std::setw(12) << IncType[instr.instruction];
                 } else {
                     out << std::setw(12) << "UNKNOWN";
                 }
-                
                 out << std::setw(25) << (instr.op1.op.empty() ? "-" : instr.op1.op);
                 out << std::setw(25) << (instr.op2.op.empty() ? "-" : instr.op2.op);
-                out << std::setw(25) << (instr.op3.op.empty() ? "-" : instr.op3.op);
-                
-                
+                out << std::setw(25) << (instr.op3.op.empty() ? "-" : instr.op3.op);   
                 if (!instr.vop.empty()) {
                     std::string extraOps;
                     for (size_t j = 0; j < instr.vop.size(); ++j) {
