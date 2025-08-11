@@ -193,7 +193,7 @@ namespace mxvm {
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";
-        std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << " platform: " << ((platform == Platform::LINUX) ? "Linux": "macOS") << "\n";
+        std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s"  << mainFunc << Col(" platform: ", mx::Color::BRIGHT_CYAN) << ((platform == Platform::LINUX) ? "Linux": "macOS") << "\n";
     }
 
 
