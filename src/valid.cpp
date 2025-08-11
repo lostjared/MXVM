@@ -57,7 +57,7 @@ namespace mxvm {
         {"jnz",   {"jnz",   {OpKind::Label}}},
         {"ja",    {"ja",    {OpKind::Label}}},
         {"jb",    {"jb",    {OpKind::Label}}},
-        {"print", {"print", {OpKind::Any}}},
+        {"print", {"print", {OpKind::Any}, VArity::AnyTail, 1, -1}},
         {"string_print", {"string_print", {OpKind::Any}}},
         {"exit",  {"exit",  {}, VArity::AnyTail, 0, 1}},
         {"alloc", {"alloc", {OpKind::Id, OpKind::Any, OpKind::Any}}},
@@ -251,6 +251,11 @@ namespace mxvm {
                 if (isIdLike(ops[i].kind)) pushVar(ops[i]);
             }
         }
+        if (op=="print") {
+            for (size_t i = 0; i < ops.size(); ++i) {
+                if (isIdLike(ops[i].kind)) pushVar(ops[i]);
+            }
+        }
     }
 
     bool Validator::validate(const std::string &name) {
@@ -369,7 +374,7 @@ namespace mxvm {
                 }
             }
 
-            auto skipSeparators = [&]() { while(token && match("\n")) { next(); } };
+            auto skipSeparators = [&]() {  };
 
             skipSeparators();
             if (!token) break; // End of file
@@ -475,6 +480,7 @@ namespace mxvm {
                                 next();
                                 skipSeparators();
                             } else if (vtype == "string") {
+                                std::cout <<  token->getTokenValue() << "\n";
                                 require(types::TokenType::TT_STR);
                                 next();
                                 skipSeparators();
