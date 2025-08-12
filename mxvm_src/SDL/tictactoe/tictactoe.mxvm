@@ -13,7 +13,7 @@ program TicTacToe {
 object SDLCore {
     section module { sdl, io }
     section data {
-        export string title = "MXVM TicTacToe"
+        export string title = "TicTacToe - [MXVM Edition]"
         export int x = 100
         export int y = 100
         export int w = 800
