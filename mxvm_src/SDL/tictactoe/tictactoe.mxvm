@@ -554,7 +554,6 @@ object Input {
         export int SDLK_ESCAPE = 27
         export int SDLK_RETURN = 13
         export int MBDOWN = 1025
-        string mouse_click = "Mouse X: %lld  Y: %lld Button: %ld\n"
     }
     section code {
     function handle:
@@ -578,8 +577,6 @@ object Input {
         mov mb, SDLCore.last_mouse_btn
         mov mx, SDLCore.last_mouse_x
         mov my, SDLCore.last_mouse_y
-        print mouse_click, mx, my, mb
-
         mov Board.tx, mx
         mov Board.ty, my
         call Board.cell_from_xy
@@ -589,7 +586,6 @@ object Input {
         je ih_ret
         cmp Board.cur_player, 1
         jne ih_ret
-
         call Board.place
         jmp ih_ret
     quit:
