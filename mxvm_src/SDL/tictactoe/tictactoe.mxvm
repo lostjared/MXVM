@@ -703,16 +703,16 @@ object Game {
 
     draw_x:
         mov textx, x0
-        add textx, 55
+        add textx, 60
         mov texty, y0
-        add texty, 45
+        add texty, 55
         invoke draw_text, SDLCore.renderer_id, Text.fnt, Xs, textx, texty, 255, 0, 0, 255
         jmp dm_next
     draw_o:
         mov textx, x0
-        add textx, 55
+        add textx, 60
         mov texty, y0
-        add texty, 45
+        add texty, 55
         invoke draw_text, SDLCore.renderer_id, Text.fnt, Os, textx, texty, 0, 0, 255, 255
         jmp dm_next
     dm_next:
