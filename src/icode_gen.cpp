@@ -492,11 +492,15 @@ namespace mxvm {
         else if(ptrVar.type == VarType::VAR_STRING)
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
         else throw mx::Exception("Load invalid type: " + i.op2.op);
-
         auto emit_load = [&](const std::string& mem) {
             if (dest.type == VarType::VAR_INTEGER) {
-                out << "\tmovq " << mem << ", %rdx\n";
-                out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                if (size == 1) {
+                    out << "\tmovzbq " << mem << ", %rdx\n";
+                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                } else {
+                    out << "\tmovq " << mem << ", %rdx\n";
+                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                }
             } else if (dest.type == VarType::VAR_FLOAT) {
                 out << "\tmovsd " << mem << ", %xmm0\n";
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
@@ -507,6 +511,7 @@ namespace mxvm {
                 throw mx::Exception("LOAD: unsupported destination type ");
             }
         };
+        
         if (size == 1 || size == 2 || size == 4 || size == 8) {
             int scale = (int)size;
             std::string mem = "(" + std::string("%rax") + ",%rcx," + std::to_string(scale) + ")";
@@ -517,7 +522,6 @@ namespace mxvm {
             emit_load("(%rax)");
         }
     }
-
     void Program::gen_store(std::ostream &out, const Instruction &i) {
         uint64_t value = 0;
         VarType  type;
