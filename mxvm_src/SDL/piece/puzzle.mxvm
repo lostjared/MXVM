@@ -159,6 +159,9 @@ object Piece {
 }
 
 object Grid {
+
+    section object { SDLCore, Engine }
+
     section data {
         export int w = 8
         export int h = 17
@@ -222,60 +225,60 @@ object Grid {
 
     function at_index:
         # byte offset = ((y * w) + x) * 8
-        mov Grid.idx_calc, Grid.ay
-        mul Grid.idx_calc, Grid.w
-        add Grid.idx_calc, Grid.ax
-        mul Grid.idx_calc, 8         # SIZEOF(cell) = 8
+        mov idx_calc, ay
+        mul idx_calc, w
+        add idx_calc, ax
+        mul idx_calc, 8         # SIZEOF(cell) = 8
         ret
 
     function get_cell:
         # compute byte offset
-        call Grid.at_index
-        mov Grid.get_o, Grid.idx_calc
+        call at_index
+        mov get_o, idx_calc
 
         # total bytes = w*h*8, last valid starting offset = bytes - 8
-        mov Grid.bytes_rt, Grid.w
-        mul Grid.bytes_rt, Grid.h
-        mul Grid.bytes_rt, 8
-        mov Grid.max_off, Grid.bytes_rt
-        sub Grid.max_off, 8
+        mov bytes_rt, w
+        mul bytes_rt, h
+        mul bytes_rt, 8
+        mov max_off, bytes_rt
+        sub max_off, 8
 
         # null / bounds guards
-        cmp Grid.buf, 0
+        cmp buf, 0
         je gc_zero
-        cmp Grid.get_o, 0
+        cmp get_o, 0
         jl gc_zero
-        cmp Grid.get_o, Grid.max_off
+        cmp get_o, max_off
         jg gc_zero
 
-        load Grid.get_v, Grid.buf, Grid.get_o, 8   # load 8 bytes
+        load get_v, buf, get_o, 8   # load 8 bytes
         ret
 
     gc_zero:
-        mov Grid.get_v, 0
+        mov get_v, 0
         ret
 
     function set_cell:
         # compute byte offset
-        call Grid.at_index
-        mov Grid.set_o, Grid.idx_calc
+        call at_index
+        mov set_o, idx_calc
 
         # total bytes = w*h*8, last valid starting offset = bytes - 8
-        mov Grid.bytes_rt, Grid.w
-        mul Grid.bytes_rt, Grid.h
-        mul Grid.bytes_rt, 8
-        mov Grid.max_off, Grid.bytes_rt
-        sub Grid.max_off, 8
+        mov bytes_rt, w
+        mul bytes_rt, h
+        mul bytes_rt, 8
+        mov max_off, bytes_rt
+        sub max_off, 8
 
         # null / bounds guards
-        cmp Grid.buf, 0
+        cmp buf, 0
         je sc_ret
-        cmp Grid.set_o, 0
+        cmp set_o, 0
         jl sc_ret
-        cmp Grid.set_o, Grid.max_off
+        cmp set_o, max_off
         jg sc_ret
 
-        store Grid.set_val, Grid.buf, Grid.set_o, 8 # store 8 bytes
+        store set_val, buf, set_o, 8 # store 8 bytes
     sc_ret:
         ret
 
@@ -336,6 +339,9 @@ object Grid {
 }
 
 object Input {
+
+    section object { GameState, SDLCore }
+
     section data {
         export int event_type = 0
         export int key = 0
@@ -453,6 +459,9 @@ object Input {
 }
 
 object Engine {
+
+    section object { Grid, GameState, Piece, SDLCore }
+
     section data {
         int i = 0
 
@@ -1166,7 +1175,7 @@ object Game {
 
     section module { string }
 
-    section object { Text }
+    section object { Text, SDLCore, GameState }
 
     section data { 
         string title = "Puzzle Game [MXVM Edition]"
@@ -1217,6 +1226,8 @@ object Game {
 }
 
 object Text {
+
+    section object { GameState, SDLCore }
     section module { string }
 
     section data {
