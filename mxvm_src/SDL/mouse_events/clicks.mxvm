@@ -82,6 +82,9 @@ object SDLCore {
 }
 
 object Text {
+
+    section object { SDLCore }
+
     section data {
         export int fnt = -1
         export string font_name = "font.ttf"
@@ -103,6 +106,9 @@ object Text {
 }
 
 object Points {
+
+    section object { SDLCore }
+
     section data {
         export ptr buf = null
         export int capacity = 1024
@@ -175,6 +181,9 @@ object Points {
 }
 
 object Input {
+
+    section object { Points, SDLCore, Game }
+
     section data {
         export int event_type = 0
         export int key = 0
@@ -216,6 +225,7 @@ object Input {
 }
 
 object Game {
+    section object { SDLCore, Text, Points, Input }
     section data {
         export int running = 1
         int delay_ms = 16
