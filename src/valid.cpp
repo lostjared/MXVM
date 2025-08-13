@@ -31,6 +31,42 @@ namespace mxvm {
         return false;
     }
 
+    void Validator::collect_objects(std::unordered_set<std::string> &objects, size_t start_index, size_t end_index) {
+        bool in_object_section = false;
+        int brace_depth = 0;
+        
+        for (size_t i = start_index; i <= end_index && i < scanner.size(); ++i) {
+            const auto &tok = scanner[i];
+            
+            if (!in_object_section) {
+                // Look for "section object {"
+                if (tok.getTokenType() == types::TokenType::TT_ID && 
+                    tok.getTokenValue() == "section" &&
+                    i + 2 < scanner.size() &&
+                    scanner[i + 1].getTokenValue() == "object" &&
+                    scanner[i + 2].getTokenValue() == "{") {
+                    in_object_section = true;
+                    brace_depth = 1;
+                    i += 2; // Skip "object" and "{"
+                    continue;
+                }
+            } else {
+                // Inside object section
+                if (tok.getTokenValue() == "{") {
+                    ++brace_depth;
+                } else if (tok.getTokenValue() == "}") {
+                    --brace_depth;
+                    if (brace_depth == 0) {
+                        in_object_section = false;
+                    }
+                } else if (tok.getTokenType() == types::TokenType::TT_ID && brace_depth == 1) {
+                    // This is an object name at the top level of the object section
+                    objects.insert(tok.getTokenValue());
+                }
+            }
+        }
+    }
+
     static const std::unordered_map<std::string, OpSpec> kOpSpecs = {
         {"mov",   {"mov",   {OpKind::Id, OpKind::Any}}},
         {"load",  {"load",  {OpKind::Id, OpKind::Id, OpKind::Any}, VArity::None, 3, 4}},
@@ -148,6 +184,7 @@ namespace mxvm {
         const std::vector<ParsedOp>& ops,
         const std::unordered_map<std::string, Variable>& vars,
         const std::unordered_map<std::string, std::string>& labels,
+        const std::unordered_set<std::string>& objects,  
         std::vector<UseVar>& usedVarsRef,
         std::vector<UseLabel>& usedLabelsRef)
     {
@@ -193,6 +230,17 @@ namespace mxvm {
                 if (p.kind == OpKind::Id && p.text.find('.') == std::string::npos) {
                     if (!vars.count(p.text)) {
                         std::string msg = "Syntax Error in '" + filename + "': Undefined variable '" + p.text + "'";
+                        if (p.at) {
+                            msg += " at line " + std::to_string(p.at->getLine());
+                        }
+                        throw mx::Exception(msg);
+                    }
+                }
+                // NEW: Validate object references
+                else if (p.kind == OpKind::Member && p.text.find('.') != std::string::npos) {
+                    std::string objectName = p.text.substr(0, p.text.find('.'));
+                    if (!objects.count(objectName)) {
+                        std::string msg = "Syntax Error in '" + filename + "': Undefined object '" + objectName + "'";
                         if (p.at) {
                             msg += " at line " + std::to_string(p.at->getLine());
                         }
@@ -261,14 +309,36 @@ namespace mxvm {
     bool Validator::validate(const std::string &name) {
         filename = name;
         scanner.scan();
-        next(); // Initialize the first token
+        next();
 
-        while (token) { // Loop until all tokens are consumed
+        while (token) {
             std::unordered_map<std::string, std::string> labels;
+            std::unordered_set<std::string> objects;
             std::vector<UseVar> usedVars;
             std::vector<UseLabel> usedLabels;
 
+            
+            size_t block_start = index - 1; 
+            size_t block_end = block_start;
+            
+            
+            int brace_count = 0;
+            bool found_opening = false;
+            for (size_t i = block_start; i < scanner.size(); ++i) {
+                if (scanner[i].getTokenValue() == "{") {
+                    found_opening = true;
+                    brace_count++;
+                } else if (scanner[i].getTokenValue() == "}") {
+                    brace_count--;
+                    if (found_opening && brace_count == 0) {
+                        block_end = i;
+                        break;
+                    }
+                }
+            }
+
             collect_labels(labels);
+            collect_objects(objects, block_start, block_end);  
 
             std::vector<std::string> lines;
             {
@@ -377,7 +447,7 @@ namespace mxvm {
             auto skipSeparators = [&]() {  };
 
             skipSeparators();
-            if (!token) break; // End of file
+            if (!token) break; 
 
             if (match("program")) {
                 next();
@@ -541,12 +611,12 @@ namespace mxvm {
 
                             if (op == "ret" || op == "done") {
                                 std::vector<ParsedOp> emptyOps;
-                                validateAgainstSpec(op, emptyOps, vars, labels, usedVars, usedLabels);
+                                validateAgainstSpec(op, emptyOps, vars, labels, objects, usedVars, usedLabels);  // Add objects
                                 continue;
                             }
 
                             auto ops = parseOperandList();
-                            validateAgainstSpec(op, ops, vars, labels, usedVars, usedLabels);
+                            validateAgainstSpec(op, ops, vars, labels, objects, usedVars, usedLabels);  // Add objects
                             continue;
                         } else {
                             throw mx::Exception("Syntax Error in file '" + filename + "': Unexpected token '" + token->getTokenValue() + "' in code section at line " + std::to_string(token->getLine()));
@@ -619,7 +689,7 @@ namespace mxvm {
     }
 
     bool Validator::next() {
-        while (index < scanner.size() &&
+        while ( index < scanner.size() &&
             scanner[index].getTokenValue() == "\n" &&
             scanner[index].getTokenType() == types::TokenType::TT_SYM) {
             index++;

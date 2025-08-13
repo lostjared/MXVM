@@ -54,6 +54,7 @@ namespace mxvm {
             const std::vector<ParsedOp>& ops,
             const std::unordered_map<std::string, Variable>& vars,
             const std::unordered_map<std::string, std::string>& labels,
+            const std::unordered_set<std::string>& objects,
             std::vector<UseVar>& usedVarsRef,
             std::vector<UseLabel>& usedLabelsRef);
 
@@ -67,6 +68,7 @@ namespace mxvm {
         bool peekIs(const types::TokenType &t);
         std::string tokenTypeToString(types::TokenType t);
         void collect_labels(std::unordered_map<std::string, std::string> &labels);
+        void collect_objects(std::unordered_set<std::string> &objects, size_t start_index, size_t end_index);
         ParsedOp parseOperand();
         std::vector<ParsedOp> parseOperandList();
     };
