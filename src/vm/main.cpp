@@ -17,7 +17,40 @@
 
 
 enum class vm_action { null_action = 0, translate , interpret, compile };
-enum class vm_target { x86_64_linux };
+enum class vm_target { x86_64_linux, x86_64_macos };
+
+std::ostream &operator<<(std::ostream &out, const vm_action &ae) {
+    switch(ae) {
+        case vm_action::null_action:
+            out << "null action";
+            break;
+        case vm_action::translate:
+            out << "translate";
+            break;
+        case vm_action::interpret:
+            out << "interpret";
+            break;
+        case vm_action::compile:
+            out << "compille";
+            break;
+        default:
+            std::cerr << "Error: ";
+            break;
+    }
+    return out;
+}
+
+std::ostream &operator<<(std::ostream &out, const vm_target &t) {
+    switch(t) {
+        case vm_target::x86_64_linux:
+            out << "linux";
+        break;
+        case vm_target::x86_64_macos:
+            out << "macos";
+        break;
+    }
+    return out; 
+}
 
 struct Args {
     std::string source_file;
@@ -31,6 +64,7 @@ struct Args {
     mxvm::Platform platform = mxvm::Platform::LINUX;
     int platform_argc = 0;
     char ** platform_argv = nullptr;
+    bool Makefile = false;
 };
 
 template<typename T>
@@ -46,6 +80,7 @@ int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Progr
 int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
 int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args);
 void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
+void createMakefile(Args *args);
 
 Args proc_args(int argc, char **argv) {
     Args args;
@@ -71,6 +106,8 @@ Args proc_args(int argc, char **argv) {
     .addOptionDoubleValue(134, "path", "module path")
     .addOptionSingleValue('I', "include path")
     .addOptionDoubleValue(137, "include", "include path")
+    .addOptionSingle('m', "gemerate Makefile")
+    .addOptionDouble(140, "makefile", "generate Makefile")
     ;
 
     if(argc == 1) {
@@ -81,6 +118,9 @@ Args proc_args(int argc, char **argv) {
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 'm':
+                case 140:
+                    args.Makefile = true;
                 case 'I':
                 case 137:
                     args.include_path = arg.arg_value;
@@ -127,12 +167,14 @@ Args proc_args(int argc, char **argv) {
                 break;
                 case 't':
                 case 129:
-                
-                if(arg.arg_value == "macos")
-                    args.platform = mxvm::Platform::DARWIN;
-                else
-                    args.platform = mxvm::Platform::LINUX;
-
+                    if(arg.arg_value == "macos") {
+                        args.platform = mxvm::Platform::DARWIN;
+                        args.target = vm_target::x86_64_macos;
+                    }
+                    else {
+                        args.platform = mxvm::Platform::LINUX;
+                        args.target = vm_target::x86_64_linux;
+                    }
                 break;
                 default:
                 case '-':
@@ -175,6 +217,10 @@ int main(int argc, char **argv) {
 }
 
 int process_arguments(Args *args) { 
+    if(args->Makefile) {
+        createMakefile(args);
+        return EXIT_SUCCESS;
+    }
     int exitCode = 0;
     if(!std::filesystem::is_regular_file(args->source_file) || !std::filesystem::exists(args->source_file)) {
         std::cerr << Col("MXVM: Error: ", mx::Color::RED) << "input file: " << args->source_file << " does not exist or is not regular file.\n";
@@ -592,4 +638,33 @@ void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program) {
         }
     }
 }
+
+void createMakefile(Args *args) {
+    std::ofstream file("Makefile");
+    if(!file.is_open())  {
+        std::cerr << Col("MXVM Error: ", mx::Color::BRIGHT_RED) << " could not open file\n";
+        exit(EXIT_FAILURE);
+    }
+    char *ldflags = getenv("LDFLAGS");
+    std::string ld_flags;
+    if(ldflags != nullptr) 
+        ld_flags = ldflags;
+    file << "LFLAGS=" << "\"" << ld_flags << "\"\n";
+    file << "all:\n";
+    file << "\tLDFLAGS=$(LFLAGS) mxvmc  " << args->source_file << " --path \"" << args->module_path <<  "\" --object-path \"" << args->object_path << "\" --action compile " << " --target " << args->target << "\n";
+    file << "run:\n";
+    file << "\tmxvmc --path " << args->module_path << " object_path " << args->object_path << " " << args->source_file << "\n";
+    file.close();
+
+}
+
+
+
+
+
+
+
+
+
+
 
