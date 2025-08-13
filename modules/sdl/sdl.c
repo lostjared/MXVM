@@ -147,14 +147,15 @@ int64_t load_texture(int64_t renderer_id, const char* file_path) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
     
     SDL_Surface* surface = SDL_LoadBMP(file_path);
-    if (!surface) return -1;
+    if (!surface) return -2;
     
     SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
     SDL_FreeSurface(surface);
-    if (!texture) return -1;
+    if (!texture) return -3;
     
     g_textures = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
     g_textures[g_texture_count] = texture;
+    
     return g_texture_count++;
 }
 
