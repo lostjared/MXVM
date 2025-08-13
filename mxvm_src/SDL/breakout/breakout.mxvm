@@ -90,6 +90,7 @@ object SDLCore {
 
 object Text {
     section module { string }
+    section object { SDLCore }
     section data {
         export int fnt = -1
         export string font_name = "font.ttf"
@@ -125,6 +126,7 @@ object GameState {
 }
 
 object Paddle {
+    section object { SDLCore, GameState }
     section data {
         export int x = 360
         export int y = 560
@@ -155,6 +157,7 @@ object Paddle {
 }
 
 object Ball {
+    section object { SDLCore, GameState, Paddle }
     section data {
         export int x = 396
         export int y = 300
@@ -177,7 +180,6 @@ object Ball {
         ret
 
     function level_up_speed:
-        # vx: add magnitude by 1, clamp to max_speed, keep sign
         mov t0, vx
         cmp t0, 0
         jl vx_neg
@@ -197,7 +199,6 @@ object Ball {
     vx_abs_has:
         cmp t0, max_speed
         jle vy_update
-        # clamp vx
         cmp vx, 0
         jl clamp_vx_neg
         mov vx, max_speed
@@ -226,7 +227,6 @@ object Ball {
     vy_abs_has:
         cmp t1, max_speed
         jle lus_ret
-        # clamp vy
         cmp vy, 0
         jl clamp_vy_neg
         mov vy, max_speed
@@ -297,6 +297,7 @@ object Ball {
 }
 
 object Bricks {
+    section object { SDLCore, GameState, Ball }
     section data {
         export int rows = 6
         export int cols = 10
@@ -331,7 +332,7 @@ object Bricks {
         mov idx, cols
         add idx, 1
         mul idx, pad
-        sub brick_w, idx                  # (screen_w - (cols+1)*pad) / cols
+        sub brick_w, idx
         div brick_w, cols
         mov start_x, pad
         ret
@@ -453,7 +454,6 @@ object Bricks {
         add by, tmp
         add by, start_y
 
-        # AABB overlap
         mov SDLCore.last_mouse_x, Ball.x
         add SDLCore.last_mouse_x, Ball.w
         mov SDLCore.last_mouse_y, bx
@@ -472,12 +472,10 @@ object Bricks {
         cmp Ball.y, SDLCore.last_mouse_y
         jge c_skip
 
-        # hit: remove brick, score++, bounce vertically
         store 0, data, idx, 1
         add GameState.score, 1
         mul Ball.vy, -1
 
-        # move ball just outside to avoid double-hit
         cmp Ball.vy, 0
         jge c_hit_adjust_up
         mov Ball.y, by
@@ -500,6 +498,7 @@ object Bricks {
 }
 
 object Input {
+    section object { SDLCore, Paddle, GameState }
     section data {
         export int event_type = 0
         export int key = 0
@@ -560,6 +559,7 @@ object Input {
 }
 
 object Game {
+    section object { SDLCore, Text, GameState, Bricks, Ball, Paddle, Input }
     section data {
         int tmp = 0
         string score_fmt = "Score: %lld   Misses: %lld/4   Level: %lld"
@@ -609,7 +609,6 @@ object Game {
         call Ball.collide_paddle
         call Bricks.collide_ball
 
-        # bricks cleared? -> level up, speed up ball, refill; keep score
         call Bricks.any_left
         cmp GameState.tmp, 1
         je skip_refill
@@ -617,10 +616,9 @@ object Game {
         call Ball.level_up_speed
         call Bricks.release
         call Bricks.allocate
-        call Ball.reset    # start each new level from center with faster speed
+        call Ball.reset
     skip_refill:
 
-        # 4 misses? -> reset grid, score, level, misses, and ball speed
         cmp GameState.misses, 4
         jl no_full_reset
         mov GameState.score, 0
