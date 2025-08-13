@@ -8,6 +8,7 @@
 #include<set>
 #include<iostream>
 #include<iomanip>
+#include<filesystem>
 
 namespace mxvm {
 
@@ -184,6 +185,11 @@ namespace mxvm {
     }
 
    void Parser::processObjectFile(const std::string &src, std::unique_ptr<Program> &program) {
+        static std::set<std::string> processing_files;
+        if (processing_files.count(src)) {
+            return; 
+        }
+        processing_files.insert(src);
         std::fstream file;
         std::string path;
         if(object_path.ends_with("/"))
@@ -198,6 +204,21 @@ namespace mxvm {
         std::ostringstream stream;
         stream << file.rdbuf();
         file.close();
+
+        std::string full_path = path + src + ".mxvm";
+
+        if (!std::filesystem::exists(full_path)) {
+            throw mx::Exception("Object file not found: " + full_path);
+        }
+
+        mxvm::Validator file_validator(stream.str());
+        try {
+            if (!file_validator.validate(full_path)) {
+                throw mx::Exception("Validation failed for: " + full_path);
+            }
+        } catch (mx::Exception &e) {
+            throw; 
+        }
 
         std::unique_ptr<Parser> parser(new Parser(stream.str()));
         parser->module_path = module_path;
@@ -239,6 +260,7 @@ namespace mxvm {
 
             program->objects.push_back(std::move(objProgram));
         }
+        processing_files.erase(src);
     }
     std::unique_ptr<SectionNode> Parser::parseSection(uint64_t& index) {
         index++; 
@@ -1249,7 +1271,7 @@ out << R"(</div>
                     out << R"(</div>
                     </div>)";
 
-                    // Show Labels section
+                    
                     out << R"(<div class="section">
                         <div class="section-header"><span class="icon">&#x1F516;</span> Labels</div>
                         <div class="section-content">)";
@@ -1275,7 +1297,6 @@ out << R"(</div>
                     out << R"(</div>
                     </div>)";
 
-                    // Show Instructions section
                     out << R"(<div class="section">
                         <div class="section-header">
                             <span class="icon">&#9881;</span>
