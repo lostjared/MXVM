@@ -83,6 +83,7 @@ object SDLCore {
 
 object Text {
     section module { string }
+    section object { SDLCore }
     section data {
         export int fnt = -1
         export string font_name = "font.ttf"
@@ -372,6 +373,9 @@ object Board {
 }
 
 object AI {
+
+    section object { Board }
+
     section data {
         int i = 0
         int best = -1
@@ -545,6 +549,9 @@ object AI {
 }
 
 object Input {
+
+    section object { SDLCore, Board, Game }
+
     section data {
         export int event_type = 0
         export int key = 0
@@ -600,6 +607,9 @@ object Input {
 }
 
 object Game {
+
+    section object { SDLCore, Text, Board }
+
     section data {
         export int running = 1
         int gx = 0
