@@ -6,7 +6,7 @@ object Game {
         int image_id = 0
         string image_path = "logo.bmp"
         string err_msg = "Error could not load: logo.bmp\n"
-        string debug_msg = "%lld\n"
+        string fdebug_msg = "%lld\n"
 
     }
     section code {
@@ -16,7 +16,6 @@ object Game {
         invoke load_texture, SDLCore.renderer_id, image_path
         return image_id
         cmp image_id, 0
-        print debug_msg  image_id
         jl error_msg
         ret
         error_msg:
@@ -31,7 +30,7 @@ object Game {
         ret
     function frame:
         call SDLCore.begin_frame
-        invoke render_texture, renderer_id, image_id, -1, -1, -1, -1, 0, 0, SDLCore.w, SDLCore.h
+        invoke render_texture, SDLCore.renderer_id, image_id, -1, -1, -1, -1, 0, 0, SDLCore.w, SDLCore.h
         call Text.draw
         call SDLCore.end_frame
         ret
