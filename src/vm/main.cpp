@@ -656,9 +656,7 @@ void createMakefile(Args *args) {
     file << "run:\n";
     file << "\tmxvmc --path \"" << args->module_path << "\" object_path \"" << args->object_path << "\" \"" << args->source_file << "\"\n";
     file.close();
-
     std::cout << Col("MXVM: ", mx::Color::BRIGHT_RED) << "Created Makefile.\n";
-
 }
 
 

@@ -11,7 +11,11 @@ int64_t fsize(FILE *fptr) {
 	return total;
 }
 
-int64_t rand_number(int64_t size) {
+int64_t seed_random() {
 	srand(time(0));
+	return 0;
+}
+
+int64_t rand_number(int64_t size) {
 	return rand()%size;
 }

@@ -7,4 +7,5 @@ module io {
     extern fwrite
     extern fseek
     extern rand_number
+    extern seed_random
 }
