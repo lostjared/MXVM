@@ -1,6 +1,6 @@
 object Input {
 
-    section object { SDLCore }
+    section object { SDLCore, Game }
 
     section data {
         export int event_type = 0
