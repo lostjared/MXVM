@@ -522,31 +522,33 @@ namespace mxvm {
             emit_load("(%rax)");
         }
     }
-    void Program::gen_store(std::ostream &out, const Instruction &i) {
+   void Program::gen_store(std::ostream &out, const Instruction &i) {
         uint64_t value = 0;
         VarType  type;
         bool is_const = false;
-      
+
+
         if (!isVariable(i.op1.op) && i.op1.type == OperandType::OP_CONSTANT) {
-            value = std::stoll(i.op1.op, nullptr, 0);            
-            type =  VarType::VAR_INTEGER;
+            value = std::stoll(i.op1.op, nullptr, 0);
+            type  = VarType::VAR_INTEGER;
             is_const = true;
         } else {
             Variable &src = getVariable(i.op1.op);
             value = src.var_value.int_value;
-            type = src.type;
+            type  = src.type;
             is_const = false;
         }
 
-        if (!isVariable(i.op2.op)) {
+
+        if (!isVariable(i.op2.op))
             throw mx::Exception("STORE destination must be a pointer variable: " + i.op2.op);
-        }
         Variable &ptrVar = getVariable(i.op2.op);
+
         size_t elemSize = 8;
         bool elemSizeKnown = true;
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
-                elemSizeKnown = false; 
+                elemSizeKnown = false;                             // dynamic element size in %rdx
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rdx", i.vop[0]);
             } else {
                 elemSize = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
@@ -555,53 +557,76 @@ namespace mxvm {
             elemSize = 8;
         }
 
+
         std::string idx_reg = "%rcx";
         if (!i.op3.op.empty()) {
             generateLoadVar(out, VarType::VAR_INTEGER, idx_reg, i.op3);
         } else {
-           throw mx::Exception("STORE resize third argument of size count");
+            throw mx::Exception("STORE requires third argument: element index");
         }
 
-        if(ptrVar.type == VarType::VAR_POINTER)
-             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-        else if(ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0)
+
+        if (ptrVar.type == VarType::VAR_POINTER)
+            out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0)
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
         else
-            throw mx::Exception ("STORE must be pointer or string buffer");
+            throw mx::Exception("STORE must target pointer or string buffer");
+
+
+        auto emit_imm_store = [&](const std::string& mem) {
+            switch (elemSize) {
+                case 1: out << "\tmovb $"  << (value & 0xFFu)         << ", " << mem << "\n"; break;
+                case 2: out << "\tmovw $"  << (value & 0xFFFFu)       << ", " << mem << "\n"; break;
+                case 4: out << "\tmovl $"  << (uint32_t)(value & 0xFFFFFFFFu) << ", " << mem << "\n"; break;
+                case 8: out << "\tmovq $"  << value                   << ", " << mem << "\n"; break;
+                default: throw mx::Exception("STORE: unsupported elemSize");
+            }
+        };
+
+
+        auto emit_rdx_store = [&](const std::string& mem) {
+            switch (elemSize) {
+                case 1: out << "\tmovb %dl, "   << mem << "\n"; break;
+                case 2: out << "\tmovw %dx, "   << mem << "\n"; break;
+                case 4: out << "\tmovl %edx, "  << mem << "\n"; break;
+                case 8: out << "\tmovq %rdx, "  << mem << "\n"; break;
+                default: throw mx::Exception("STORE: unsupported elemSize");
+            }
+        };
 
         auto emit_store = [&](const std::string& mem) {
-            if(is_const == true) {
-                if (type == VarType::VAR_BYTE || elemSize == 1) {
-                    out << "\tmovb $" << (value & 0xFF) << ", " << mem << "\n";
-                } else if (elemSize == 4) {
-                    out << "\tmovl $" << (uint32_t)(value & 0xFFFFFFFFu) << ", " << mem << "\n";
-                } else {
-                    out << "\tmovq $" << value << ", " << mem << "\n";
-                }
+            if (is_const) {
+                emit_imm_store(mem);
                 return;
             }
             if (type == VarType::VAR_INTEGER || type == VarType::VAR_POINTER || type == VarType::VAR_EXTERN) {
                 out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdx\n";
-                out << "\tmovq %rdx, " << mem << "\n";
-            } else if(type == VarType::VAR_BYTE) {
-                out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %r8\n";
-                out << "\tmovb %r8b, " << mem << "\n";
+                emit_rdx_store(mem);
+            } else if (type == VarType::VAR_BYTE) {
+                out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %rdx\n";
+                emit_rdx_store(mem);
             } else if (type == VarType::VAR_FLOAT) {
-                out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
-                out << "\tmovsd %xmm0, " << mem << "\n";
+                if (elemSize == 4) {
+                    out << "\tmovss " << getMangledName(i.op1) << "(%rip), %xmm0\n";
+                    out << "\tmovss %xmm0, " << mem << "\n";
+                } else { 
+                    out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
+                    out << "\tmovsd %xmm0, " << mem << "\n";
+                }
             } else {
                 throw mx::Exception("STORE: unsupported source type");
             }
         };
 
         if (elemSizeKnown && (elemSize == 1 || elemSize == 2 || elemSize == 4 || elemSize == 8)) {
-            int scale = (int)elemSize;
+            int scale = static_cast<int>(elemSize);
             std::string mem = "(" + std::string("%rax") + ",%rcx," + std::to_string(scale) + ")";
             emit_store(mem);
         } else {
             out << "\timulq %rdx, %rcx\n";
             out << "\taddq %rcx, %rax\n";
-           emit_store("(%rax)");
+            emit_store("(%rax)");
         }
     }
 
