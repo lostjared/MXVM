@@ -48,6 +48,6 @@ install(TARGETS mxvm_sdl mxvm_sdl_static
 
 if(WIN32)
     install(TARGETS mxvm_sdl
-        RUNTIME DESTINATION lib/modules/sdls
+        RUNTIME DESTINATION lib/modules/sdl
     )
 endif()
