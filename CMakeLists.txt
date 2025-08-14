@@ -84,6 +84,7 @@ add_library(mxvm SHARED
     src/ast.cpp
     src/valid.cpp
     src/function.cpp
+    src/html_gen.cpp
 )
 
 include(CheckLibraryExists)
@@ -129,7 +130,7 @@ add_subdirectory(modules/io)
 add_subdirectory(modules/string)
 add_compile_definitions()
 add_subdirectory(src/vm)
-
+add_subdirectory(src/html_gen)
 include(GNUInstallDirs)
 install(TARGETS mxvm
     EXPORT mxvmTargets
