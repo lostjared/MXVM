@@ -1,5 +1,19 @@
 #include"mxvm/instruct.hpp"
 
+namespace mxvm {
+    std::vector<std::string> keywords{"program", "object", "module", "data" , "code", "section" };
+
+}
+
+std::ostream &operator<<(std::ostream &out, const mxvm::Keywords &key) {
+    size_t i = static_cast<size_t>(key);
+    if(i < mxvm::keywords.size())
+        out << mxvm::keywords[i];
+    else
+        out << "Error";
+    return out;
+}
+
 std::ostream &operator<<(std::ostream &out, const enum  Inc &i) {
     size_t pos = static_cast<size_t>(i);
     if(pos  <= IncType.size())

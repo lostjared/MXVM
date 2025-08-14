@@ -526,8 +526,6 @@ namespace mxvm {
         uint64_t value = 0;
         VarType  type;
         bool is_const = false;
-
-
         if (!isVariable(i.op1.op) && i.op1.type == OperandType::OP_CONSTANT) {
             value = std::stoll(i.op1.op, nullptr, 0);
             type  = VarType::VAR_INTEGER;
@@ -538,7 +536,6 @@ namespace mxvm {
             type  = src.type;
             is_const = false;
         }
-
 
         if (!isVariable(i.op2.op))
             throw mx::Exception("STORE destination must be a pointer variable: " + i.op2.op);

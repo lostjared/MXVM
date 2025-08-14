@@ -82,6 +82,9 @@ namespace mxvm {
     };
 
     enum class VarType { VAR_NULL=0, VAR_INTEGER, VAR_FLOAT, VAR_STRING, VAR_POINTER, VAR_LABEL, VAR_ARRAY, VAR_EXTERN, VAR_BYTE };
+    enum class Keywords { KEY_PROGRAM, KEY_OBJECT, KEY_MODULE, KEY_DATA, KEY_CODE, KEY_SECTION };
+    extern std::vector<std::string> keywords;
+    //const char *keywords[] = {"program", "object", "module", "data" , "code", "section" };
 
     struct Variable_Value {
         std::string str_value;
@@ -196,4 +199,5 @@ namespace mxvm {
 
 std::ostream &operator<<(std::ostream &out, const mxvm::Instruction &inc);
 std::ostream &operator<<(std::ostream &out, const mxvm::VarType &type);
+std::ostream &operator<<(std::ostream &out, const mxvm::Keywords &key);
 #endif
