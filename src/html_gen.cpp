@@ -60,9 +60,9 @@ namespace mxvm {
 
     HTMLGen::HTMLGen(const std::string &text) : source(text) {}
 
-    void HTMLGen::output(std::ostream &out) {
+    void HTMLGen::output(std::ostream &out, std::string filename) {
         out << "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">";
-        out << "<title>MXVM Source</title>";
+        out << "<title>" << filename << " - [ MXVM Source ]</title>";
         out << "<style>";
         out << "body{background:#0b0b0b;color:#e6e6e6;margin:0;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace}";
         out << ".wrap{max-width:1200px;margin:0 auto;padding:24px}";

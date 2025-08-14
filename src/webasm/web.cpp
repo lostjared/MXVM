@@ -36,7 +36,7 @@ class MXVM_Debug {
 public:
     MXVM_Debug () {}
             
-    std::string parseToHTML(const std::string& code) {
+    std::string parseToHTML(int output_type, const std::string& code) {
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         BaseGuard guard(program.get());
         mxvm::Base::object_map.clear();
@@ -48,10 +48,14 @@ public:
         std::streambuf* old_cerr = std::cerr.rdbuf();
         std::cerr.rdbuf(html_err.rdbuf());
 
+        mxvm::Platform platform = (output_type == 0) ? mxvm::Platform::LINUX : mxvm::Platform::DARWIN;
+
         try {
             mxvm::Parser parser(code);
+            parser.platform = platform;
             parser.include_path = "include";
             parser.scan();
+            program->platform = platform;
 
             if (parser.generateProgramCode(mxvm::Mode::MODE_COMPILE, program)) {
                 std::ostringstream code_v;
@@ -59,8 +63,8 @@ public:
                 collectAndRegisterAllExterns(*program);
 
                 program->object = (program->root_name != program->name);
-                program->generateCode(program->object, code_v);
-                program->assembly_code = program->gen_optimize(code_v.str());
+                program->generateCode(platform, program->object, code_v);
+                program->assembly_code = program->gen_optimize(code_v.str(),  platform);
 
                 parser.generateDebugHTML(html, program);
             } else {

@@ -17,67 +17,51 @@ namespace mxvm {
         if (dot_pos != std::string::npos) {
             std::string sym = var;
             std::replace(sym.begin(), sym.end(), '.', '_');
-#ifdef __APPLE
-
-            if(var == "stdout" || var == "stdin" || var == "stderr")
-                return var;
-
-            return "_" + sym;
-#else
-            return sym;
-#endif
-        }
-
-
-
-        if (!isVariable(var)) return var;
-        Variable& v = getVariable(var);
-        
-        if (!v.obj_name.empty())
-#ifdef __APPLE__
-            return "_" + v.obj_name + "_" + var;
-#else
-            return v.obj_name + "_" + var;
-#endif
-        
-#ifdef __APPLE__
-        return "_" + var;
-#else
-        return var;
-#endif
-    }
-
-    std::string Program::getMangledName(const Operand &op) {
-
-        auto pos = op.op.find(".");
-        if(pos == std::string::npos) {
-            auto it = labels.find(op.op);
-            if(it != labels.end()) {
-                return name + "_" + op.op;
+            if(platform == Platform::DARWIN) {
+                    if(var == "stdout" || var == "stdin" || var == "stderr") {
+                        return var;
+                    }
+                    return "_" + sym;
+            }
+            else {
+                    return sym;
             }
         }
 
-        if(!op.object.empty()) {
-            if(!op.label.empty())
-#ifdef __APPLE__
-
-                if(op.op == "stdout" || op.op == "stderr" || op.op == "stdin")
-                    return op.op;
-
-                return "_" + op.object + "_" + op.label;
-#else
-            return op.object + "_" + op.label;
-#endif
-            
-            std::string sym = op.op;
-            std::replace(sym.begin(), sym.end(), '.', '_');
-#ifdef __APPLE__
-            return "_" + sym;
-#else
-            return sym;
-#endif
+        if (!isVariable(var)) return var;
+        Variable& v = getVariable(var);        
+        if (!v.obj_name.empty()) {
+            if(platform == Platform::DARWIN) {
+                    return "_" + v.obj_name + "_" + var;
+            }
+            else {
+                    return v.obj_name + "_" + var;
+            }
         }
-        return getMangledName(op.op);
+
+        if(platform == Platform::DARWIN) {
+                return "_" + var;
+        }
+        else {
+                return var;
+        }
+    }
+
+    std::string Program::getMangledName(const Operand &op) {
+        if (op.op.find('.') == std::string::npos) {
+            auto it = labels.find(op.op);
+            if (it != labels.end()) {
+                return name + "_" + op.op;
+            }
+        }
+        if (!op.object.empty() && !op.label.empty()) {
+            if (op.op == "stdout" || op.op == "stderr" || op.op == "stdin") {
+                return op.op;
+            }
+            std::string base = op.object + "_" + op.label;
+            return (platform == Platform::DARWIN) ? ("_" + base) : base;
+        }
+        return getMangledName(op.op); 
     }
 
     Base::Base(Base&& other) noexcept

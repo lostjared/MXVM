@@ -194,6 +194,47 @@
             text-decoration: underline;
         }
         
+        .input-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .platform-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .platform-selector label {
+            color: #e57373;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        #platformSelect {
+            background: #222;
+            border: 1px solid #b71c1c;
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: #e0e0e0;
+            font-size: 14px;
+            min-width: 150px;
+            outline: none;
+        }
+        
+        #platformSelect:focus {
+            border-color: #ff5252;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.3);
+        }
+        
+        #platformSelect option {
+            background: #222;
+            color: #e0e0e0;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -226,6 +267,15 @@
         <a href="#" class="example-link" onclick="loadExample()">Load Example</a>
       </div>
       <div class="input-content">
+        <div class="input-controls">
+          <div class="platform-selector">
+            <label for="platformSelect">🖥️ Target Platform:</label>
+            <select id="platformSelect">
+              <option value="0">Linux</option>
+              <option value="1">macOS</option>
+            </select>
+          </div>
+        </div>
         <textarea id="codeInput" placeholder="Enter your MXVM source code…"></textarea>
         <div class="button-group">
           <button class="btn" id="parseBtn" onclick="parseCode()" disabled>
@@ -250,7 +300,7 @@
       </div>
       <div id="output">
         <div class="loading">
-          Enter MXVM code above and click “Parse & Generate Debug HTML” to see the output here.
+          Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.
         </div>
       </div>
     </div>
@@ -274,8 +324,9 @@
     };
 
     function parseCode() {
-      const code    = document.getElementById('codeInput').value.trim();
-      const output  = document.getElementById('output');
+      const code     = document.getElementById('codeInput').value.trim();
+      const platform = parseInt(document.getElementById('platformSelect').value);
+      const output   = document.getElementById('output');
       const parseBtn = document.getElementById('parseBtn');
       const zipBtn   = document.getElementById('downloadZipBtn');
 
@@ -292,7 +343,7 @@
       output.innerHTML     = '<div class="loading">Parsing MXVM code…</div>';
 
       try {
-        const html = debuggerInstance.parseToHTML(code);
+        const html = debuggerInstance.parseToHTML(platform, code);
         output.innerHTML = html;
         zipBtn.disabled = false;
       } catch (err) {
@@ -411,6 +462,7 @@ object State {
 }
 
 object Board {
+  section object { State }
   section data {
     export ptr board = null
     int i = 0
@@ -435,6 +487,7 @@ object Board {
 }
 
 object Printer {
+  section object { Board }
   section data {
     string row_fmt  = "%c | %c | %c\\n"
     string sep_line = "- + - + - \\n"
@@ -466,6 +519,7 @@ object Printer {
 }
 
 object Rules {
+  section object { State, Board }
   section data {
     int a = 0
     int b = 0
@@ -482,55 +536,55 @@ object Rules {
     mov c, 2
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 3
     mov b, 4
     mov c, 5
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 6
     mov b, 7
     mov c, 8
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 0
     mov b, 3
     mov c, 6
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 1
     mov b, 4
     mov c, 7
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 2
     mov b, 5
     mov c, 8
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 0
     mov b, 4
     mov c, 8
     call check_line
     cmp State.winner, 0
-    jne done
+    jne donex
 
     mov a, 2
     mov b, 4
     mov c, 6
     call check_line
-  done:
+  donex:
     ret
 
   function check_line:
@@ -559,6 +613,7 @@ object Rules {
 }
 
 object Human {
+  section object { State, Board }
   section data {
     string prompt       = "Player %c, enter position (0-8): "
     string invalid_move = "Invalid move. That spot is taken or out of bounds.\\n"
@@ -589,6 +644,7 @@ object Human {
 }
 
 object AI {
+  section object { State, Board }
   section data {
     string ai_msg = "Computer chooses position %d\\n"
     int zdx = 0

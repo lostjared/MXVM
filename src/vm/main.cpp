@@ -658,14 +658,3 @@ void createMakefile(Args *args) {
     file.close();
     std::cout << Col("MXVM: ", mx::Color::BRIGHT_RED) << "Created Makefile.\n";
 }
-
-
-
-
-
-
-
-
-
-
-

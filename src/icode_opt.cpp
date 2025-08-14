@@ -217,7 +217,7 @@ namespace mxvm {
     static std::vector<std::string> opt_darwin_lines(const std::vector<std::string>& lines) {
         std::vector<std::string> out;
         out.reserve(lines.size());
-
+  
         std::regex re_stdin_access(R"(movq?\s+stdin\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
         std::regex re_stdout_access(R"(movq?\s+stdout\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
         std::regex re_stderr_access(R"(movq?\s+stderr\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
@@ -313,20 +313,17 @@ namespace mxvm {
         return lines;
     }
 
-    std::string Program::gen_optimize(const std::string &code, const Platform &platform) {
+    std::string Program::gen_optimize(const std::string &code, const Platform &platform_name) {
         std::vector<std::string> lines;
         {
             std::istringstream stream(code);
             std::string s;
             while (std::getline(stream, s)) lines.push_back(s);
         }
-        if (lines.empty()) return "";
-
+  
         auto core = opt_core_lines(lines);
-
-        
-        std::vector<std::string> final_lines =
-            (platform == Platform::DARWIN) ? opt_darwin_lines(core)
+           std::vector<std::string> final_lines =
+            (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
                                            : opt_linux_lines(core);
 
         return join_lines(final_lines);

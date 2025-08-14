@@ -8,7 +8,7 @@ public:
     std::string codeToHTML(const std::string &code) {
         mxvm::HTMLGen gen(code);
         std::ostringstream out;
-        gen.output(out);
+        gen.output(out, "Filename");
         return out.str();
     }
 };

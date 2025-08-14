@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
         std::cerr << "mxvm-html: could not open output file: "<< argv[2] << "\n";
     }
     std::ostringstream output;
-    gen.output(output);
+    gen.output(output, argv[1]);
     std::cout << output.str();
     ofile << output.str();
     ofile.close();

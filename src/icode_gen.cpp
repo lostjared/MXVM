@@ -944,21 +944,20 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-
-                    out << "\tmovq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovq " <<  getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovsd " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
                     count = 0;
-                    out << "\tleaq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                 break;
                 case VarType::VAR_BYTE:
                     count = 0;
-                    out << "\tmovzbq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                 break;
                 default:
                 break;
@@ -988,19 +987,19 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-                    out << "\tmovq "  << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovq "  << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 0;
                     break;
                 case VarType::VAR_BYTE:
-                    out << "\tmovzbq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovsd " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 1;
                 break;
                 case VarType::VAR_STRING:
                     count = 0;
-                    out << "\tleaq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                 break;
                 default:
                 break;
