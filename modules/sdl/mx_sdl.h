@@ -96,6 +96,13 @@ void quit_text(void);
 int64_t load_font(const char* file, int64_t ptsize);
 void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a);
 
+
+int64_t create_render_target(int64_t renderer_id, int64_t width, int64_t height);
+void set_render_target(int64_t renderer_id, int64_t target_id);    
+void destroy_render_target(int64_t target_id);
+void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width, int64_t scale_height);
+void present_stretched(int64_t renderer_id, int64_t target_id, int64_t dst_width, int64_t dst_height);
+
 #ifdef __cplusplus
 }
 #endif

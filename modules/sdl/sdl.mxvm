@@ -72,4 +72,10 @@ module sdl {
     extern quit_text
     extern load_font
     extern draw_text
+
+    extern create_render_target
+    extern set_render_target
+    extern destroy_render_target
+    extern present_scaled
+    extern present_stretched
 }

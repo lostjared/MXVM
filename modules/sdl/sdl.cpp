@@ -977,3 +977,84 @@ extern "C" void mxvm_sdl_draw_text(mxvm::Program *program, std::vector<mxvm::Ope
 
     draw_text(renderer_id, font_id, text.c_str(), x, y, r, g, b, a);
 }
+
+
+extern "C" void mxvm_sdl_create_render_target(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 3) {
+        throw mx::Exception("sdl_create_render_target requires 3 arguments (renderer_id, width, height).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t width = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t height = program->isVariable(operand[2].op) ?
+        program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+
+    int64_t result = create_render_target(renderer_id, width, height);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+
+extern "C" void mxvm_sdl_set_render_target(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_set_render_target requires 2 arguments (renderer_id, target_id).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t target_id = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+
+    set_render_target(renderer_id, target_id);
+}
+
+
+extern "C" void mxvm_sdl_destroy_render_target(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("sdl_destroy_render_target requires 1 argument (target_id).");
+    }
+
+    int64_t target_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+
+
+    destroy_render_target(target_id);
+}
+
+
+extern "C" void mxvm_sdl_present_scaled(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 4) {
+        throw mx::Exception("sdl_present_scaled requires 4 arguments (renderer_id, target_id, src_width, src_height).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t target_id = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t src_w = program->isVariable(operand[2].op) ?
+        program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    int64_t src_h = program->isVariable(operand[3].op) ?
+        program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
+
+    present_scaled(renderer_id, target_id, src_w, src_h);
+}
+
+extern "C" void mxvm_sdl_present_stretched(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 4) {
+        throw mx::Exception("sdl_present_stretched requires 4 arguments (renderer_id, target_id, dst_width, dst_height).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    int64_t target_id = program->isVariable(operand[1].op) ?
+        program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
+    int64_t dst_w = program->isVariable(operand[2].op) ?
+        program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    int64_t dst_h = program->isVariable(operand[3].op) ?
+        program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
+
+    present_stretched(renderer_id, target_id, dst_w, dst_h);
+}
