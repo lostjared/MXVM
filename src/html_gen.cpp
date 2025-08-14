@@ -23,6 +23,8 @@ namespace {
                 case '>': out += "&gt;"; break;
                 case '"': out += "&quot;"; break;
                 case '\'': out += "&#39;"; break;
+                case '\n': out += "\\n"; break;
+                case '\t': out += "\\t"; break;
                 default: out.push_back(c); break;
             }
         }
