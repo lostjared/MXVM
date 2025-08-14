@@ -14,10 +14,11 @@ program MasterPiece {
     }
 }
 
+// ...existing code...
 object SDLCore {
     section module { sdl }
     section data {
-        export string title = "MasterPiece"
+        export string title = "MasterPiece - [MXVM Edition]"
         export int x = 100
         export int y = 100
         export int w = 640
@@ -42,21 +43,31 @@ object SDLCore {
         export int last_mouse_btn = 0
         export int last_mouse_x = 0
         export int last_mouse_y = 0
+
+        # new: render target id and logical size (1440x1080)
+        export int target_id = -1
+        export int target_w = 1440
+        export int target_h = 1080
     }
     section code {
     function init:
         invoke init
-        invoke create_window, title, x, y, w, h, flags
+        invoke create_window, title, x, y, target_w, target_h, flags
         return window_id
         invoke create_renderer, window_id, -1, 0
         return renderer_id
+
+        invoke create_render_target, renderer_id, w, h
+        return target_id
+
         ret
     function begin_frame:
+        invoke set_render_target, renderer_id, target_id
         invoke set_draw_color, renderer_id, bg_r, bg_g, bg_b, 255
         invoke clear, renderer_id
         ret
     function end_frame:
-        invoke present, renderer_id
+        invoke present_scaled, renderer_id, target_id, target_w, target_h
         ret
     function poll_one_event:
         invoke poll_event
@@ -101,6 +112,11 @@ object SDLCore {
         invoke delay, 8
         ret
     function cleanup:
+        # destroy render target first if created
+        cmp target_id, -1
+        jle skip_destroy_target
+        invoke destroy_render_target, target_id
+    skip_destroy_target:
         invoke destroy_renderer, renderer_id
         invoke destroy_window, window_id
         ret
