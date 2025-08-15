@@ -22,18 +22,22 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
+    // Correct stack alignment logic for Windows x64 ABI
     size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
-        const size_t need  = 32 + spill_bytes;
-        const size_t pad   = (16 - ((x64_sp_mod16 + (need & 15)) & 15)) & 15;
-        const size_t total = need + pad;
+        // Calculate required space: 32 bytes shadow + spill
+        size_t need = 32 + spill_bytes;
+        // Calculate padding to align %rsp to 16 bytes
+        size_t pad = (16 - ((x64_sp_mod16 + need) % 16)) % 16;
+        size_t total = need + pad;
         out << "\tsub $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + total) & 15);
+        // After call, stack is aligned, so set mod16 to 0
+        x64_sp_mod16 = 0;
         return total;
     }
 
     void Program::x64_release_call_area(std::ostream &out, size_t total) {
         out << "\tadd $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (16 - (total & 15))) & 15);
+        x64_sp_mod16 = 8;
     }
 
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
