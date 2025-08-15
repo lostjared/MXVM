@@ -20,12 +20,13 @@ namespace mxvm {
     }
 
    size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
-        const size_t need  = 32 + spill_bytes;
-        const size_t pad   = (16 - ((x64_sp_mod16 + (need & 15)) & 15)) & 15;
-        const size_t total = need + pad;
-        out << "\tsub $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + total) & 15);
-        return total;
+        const size_t needed_for_call = 32 + spill_bytes;
+        const size_t current_offset = x64_sp_mod16 + needed_for_call;
+        const size_t padding = (16 - (current_offset % 16)) % 16;
+        const size_t total_sub = needed_for_call + padding;
+        out << "\tsub $" << total_sub << ", %rsp\n";
+        x64_sp_mod16 = 0;
+        return total_sub;
     }
 
     void Program::x64_direct_stack_adjust(std::ostream &out, int64_t bytes) {
