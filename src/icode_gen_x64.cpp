@@ -687,33 +687,39 @@ namespace mxvm {
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
             throw mx::Exception("GETLINE: needs string buffer");
 
-        // r8 = stdin
+        
         out << "\txor %ecx, %ecx\n";
         size_t t0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
         x64_release_call_area(out, t0);
         out << "\tmov %rax, %r8\n";
-
-        // fgets(buf, size, stdin)
+        
+        
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
         size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
         x64_release_call_area(out, total);
-
-        // strlen(buf) and strip trailing '\n'
+        static size_t over_count = 0;
+        
+        
+        out << "\ttest %rax, %rax\n";
+        out << "\tje .over" << over_count << "\n";
+        
+        
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         size_t tlen = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
         x64_release_call_area(out, tlen);
-
-        static size_t over_count = 0;
+        
         out << "\tmov %rax, %rcx\n";
-        out << "\tcmp $0, %rax\n";
+        out << "\ttest %rcx, %rcx\n";  
         out << "\tje .over" << over_count << "\n";
-        out << "\tsub $1, %rcx\n";
-        out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
-        out << "\tmovb $0, (%rdi, %rcx, 1)\n";
+        out << "\tdec %rcx\n";         
+        
+        
+        out << "\tleaq " << getMangledName(i.op1) << "(%rip), %r10\n";
+        out << "\tmovb $0, (%r10, %rcx, 1)\n";
         out << ".over" << over_count++ << ":\n";
     }
 
