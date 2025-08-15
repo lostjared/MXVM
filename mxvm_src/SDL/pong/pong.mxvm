@@ -47,7 +47,7 @@ program Pong {
     section code {
     start:
         # init SDL
-        invoke init, 0
+        invoke init
         return rax
         cmp rax, 0
         jl quit
