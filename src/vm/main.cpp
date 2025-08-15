@@ -17,7 +17,7 @@
 
 
 enum class vm_action { null_action = 0, translate , interpret, compile };
-enum class vm_target { x86_64_linux, x86_64_macos };
+enum class vm_target { x86_64_linux, x86_64_macos, x86_64_windows};
 
 std::ostream &operator<<(std::ostream &out, const vm_action &ae) {
     switch(ae) {
@@ -48,6 +48,10 @@ std::ostream &operator<<(std::ostream &out, const vm_target &t) {
         case vm_target::x86_64_macos:
             out << "macos";
         break;
+        case vm_target::x86_64_windows:
+            out << "windows";
+            break;
+        
     }
     return out; 
 }
@@ -171,9 +175,14 @@ Args proc_args(int argc, char **argv) {
                         args.platform = mxvm::Platform::DARWIN;
                         args.target = vm_target::x86_64_macos;
                     }
-                    else {
+                    else if(arg.arg_value == "linux") {
                         args.platform = mxvm::Platform::LINUX;
                         args.target = vm_target::x86_64_linux;
+                    } else if(arg.arg_value == "windows") {
+                        args.platform = mxvm::Platform::WINX64;
+                        args.target = vm_target::x86_64_windows;
+                    } else {
+                        throw mx::Exception("Error platform unsupported.\n");
                     }
                 break;
                 default:
@@ -185,6 +194,8 @@ Args proc_args(int argc, char **argv) {
     } catch(mx::ArgException<std::string> &exec) {
         std::cerr << Col("MXVM: ", mx::Color::RED) << "Command Line Argument Parsing Sytnax Error: "<< exec.text() << "\n";
         exit(EXIT_FAILURE);
+    } catch(const mx::Exception &e) {
+        std::cerr << Col("MXVM: ", mx::Color::RED) << " Exception: " << e.what() << "\n";
     }
 
     if(args.source_file.empty()) {
@@ -234,7 +245,7 @@ int process_arguments(Args *args) {
         exitCode = action_translate(args->platform, program, args);
         if(exitCode == 0) {
             if(mxvm::Program::base != nullptr && !mxvm::Program::base->root_name.empty()) {
-                if(args->platform == mxvm::Platform::LINUX) {
+                if(args->platform == mxvm::Platform::LINUX || args->platform == mxvm::Platform::WINX64) {
                     std::vector<std::string> object_files;
                     std::string assembler = "as";
                     const char *as_env = getenv("AS");

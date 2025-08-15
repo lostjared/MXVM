@@ -14,6 +14,13 @@ namespace mxvm {
 
 
     void Program::generateCode(const Platform &platform, bool obj, std::ostream &out) {
+
+        if(platform == Platform::WINX64) {
+            x64_generateCode(platform, obj, out);
+            return;
+        }
+
+
         this->add_standard();
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {

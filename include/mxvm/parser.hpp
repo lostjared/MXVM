@@ -31,7 +31,7 @@ namespace mxvm {
     extern bool html_mode;
 
     enum class Mode { MODE_INTERPRET, MODE_COMPILE };
-    enum class Platform { LINUX, DARWIN };
+    enum class Platform { LINUX, DARWIN, WINX64 };
       
     class ModuleParser;
 

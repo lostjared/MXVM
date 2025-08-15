@@ -12,6 +12,9 @@
 
 namespace mxvm {
 
+    
+    
+
     using StackValue = std::variant<int64_t, void*>;
 
     class Stack {
@@ -231,6 +234,44 @@ namespace mxvm {
         std::string gen_optimize(const std::string  &code, const Platform &platform);
         std::string optimize_darwin(const std::string &code);
         std::string optimize_core(const std::string &code);
+
+        std::string x64_getRegisterByIndex(int index, VarType type);
+        int x64_generateLoadVar(std::ostream &out, int r, const Operand &op);
+        int x64_generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);
+        void x64_generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &args);
+        void x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op);
+        void x64_generateCode(const Platform &platform, bool obj, std::ostream &out);
+        void x64_generateInstruction(std::ostream &out, const Instruction &i);
+        void x64_gen_done(std::ostream &out, const Instruction &i);
+        void x64_gen_ret(std::ostream &out, const Instruction &i);
+        void x64_gen_return(std::ostream &out, const Instruction &i);
+        void x64_gen_neg(std::ostream &out, const Instruction &i);
+        void x64_gen_invoke(std::ostream &out, const Instruction &i);
+        void x64_gen_call(std::ostream &out, const Instruction &i);
+        void x64_gen_alloc(std::ostream &out, const Instruction &i);
+        void x64_gen_free(std::ostream &out, const Instruction &i);
+        void x64_gen_load(std::ostream &out, const Instruction &i);
+        void x64_gen_store(std::ostream &out, const Instruction &i);
+        void x64_gen_to_int(std::ostream &out, const Instruction &i);
+        void x64_gen_to_float(std::ostream &out, const Instruction &i);
+        void x64_gen_div(std::ostream &out, const Instruction &i);
+        void x64_gen_mod(std::ostream &out, const Instruction &i);
+        void x64_gen_getline(std::ostream &out, const Instruction &i);
+        void x64_gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i);
+        void x64_gen_not(std::ostream &out, const Instruction &i);
+        void x64_gen_push(std::ostream &out, const Instruction &i);
+        void x64_gen_pop(std::ostream &out, const Instruction &i);
+        void x64_gen_stack_load(std::ostream &out, const Instruction &i);
+        void x64_gen_stack_store(std::ostream &out, const Instruction &i);
+        void x64_gen_stack_sub(std::ostream &out, const Instruction &i);
+        void x64_gen_print(std::ostream &out, const Instruction &i);
+        void x64_gen_jmp(std::ostream &out, const Instruction &i);
+        void x64_gen_cmp(std::ostream &out, const Instruction &i);
+        void x64_gen_mov(std::ostream &out, const Instruction &i);
+        void x64_gen_arth(std::ostream &out, std::string arth, const Instruction &i);
+        void x64_gen_exit(std::ostream &out, const Instruction &i);
+
+
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
