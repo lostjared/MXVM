@@ -138,7 +138,17 @@ namespace mxvm {
             return n;
         }
         if (match("-") && peekIs(types::TokenType::TT_NUM)) { next(); }
-        if (match(types::TokenType::TT_NUM)) { n.kind=OpKind::Num; n.text=token->getTokenValue(); n.at=token; next(); return n; }
+        if (match(types::TokenType::TT_NUM)) { 
+            std::string num_str = token->getTokenValue();
+            if (num_str.find('.') != std::string::npos) {
+                throw mx::Exception("Syntax Error in '" + filename + "': Floating point constants must be declared as variables, not used directly in instructions at line " + std::to_string(token->getLine()));
+            }
+            n.kind=OpKind::Num; 
+            n.text=token->getTokenValue(); 
+            n.at=token; 
+            next(); 
+            return n; 
+        }
         if (match(types::TokenType::TT_HEX)) { n.kind=OpKind::Hex; n.text=token->getTokenValue(); n.at=token; next(); return n; }
         if (match(types::TokenType::TT_STR)) { n.kind=OpKind::Str; n.text=token->getTokenValue(); n.at=token; next(); return n; }
         throw mx::Exception("Syntax Error in '" + filename + "': invalid operand '" + token->getTokenValue() + "' at line " + std::to_string(token->getLine()));
