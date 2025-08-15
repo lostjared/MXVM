@@ -2,8 +2,7 @@
 
 namespace mxvm {
 
-    // Tracks current (%rsp % 16) while emitting code.
-    // After function prologue (push %rbp), this should be 8.
+
     static unsigned x64_sp_mod16 = 0;
 
     std::string Program::x64_getRegisterByIndex(int index, VarType type) {
