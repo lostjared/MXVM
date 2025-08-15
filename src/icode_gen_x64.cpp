@@ -644,21 +644,27 @@ namespace mxvm {
     }
 
     void Program::x64_gen_getline(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op)) throw mx::Exception("GETLINE dest must be variable");
+        if (!isVariable(i.op1.op)) throw mx::Exception("GETLINE destination must be a variable");
         Variable &dest = getVariable(i.op1.op);
-        if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0) throw mx::Exception("GETLINE requires string buffer");
+        if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
+            throw mx::Exception("GETLINE destination must be a string buffer variable");
         static int over_count = 0;
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
-        out << "\tmovq stdin(%rip), %r8\n";
-        size_t total = 32; x64_call_frame_enter(out, total);
+        out << "\txor %ecx, %ecx\n";                   
+        size_t total = 32;
+        out << "\tsub $" << total << ", %rsp\n";
+        out << "\tcall __acrt_iob_func\n";
+        out << "\tadd $" << total << ", %rsp\n";
+        out << "\tmov %rax, %r8\n";
+        out << "\tsub $" << total << ", %rsp\n";
         out << "\tcall fgets\n";
-        x64_call_frame_leave(out, total);
+        out << "\tadd $" << total << ", %rsp\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        x64_call_frame_enter(out, total);
+        out << "\tsub $" << total << ", %rsp\n";
         out << "\tcall strlen\n";
-        x64_call_frame_leave(out, total);
-        out << "\tmovq %rax, %rcx\n";
+        out << "\tadd $" << total << ", %rsp\n";
+        out << "\tmov %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
         out << "\tsub $1, %rcx\n";
@@ -667,6 +673,7 @@ namespace mxvm {
         out << ".over" << over_count << ":\n";
         over_count++;
     }
+
 
     void Program::x64_gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
         if (i.op3.op.empty()) {
