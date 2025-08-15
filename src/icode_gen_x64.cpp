@@ -12,47 +12,32 @@ namespace mxvm {
         return "[stack]";
     }
 
-    int Program::x64_generateLoadVar(std::ostream &out, int r, const Operand &op) {
-        int count = 0;
-        if (isVariable(op.op)) {
-            if (op.type != OperandType::OP_VARIABLE) throw mx::Exception("Operand expected variable: " + op.op);
-            Variable &v = getVariable(op.op);
-            std::string reg = x64_getRegisterByIndex(r, v.type);
-            switch (v.type) {
-                case VarType::VAR_INTEGER:
-                case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq " << getMangledName(op) << "(%rip), " << reg << "\n";
-                    break;
-                case VarType::VAR_FLOAT:
-                    out << "\tmovsd " << getMangledName(op) << "(%rip), " << reg << "\n";
-                    count = 1;
-                    break;
-                case VarType::VAR_STRING:
-                    out << "\tleaq " << getMangledName(op) << "(%rip), " << reg << "\n";
-                    break;
-                case VarType::VAR_BYTE:
-                    out << "\tmovzbq " << getMangledName(op) << "(%rip), " << reg << "\n";
-                    break;
-                default: break;
-            }
-        } else {
-            if (op.type == OperandType::OP_CONSTANT) {
-                out << "\tmovq $" << op.op << ", " << x64_getRegisterByIndex(r, VarType::VAR_INTEGER) << "\n";
-            }
-        }
-        return count;
+    static inline bool is_stdio_name(const std::string &s) {
+        return s == "stdin" || s == "stdout" || s == "stderr";
+    }
+    static inline int stdio_index(const std::string &s) {
+        return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
+    }
+
+
+    void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
+        out << "\tmov $" << index << ", %ecx\n";
+        out << "\tsub $32, %rsp\n";
+        out << "\tcall __acrt_iob_func\n";
+        out << "\tadd $32, %rsp\n";
+        if (dstReg != "%rax") out << "\tmov %rax, " << dstReg << "\n";
     }
 
     int Program::x64_generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op) {
         int count = 0;
         if (isVariable(op.op)) {
-            if (op.type != OperandType::OP_VARIABLE) throw mx::Exception("Operand expected variable: " + op.op);
             Variable &v = getVariable(op.op);
-            if (v.type != type && type != VarType::VAR_INTEGER) {
-                std::ostringstream s; s << v.type << " != " << type;
-                throw mx::Exception("LoadVar type mismatch: " + op.op + " " + s.str());
+
+            if ((v.type == VarType::VAR_EXTERN || v.type == VarType::VAR_POINTER) && is_stdio_name(op.op)) {
+                x64_emit_iob_func(out, stdio_index(op.op), reg);
+                return 0;
             }
+
             switch (v.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
@@ -72,11 +57,46 @@ namespace mxvm {
                 default: break;
             }
         } else {
-            if (op.type == OperandType::OP_CONSTANT && type == VarType::VAR_INTEGER) {
+            if (op.type == OperandType::OP_CONSTANT && type == VarType::VAR_INTEGER)
                 out << "\tmovq $" << op.op << ", " << reg << "\n";
-            } else if (op.type == OperandType::OP_CONSTANT && type == VarType::VAR_FLOAT) {
+            else if (op.type == OperandType::OP_CONSTANT && type == VarType::VAR_FLOAT)
                 throw mx::Exception("Constant to float not supported");
+        }
+        return count;
+    }
+
+    int Program::x64_generateLoadVar(std::ostream &out, int r, const Operand &op) {
+        int count = 0;
+        if (isVariable(op.op)) {
+            Variable &v = getVariable(op.op);
+            std::string reg = x64_getRegisterByIndex(r, v.type);
+
+            if ((v.type == VarType::VAR_EXTERN || v.type == VarType::VAR_POINTER) && is_stdio_name(op.op)) {
+                x64_emit_iob_func(out, stdio_index(op.op), reg);
+                return 0;
             }
+
+            switch (v.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    break;
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    count = 1;
+                    break;
+                case VarType::VAR_STRING:
+                    out << "\tleaq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    break;
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq " << getMangledName(op) << "(%rip), " << reg << "\n";
+                    break;
+                default: break;
+            }
+        } else {
+            if (op.type == OperandType::OP_CONSTANT)
+                out << "\tmovq $" << op.op << ", " << x64_getRegisterByIndex(r, VarType::VAR_INTEGER) << "\n";
         }
         return count;
     }
