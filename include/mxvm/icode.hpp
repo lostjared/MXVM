@@ -235,6 +235,7 @@ namespace mxvm {
         std::string optimize_darwin(const std::string &code);
         std::string optimize_core(const std::string &code);
 
+        void x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg);
         std::string x64_getRegisterByIndex(int index, VarType type);
         int x64_generateLoadVar(std::ostream &out, int r, const Operand &op);
         int x64_generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);
