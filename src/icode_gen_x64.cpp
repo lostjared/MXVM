@@ -125,23 +125,17 @@ namespace mxvm {
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
    void Program::x64_generateFunctionCall(std::ostream &out,
-                                  const std::string &name,
-                                  std::vector<Operand> &args) {
+                               const std::string &name,
+                               std::vector<Operand> &args) {
         xmm_offset = 0;
         
-        size_t n_int = 0, n_float = 0;
-        for (size_t i = 0; i < args.size(); i++) {
-            bool isfp = isVariable(args[i].op) && getVariable(args[i].op).type == VarType::VAR_FLOAT;
-            if (isfp) n_float++; else n_int++;
-        }
-        
-        size_t reg_int = std::min(n_int, size_t(4));
-        size_t reg_float = std::min(n_float, size_t(4));
-        size_t stack_args = args.size() - reg_int - reg_float;
+        // Calculate stack arguments: anything beyond position 4 goes on stack
+        size_t stack_args = (args.size() > 4) ? args.size() - 4 : 0;
         size_t spill_bytes = stack_args * 8;
         
         auto frame = x64_reserve_call_area(out, spill_bytes);
         
+        // Place stack arguments (positions 4, 5, 6, ...)
         if (stack_args > 0) {
             for (size_t i = 4; i < args.size(); i++) {
                 const size_t off = 32 + 8 * (i - 4);
@@ -165,7 +159,8 @@ namespace mxvm {
             }
         }
         
-        static const char* GPR[4] = {"%rcx","%rdx","%r8","%r9"};
+        // Place register arguments (positions 0, 1, 2, 3)
+        static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
         
         for (size_t i = 0; i < args.size() && i < 4; i++) {
             if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
@@ -183,10 +178,10 @@ namespace mxvm {
                 x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
             }
         }
-    
-        out << "\tcall " << name << "\n";
-        x64_release_call_area(out, frame);
-    }
+
+    out << "\tcall " << name << "\n";
+    x64_release_call_area(out, frame);
+}
 
 
     void Program::x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
