@@ -39,11 +39,8 @@ namespace mxvm {
         std::regex re_cmp_zero(R"(^\s*cmp[a-z]*\s+\$0\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_mem_load_store(R"(^\s*mov[a-z]*\s+([^%][^,]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_mem_store(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([^%][^,]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        
-        
-        std::regex re_call(R"(^\s*call\s+)", std::regex::icase);
-        std::regex re_sub_rsp(R"(^\s*sub\s+\$\d+\s*,\s*%rsp)", std::regex::icase);
-        std::regex re_add_rsp(R"(^\s*add\s+\$\d+\s*,\s*%rsp)", std::regex::icase);
+        std::regex re_mov_rax_to_mem(R"(^\s*mov[a-z]*\s+%rax\s*,\s*([^%][^,]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mov_mem_to_rax(R"(^\s*mov[a-z]*\s+([^%][^,]+)\s*,\s*%rax\s*(?:[#;].*)?$)", std::regex::icase);
 
         std::vector<std::string> out;
         out.reserve(lines.size());
@@ -56,15 +53,18 @@ namespace mxvm {
 
             std::smatch m;
 
-        
-            bool in_call_region = false;
-            if (i > 0 && std::regex_search(lines[i-1], re_sub_rsp)) {
-                for (size_t j = i; j < std::min(i + 10, lines.size()); ++j) {
-                    if (std::regex_search(lines[j], re_call)) {
-                        in_call_region = true;
-                        break;
+            if (i + 1 < lines.size() && std::regex_match(lines[i], m, re_mem_store)) {
+                const std::string store_reg = trim(m[1].str());
+                const std::string store_mem = trim(m[2].str());
+                std::smatch m2;
+                if (std::regex_match(lines[i + 1], m2, re_mem_load_store)) {
+                    const std::string load_mem = trim(m2[1].str());
+                    const std::string load_reg = trim(m2[2].str());
+                    if (store_reg == load_reg && store_mem == load_mem) {
+                        out.push_back(lines[i]); 
+                        ++i;                     
+                        continue;
                     }
-                    if (std::regex_search(lines[j], re_add_rsp)) break;
                 }
             }
 
@@ -74,94 +74,106 @@ namespace mxvm {
                 continue;
             }
 
+            if (std::regex_match(lines[i], m, re_mov_mem_to_rax)) {
+                const std::string mem_loc = m[1].str();
+                if (i + 1 < lines.size()) {
+                    std::smatch m2;
+                    if (std::regex_match(lines[i + 1], m2, re_mov_rax_to_mem)) {
+                        const std::string store_mem = m2[1].str();
+                        out.push_back("\tpushq %rax");
+                        out.push_back("\tmovq " + mem_loc + ", %rax");
+                        out.push_back("\tmovq %rax, " + store_mem);
+                        out.push_back("\tpopq %rax");
+                        i++;
+                        continue;
+                    }
+                }
+            }
+
+            if (std::regex_match(lines[i], m, re_mul_pow2)) {
+                const int imm = std::stoi(m[1].str());
+                const std::string src_reg = m[2].str();
+                const std::string dst_reg = m.size() > 3 && !m[3].str().empty() ? m[3].str() : src_reg;
+                if (imm == 3 || imm == 5 || imm == 9) {
+                    if (src_reg != dst_reg) out.push_back("\tmov " + src_reg + ", " + dst_reg);
+                    if (imm == 3) {
+                        out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",2), " + dst_reg);
+                    } else if (imm == 5) {
+                        out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",4), " + dst_reg);
+                    } else {
+                        out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",8), " + dst_reg);
+                    }
+                    continue;
+                }
+            }
+
+            if (std::regex_match(lines[i], m, re_mem_load_store)) {
+                const std::string mem_loc = m[1].str();
+                const std::string reg = m[2].str();
+                if (i + 1 < lines.size()) {
+                    std::smatch m2;
+                    if (std::regex_match(lines[i + 1], m2, re_mem_store)) {
+                        const std::string store_reg = m2[1].str();
+                        const std::string store_mem = m2[2].str();
+                        if (reg == store_reg && trim(mem_loc) == trim(store_mem)) {
+                            ++i; 
+                            out.push_back(lines[i]); 
+                            continue;
+                        }
+                    }
+                }
+            }
+
             if (std::regex_match(lines[i], m, re_add_one)) {
                 const std::string reg = m[1].str();
                 out.push_back("\tinc " + reg);
                 continue;
             }
-            
             if (std::regex_match(lines[i], m, re_sub_one)) {
                 const std::string reg = m[1].str();
                 out.push_back("\tdec " + reg);
                 continue;
             }
 
-
-            if (!in_call_region) {
-
-                if (i + 1 < lines.size() && std::regex_match(lines[i], m, re_mem_store)) {
-                    const std::string store_reg = trim(m[1].str());
-                    const std::string store_mem = trim(m[2].str());
+            if (std::regex_match(lines[i], m, re_mov_imm)) {
+                const std::string imm = m[1].str();
+                const std::string reg = m[2].str();
+                if (imm == "0") {
+                    out.push_back("\txor " + reg + ", " + reg);
+                    continue;
+                }
+                if (i + 1 < lines.size()) {
                     std::smatch m2;
-                    if (std::regex_match(lines[i + 1], m2, re_mem_load_store)) {
-                        const std::string load_mem = trim(m2[1].str());
-                        const std::string load_reg = trim(m2[2].str());
-                        if (store_reg == load_reg && store_mem == load_mem) {
-                            out.push_back(lines[i]); 
-                            ++i;                     
+                    if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
+                        const std::string op_full = m2[1].str();
+                        const std::string src = m2[2].str();
+                        const std::string dst = m2[3].str();
+                        const std::string comment = m2.size() >= 5 ? m2[4].str() : "";
+                        if (src == reg && (
+                            op_full.rfind("cmp",0)==0 || op_full.rfind("add",0)==0 || op_full.rfind("sub",0)==0 ||
+                            op_full.rfind("and",0)==0 || op_full.rfind("or",0)==0  || op_full.rfind("xor",0)==0)) {
+                            out.push_back("\t" + op_full + " $" + imm + ", " + dst + comment);
+                            ++i;
                             continue;
                         }
                     }
                 }
+            }
 
-
-                if (std::regex_match(lines[i], m, re_mul_pow2)) {
-                    const int imm = std::stoi(m[1].str());
-                    const std::string src_reg = m[2].str();
-                    const std::string dst_reg = m.size() > 3 && !m[3].str().empty() ? m[3].str() : src_reg;
-                    if (imm == 3 || imm == 5 || imm == 9) {
-                        if (src_reg != dst_reg) out.push_back("\tmov " + src_reg + ", " + dst_reg);
-                        if (imm == 3) {
-                            out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",2), " + dst_reg);
-                        } else if (imm == 5) {
-                            out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",4), " + dst_reg);
-                        } else {
-                            out.push_back("\tlea (" + dst_reg + "," + dst_reg + ",8), " + dst_reg);
-                        }
-                        continue;
-                    }
-                }
-
-                if (std::regex_match(lines[i], m, re_mov_imm)) {
-                    const std::string imm = m[1].str();
-                    const std::string reg = m[2].str();
-                    if (imm == "0") {
-                        out.push_back("\txor " + reg + ", " + reg);
-                        continue;
-                    }
-                    if (i + 1 < lines.size()) {
-                        std::smatch m2;
-                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
-                            const std::string op_full = m2[1].str();
-                            const std::string src = m2[2].str();
-                            const std::string dst = m2[3].str();
-                            const std::string comment = m2.size() >= 5 ? m2[4].str() : "";
-                            if (src == reg && (
-                                op_full.rfind("cmp",0)==0 || op_full.rfind("add",0)==0 || op_full.rfind("sub",0)==0 ||
-                                op_full.rfind("and",0)==0 || op_full.rfind("or",0)==0  || op_full.rfind("xor",0)==0)) {
-                                out.push_back("\t" + op_full + " $" + imm + ", " + dst + comment);
-                                ++i;
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                if (std::regex_match(lines[i], m, re_mov_reg)) {
-                    const std::string src_reg = m[1].str();
-                    const std::string dst_reg = m[2].str();
-                    if (i + 1 < lines.size()) {
-                        std::smatch m2;
-                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
-                            const std::string op_full = m2[1].str();
-                            const std::string op_src = m2[2].str();
-                            const std::string op_dst = m2[3].str();
-                            const std::string comment = m2.size() >= 5 ? m2[4].str() : "";
-                            if (op_src == dst_reg) {
-                                out.push_back("\t" + op_full + " " + src_reg + ", " + op_dst + comment);
-                                ++i;
-                                continue;
-                            }
+            if (std::regex_match(lines[i], m, re_mov_reg)) {
+                const std::string src_reg = m[1].str();
+                const std::string dst_reg = m[2].str();
+                if (i + 1 < lines.size()) {
+                    std::smatch m2;
+                    if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
+                        const std::string op_full = m2[1].str();
+                        const std::string op_src = m2[2].str();
+                        const std::string op_dst = m2[3].str();
+                        const std::string comment = m2.size() >= 5 ? m2[4].str() : "";
+                        if (op_src == dst_reg) {
+                            out.push_back("\t" + op_full + " " + src_reg + ", " + op_dst + comment);
+                            ++i;
+                            continue;
                         }
                     }
                 }
@@ -170,6 +182,157 @@ namespace mxvm {
             out.push_back(lines[i]);
         }
 
+        return out;
+    }
+
+    static std::vector<std::string> x64_opt_core_lines(const std::vector<std::string>& lines) {
+    
+        std::regex re_mov_imm(R"(^\s*mov[a-z]*\s+\$(-?\d+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_bin_op(R"(^\s*((?:add|sub|and|or|xor|cmp)[a-z]*)\s+(\%[a-z0-9]+|\$-?[0-9]+)\s*,\s*(\%[a-z0-9]+)\s*(?:([#;].*))?$)", std::regex::icase);
+        std::regex re_mov_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_add_one(R"(^\s*add[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_sub_one(R"(^\s*sub[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mul_pow2(R"(^\s*(?:imul|mul)[a-z]*\s+\$(\d+)\s*,\s*(%[a-z0-9]+)(?:\s*,\s*(%[a-z0-9]+))?\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_cmp_zero(R"(^\s*cmp[a-z]*\s+\$0\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mem_load_store(R"(^\s*mov[a-z]*\s+([^%][^,]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mem_store(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([^%][^,]+)\s*(?:[#;].*)?$)", std::regex::icase);
+
+        
+        std::regex re_sub_rsp(R"(^\s*sub\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_add_rsp(R"(^\s*add\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
+        auto is_label = [](const std::string& line) {
+            static const std::regex re(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)");
+            return std::regex_search(line, re);
+        };
+        auto has_call_or_ret = [](const std::string& s){
+            return s.find(" call ") != std::string::npos ||
+                s.find("\tcall ") != std::string::npos ||
+                s.find(" ret") != std::string::npos ||
+                s.find("\tret") != std::string::npos;
+        };
+        auto touches_rsp = [](const std::string& s){
+            return s.find("%rsp") != std::string::npos || s.find("(%rsp") != std::string::npos;
+        };
+
+        std::vector<std::string> out;
+        out.reserve(lines.size());
+
+        
+        std::vector<int> frame_bytes;
+
+        for (size_t i = 0; i < lines.size(); ++i) {
+            const std::string line = lines[i];
+
+            if (is_label(line)) { out.push_back(line); continue; }
+
+        
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_sub_rsp)) {
+                    frame_bytes.push_back(std::stoi(m[1].str()));
+                    out.push_back(line);
+                    continue;
+                }
+            }
+
+        
+            if (!frame_bytes.empty()) {
+                out.push_back(line);
+
+                std::smatch m;
+                if (std::regex_match(line, m, re_add_rsp)) {
+                    int n = std::stoi(m[1].str());
+                    if (!frame_bytes.empty() && frame_bytes.back() == n) frame_bytes.pop_back();
+                }
+                continue; 
+            }
+
+        
+            if (has_call_or_ret(line) || touches_rsp(line)) {
+                out.push_back(line);
+                continue;
+            }
+
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_cmp_zero)) {
+                    out.push_back("\ttest " + m[1].str() + ", " + m[1].str());
+                    continue;
+                }
+            }
+
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_add_one)) { out.push_back("\tinc " + m[1].str()); continue; }
+                if (std::regex_match(line, m, re_sub_one)) { out.push_back("\tdec " + m[1].str()); continue; }
+            }
+
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mul_pow2)) {
+                    int imm = std::stoi(m[1].str());
+                    const std::string src = m[2].str();
+                    const std::string dst = (m.size() > 3 && !m[3].str().empty()) ? m[3].str() : src;
+                    if (imm == 3 || imm == 5 || imm == 9) {
+                        if (src != dst) out.push_back("\tmov " + src + ", " + dst);
+                        if (imm == 3)      out.push_back("\tlea (" + dst + "," + dst + ",2), " + dst);
+                        else if (imm == 5) out.push_back("\tlea (" + dst + "," + dst + ",4), " + dst);
+                        else               out.push_back("\tlea (" + dst + "," + dst + ",8), " + dst);
+                        continue;
+                    }
+                }
+            }
+
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mov_imm)) {
+                    const std::string imm = m[1].str();
+                    const std::string reg = m[2].str();
+                    if (imm == "0") { out.push_back("\txor " + reg + ", " + reg); continue; }
+
+                    if (i + 1 < lines.size()) {
+                        std::smatch m2;
+                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
+                            const std::string op_full = m2[1].str();
+                            const std::string src     = m2[2].str();
+                            const std::string dst     = m2[3].str();
+                            const std::string cmt     = (m2.size() >= 5) ? m2[4].str() : "";
+                            if (src == reg &&
+                                (op_full.rfind("cmp",0)==0 || op_full.rfind("add",0)==0 || op_full.rfind("sub",0)==0 ||
+                                op_full.rfind("and",0)==0 || op_full.rfind("or",0)==0  || op_full.rfind("xor",0)==0)) {
+                                out.push_back("\t" + op_full + " $" + imm + ", " + dst + cmt);
+                                ++i;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mov_reg)) {
+                    const std::string src_reg = m[1].str();
+                    const std::string dst_reg = m[2].str();
+                    if (i + 1 < lines.size()) {
+                        std::smatch m2;
+                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
+                            const std::string op_full = m2[1].str();
+                            const std::string op_src  = m2[2].str();
+                            const std::string op_dst  = m2[3].str();
+                            const std::string cmt     = (m2.size() >= 5) ? m2[4].str() : "";
+                            if (op_src == dst_reg) {
+                                out.push_back("\t" + op_full + " " + src_reg + ", " + op_dst + cmt);
+                                ++i;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            out.push_back(line);
+        }
         return out;
     }
 
@@ -308,8 +471,13 @@ namespace mxvm {
             std::string s;
             while (std::getline(stream, s)) lines.push_back(s);
         }
-  
-        auto core = opt_core_lines(lines);
+
+        std::vector<std::string> core;
+
+        if(platform == Platform::WINX64) 
+             core = x64_opt_core_lines(lines);
+        else
+             core = opt_core_lines(lines);
            std::vector<std::string> final_lines =
             (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
                                            : opt_linux_lines(core);
