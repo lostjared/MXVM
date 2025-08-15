@@ -229,6 +229,8 @@ namespace mxvm {
 
         out << ".section .text\n";
 
+        out << ".extern _acrt_iob_func\n";
+
         if (this->object) out << "\t.globl " << name << "\n";
 
         for (auto &lbl : labels)
