@@ -19,7 +19,10 @@ static int64_t g_render_target_count = 0;
 /* --- END NEW --- */
 
 int64_t init(void) {
-    return SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == 0 ? 1 : 0;
+    if (SDL_Init(SDL_INIT_VIDEO) == 0) {
+        return 1;
+    }
+    return 0;
 }
 
 void quit(void) {
