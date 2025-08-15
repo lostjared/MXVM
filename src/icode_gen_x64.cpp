@@ -227,9 +227,6 @@ namespace mxvm {
         } else {
             out << "\t.p2align 4, 0x90\n";
             out << ".globl main\n";
-    #ifndef __APPLE__
-            out << ".type main, @function\n";
-    #endif
             out << "main:\n";
         }
 
