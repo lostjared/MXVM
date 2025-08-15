@@ -132,6 +132,25 @@ namespace mxvm {
                                        std::vector<Operand> &args) {
         xmm_offset = 0;
         size_t iregs = 0, fregs = 0, stack_args = 0;
+
+        // --- BEGIN FIX ---
+        // Pre-resolve stdio handles to avoid nested stack reservations.
+        // We load them into their target registers before the main call frame is set up.
+        std::vector<bool> is_preloaded(args.size(), false);
+        size_t temp_ri = 0, temp_rf = 0;
+        for (size_t z = 0; z < args.size(); ++z) {
+            bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
+            if (isVariable(args[z].op) && is_stdio_name(args[z].op)) {
+                if ((isfp && temp_rf < 4) || (!isfp && temp_ri < 4)) {
+                    std::string reg = x64_getRegisterByIndex((int)(isfp ? temp_rf : temp_ri), isfp ? VarType::VAR_FLOAT : VarType::VAR_INTEGER);
+                    x64_emit_iob_func(out, stdio_index(args[z].op), reg);
+                    is_preloaded[z] = true;
+                }
+            }
+            if (isfp) temp_rf++; else temp_ri++;
+        }
+        // --- END FIX ---
+
         for (auto &a : args) {
             bool isfp = isVariable(a.op) && getVariable(a.op).type == VarType::VAR_FLOAT;
             if (isfp) { (fregs < 4) ? ++fregs : ++stack_args; }
@@ -143,7 +162,7 @@ namespace mxvm {
 
         if (stack_args) {
             size_t idx = args.size();
-            size_t sp_off = 32;   // shadow space
+            size_t sp_off = 32;   
             size_t ci = 0, cf = 0;
             while (idx-- > 0) {
                 bool isfp = isVariable(args[idx].op) &&
@@ -164,6 +183,11 @@ namespace mxvm {
 
         size_t ri = 0, rf = 0;
         for (size_t z = 0; z < args.size(); ++z) {
+            if (is_preloaded[z]) { 
+                bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
+                if (isfp) rf++; else ri++;
+                continue;
+            }
             bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
             if (isfp) {
                 if (rf < 4) {
