@@ -2,7 +2,6 @@
 
 namespace mxvm {
 
-
     static unsigned x64_sp_mod16 = 0;
 
     std::string Program::x64_getRegisterByIndex(int index, VarType type) {
@@ -22,29 +21,26 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
-    // Correct stack alignment logic for Windows x64 ABI
-    size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
-        // Calculate required space: 32 bytes shadow + spill
-        size_t need = 32 + spill_bytes;
-        // Calculate padding to align %rsp to 16 bytes
-        size_t pad = (16 - ((x64_sp_mod16 + need) % 16)) % 16;
-        size_t total = need + pad;
+    // -------- Aligned call-frame helpers (save/restore mod16) --------
+    std::pair<size_t, unsigned> Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+        const unsigned original_mod = x64_sp_mod16;
+        const size_t need = 32 + spill_bytes;                   // 32B shadow + spill
+        const size_t pad  = (16 - ((x64_sp_mod16 + need) & 15)) & 15;
+        const size_t total = need + pad;
         out << "\tsub $" << total << ", %rsp\n";
-        // After call, stack is aligned, so set mod16 to 0
-        x64_sp_mod16 = 0;
-        return total;
+        x64_sp_mod16 = 0;                                       // %rsp now 16B-aligned
+        return {total, original_mod};
     }
-
-    void Program::x64_release_call_area(std::ostream &out, size_t total) {
-        out << "\tadd $" << total << ", %rsp\n";
-        x64_sp_mod16 = 8;
+    void Program::x64_release_call_area(std::ostream &out, std::pair<size_t,unsigned> frame) {
+        out << "\tadd $" << frame.first << ", %rsp\n";
+        x64_sp_mod16 = frame.second;                            // restore previous mod16
     }
 
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
         out << "\tmov $" << index << ", %ecx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         if (dstReg != "%rax") out << "\tmov %rax, " << dstReg << "\n";
     }
 
@@ -124,65 +120,79 @@ namespace mxvm {
     static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
-   void Program::x64_generateFunctionCall(std::ostream &out,
-                               const std::string &name,
-                               std::vector<Operand> &args) {
+    void Program::x64_generateFunctionCall(std::ostream &out,
+                                           const std::string &name,
+                                           std::vector<Operand> &args) {
+        // Windows x64 ABI:
+        // - 32B shadow space
+        // - RCX,RDX,R8,R9 or XMM0..3 for first 4 args
+        // - Arg 5+ at [rsp+32], [rsp+40], ...
         xmm_offset = 0;
-        
-        // Calculate stack arguments: anything beyond position 4 goes on stack
-        size_t stack_args = (args.size() > 4) ? args.size() - 4 : 0;
-        size_t spill_bytes = stack_args * 8;
-        
-        auto frame = x64_reserve_call_area(out, spill_bytes);
-        
-        // Place stack arguments (positions 4, 5, 6, ...)
-        if (stack_args > 0) {
-            for (size_t i = 4; i < args.size(); i++) {
-                const size_t off = 32 + 8 * (i - 4);
-                
-                if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
-                    x64_emit_iob_func(out, stdio_index(args[i].op), "%rax");
-                    out << "\tmovq %rax, " << off << "(%rsp)\n";
-                    continue;
-                }
-                
-                VarType t = VarType::VAR_INTEGER;
-                if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
-                
-                if (t == VarType::VAR_FLOAT) {
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
-                    out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
-                } else {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
-                    out << "\tmovq %rax, " << off << "(%rsp)\n";
-                }
+        const size_t n = args.size();
+
+        // Preload stdio handles for register args into non-volatile temps (no nested reserves later).
+        static const char* TMP[4] = {"%r12","%r13","%r14","%r15"};
+        bool preloaded[4] = {false,false,false,false};
+        for (size_t i = 0; i < n && i < 4; ++i) {
+            if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
+                out << "\tmov $" << stdio_index(args[i].op) << ", %ecx\n";
+                auto t = x64_reserve_call_area(out, 0);
+                out << "\tcall __acrt_iob_func\n";
+                x64_release_call_area(out, t);
+                out << "\tmov %rax, " << TMP[i] << "\n";
+                preloaded[i] = true;
             }
         }
-        
-        // Place register arguments (positions 0, 1, 2, 3)
-        static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
-        
-        for (size_t i = 0; i < args.size() && i < 4; i++) {
+
+        // Reserve for this call: spill space for stack args (n>4)
+        const size_t stack_count = (n > 4) ? (n - 4) : 0;
+        auto frame = x64_reserve_call_area(out, stack_count * 8);
+
+        // Place stack args strictly left-to-right
+        for (size_t i = 4; i < n; ++i) {
+            const size_t off = 32 + 8 * (i - 4);
+
             if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
-                x64_emit_iob_func(out, stdio_index(args[i].op), GPR[i]);
+                // Resolve FILE* then store into the slot after nested call returns
+                out << "\tmov $" << stdio_index(args[i].op) << ", %ecx\n";
+                auto t = x64_reserve_call_area(out, 0);
+                out << "\tcall __acrt_iob_func\n";
+                x64_release_call_area(out, t);
+                out << "\tmovq %rax, " << off << "(%rsp)\n";
                 continue;
             }
-            
-            VarType t = VarType::VAR_INTEGER;
-            if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
-            
-            if (t == VarType::VAR_FLOAT) {
-                std::string xmm = "%xmm" + std::to_string(i);
+
+            VarType vt = VarType::VAR_INTEGER;
+            if (isVariable(args[i].op)) vt = getVariable(args[i].op).type;
+
+            if (vt == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
+                out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
+            } else {
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
+                out << "\tmovq %rax, " << off << "(%rsp)\n";
+            }
+        }
+
+        // Move register args into place
+        static const char* GPR[4] = {"%rcx","%rdx","%r8","%r9"};
+        for (size_t i = 0; i < n && i < 4; ++i) {
+            if (preloaded[i]) { out << "\tmov " << TMP[i] << ", " << GPR[i] << "\n"; continue; }
+
+            VarType vt = VarType::VAR_INTEGER;
+            if (isVariable(args[i].op)) vt = getVariable(args[i].op).type;
+
+            if (vt == VarType::VAR_FLOAT) {
+                std::string xmm = "%xmm" + std::to_string((int)i);
                 x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm, args[i]);
             } else {
                 x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
             }
         }
 
-    out << "\tcall " << name << "\n";
-    x64_release_call_area(out, frame);
-}
-
+        out << "\tcall " << name << "\n";
+        x64_release_call_area(out, frame);
+    }
 
     void Program::x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
         if (op.empty() || op[0].op.empty()) throw mx::Exception("invoke requires instruction name");
@@ -403,9 +413,9 @@ namespace mxvm {
 
     void Program::x64_gen_call(std::ostream &out, const Instruction &i) {
         if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall " << getMangledName(i.op1) << "\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
 
     void Program::x64_gen_alloc(std::ostream &out, const Instruction &i) {
@@ -422,9 +432,9 @@ namespace mxvm {
             else                      out << "\tmovq $" << i.op2.op << ", %rdx\n";
         } else out << "\tmovq $8, %rdx\n";
 
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall calloc\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
 
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
         getVariable(i.op1.op).var_value.owns = true;
@@ -436,9 +446,9 @@ namespace mxvm {
         if (v.type != VarType::VAR_POINTER) throw mx::Exception("FREE argument must be a pointer");
 
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall free\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
 
     void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
@@ -567,17 +577,17 @@ namespace mxvm {
 
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall atol\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
     void Program::x64_gen_to_float(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall atof\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
@@ -687,30 +697,26 @@ namespace mxvm {
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
             throw mx::Exception("GETLINE: needs string buffer");
 
-        // r8 = stdin
         out << "\txor %ecx, %ecx\n";
-        size_t t0 = x64_reserve_call_area(out, 0);
+        auto frame0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        x64_release_call_area(out, t0);
+        x64_release_call_area(out, frame0);
         out << "\tmov %rax, %r8\n";
 
-        // fgets(buf, size, stdin)
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame1 = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame1);
 
-        // if (fgets == NULL) skip trimming
         static size_t over_count = 0;
         out << "\ttest %rax, %rax\n";
         out << "\tje .over" << over_count << "\n";
 
-        // strlen(buf) and strip trailing '\n'
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        size_t tlen = x64_reserve_call_area(out, 0);
+        auto frame2 = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
-        x64_release_call_area(out, tlen);
+        x64_release_call_area(out, frame2);
 
         out << "\tmov %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
@@ -801,7 +807,6 @@ namespace mxvm {
         }
         out << "\tshl $3, %rcx\n";
         out << "\taddq %rcx, %rsp\n";
-        // Update alignment tracker when the count is a known constant.
         if (!i.op1.op.empty() && !isVariable(i.op1.op)) {
             unsigned long long n = std::stoull(i.op1.op, nullptr, 0);
             if (n & 1ull) x64_sp_mod16 ^= 8;
