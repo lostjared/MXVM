@@ -123,79 +123,45 @@ namespace mxvm {
     void Program::x64_generateFunctionCall(std::ostream &out,
                                        const std::string &name,
                                        std::vector<Operand> &args) {
-        xmm_offset = 0;
-        size_t iregs = 0, fregs = 0, stack_args = 0;
-        std::vector<bool> is_preloaded(args.size(), false);
-        size_t temp_ri = 0, temp_rf = 0;
-        for (size_t z = 0; z < args.size(); ++z) {
-            bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
-            if (isVariable(args[z].op) && is_stdio_name(args[z].op)) {
-                if ((isfp && temp_rf < 4) || (!isfp && temp_ri < 4)) {
-                    std::string reg = x64_getRegisterByIndex((int)(isfp ? temp_rf : temp_ri),
-                                                             isfp ? VarType::VAR_FLOAT : VarType::VAR_INTEGER);
-                    x64_emit_iob_func(out, stdio_index(args[z].op), reg);
-                    is_preloaded[z] = true;
-                }
-            }
-            if (isfp) temp_rf++; else temp_ri++;
-        }
+        const size_t n = args.size();
+        const size_t stack_args = (n > 4) ? (n - 4) : 0;
+        auto frame = x64_reserve_call_area(out, stack_args * 8);
+        for (size_t i = 4; i < n; ++i) {
+            const size_t off = 32 + 8 * (i - 4);
+            const bool isfp = isVariable(args[i].op) &&
+                            (getVariable(args[i].op).type == VarType::VAR_FLOAT);
 
-        for (auto &a : args) {
-            bool isfp = isVariable(a.op) && getVariable(a.op).type == VarType::VAR_FLOAT;
-            if (isfp) { (fregs < 4) ? ++fregs : ++stack_args; }
-            else      { (iregs < 4) ? ++iregs : ++stack_args; }
-        }
-
-        const size_t spill_bytes = stack_args * 8;
-        size_t total = x64_reserve_call_area(out, spill_bytes);
-
-        if (stack_args) {
-            size_t idx = args.size();
-            size_t sp_off = 32;   // shadow space
-            size_t ci = 0, cf = 0;
-            while (idx-- > 0) {
-                bool isfp = isVariable(args[idx].op) &&
-                            getVariable(args[idx].op).type == VarType::VAR_FLOAT;
-                if (isfp) {
-                    if (cf < 4) { ++cf; continue; }
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[idx]);
-                    out << "\tmovsd %xmm0, " << sp_off << "(%rsp)\n";
-                    sp_off += 8;
-                } else {
-                    if (ci < 4) { ++ci; continue; }
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
-                    out << "\tmovq %rax, " << sp_off << "(%rsp)\n";
-                    sp_off += 8;
-                }
-            }
-        }
-
-        size_t ri = 0, rf = 0;
-        for (size_t z = 0; z < args.size(); ++z) {
-            if (is_preloaded[z]) {
-                bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
-                if (isfp) rf++; else ri++;
-                continue;
-            }
-            bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
             if (isfp) {
-                if (rf < 4) {
-                    std::string reg = x64_getRegisterByIndex((int)rf, VarType::VAR_FLOAT);
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, reg, args[z]);
-                    ++rf;
-                }
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
+                out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
             } else {
-                if (ri < 4) {
-                    std::string reg = x64_getRegisterByIndex((int)ri, VarType::VAR_INTEGER);
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, reg, args[z]);
-                    ++ri;
-                }
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
+                out << "\tmovq %rax, " << off << "(%rsp)\n";
             }
         }
 
+        for (size_t i = 0; i < std::min<size_t>(4, n); ++i) {
+            const bool isfp = isVariable(args[i].op) &&
+                            (getVariable(args[i].op).type == VarType::VAR_FLOAT);
+
+            if (isfp) {
+                const char* xmm =
+                    (i == 0) ? "%xmm0" :
+                    (i == 1) ? "%xmm1" :
+                    (i == 2) ? "%xmm2" : "%xmm3";
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm, args[i]);
+            } else {
+                const char* gpr =
+                    (i == 0) ? "%rcx" :
+                    (i == 1) ? "%rdx" :
+                    (i == 2) ? "%r8"  : "%r9";
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, gpr, args[i]);
+            }
+        }
         out << "\tcall " << name << "\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
+
 
     void Program::x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
         if (op.empty() || op[0].op.empty()) throw mx::Exception("invoke requires instruction name");
