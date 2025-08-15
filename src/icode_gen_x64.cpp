@@ -120,17 +120,33 @@ namespace mxvm {
     static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
-    void Program::x64_generateFunctionCall(std::ostream &out,
-                                        const std::string &name,
-                                        std::vector<Operand> &args) {
+   void Program::x64_generateFunctionCall(std::ostream &out,
+                                       const std::string &name,
+                                       std::vector<Operand> &args) {
+        xmm_offset = 0;
+
         const size_t n = args.size();
-        const size_t stack_args = (n > 4) ? (n - 4) : 0;
-        auto frame = x64_reserve_call_area(out, stack_args * 8);
+        const size_t stack_count = (n > 4) ? (n - 4) : 0;
+        const size_t spill_bytes = stack_count * 8;
+
+        auto frame = x64_reserve_call_area(out, spill_bytes);
+
+     
         for (size_t i = 4; i < n; ++i) {
             const size_t off = 32 + 8 * (i - 4);
-            const bool isfp = isVariable(args[i].op) &&
-                            (getVariable(args[i].op).type == VarType::VAR_FLOAT);
-            if (isfp) {
+
+     
+            if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
+                x64_emit_iob_func(out, stdio_index(args[i].op), "%rax");
+                out << "\tmovq %rax, " << off << "(%rsp)\n";
+                continue;
+            }
+
+     
+            VarType t = VarType::VAR_INTEGER;
+            if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
+
+            if (t == VarType::VAR_FLOAT) {
                 x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
                 out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
             } else {
@@ -139,35 +155,29 @@ namespace mxvm {
             }
         }
 
-        const char* gpr_of_slot[4]  = {"%rcx","%rdx","%r8","%r9"};
-        const char* xmm_of_slot[4]  = {"%xmm0","%xmm1","%xmm2","%xmm3"};
+     
+        static const char* GPR[4] = {"%rcx","%rdx","%r8","%r9"};
 
-        const size_t reg_n = std::min<size_t>(4, n);
-        for (size_t i = 0; i < reg_n; ++i) {
-            const bool isfp = isVariable(args[i].op) &&
-                            (getVariable(args[i].op).type == VarType::VAR_FLOAT);
+        for (size_t i = 0; i < n && i < 4; ++i) {
+     
+            if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
+                x64_emit_iob_func(out, stdio_index(args[i].op), GPR[i]);
+                continue;
+            }
 
-            if (isfp) {
-                x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm_of_slot[i], args[i]);
+            VarType t = VarType::VAR_INTEGER;
+            if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
+
+            if (t == VarType::VAR_FLOAT) {
+     
+                std::string xmm = "%xmm" + std::to_string((int)i);
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm, args[i]);
             } else {
-                x64_generateLoadVar(out, VarType::VAR_INTEGER, gpr_of_slot[i], args[i]);
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
             }
         }
 
-        for (size_t i = 0; i < reg_n; ++i) {
-            const size_t off = 8 * i;
-            const bool isfp = isVariable(args[i].op) &&
-                            (getVariable(args[i].op).type == VarType::VAR_FLOAT);
-
-            if (isfp) {
-                const char* xmm = xmm_of_slot[i];
-                out << "\tmovsd " << xmm << ", " << off << "(%rsp)\n";
-            } else {
-                const char* gpr = gpr_of_slot[i];
-                out << "\tmovq " << gpr << ", " << off << "(%rsp)\n";
-            }
-        }
-
+     
         out << "\tcall " << name << "\n";
         x64_release_call_area(out, frame);
     }
