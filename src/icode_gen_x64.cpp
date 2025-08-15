@@ -2,10 +2,6 @@
 
 namespace mxvm {
 
-    // Tracks current (%rsp % 16) while emitting code.
-    // After function prologue (push %rbp), this should be 8.
-    static unsigned x64_sp_mod16 = 0;
-
     std::string Program::x64_getRegisterByIndex(int index, VarType type) {
         if (type == VarType::VAR_FLOAT) {
             if (index < 4) return "%xmm" + std::to_string(index);
@@ -23,11 +19,8 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
-    // Reserve Win64 call area: 32-byte shadow + spills, plus padding so
-    // (%rsp % 16) == 0 at the moment of 'call'.
-    size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+   size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
         const size_t need  = 32 + spill_bytes;
-        // Pad so: (x64_sp_mod16 + need + pad) % 16 == 0
         const size_t pad   = (16 - ((x64_sp_mod16 + (need & 15)) & 15)) & 15;
         const size_t total = need + pad;
         out << "\tsub $" << total << ", %rsp\n";
@@ -35,9 +28,18 @@ namespace mxvm {
         return total;
     }
 
-    void Program::x64_release_call_area(std::ostream &out, size_t total) {
+    void Program::x64_direct_stack_adjust(std::ostream &out, int64_t bytes) {
+        if (bytes > 0) {
+            out << "\tsub $" << bytes << ", %rsp\n";
+            x64_sp_mod16 = (unsigned)((x64_sp_mod16 + bytes) & 15);
+        } else if (bytes < 0) {
+            out << "\tadd $" << -bytes << ", %rsp\n";
+            x64_sp_mod16 = (unsigned)((x64_sp_mod16 + bytes) & 15); // bytes is negative
+        }
+    }
+   void Program::x64_release_call_area(std::ostream &out, size_t total) {
         out << "\tadd $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (16 - (total & 15))) & 15);
+        x64_sp_mod16 = (unsigned)((x64_sp_mod16 - total) & 15);
     }
 
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
@@ -399,9 +401,8 @@ namespace mxvm {
         for (const auto &vx : i.vop) if (!vx.op.empty()) op.push_back(vx);
         x64_generateInvokeCall(out, op);
     }
-
     void Program::x64_gen_call(std::ostream &out, const Instruction &i) {
-        if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");
+        if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");   
         size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall " << getMangledName(i.op1) << "\n";
         x64_release_call_area(out, total);
