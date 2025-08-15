@@ -334,6 +334,8 @@ namespace mxvm {
         Operand result;
         Program *parent = nullptr;
         Platform platform;
+        size_t x64_reserve_call_area(std::ostream &out, size_t spill_bytes);
+        void   x64_release_call_area(std::ostream &out, size_t total);
     };
 
     void except_assert(std::string reason, bool value);

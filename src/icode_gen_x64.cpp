@@ -2,6 +2,10 @@
 
 namespace mxvm {
 
+    // Tracks current (%rsp % 16) while emitting code.
+    // After function prologue (push %rbp), this should be 8.
+    static unsigned x64_sp_mod16 = 0;
+
     std::string Program::x64_getRegisterByIndex(int index, VarType type) {
         if (type == VarType::VAR_FLOAT) {
             if (index < 4) return "%xmm" + std::to_string(index);
@@ -19,18 +23,22 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
-
-    static inline size_t x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
-        size_t total = 32 + spill_bytes;
-        if ((total % 16) == 0) total += 8;   
+    // Reserve Win64 call area: 32-byte shadow + spills, plus padding so
+    // (%rsp % 16) == 0 at the moment of 'call'.
+    size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+        const size_t need  = 32 + spill_bytes;
+        // Pad so: (x64_sp_mod16 + need + pad) % 16 == 0
+        const size_t pad   = (16 - ((x64_sp_mod16 + (need & 15)) & 15)) & 15;
+        const size_t total = need + pad;
         out << "\tsub $" << total << ", %rsp\n";
+        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + total) & 15);
         return total;
     }
 
-    static inline void x64_release_call_area(std::ostream &out, size_t total) {
+    void Program::x64_release_call_area(std::ostream &out, size_t total) {
         out << "\tadd $" << total << ", %rsp\n";
+        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (16 - (total & 15))) & 15);
     }
-
 
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
         out << "\tmov $" << index << ", %ecx\n";
@@ -113,6 +121,7 @@ namespace mxvm {
         return count;
     }
 
+    // (Kept for completeness; unused now)
     static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
@@ -132,7 +141,7 @@ namespace mxvm {
 
         if (stack_args) {
             size_t idx = args.size();
-            size_t sp_off = 32;   
+            size_t sp_off = 32;   // shadow space
             size_t ci = 0, cf = 0;
             while (idx-- > 0) {
                 bool isfp = isVariable(args[idx].op) &&
@@ -241,7 +250,7 @@ namespace mxvm {
 
         out << ".section .text\n";
 
-        out << ".extern __acrt_iob_func\n";
+        out << "\t.extern __acrt_iob_func\n";
 
         if (this->object) out << "\t.globl " << name << "\n";
 
@@ -266,6 +275,7 @@ namespace mxvm {
 
         out << "\tpush %rbp\n";
         out << "\tmov %rsp, %rbp\n";
+        x64_sp_mod16 = 8; // prologue consumed 8 bytes
 
         bool done_found = false;
 
@@ -277,6 +287,7 @@ namespace mxvm {
                     out << name + "_" + l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
+                    x64_sp_mod16 = 8; // new prologue
                     break;
                 }
             }
@@ -350,6 +361,7 @@ namespace mxvm {
         out << "\txor %eax, %eax\n";
         out << "\tleave\n";
         out << "\tret\n";
+        // After 'leave', we conceptually exit; no need to update x64_sp_mod16.
     }
 
     void Program::x64_gen_ret(std::ostream &out, const Instruction&) {
@@ -403,16 +415,11 @@ namespace mxvm {
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
             else                      out << "\tmovq $" << i.op3.op << ", %rcx\n";
-        } else {
-            out << "\tmovq $1, %rcx\n";
-        }
-
+        } else out << "\tmovq $1, %rcx\n";
         if (!i.op2.op.empty()) {
             if (isVariable(i.op2.op)) out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rdx\n";
             else                      out << "\tmovq $" << i.op2.op << ", %rdx\n";
-        } else {
-            out << "\tmovq $8, %rdx\n";
-        }
+        } else out << "\tmovq $8, %rdx\n";
 
         size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall calloc\n";
@@ -565,7 +572,6 @@ namespace mxvm {
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
-
     void Program::x64_gen_to_float(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         size_t total = x64_reserve_call_area(out, 0);
@@ -674,29 +680,32 @@ namespace mxvm {
         }
     }
 
-  void Program::x64_gen_getline(std::ostream &out, const Instruction &i) {
+    void Program::x64_gen_getline(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) throw mx::Exception("GETLINE: dest must be var");
         Variable &dest = getVariable(i.op1.op);
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
             throw mx::Exception("GETLINE: needs string buffer");
 
+        // r8 = stdin
         out << "\txor %ecx, %ecx\n";
         size_t t0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
         x64_release_call_area(out, t0);
         out << "\tmov %rax, %r8\n";
 
+        // fgets(buf, size, stdin)
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
-
         size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
         x64_release_call_area(out, total);
 
+        // strlen(buf) and strip trailing '\n'
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         size_t tlen = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
         x64_release_call_area(out, tlen);
+
         static size_t over_count = 0;
         out << "\tmov %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
@@ -706,7 +715,6 @@ namespace mxvm {
         out << "\tmovb $0, (%rdi, %rcx, 1)\n";
         out << ".over" << over_count++ << ":\n";
     }
-
 
     void Program::x64_gen_bitop(std::ostream &out, const std::string &opc, const Instruction &i) {
         if (i.op3.op.empty()) {
@@ -750,14 +758,21 @@ namespace mxvm {
             if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
                 out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
+                x64_sp_mod16 ^= 8;
             } else if (v.type == VarType::VAR_STRING) {
                 out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
-            } else throw mx::Exception("PUSH supports int/pointer/string");
+                x64_sp_mod16 ^= 8;
+            } else {
+                throw mx::Exception("PUSH supports int/pointer/string");
+            }
         } else if (i.op1.type == OperandType::OP_CONSTANT) {
             out << "\tmovq $" << i.op1.op << ", %rax\n";
             out << "\tpushq %rax\n";
-        } else throw mx::Exception("PUSH requires var or const");
+            x64_sp_mod16 ^= 8;
+        } else {
+            throw mx::Exception("PUSH requires var or const");
+        }
     }
 
     void Program::x64_gen_pop(std::ostream &out, const Instruction &i) {
@@ -765,8 +780,27 @@ namespace mxvm {
         Variable &v = getVariable(i.op1.op);
         if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
             out << "\tpopq %rax\n";
+            x64_sp_mod16 ^= 8;
             out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-        } else throw mx::Exception("POP supports int/pointer");
+        } else {
+            throw mx::Exception("POP supports int/pointer");
+        }
+    }
+
+    void Program::x64_gen_stack_sub(std::ostream &out, const Instruction &i) {
+        if (!i.op1.op.empty()) {
+            if (isVariable(i.op1.op))      out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
+            else /* constant */            out << "\tmovq $" << i.op1.op << ", %rcx\n";
+        } else {
+            out << "\tmovq $1, %rcx\n";
+        }
+        out << "\tshl $3, %rcx\n";
+        out << "\taddq %rcx, %rsp\n";
+        // Update alignment tracker when the count is a known constant.
+        if (!i.op1.op.empty() && !isVariable(i.op1.op)) {
+            unsigned long long n = std::stoull(i.op1.op, nullptr, 0);
+            if (n & 1ull) x64_sp_mod16 ^= 8;
+        }
     }
 
     void Program::x64_gen_stack_load(std::ostream &out, const Instruction &i) {
@@ -785,15 +819,6 @@ namespace mxvm {
         x64_generateLoadVar(out, dest.type, "%rax", i.op2);
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq %rcx, (%rsp, %rax, 8)\n";
-    }
-
-    void Program::x64_gen_stack_sub(std::ostream &out, const Instruction &i) {
-        if (!i.op1.op.empty()) {
-            if (isVariable(i.op1.op)) out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-            else out << "\tmovq $" << i.op1.op << ", %rcx\n";
-        } else out << "\tmovq $1, %rcx\n";
-        out << "\tshl $3, %rcx\n";
-        out << "\taddq %rcx, %rsp\n";
     }
 
     void Program::x64_gen_print(std::ostream &out, const Instruction &i) {
