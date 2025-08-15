@@ -20,11 +20,23 @@ namespace mxvm {
     }
 
 
+    static inline size_t x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+        size_t total = 32 + spill_bytes;
+        if ((total % 16) == 0) total += 8;   
+        out << "\tsub $" << total << ", %rsp\n";
+        return total;
+    }
+
+    static inline void x64_release_call_area(std::ostream &out, size_t total) {
+        out << "\tadd $" << total << ", %rsp\n";
+    }
+
+
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
         out << "\tmov $" << index << ", %ecx\n";
-        out << "\tsub $32, %rsp\n";
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        out << "\tadd $32, %rsp\n";
+        x64_release_call_area(out, total);
         if (dstReg != "%rax") out << "\tmov %rax, " << dstReg << "\n";
     }
 
@@ -104,34 +116,34 @@ namespace mxvm {
     static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
-    void Program::x64_generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &args) {
+    void Program::x64_generateFunctionCall(std::ostream &out,
+                                       const std::string &name,
+                                       std::vector<Operand> &args) {
         xmm_offset = 0;
         size_t iregs = 0, fregs = 0, stack_args = 0;
         for (auto &a : args) {
-            bool fp = isVariable(a.op) && getVariable(a.op).type == VarType::VAR_FLOAT;
-            if (fp) { if (fregs < 4) fregs++; else stack_args++; }
-            else { if (iregs < 4) iregs++; else stack_args++; }
+            bool isfp = isVariable(a.op) && getVariable(a.op).type == VarType::VAR_FLOAT;
+            if (isfp) { (fregs < 4) ? ++fregs : ++stack_args; }
+            else      { (iregs < 4) ? ++iregs : ++stack_args; }
         }
-        size_t shadow = 32;
-        size_t spill = stack_args * 8;
-        size_t total = shadow + spill;
-        if ((total % 16) != 0) total += 8;
 
-        x64_call_frame_enter(out, total);
+        const size_t spill_bytes = stack_args * 8;
+        size_t total = x64_reserve_call_area(out, spill_bytes);
 
         if (stack_args) {
             size_t idx = args.size();
-            size_t sp_off = shadow;
+            size_t sp_off = 32;   
             size_t ci = 0, cf = 0;
             while (idx-- > 0) {
-                bool fp = isVariable(args[idx].op) && getVariable(args[idx].op).type == VarType::VAR_FLOAT;
-                if (fp) {
-                    if (cf < 4) { cf++; continue; }
+                bool isfp = isVariable(args[idx].op) &&
+                            getVariable(args[idx].op).type == VarType::VAR_FLOAT;
+                if (isfp) {
+                    if (cf < 4) { ++cf; continue; }
                     x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[idx]);
                     out << "\tmovsd %xmm0, " << sp_off << "(%rsp)\n";
                     sp_off += 8;
                 } else {
-                    if (ci < 4) { ci++; continue; }
+                    if (ci < 4) { ++ci; continue; }
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
                     out << "\tmovq %rax, " << sp_off << "(%rsp)\n";
                     sp_off += 8;
@@ -141,24 +153,24 @@ namespace mxvm {
 
         size_t ri = 0, rf = 0;
         for (size_t z = 0; z < args.size(); ++z) {
-            bool fp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
-            if (fp) {
+            bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
+            if (isfp) {
                 if (rf < 4) {
                     std::string reg = x64_getRegisterByIndex((int)rf, VarType::VAR_FLOAT);
                     x64_generateLoadVar(out, VarType::VAR_FLOAT, reg, args[z]);
-                    rf++;
+                    ++rf;
                 }
             } else {
                 if (ri < 4) {
                     std::string reg = x64_getRegisterByIndex((int)ri, VarType::VAR_INTEGER);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, reg, args[z]);
-                    ri++;
+                    ++ri;
                 }
             }
         }
 
         out << "\tcall " << name << "\n";
-        x64_call_frame_leave(out, total);
+        x64_release_call_area(out, total);
     }
 
     void Program::x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
@@ -229,7 +241,7 @@ namespace mxvm {
 
         out << ".section .text\n";
 
-        out << ".extern _acrt_iob_func\n";
+        out << ".extern __acrt_iob_func\n";
 
         if (this->object) out << "\t.globl " << name << "\n";
 
@@ -377,44 +389,48 @@ namespace mxvm {
     }
 
     void Program::x64_gen_call(std::ostream &out, const Instruction &i) {
-        if (isFunctionValid(i.op1.op)) {
-            size_t total = 32;
-            x64_call_frame_enter(out, total);
-            out << "\tcall " << getMangledName(i.op1) << "\n";
-            x64_call_frame_leave(out, total);
-        } else throw mx::Exception("Function " + i.op1.op + " not found!");
+        if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");
+        size_t total = x64_reserve_call_area(out, 0);
+        out << "\tcall " << getMangledName(i.op1) << "\n";
+        x64_release_call_area(out, total);
     }
 
     void Program::x64_gen_alloc(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) throw mx::Exception("ALLOC destination must be a variable");
         Variable &v = getVariable(i.op1.op);
         if (v.type != VarType::VAR_POINTER) throw mx::Exception("ALLOC destination must be a pointer");
+
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
-            else out << "\tmovq $" << i.op3.op << ", %rcx\n";
-        } else out << "\tmovq $1, %rcx\n";
+            else                      out << "\tmovq $" << i.op3.op << ", %rcx\n";
+        } else {
+            out << "\tmovq $1, %rcx\n";
+        }
+
         if (!i.op2.op.empty()) {
             if (isVariable(i.op2.op)) out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rdx\n";
-            else out << "\tmovq $" << i.op2.op << ", %rdx\n";
-        } else out << "\tmovq $8, %rdx\n";
-        size_t total = 32;
-        x64_call_frame_enter(out, total);
+            else                      out << "\tmovq $" << i.op2.op << ", %rdx\n";
+        } else {
+            out << "\tmovq $8, %rdx\n";
+        }
+
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall calloc\n";
-        x64_call_frame_leave(out, total);
+        x64_release_call_area(out, total);
+
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-        Variable &var = getVariable(i.op1.op);
-        var.var_value.owns = true;
+        getVariable(i.op1.op).var_value.owns = true;
     }
 
     void Program::x64_gen_free(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) throw mx::Exception("FREE argument must be a variable");
         Variable &v = getVariable(i.op1.op);
         if (v.type != VarType::VAR_POINTER) throw mx::Exception("FREE argument must be a pointer");
+
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        size_t total = 32;
-        x64_call_frame_enter(out, total);
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall free\n";
-        x64_call_frame_leave(out, total);
+        x64_release_call_area(out, total);
     }
 
     void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
@@ -542,28 +558,19 @@ namespace mxvm {
     }
 
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) throw mx::Exception("to_int requires two variables");
-        Variable &dest = getVariable(i.op1.op);
-        Variable &src  = getVariable(i.op2.op);
-        if (dest.type != VarType::VAR_INTEGER) throw mx::Exception("to_int: first must be int");
-        if (src.type != VarType::VAR_STRING)   throw mx::Exception("to_int: second must be string");
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = 32; x64_call_frame_enter(out, total);
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall atol\n";
-        x64_call_frame_leave(out, total);
+        x64_release_call_area(out, total);
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
+
     void Program::x64_gen_to_float(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) throw mx::Exception("to_float requires two variables");
-        Variable &dest = getVariable(i.op1.op);
-        Variable &src  = getVariable(i.op2.op);
-        if (dest.type != VarType::VAR_FLOAT)  throw mx::Exception("to_float: first must be float");
-        if (src.type != VarType::VAR_STRING)  throw mx::Exception("to_float: second must be string");
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = 32; x64_call_frame_enter(out, total);
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall atof\n";
-        x64_call_frame_leave(out, total);
+        x64_release_call_area(out, total);
         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
@@ -667,48 +674,37 @@ namespace mxvm {
         }
     }
 
-   void Program::x64_gen_getline(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op))
-            throw mx::Exception("GETLINE destination must be a variable");
-
+  void Program::x64_gen_getline(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) throw mx::Exception("GETLINE: dest must be var");
         Variable &dest = getVariable(i.op1.op);
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
-            throw mx::Exception("GETLINE destination must be a string buffer variable");
-
-        static int over_count = 0;
+            throw mx::Exception("GETLINE: needs string buffer");
 
         out << "\txor %ecx, %ecx\n";
-        out << "\tsub $32, %rsp\n";
-        out << "\tcall fflush\n";
-        out << "\tadd $32, %rsp\n";
-
-        out << "\txor %ecx, %ecx\n";
-        out << "\tsub $32, %rsp\n";
+        size_t t0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        out << "\tadd $32, %rsp\n";
+        x64_release_call_area(out, t0);
         out << "\tmov %rax, %r8\n";
 
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
 
-        out << "\tsub $32, %rsp\n";
+        size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
-        out << "\tadd $32, %rsp\n";
+        x64_release_call_area(out, total);
 
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        out << "\tsub $32, %rsp\n";
+        size_t tlen = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
-        out << "\tadd $32, %rsp\n";
-
+        x64_release_call_area(out, tlen);
+        static size_t over_count = 0;
         out << "\tmov %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
         out << "\tsub $1, %rcx\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tmovb $0, (%rdi, %rcx, 1)\n";
-
-        out << ".over" << over_count << ":\n";
-        over_count++;
+        out << ".over" << over_count++ << ":\n";
     }
 
 
