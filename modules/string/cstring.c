@@ -1,7 +1,8 @@
 #include <string.h>
 #include <stddef.h>
+#include <stdint.h>
 
-long strfind(const char *src, const char *search, long n) {
+int64_t strfind(const char *src, const char *search, long n) {
     if (!src || !search || n < 0) return -1;
     size_t src_len = strlen(src);
     if ((size_t)n > src_len) return -1;
@@ -11,7 +12,7 @@ long strfind(const char *src, const char *search, long n) {
     return (long)(found - src);
 }
 
-long substr(char *dest, long size, const char *src, long pos, long len) {
+int64_t substr(char *dest, int64_t size, const char *src, int64_t pos, int64_t len) {
     if (!dest || !src || size <= 0 || pos < 0 || len < 0) return 0;
     size_t src_len = strlen(src);
     if ((size_t)pos > src_len) return 0;
@@ -21,4 +22,9 @@ long substr(char *dest, long size, const char *src, long pos, long len) {
     memcpy(dest, src + pos, copy_len);
     dest[copy_len] = '\0';
     return (long)copy_len;
+}
+
+int64_t strat(const char *src, int64_t pos) {
+    char c = *(src + pos);
+    return (int64_t)c;
 }

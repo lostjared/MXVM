@@ -6,4 +6,5 @@ module string {
     extern snprintf
     extern strfind
     extern substr
+    extern strat
 }

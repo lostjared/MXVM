@@ -384,3 +384,20 @@ extern "C" void mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Ope
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = result.length();
 }
+
+extern "C" void mxvm_string_strat(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if(operand.size () == 2 && program->isVariable(operand[0].op)) {
+    
+        int64_t pos = 0;
+        if(operand[1].type == mxvm::OperandType::OP_CONSTANT) {
+            pos = operand[1].op_value;
+        } else {
+            mxvm::Variable &v = program->getVariable(operand[1].op);
+            pos = v.var_value.int_value;
+        }
+       mxvm::Variable &var = program->getVariable(operand[0].op);
+       program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+       program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+       program->vars["%rax"].var_value.int_value = static_cast<int64_t>(var.var_value.str_value[pos]); 
+    }
+}
