@@ -335,8 +335,8 @@ namespace mxvm {
         Program *parent = nullptr;
         Platform platform;
         int x64_sp_mod16 = 0; 
-        size_t x64_reserve_call_area(std::ostream &out, size_t spill_bytes);
-        void x64_release_call_area(std::ostream &out, size_t total);
+        std::pair<size_t, unsigned> x64_reserve_call_area(std::ostream &out, size_t spill_bytes);
+        void x64_release_call_area(std::ostream &out, std::pair<size_t, unsigned> frame_info);
         void x64_direct_stack_adjust(std::ostream &out, int64_t bytes);
     };
 

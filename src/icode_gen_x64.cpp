@@ -19,14 +19,16 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
-   size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+   // --- BEGIN FIX: Corrected stack management ---
+   std::pair<size_t, unsigned> Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
+        const unsigned original_mod = x64_sp_mod16;
         const size_t needed_for_call = 32 + spill_bytes;
-        const size_t current_offset = x64_sp_mod16 + needed_for_call;
+        const size_t current_offset = original_mod + needed_for_call;
         const size_t padding = (16 - (current_offset % 16)) % 16;
         const size_t total_sub = needed_for_call + padding;
         out << "\tsub $" << total_sub << ", %rsp\n";
         x64_sp_mod16 = 0;
-        return total_sub;
+        return {total_sub, original_mod};
     }
 
     void Program::x64_direct_stack_adjust(std::ostream &out, int64_t bytes) {
@@ -38,16 +40,17 @@ namespace mxvm {
             x64_sp_mod16 = (unsigned)((x64_sp_mod16 + bytes) & 15); // bytes is negative
         }
     }
-   void Program::x64_release_call_area(std::ostream &out, size_t total) {
-        out << "\tadd $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 - total) & 15);
+   void Program::x64_release_call_area(std::ostream &out, std::pair<size_t, unsigned> frame_info) {
+        out << "\tadd $" << frame_info.first << ", %rsp\n";
+        x64_sp_mod16 = frame_info.second;
     }
+    // --- END FIX ---
 
     void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
         out << "\tmov $" << index << ", %ecx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         if (dstReg != "%rax") out << "\tmov %rax, " << dstReg << "\n";
     }
 
@@ -159,7 +162,7 @@ namespace mxvm {
         }
 
         const size_t spill_bytes = stack_args * 8;
-        size_t total = x64_reserve_call_area(out, spill_bytes);
+        auto frame = x64_reserve_call_area(out, spill_bytes);
 
         if (stack_args) {
             size_t idx = args.size();
@@ -206,7 +209,7 @@ namespace mxvm {
         }
 
         out << "\tcall " << name << "\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
 
     void Program::x64_generateInvokeCall(std::ostream &out, std::vector<Operand> &op) {
@@ -427,10 +430,10 @@ namespace mxvm {
         x64_generateInvokeCall(out, op);
     }
     void Program::x64_gen_call(std::ostream &out, const Instruction &i) {
-        if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");   
-        size_t total = x64_reserve_call_area(out, 0);
+        if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall " << getMangledName(i.op1) << "\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
 
     void Program::x64_gen_alloc(std::ostream &out, const Instruction &i) {
@@ -447,9 +450,9 @@ namespace mxvm {
             else                      out << "\tmovq $" << i.op2.op << ", %rdx\n";
         } else out << "\tmovq $8, %rdx\n";
 
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall calloc\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
 
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
         getVariable(i.op1.op).var_value.owns = true;
@@ -461,9 +464,9 @@ namespace mxvm {
         if (v.type != VarType::VAR_POINTER) throw mx::Exception("FREE argument must be a pointer");
 
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall free\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
     }
 
     void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
@@ -592,17 +595,17 @@ namespace mxvm {
 
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall atol\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
     void Program::x64_gen_to_float(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame = x64_reserve_call_area(out, 0);
         out << "\tcall atof\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame);
         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
@@ -712,37 +715,37 @@ namespace mxvm {
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
             throw mx::Exception("GETLINE: needs string buffer");
 
-        
+
         out << "\txor %ecx, %ecx\n";
-        size_t t0 = x64_reserve_call_area(out, 0);
+        auto frame0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
-        x64_release_call_area(out, t0);
+        x64_release_call_area(out, frame0);
         out << "\tmov %rax, %r8\n";
-        
-        
+
+
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
-        size_t total = x64_reserve_call_area(out, 0);
+        auto frame1 = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
-        x64_release_call_area(out, total);
+        x64_release_call_area(out, frame1);
         static size_t over_count = 0;
-        
-        
+
+
         out << "\ttest %rax, %rax\n";
         out << "\tje .over" << over_count << "\n";
-        
-        
+
+
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
-        size_t tlen = x64_reserve_call_area(out, 0);
+        auto frame2 = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
-        x64_release_call_area(out, tlen);
-        
+        x64_release_call_area(out, frame2);
+
         out << "\tmov %rax, %rcx\n";
         out << "\ttest %rcx, %rcx\n";  
         out << "\tje .over" << over_count << "\n";
-        out << "\tdec %rcx\n";         
-        
-        
+        out << "\tdec %rcx\n";        
+
+
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %r10\n";
         out << "\tmovb $0, (%r10, %rcx, 1)\n";
         out << ".over" << over_count++ << ":\n";
