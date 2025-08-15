@@ -257,6 +257,8 @@ namespace mxvm {
         if (this->object == false && done_found == false) throw mx::Exception("Program missing done to signal completion.\n");
     #endif
 
+        out << "\n\n";
+
         std::string mainFunc = " Object";
         if (root_name == name) mainFunc = " Program";
         std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s" << mainFunc << Col(" platform: ", mx::Color::BRIGHT_CYAN) << "Windows" << "\n";
