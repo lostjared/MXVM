@@ -123,67 +123,67 @@ namespace mxvm {
     void Program::x64_generateFunctionCall(std::ostream &out,
                                            const std::string &name,
                                            std::vector<Operand> &args) {
-        // Windows x64 ABI:
-        // - 32B shadow space
-        // - RCX,RDX,R8,R9 or XMM0..3 for first 4 args
-        // - Arg 5+ at [rsp+32], [rsp+40], ...
         xmm_offset = 0;
-        const size_t n = args.size();
+        //const size_t n = args.size();
 
-        // Preload stdio handles for register args into non-volatile temps (no nested reserves later).
-        static const char* TMP[4] = {"%r12","%r13","%r14","%r15"};
-        bool preloaded[4] = {false,false,false,false};
-        for (size_t i = 0; i < n && i < 4; ++i) {
+        static const char* TEMP_REGS[] = {"%r10", "%r11"}; 
+        static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
+
+        std::vector<std::string> stdio_temps(args.size());
+        int temp_idx = 0;
+
+        for (size_t i = 0; i < args.size() && i < 4; ++i) {
             if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
-                out << "\tmov $" << stdio_index(args[i].op) << ", %ecx\n";
-                auto t = x64_reserve_call_area(out, 0);
-                out << "\tcall __acrt_iob_func\n";
-                x64_release_call_area(out, t);
-                out << "\tmov %rax, " << TMP[i] << "\n";
-                preloaded[i] = true;
+                if (temp_idx < 2) {
+                    x64_emit_iob_func(out, stdio_index(args[i].op), TEMP_REGS[temp_idx]);
+                    stdio_temps[i] = TEMP_REGS[temp_idx];
+                    temp_idx++;
+                }
             }
         }
 
-        // Reserve for this call: spill space for stack args (n>4)
-        const size_t stack_count = (n > 4) ? (n - 4) : 0;
-        auto frame = x64_reserve_call_area(out, stack_count * 8);
+        
+        size_t stack_args = (args.size() > 4) ? args.size() - 4 : 0;
+        size_t spill_bytes = stack_args * 8;
+        auto frame = x64_reserve_call_area(out, spill_bytes);
 
-        // Place stack args strictly left-to-right
-        for (size_t i = 4; i < n; ++i) {
-            const size_t off = 32 + 8 * (i - 4);
+        
+        if (stack_args > 0) {
+            for (size_t i = 4; i < args.size(); i++) {
+                const size_t off = 32 + 8 * (i - 4);
 
-            if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
-                // Resolve FILE* then store into the slot after nested call returns
-                out << "\tmov $" << stdio_index(args[i].op) << ", %ecx\n";
-                auto t = x64_reserve_call_area(out, 0);
-                out << "\tcall __acrt_iob_func\n";
-                x64_release_call_area(out, t);
-                out << "\tmovq %rax, " << off << "(%rsp)\n";
+                if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
+                    x64_emit_iob_func(out, stdio_index(args[i].op), "%rax");
+                    out << "\tmovq %rax, " << off << "(%rsp)\n";
+                    continue;
+                }
+
+                VarType t = VarType::VAR_INTEGER;
+                if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
+
+                if (t == VarType::VAR_FLOAT) {
+                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
+                    out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
+                } else {
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
+                    out << "\tmovq %rax, " << off << "(%rsp)\n";
+                }
+            }
+        }
+
+        
+        for (size_t i = 0; i < args.size() && i < 4; i++) {
+            if (!stdio_temps[i].empty()) {
+        
+                out << "\tmov " << stdio_temps[i] << ", " << GPR[i] << "\n";
                 continue;
             }
 
-            VarType vt = VarType::VAR_INTEGER;
-            if (isVariable(args[i].op)) vt = getVariable(args[i].op).type;
+            VarType t = VarType::VAR_INTEGER;
+            if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
 
-            if (vt == VarType::VAR_FLOAT) {
-                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[i]);
-                out << "\tmovsd %xmm0, " << off << "(%rsp)\n";
-            } else {
-                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
-                out << "\tmovq %rax, " << off << "(%rsp)\n";
-            }
-        }
-
-        // Move register args into place
-        static const char* GPR[4] = {"%rcx","%rdx","%r8","%r9"};
-        for (size_t i = 0; i < n && i < 4; ++i) {
-            if (preloaded[i]) { out << "\tmov " << TMP[i] << ", " << GPR[i] << "\n"; continue; }
-
-            VarType vt = VarType::VAR_INTEGER;
-            if (isVariable(args[i].op)) vt = getVariable(args[i].op).type;
-
-            if (vt == VarType::VAR_FLOAT) {
-                std::string xmm = "%xmm" + std::to_string((int)i);
+            if (t == VarType::VAR_FLOAT) {
+                std::string xmm = "%xmm" + std::to_string(i);
                 x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm, args[i]);
             } else {
                 x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
