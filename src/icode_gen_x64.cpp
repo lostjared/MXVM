@@ -127,50 +127,74 @@ namespace mxvm {
         return count;
     }
 
-    // (Kept for completeness; unused now)
+    
     static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
     static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
     void Program::x64_generateFunctionCall(std::ostream &out,
-                                       const std::string &name,
-                                       std::vector<Operand> &args) {
+                                   const std::string &name,
+                                   std::vector<Operand> &args) {
         xmm_offset = 0;
         size_t iregs = 0, fregs = 0, stack_args = 0;
 
-        // --- BEGIN FIX ---
-        // Pre-resolve stdio handles to avoid nested stack reservations.
-        // We load them into their target registers before the main call frame is set up.
+    
+        unsigned original_alignment = x64_sp_mod16;
         std::vector<bool> is_preloaded(args.size(), false);
+        std::vector<std::string> preloaded_regs(args.size());
         size_t temp_ri = 0, temp_rf = 0;
+        
         for (size_t z = 0; z < args.size(); ++z) {
             bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
             if (isVariable(args[z].op) && is_stdio_name(args[z].op)) {
                 if ((isfp && temp_rf < 4) || (!isfp && temp_ri < 4)) {
                     std::string reg = x64_getRegisterByIndex((int)(isfp ? temp_rf : temp_ri), isfp ? VarType::VAR_FLOAT : VarType::VAR_INTEGER);
+                    
+                    
+                    unsigned saved_alignment = x64_sp_mod16;
                     x64_emit_iob_func(out, stdio_index(args[z].op), reg);
+                    x64_sp_mod16 = saved_alignment;
+                    
                     is_preloaded[z] = true;
+                    preloaded_regs[z] = reg;
                 }
             }
             if (isfp) temp_rf++; else temp_ri++;
         }
-        // --- END FIX ---
 
+        
         for (auto &a : args) {
             bool isfp = isVariable(a.op) && getVariable(a.op).type == VarType::VAR_FLOAT;
             if (isfp) { (fregs < 4) ? ++fregs : ++stack_args; }
             else      { (iregs < 4) ? ++iregs : ++stack_args; }
         }
 
+        
+        x64_sp_mod16 = original_alignment;
         const size_t spill_bytes = stack_args * 8;
         auto frame = x64_reserve_call_area(out, spill_bytes);
 
+        
         if (stack_args) {
             size_t idx = args.size();
             size_t sp_off = 32;   
             size_t ci = 0, cf = 0;
             while (idx-- > 0) {
-                bool isfp = isVariable(args[idx].op) &&
-                            getVariable(args[idx].op).type == VarType::VAR_FLOAT;
+                if (is_preloaded[idx]) {
+                    bool isfp = isVariable(args[idx].op) && getVariable(args[idx].op).type == VarType::VAR_FLOAT;
+                    if (isfp) { if (cf < 4) { ++cf; continue; } }
+                    else { if (ci < 4) { ++ci; continue; } }
+                    
+        
+                    if (isfp) {
+                        out << "\tmovsd " << preloaded_regs[idx] << ", " << sp_off << "(%rsp)\n";
+                    } else {
+                        out << "\tmovq " << preloaded_regs[idx] << ", " << sp_off << "(%rsp)\n";
+                    }
+                    sp_off += 8;
+                    continue;
+                }
+                
+                bool isfp = isVariable(args[idx].op) && getVariable(args[idx].op).type == VarType::VAR_FLOAT;
                 if (isfp) {
                     if (cf < 4) { ++cf; continue; }
                     x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[idx]);
@@ -185,6 +209,7 @@ namespace mxvm {
             }
         }
 
+        
         size_t ri = 0, rf = 0;
         for (size_t z = 0; z < args.size(); ++z) {
             if (is_preloaded[z]) { 
@@ -192,6 +217,7 @@ namespace mxvm {
                 if (isfp) rf++; else ri++;
                 continue;
             }
+            
             bool isfp = isVariable(args[z].op) && getVariable(args[z].op).type == VarType::VAR_FLOAT;
             if (isfp) {
                 if (rf < 4) {
