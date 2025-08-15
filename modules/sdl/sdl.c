@@ -19,6 +19,7 @@ static int64_t g_render_target_count = 0;
 /* --- END NEW --- */
 
 int64_t init(void) {
+    SDL_SetMaiReady();
     if (SDL_Init(SDL_INIT_VIDEO) == 0) {
         return 1;
     }
