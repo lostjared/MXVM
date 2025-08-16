@@ -8,11 +8,9 @@
 
 namespace mxvm {
 
-    // Tracks %rsp mod 16 *after* your function prologue (push %rbp; mov %rsp,%rbp)
+    
     static unsigned x64_sp_mod16 = 0;
-
-    // If you use this elsewhere:
-    extern size_t xmm_offset; // keep as-is if declared in a header/another TU
+    extern size_t xmm_offset; 
 
     std::string Program::x64_getRegisterByIndex(int index, VarType type) {
         if (type == VarType::VAR_FLOAT) {
@@ -31,27 +29,15 @@ namespace mxvm {
         return s == "stdin" ? 0 : (s == "stdout" ? 1 : 2);
     }
 
-    // =========================
-    // Win64 call-frame helpers
-    // =========================
-    //
-    // Rule: Callee entry must be 16-aligned, which means the CALL instruction
-    // happens with RSP % 16 == 8 (because CALL pushes a return address).
-    //
-    // We reserve: 32B shadow space + 8B * (#stack args) + pad
-    // where pad makes (prev_mod + need + pad) % 16 == 8
-    //
-    // We keep the old signatures, but fix the internal state so alignment is
-    // correct, and we *restore* x64_sp_mod16 on release without needing prev_mod.
-
+   
     size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
         const size_t need = 32 + spill_bytes;
         const unsigned need_mod = (x64_sp_mod16 + (unsigned)(need & 15)) & 15;
-        const unsigned pad = (8u - need_mod) & 15u; // ensure mod==8 at call
-        const size_t total = need + pad;            // total is multiple of 16
+        const unsigned pad = (8u - need_mod) & 15u; 
+        const size_t total = need + pad;            
 
         out << "\tsub $" << total << ", %rsp\n";
-        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (unsigned)(total & 15)) & 15); // becomes 8 at call
+        x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (unsigned)(total & 15)) & 15); 
         return total;
     }
 
@@ -283,17 +269,14 @@ namespace mxvm {
         for (auto &e : external)
             out << "\t.extern " << (e.module ? e.name : e.mod + "_" + e.name) << "\n";
 
-        if (this->object) {
-            out << "\t.p2align 4, 0x90\n";
-            out << name << ":\n";
-        } else {
+         if(!this->object) {
             out << "\t.p2align 4, 0x90\n";
             out << ".globl main\n";
             out << "main:\n";
+                 out << "\tpush %rbp\n";
+            out << "\tmov %rsp, %rbp\n";
         }
 
-        out << "\tpush %rbp\n";
-        out << "\tmov %rsp, %rbp\n";
         x64_sp_mod16 = 8; // prologue consumed 8 bytes (push)
 
         bool done_found = false;

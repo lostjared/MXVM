@@ -149,23 +149,14 @@ namespace mxvm {
                 out << "\t.extern " << getPlatformSymbolName(e.mod + "_" + e.name) << "\n";
         }
     
-        if(this->object) {
-            out << "\t.p2align 4, 0x90\n";
-            out << name << ":\n";
-        }
-        else {
+        if(!this->object)  {
             out << "\t.p2align 4, 0x90\n";
             out << ".global " << "main" << "\n";
-            
-#ifndef __APPLE__
-            out << ".type main, @function\n";
-#endif
             out << "main" << ":\n";
+            out << "\tpush %rbp\n";
+            out << "\tmov %rsp, %rbp\n";
         }
 
-        out << "\tpush %rbp\n";
-        out << "\tmov %rsp, %rbp\n";
-    
         bool done_found = false;
 
         for(size_t i = 0; i < inc.size(); ++i) {

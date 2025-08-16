@@ -517,10 +517,10 @@ namespace mxvm {
         }
         else {
             std::vector<std::string> core  = opt_core_lines(lines);
-           std::vector<std::string> final_lines =
+            std::vector<std::string> final_lines =
             (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
                                            : opt_linux_lines(core);
+            return join_lines(final_lines);
         }
-        return join_lines(final_lines);
     }
 }
