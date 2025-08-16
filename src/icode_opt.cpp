@@ -459,6 +459,42 @@ namespace mxvm {
         return out;
     }
 
+  static std::vector<std::string> opt_x64_windows_lines(const std::vector<std::string> &lines) {
+        static const std::regex add_rx(R"(^\s*addq?\s+\$([0-9]+|0x[0-9a-fA-F]+)\s*,\s*%rsp\s*(?:#.*)?$)");
+        static const std::regex sub_rx(R"(^\s*subq?\s+\$([0-9]+|0x[0-9a-fA-F]+)\s*,\s*%rsp\s*(?:#.*)?$)");
+
+        auto parse_imm = [](const std::string &s) -> unsigned long long {
+            return std::stoull(s, nullptr, 0);
+        };
+
+        std::vector<std::string> out;
+        out.reserve(lines.size());
+
+        for (size_t i = 0; i < lines.size(); ) {
+            const std::string &a = lines[i];
+
+            std::smatch ma, mb;
+            bool a_is_add = std::regex_match(a, ma, add_rx);
+            bool a_is_sub = !a_is_add && std::regex_match(a, ma, sub_rx);
+
+            if ((a_is_add || a_is_sub) && (i + 1) < lines.size()) {
+                const std::string &b = lines[i + 1];
+                bool b_is_add = std::regex_match(b, mb, add_rx);
+                bool b_is_sub = !b_is_add && std::regex_match(b, mb, sub_rx);
+
+                if ((a_is_add && b_is_sub) || (a_is_sub && b_is_add)) {
+                    unsigned long long ia = parse_imm(ma[1].str());
+                    unsigned long long ib = parse_imm(mb[1].str());
+                    if (ia == ib) { i += 2; continue; }
+                }
+            }
+
+            out.push_back(a);
+            ++i;
+        }
+
+        return out;
+    }
 
     static std::vector<std::string> opt_linux_lines(const std::vector<std::string>& lines) {
         return lines;
@@ -472,16 +508,19 @@ namespace mxvm {
             while (std::getline(stream, s)) lines.push_back(s);
         }
 
-        std::vector<std::string> core;
+        std::vector<std::string> final_lines;
 
-        if(platform == Platform::WINX64) 
-             core = x64_opt_core_lines(lines);
-        else
-             core = opt_core_lines(lines);
+        if(platform == Platform::WINX64) {
+             final_lines = x64_opt_core_lines(lines);
+             auto lines = opt_x64_windows_lines(final_lines);
+             return join_lines(lines);
+        }
+        else {
+            std::vector<std::string> core  = opt_core_lines(lines);
            std::vector<std::string> final_lines =
             (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
                                            : opt_linux_lines(core);
-
+        }
         return join_lines(final_lines);
     }
 }
