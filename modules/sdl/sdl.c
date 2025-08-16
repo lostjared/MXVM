@@ -20,7 +20,7 @@ static int64_t g_render_target_count = 0;
 
 int64_t init(void) {
     SDL_SetMainReady();
-    if (SDL_Init(SDL_INIT_VIDEO) == 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) == 0) {
         return 0;
     }
     return 0;
