@@ -48,7 +48,20 @@ public:
         std::streambuf* old_cerr = std::cerr.rdbuf();
         std::cerr.rdbuf(html_err.rdbuf());
 
-        mxvm::Platform platform = (output_type == 0) ? mxvm::Platform::LINUX : mxvm::Platform::DARWIN;
+        mxvm::Platform platform;
+        
+        switch(output_type) {
+            case 0:
+            platform = Platform::LINUX;
+            break;
+            case 1:
+            platform = Platform::DARWIN;
+            break;
+            case 2:
+            platform = Platform::WIN64;
+            break;
+        }
+        
 
         try {
             mxvm::Parser parser(code);
