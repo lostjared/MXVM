@@ -19,6 +19,7 @@ object SDLCore {
     section module { sdl }
     section data {
         export string title = "MasterPiece - [MXVM Edition]"
+        export string icon = "img/xicon.bmp"
         export int x = 100
         export int y = 100
         export int w = 640
@@ -56,10 +57,9 @@ object SDLCore {
         return window_id
         invoke create_renderer, window_id, -1, 0
         return renderer_id
-
         invoke create_render_target, renderer_id, w, h
         return target_id
-
+        invoke set_window_icon, window_id, icon
         ret
     function begin_frame:
         invoke set_render_target, renderer_id, target_id
