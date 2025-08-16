@@ -8,8 +8,4 @@ module io {
     extern fseek
     extern rand_number
     extern seed_random
-    extern probe0
-    extern probeI8
-    extern probeF5
-    extern probMix
 }
