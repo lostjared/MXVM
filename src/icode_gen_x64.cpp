@@ -257,8 +257,6 @@ namespace mxvm {
 
         out << "\t.extern __acrt_iob_func\n";
 
-        if (this->object) out << "\t.globl " << name << "\n";
-
         for (auto &lbl : labels)
             if (lbl.second.second == true) out << "\t.globl " << name + "_" + lbl.first << "\n";
 
@@ -277,7 +275,7 @@ namespace mxvm {
             out << "\tmov %rsp, %rbp\n";
         }
 
-        x64_sp_mod16 = 8; // prologue consumed 8 bytes (push)
+        x64_sp_mod16 = 8; 
 
         bool done_found = false;
 

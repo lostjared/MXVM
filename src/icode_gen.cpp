@@ -126,12 +126,7 @@ namespace mxvm {
                     out << ".section .text\n";
 
 
-        if(this->object)
-            out << "\t.global " << name << "\n";
-        //else
-        //    out << "\t.global main\n";
-
-        for(auto &lbl : labels) {
+         for(auto &lbl : labels) {
             if(lbl.second.second == true) {
                 out << "\t.global " << name + "_" + lbl.first << "\n";
             }
