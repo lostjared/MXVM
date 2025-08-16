@@ -52,13 +52,13 @@ public:
         
         switch(output_type) {
             case 0:
-            platform = Platform::LINUX;
+            platform = mxvm::Platform::LINUX;
             break;
             case 1:
-            platform = Platform::DARWIN;
+            platform = mxvm::Platform::DARWIN;
             break;
             case 2:
-            platform = Platform::WIN64;
+            platform = mxvm::Platform::WINX64;
             break;
         }
         
