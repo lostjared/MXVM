@@ -67,7 +67,7 @@ object SDLCore {
         invoke clear, renderer_id
         ret
     function end_frame:
-        invoke present_scavvvvled, renderer_id, target_id, target_w, target_h
+        invoke present_scaled, renderer_id, target_id, target_w, target_h
         ret
     function poll_one_event:
         invoke poll_event
