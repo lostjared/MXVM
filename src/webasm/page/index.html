@@ -347,6 +347,9 @@
         const html = debuggerInstance.parseToHTML(platform, code);
         output.innerHTML = html;
         zipBtn.disabled = false;
+        
+        // NEW CODE: Connect event handlers to the assembly section buttons
+        connectAssemblyButtons();
       } catch (err) {
         showError("Parsing failed: " + err.message);
       } finally {
@@ -363,27 +366,77 @@
     function clearAll() {
       document.getElementById('codeInput').value = '';
       document.getElementById('output').innerHTML =
-        '<div class="loading">Enter MXVM code above and click “Parse & Generate Debug HTML” to see the output here.</div>';
+        '<div class="loading">Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.</div>';
       document.getElementById('downloadZipBtn').disabled = true;
     }
 
+    
     function copyOutput() {
       const out = document.getElementById('output');
-      const range = document.createRange();
-      range.selectNode(out);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      try {
-        document.execCommand('copy');
+      const areas = out.querySelectorAll('textarea[id^="asm-"]');
+      
+      if (areas.length === 0) {
+    
+        const range = document.createRange();
+        range.selectNode(out);
+        const sel = window.getSelection();
         sel.removeAllRanges();
-      } catch {
-        showError("Failed to copy to clipboard");
+        sel.addRange(range);
+        try {
+          document.execCommand('copy');
+          sel.removeAllRanges();
+          showSuccess("HTML content copied to clipboard!");
+        } catch {
+          showError("Failed to copy to clipboard");
+        }
+        return;
       }
+
+    
+      let allAssembly = '';
+      areas.forEach((ta, index) => {
+        const id = ta.id;
+        let filename;
+        if (id === 'asm-main') {
+          filename = 'main.s';
+        } else {
+          filename = `${id.slice(4)}.s`;
+        }
+        
+        if (index > 0) allAssembly += '\n\n';
+        allAssembly += `// ===== ${filename} =====\n`;
+        allAssembly += ta.value;
+      });
+
+      navigator.clipboard.writeText(allAssembly).then(() => {
+        showSuccess("Assembly code copied to clipboard!");
+      }).catch(() => {
+        // Fallback for older browsers
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = allAssembly;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        try {
+          document.execCommand('copy');
+          showSuccess("Assembly code copied to clipboard!");
+        } catch {
+          showError("Failed to copy to clipboard");gggggggggggggggggggggggggg
+        }
+        document.body.removeChild(tempTextArea);
+      });
+    }
+
+    function showSuccess(msg) {
+      const output = document.getElementById('output');
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #2e7d32; color: white; padding: 15px; border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+      successDiv.textContent = '✅ ' + msg;
+      document.body.appendChild(successDiv);
+      setTimeout(() => document.body.removeChild(successDiv), 3000);
     }
 
     function loadExample() {
-   const exampleCode = `program TicTacToe {
+      const exampleCode = `program TicTacToe {
   section module { io }
   section object { State, Board, Printer, Rules, Human, AI }
 
@@ -679,43 +732,49 @@ object AI {
       document.getElementById('codeInput').value = exampleCode;
     }
 
-   document.getElementById('downloadZipBtn')
-  .addEventListener('click', async () => {
-    const out = document.getElementById('output');
-    const areas = out.querySelectorAll('textarea[id^="asm-"]');
-    if (areas.length === 0) {
-      return showError("No assembly snippets found to zip.");
-    }
-
-    const titleElem = out.querySelector('.subtitle strong');
-    const progName = titleElem?.textContent || 'program';
-    const zip = new JSZip();
-
-    let asmFiles = [];
-    areas.forEach(ta => {
-      const id = ta.id;
-      let filename;
-      if (id === 'asm-main') {
-        filename = `${progName}.s`;
-      } else {
-        filename = `${id.slice(4)}.s`;
+    // Fixed download function
+    document.getElementById('downloadZipBtn')
+    .addEventListener('click', async () => {
+      const out = document.getElementById('output');
+      const areas = out.querySelectorAll('textarea[id^="asm-"]');
+      if (areas.length === 0) {
+        return showError("No assembly snippets found to zip.");
       }
-      asmFiles.push(filename);
-      zip.file(filename, ta.value);
+
+      const titleElem = out.querySelector('.subtitle strong');
+      const progName = titleElem?.textContent || 'program';
+      const zip = new JSZip();
+
+      let asmFiles = [];
+      areas.forEach(ta => {
+        const id = ta.id;
+        let filename;
+        if (id === 'asm-main') {
+          filename = `${progName}.s`;
+        } else {
+          filename = `${id.slice(4)}.s`;
+        }
+        asmFiles.push(filename);
+        zip.file(filename, ta.value);
+      });
+
+      // Create Makefile
+      const makefileContent = `all:\n\tgcc ${asmFiles.join(' ')} -o ${progName} -L/usr/local/lib/modules/io -lmxvm_io_static -L/usr/local/lib/modules/string -lmxvm_string_static\n\nclean:\n\trm -f ${progName} *.o\n`;
+      zip.file('Makefile', makefileContent);
+
+      try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `${progName}_assembly.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showSuccess("Assembly ZIP downloaded successfully!");
+      } catch (err) {
+        showError("Failed to create ZIP file: " + err.message);
+      }
     });
-
-    
-    const makefileContent = `all:\n\tgcc ${asmFiles.join(' ')} -o ${progName} -L/usr/local/lib/modules/io -lmxvm_io_static -L/usr/local/lib/modules/string -lmxvm_string_static\n`;
-    zip.file('Makefile', makefileContent);
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'mxvm_assembly.zip';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
     
     document.getElementById('codeInput').addEventListener('keydown', function(e) {
       if (e.ctrlKey && e.key === 'Enter') {
@@ -734,6 +793,75 @@ object AI {
 
     document.getElementById('parseBtn').disabled = true;
     document.getElementById('parseBtn').textContent = "⏳ Loading WebAssembly...";
+
+    // Add this new function
+    function connectAssemblyButtons() {
+      // Find all buttons within the output section that haven't been connected yet
+      const allButtons = document.querySelectorAll('#output button:not([data-connected])');
+      
+      allButtons.forEach(btn => {
+        // Mark the button as connected to prevent attaching multiple listeners
+        btn.setAttribute('data-connected', 'true');
+
+        if (btn.textContent.includes('Copy')) {
+          btn.addEventListener('click', function() {
+            // Find the parent container of the button, then find the textarea within it
+            const container = this.parentElement;
+            const codeElement = container.previousElementSibling;
+            
+            if (codeElement && (codeElement.tagName === 'TEXTAREA' || codeElement.tagName === 'PRE')) {
+              navigator.clipboard.writeText(codeElement.value || codeElement.textContent).then(() => {
+                showSuccess("Assembly copied to clipboard!");
+              }).catch(err => {
+                showError("Failed to copy: " + err.message);
+              });
+            } else {
+              showError("Could not find the assembly code to copy.");
+            }
+          });
+        } else if (btn.textContent.includes('Download')) {
+          btn.addEventListener('click', function() {
+            // Find the parent container of the button, then find the textarea within it
+            const container = this.parentElement;
+            const codeElement = container.previousElementSibling;
+            
+            if (codeElement && (codeElement.tagName === 'TEXTAREA' || codeElement.tagName === 'PRE')) {
+              const code = codeElement.value || codeElement.textContent;
+              const blob = new Blob([code], {type: 'text/plain'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'assembly.s';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              showSuccess("Assembly file downloaded!");
+            } else {
+              showError("Could not find the assembly code to download.");
+            }
+          });
+        }
+      });
+    }
+
+    // Also use a MutationObserver to catch dynamically added buttons
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length) {
+          connectAssemblyButtons();
+        }
+      }
+    });
+
+    // Start observing the output container for changes
+    observer.observe(document.getElementById('output'), { 
+      childList: true, 
+      subtree: true 
+    });
+
+    // Call this once at startup to connect any buttons that might already exist
+    document.addEventListener('DOMContentLoaded', connectAssemblyButtons);
   </script>
 </body>
 </html>
