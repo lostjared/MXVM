@@ -21,7 +21,7 @@ void set_window_title(int64_t window_id, const char* title);
 void set_window_position(int64_t window_id, int64_t x, int64_t y);
 void get_window_size(int64_t window_id, int64_t* w, int64_t* h);
 void set_window_fullscreen(int64_t window_id, int64_t fullscreen);
-
+void set_window_icon(uint64_t window_id, const char *path);
 // Renderer management
 int64_t create_renderer(int64_t window_id, int64_t index, int64_t flags);
 void destroy_renderer(int64_t renderer_id);

@@ -1058,3 +1058,23 @@ extern "C" void mxvm_sdl_present_stretched(mxvm::Program *program, std::vector<m
 
     present_stretched(renderer_id, target_id, dst_w, dst_h);
 }
+
+extern "C" void mxvm_sdl_set_window_icon(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+
+    int64_t window_id = program->isVariable(operand[0].op) ?
+        program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+    
+    std::string path;
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &var = program->getVariable(operand[1].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            path = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            path = std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        }
+    } else {
+        path = operand[0].op;
+    }
+
+    set_window_icon(window_id, path.c_str());
+}

@@ -48,7 +48,6 @@ void quit(void) {
     SDL_Quit();
 }
 
-// Create window with actual size (no render target texture created automatically)
 int64_t create_window(const char* title, int64_t x, int64_t y, int64_t w, int64_t h, int64_t flags) {
     SDL_Window* window = SDL_CreateWindow(title, (int)x, (int)y, (int)w, (int)h, (Uint32)flags);
     if (!window) return -1;
@@ -65,7 +64,13 @@ void destroy_window(int64_t window_id) {
     }
 }
 
-// Create renderer (no automatic render target)
+void set_window_icon(uint64_t window_id, const char *path) { 
+    SDL_Surface *surf = SDL_LoadBMP(path);
+    if(!surf) return;
+    SDL_SetWindowIcon(g_windows[window_id], surf);
+    SDL_FreeSurface(surf);   
+}
+
 int64_t create_renderer(int64_t window_id, int64_t index, int64_t flags) {
     if (window_id < 0 || window_id >= g_window_count || !g_windows[window_id]) return -1;
     
@@ -166,14 +171,13 @@ void clear(int64_t renderer_id) {
     }
 }
 
-/* --- MODIFIED: Present function now takes target ID and scaling dimensions --- */
+
 void present(int64_t renderer_id) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
         SDL_RenderPresent(g_renderers[renderer_id]);
     }
 }
 
-/* NEW: Present render target with scaling */
 void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width, int64_t scale_height) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
     if (target_id < 0 || target_id >= g_render_target_count || !g_render_targets[target_id]) return;
@@ -181,14 +185,14 @@ void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width,
     SDL_Renderer* renderer = g_renderers[renderer_id];
     SDL_Texture* target = g_render_targets[target_id];
     
-    // Set render target to default (window)
+
     SDL_SetRenderTarget(renderer, NULL);
     
-    // Clear the window
+
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     
-    // Get window size for centering if needed
+
     SDL_Window* window = NULL;
     for (int i = 0; i < g_window_count; i++) {
         if (g_windows[i] && SDL_GetRenderer(g_windows[i]) == renderer) {
@@ -205,32 +209,27 @@ void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width,
         window_h = (int)scale_height;
     }
     
-    // Calculate scaling to fit window while maintaining aspect ratio
+
     int target_w = (int)scale_width;
     int target_h = (int)scale_height;
     
     float scale_x = (float)window_w / target_w;
     float scale_y = (float)window_h / target_h;
-    float scale = (scale_x < scale_y) ? scale_x : scale_y; // Use smaller scale to fit
+    float scale = (scale_x < scale_y) ? scale_x : scale_y; 
     
     int scaled_w = (int)(target_w * scale);
     int scaled_h = (int)(target_h * scale);
     
-    // Center the scaled texture
     int x = (window_w - scaled_w) / 2;
     int y = (window_h - scaled_h) / 2;
     
     SDL_Rect dst = { x, y, scaled_w, scaled_h };
     SDL_RenderCopy(renderer, target, NULL, &dst);
-    
-    // Present to screen
     SDL_RenderPresent(renderer);
-    
-    // Restore render target back to the texture for future drawing
     SDL_SetRenderTarget(renderer, target);
 }
 
-/* Simple present scaled to exact size without aspect ratio preservation */
+
 void present_stretched(int64_t renderer_id, int64_t target_id, int64_t dst_width, int64_t dst_height) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
     if (target_id < 0 || target_id >= g_render_target_count || !g_render_targets[target_id]) return;
@@ -238,24 +237,24 @@ void present_stretched(int64_t renderer_id, int64_t target_id, int64_t dst_width
     SDL_Renderer* renderer = g_renderers[renderer_id];
     SDL_Texture* target = g_render_targets[target_id];
     
-    // Set render target to default (window)
+
     SDL_SetRenderTarget(renderer, NULL);
     
-    // Clear the window
+
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     
-    // Stretch to exact size
+
     SDL_Rect dst = { 0, 0, (int)dst_width, (int)dst_height };
     SDL_RenderCopy(renderer, target, NULL, &dst);
     
-    // Present to screen
+
     SDL_RenderPresent(renderer);
     
-    // Restore render target
+
     SDL_SetRenderTarget(renderer, target);
 }
-/* --- END MODIFIED --- */
+
 
 void draw_point(int64_t renderer_id, int64_t x, int64_t y) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
@@ -283,7 +282,7 @@ void fill_rect(int64_t renderer_id, int64_t x, int64_t y, int64_t w, int64_t h) 
     }
 }
 
-// Texture functions
+
 int64_t create_texture(int64_t renderer_id, int64_t format, int64_t access, int64_t w, int64_t h) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
     
@@ -363,7 +362,7 @@ void unlock_texture(int64_t texture_id) {
     }
 }
 
-// Timing functions
+
 int64_t get_ticks(void) {
     return SDL_GetTicks();
 }
@@ -372,7 +371,7 @@ void delay(int64_t ms) {
     SDL_Delay((Uint32)ms);
 }
 
-// Audio functions
+
 int64_t open_audio(int64_t freq, int64_t format, int64_t channels, int64_t samples) {
     SDL_AudioSpec wanted_spec;
     wanted_spec.freq = (int)freq;
@@ -426,7 +425,7 @@ void clear_queued_audio(void) {
     SDL_ClearQueuedAudio(1);
 }
 
-// Mouse functions (no pointers)
+
 int64_t get_mouse_buttons(void) {
     int x, y;
     return SDL_GetMouseState(&x, &y);
@@ -449,7 +448,7 @@ int64_t get_relative_mouse_buttons(void) {
     return SDL_GetRelativeMouseState(&x, &y);
 }
 
-// Keyboard functions
+
 int64_t get_keyboard_state(int64_t* numkeys) {
     int nk;
     const Uint8* state = SDL_GetKeyboardState(&nk);
@@ -470,7 +469,7 @@ int64_t get_num_keys(void) {
     return numkeys;
 }
 
-// Clipboard functions
+
 void set_clipboard_text(const char* text) {
     SDL_SetClipboardText(text);
 }
@@ -479,7 +478,7 @@ const char* get_clipboard_text(void) {
     return SDL_GetClipboardText();
 }
 
-// Window management additions
+
 void set_window_title(int64_t window_id, const char* title) {
     if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
         SDL_SetWindowTitle(g_windows[window_id], title);
