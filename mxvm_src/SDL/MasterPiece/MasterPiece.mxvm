@@ -1,5 +1,8 @@
 program MasterPiece {
     section module { sdl, string, io }
+    section data {
+        string message = "MasterPiece: Init\n"
+    }
     section object { SDLCore, Assets, Screen, Input, Board, UI, Game }
     section code {
     start:
@@ -8,6 +11,7 @@ program MasterPiece {
         call Board.init
         mov Screen.screen, 0
         call UI.init
+        print message
         call Game.loop
         call SDLCore.cleanup
         done
@@ -44,8 +48,6 @@ object SDLCore {
         export int last_mouse_btn = 0
         export int last_mouse_x = 0
         export int last_mouse_y = 0
-
-        # new: render target id and logical size (1440x1080)
         export int target_id = -1
         export int target_w = 1440
         export int target_h = 1080
@@ -112,7 +114,6 @@ object SDLCore {
         invoke delay, 8
         ret
     function cleanup:
-        # destroy render target first if created
         cmp target_id, -1
         jle skip_destroy_target
         invoke destroy_render_target, target_id
@@ -515,6 +516,8 @@ fx_loop:
         jge fx_next
         call checkHorizontalMatch
         call checkVerticalMatch
+        call checkDiagonalMatchDownRight
+        call checkDiagonalMatchUpRight
         add rcx, 1
         jmp fx_loop
 fx_next:
@@ -555,6 +558,90 @@ fy_done:
         mov rcx, r11
         call markThreeHorizontal
 chm_exit:
+        mov rax, r6
+        mov rcx, r7
+        ret
+    function checkDiagonalMatchDownRight:
+        mov r6, rax
+        mov r7, rcx
+        mov r8, r6
+        add r8, 2
+        cmp r8, rows
+        jge cddr_exit
+        mov r8, r7
+        add r8, 2
+        cmp r8, cols
+        jge cddr_exit
+        mov r10, r6
+        mov r11, r7
+        mov rax, r10
+        mov rcx, r11
+        call indexOf
+        load r12, data, rax, 1
+        cmp r12, 0
+        je cddr_exit
+        mov rax, r10
+        add rax, 1
+        mov rcx, r11
+        add rcx, 1
+        call indexOf
+        load r13, data, rax, 1
+        cmp r13, r12
+        jne cddr_exit
+        mov rax, r10
+        add rax, 2
+        mov rcx, r11
+        add rcx, 2
+        call indexOf
+        load r14, data, rax, 1
+        cmp r14, r12
+        jne cddr_exit
+        mov rax, r10
+        mov rcx, r11
+        call markThreeDiagonalDownRight
+cddr_exit:
+        mov rax, r6
+        mov rcx, r7
+        ret
+    function checkDiagonalMatchUpRight:
+        mov r6, rax
+        mov r7, rcx
+        mov r8, r6
+        sub r8, 2
+        cmp r8, 0
+        jl cdur_exit
+        mov r8, r7
+        add r8, 2
+        cmp r8, cols
+        jge cdur_exit
+        mov r10, r6
+        mov r11, r7
+        mov rax, r10
+        mov rcx, r11
+        call indexOf
+        load r12, data, rax, 1
+        cmp r12, 0
+        je cdur_exit
+        mov rax, r10
+        sub rax, 1
+        mov rcx, r11
+        add rcx, 1
+        call indexOf
+        load r13, data, rax, 1
+        cmp r13, r12
+        jne cdur_exit
+        mov rax, r10
+        sub rax, 2
+        mov rcx, r11
+        add rcx, 2
+        call indexOf
+        load r14, data, rax, 1
+        cmp r14, r12
+        jne cdur_exit
+        mov rax, r10
+        mov rcx, r11
+        call markThreeDiagonalUpRight
+cdur_exit:
         mov rax, r6
         mov rcx, r7
         ret
@@ -607,6 +694,48 @@ cvm_exit:
         call indexOf
         store 1, marks, rax, 1
         mov rax, r8
+        mov rcx, r9
+        add rcx, 2
+        call indexOf
+        store 1, marks, rax, 1
+        mov match_found, 1
+        ret
+    function markThreeDiagonalDownRight:
+        mov r8, rax
+        mov r9, rcx
+        mov rax, r8
+        mov rcx, r9
+        call indexOf
+        store 1, marks, rax, 1
+        mov rax, r8
+        add rax, 1
+        mov rcx, r9
+        add rcx, 1
+        call indexOf
+        store 1, marks, rax, 1
+        mov rax, r8
+        add rax, 2
+        mov rcx, r9
+        add rcx, 2
+        call indexOf
+        store 1, marks, rax, 1
+        mov match_found, 1
+        ret
+    function markThreeDiagonalUpRight:
+        mov r8, rax
+        mov r9, rcx
+        mov rax, r8
+        mov rcx, r9
+        call indexOf
+        store 1, marks, rax, 1
+        mov rax, r8
+        sub rax, 1
+        mov rcx, r9
+        add rcx, 1
+        call indexOf
+        store 1, marks, rax, 1
+        mov rax, r8
+        sub rax, 2
         mov rcx, r9
         add rcx, 2
         call indexOf
@@ -948,6 +1077,7 @@ object Game {
         export int SDLK_D = 100
         export int SDLK_W = 119
         export int SDLK_S = 115
+        string goodbye = "MasterPiece: Shutting Down\n"
     }
     section code {
     function loop:
@@ -1071,7 +1201,10 @@ object Game {
         mov Screen.screen, 1
         jmp ev_loop
     quit_game:
+        print goodbye
         call Board.cleanup
+        call SDLCore.cleanup
+        invoke quit
         exit 0
         ret
     }
