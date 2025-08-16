@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmpoh14744d.js
+// include: /tmp/tmpxyzgtvik.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -215,21 +215,21 @@ Module['FS_createPath']("/include", "string", true, true);
 
   })();
 
-// end include: /tmp/tmpoh14744d.js
-// include: /tmp/tmp92bvl6z1.js
+// end include: /tmp/tmpxyzgtvik.js
+// include: /tmp/tmpnrkg2bh8.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmp92bvl6z1.js
-// include: /tmp/tmp6z23e_gs.js
+  // end include: /tmp/tmpnrkg2bh8.js
+// include: /tmp/tmpc0tu_zn2.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmp6z23e_gs.js
+  // end include: /tmp/tmpc0tu_zn2.js
 
 
 var arguments_ = [];
@@ -6962,6 +6962,8 @@ var wasmImports = {
   /** @export */
   invoke_ji,
   /** @export */
+  invoke_jii,
+  /** @export */
   invoke_jiii,
   /** @export */
   invoke_jiiii,
@@ -7225,6 +7227,18 @@ function invoke_viiiiii(index,a1,a2,a3,a4,a5,a6) {
     stackRestore(sp);
     if (!(e instanceof EmscriptenEH)) throw e;
     _setThrew(1, 0);
+  }
+}
+
+function invoke_jii(index,a1,a2) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2);
+  } catch(e) {
+    stackRestore(sp);
+    if (!(e instanceof EmscriptenEH)) throw e;
+    _setThrew(1, 0);
+    return 0n;
   }
 }
 
