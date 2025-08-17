@@ -128,8 +128,6 @@ namespace mxvm {
         return count;
     }
 
-    static inline void x64_call_frame_enter(std::ostream &out, size_t bytes) { out << "\tsub $" << bytes << ", %rsp\n"; }
-    static inline void x64_call_frame_leave(std::ostream &out, size_t bytes) { out << "\tadd $" << bytes << ", %rsp\n"; }
 
     void Program::x64_generateFunctionCall(std::ostream &out,
                                            const std::string &name,
