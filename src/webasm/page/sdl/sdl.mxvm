@@ -8,6 +8,7 @@ module sdl {
     extern set_window_position
     extern get_window_size
     extern set_window_fullscreen
+    extern set_window_icon
 
     extern create_renderer
     extern destroy_renderer
