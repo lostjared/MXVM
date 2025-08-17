@@ -54,6 +54,11 @@ int64_t create_window(const char* title, int64_t x, int64_t y, int64_t w, int64_
     
     g_windows = realloc(g_windows, sizeof(SDL_Window*) * (g_window_count + 1));
     g_windows[g_window_count] = window;
+    SDL_Surface *surf = SDL_LoadBMP("icon.bmp");
+    if(surf != NULL) { // if it is there
+        SDL_SetWindowIcon(window, surf);
+        SDL_FreeSurface(surf);
+    }
     return g_window_count++;
 }
 
