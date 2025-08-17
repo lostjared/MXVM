@@ -661,11 +661,14 @@ void createMakefile(Args *args) {
     if(ldflags != nullptr) 
         ld_flags = ldflags;
     file << "### Created by MXVM\n\n";
+    file << ".PHONY: all run clean\n";
     file << "LFLAGS=" << "\"" << ld_flags << "\"\n";
     file << "all:\n";
     file << "\tLDFLAGS=$(LFLAGS) mxvmc  \"" << args->source_file << "\" --path \"" << args->module_path <<  "\" --object-path \"" << args->object_path << "\" --action compile " << " --target " << args->target << "\n";
     file << "run:\n";
-    file << "\tmxvmc --path \"" << args->module_path << "\" object_path \"" << args->object_path << "\" \"" << args->source_file << "\"\n";
+    file << "\tmxvmc --path \"" << args->module_path << "\" --object-path \"" << args->object_path << "\" \"" << args->source_file << "\"\n";
+    file << "clean:\n";
+    file << "\trm -f *.o *.s";
     file.close();
     std::cout << Col("MXVM: ", mx::Color::BRIGHT_RED) << "Created Makefile.\n";
 }
