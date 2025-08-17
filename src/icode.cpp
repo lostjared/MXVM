@@ -17,11 +17,11 @@ namespace mxvm {
         if (dot_pos != std::string::npos) {
             std::string sym = var;
             std::replace(sym.begin(), sym.end(), '.', '_');
-            if(platform == Platform::DARWIN) {
+            if(platform == Platform::DARWIN && !sym.empty() && sym[0] != '_') {
                     if(var == "stdout" || var == "stdin" || var == "stderr") {
                         return var;
                     }
-                    return "_" + sym;
+                    return sym;
             }
             else {
                     return sym;
@@ -39,7 +39,7 @@ namespace mxvm {
             }
         }
 
-        if(platform == Platform::DARWIN) {
+        if(platform == Platform::DARWIN && !var.empty() && var[0] != '-') {
                 return "_" + var;
         }
         else {
