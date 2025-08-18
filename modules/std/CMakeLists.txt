@@ -21,22 +21,22 @@ target_link_libraries(mxvm_std_static
     mxvm
 )
 
-set_target_properties(mxvm_sdl PROPERTIES
-    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/sdl"
+set_target_properties(mxvm_std PROPERTIES
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/std"
 )
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/sdl.mxvm
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/std.mxvm
     DESTINATION include/mxvm/modules/std
     RENAME std.mxvm
 )
 
 install(TARGETS mxvm_sdl mxvm_std_static
-    LIBRARY DESTINATION lib/modules/sdl
-    ARCHIVE DESTINATION lib/modules/sdl
+    LIBRARY DESTINATION lib/modules/std
+    ARCHIVE DESTINATION lib/modules/std
 )
 
 if(WIN32)
-    install(TARGETS mxvm_sdl
+    install(TARGETS mxvm_std
         RUNTIME DESTINATION lib/modules/std
     )
 endif()
