@@ -30,7 +30,7 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/std.mxvm
     RENAME std.mxvm
 )
 
-install(TARGETS mxvm_sdl mxvm_std_static
+install(TARGETS mxvm_std mxvm_std_static
     LIBRARY DESTINATION lib/modules/std
     ARCHIVE DESTINATION lib/modules/std
 )
