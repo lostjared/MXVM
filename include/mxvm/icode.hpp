@@ -272,7 +272,6 @@ namespace mxvm {
         void x64_gen_arth(std::ostream &out, std::string arth, const Instruction &i);
         void x64_gen_exit(std::ostream &out, const Instruction &i);
 
-
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);

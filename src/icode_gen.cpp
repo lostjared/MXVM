@@ -20,12 +20,19 @@ namespace mxvm {
             return;
         }
 
-
         this->add_standard();
         std::unordered_map<int, std::string> labels_;
         for(auto &l : labels) {
             labels_[l.second.first] = l.first;
-            
+        }
+
+        // Check if std module is being used
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
         }
                 
         if(platform == Platform::DARWIN)
@@ -143,6 +150,12 @@ namespace mxvm {
             else
                 out << "\t.extern " << getPlatformSymbolName(e.mod + "_" + e.name) << "\n";
         }
+
+        
+        if(uses_std_module) {
+            out << "\t.extern " << getPlatformSymbolName("set_program_args") << "\n";
+            out << "\t.extern " << getPlatformSymbolName("free_program_args") << "\n";
+        }
     
         if(!this->object)  {
             out << "\t.p2align 4, 0x90\n";
@@ -150,6 +163,13 @@ namespace mxvm {
             out << "main" << ":\n";
             out << "\tpush %rbp\n";
             out << "\tmov %rsp, %rbp\n";
+            
+            if(uses_std_module) {
+                out << "\t# Set up program arguments for std module\n";
+                out << "\tmov %rdi, %r12\n";  
+                out << "\tmov %rsi, %r13\n";  
+                out << "\tcall " << getPlatformSymbolName("set_program_args") << "\n";
+            }
         }
 
         bool done_found = false;
@@ -182,7 +202,6 @@ namespace mxvm {
         if(platform == Platform::LINUX)
             out << "\n\n\n.section .note.GNU-stack,\"\",@progbits\n\n";
 
-   
         std::string mainFunc = " Object";
         if(root_name == name)
                 mainFunc = " Program";
@@ -303,6 +322,19 @@ namespace mxvm {
         }
     }
     void Program::gen_done(std::ostream &out, const Instruction &i) {
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
+        }
+
+        if(uses_std_module && !this->object) {
+            out << "\t# Clean up program arguments\n";
+            out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
+        }
+
         out << "\txor %eax, %eax\n";
         out << "\tleave\n";
         out << "\tret\n";
@@ -315,7 +347,15 @@ namespace mxvm {
 
     void Program::gen_return(std::ostream &out, const Instruction &i) {
         if(isVariable(i.op1.op)) {
-            out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+            Variable &v = getVariable(i.op1.op);
+            switch(v.type) {
+                case VarType::VAR_FLOAT:
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                break;
+                default:
+                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+            }
+            
         } else {
             throw mx::Exception("return: " + i.op1.op + " requires variable\n");
         }
@@ -1017,7 +1057,6 @@ namespace mxvm {
         return "[stack]";
     }
 
-    // ...existing code...
     void Program::gen_print(std::ostream &out, const Instruction &i) {
         xmm_offset = 0;
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
@@ -1235,6 +1274,21 @@ namespace mxvm {
     }
 
     void Program::gen_exit(std::ostream &out, const Instruction &i) {
+        // Check if std module is being used
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
+        }
+
+        // If using std module, clean up program args before exit
+        if(uses_std_module) {
+            out << "\t# Clean up program arguments before exit\n";
+            out << "\tcall " << getPlatformSymbolName("mxvm_free_program_args") << "\n";
+        }
+
         if(!i.op1.op.empty()) {
             std::vector<Operand> opz;
             opz.push_back(i.op1);
