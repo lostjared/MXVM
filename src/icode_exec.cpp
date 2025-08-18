@@ -841,10 +841,10 @@ namespace mxvm {
 
         Variable& ptrVar = getVariable(instr.op2.op);
         if (index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name);
+            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name + ", " + std::to_string(index) + " >= " + std::to_string(ptrVar.var_value.ptr_count));
         }
         if (size > ptrVar.var_value.ptr_size) {
-            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name);
+            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name + ", " + std::to_string(size) + " > " + std::to_string(ptrVar.var_value.ptr_size));
         }
 
         char* base = static_cast<char*>(ptr) + index * size;

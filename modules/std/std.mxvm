@@ -46,4 +46,6 @@ module std {
     extern hypot
     extern round
     extern trunc
+    extern float_to_int
+    extern int_to_float
 }

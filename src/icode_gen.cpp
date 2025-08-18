@@ -1183,7 +1183,16 @@ namespace mxvm {
             if(isVariable(i.op2.op)) {
                 Variable &v2 = getVariable(i.op2.op);
                 if(v2.type != v.type) {
-                    throw mx::Exception ("mov operand type mismatch. ");
+
+                    std::string s1;
+                    std::ostringstream stream;
+                    stream << v.type;
+                    s1 = stream.str();
+                    std::string s2;
+                    stream.str("");
+                    stream << v2.type;
+                    s2 = stream.str();
+                    throw mx::Exception ("mov operand type mismatch in " + name + " " + s1 + " != " + s2 );
                 }
                 switch(v.type) {
                     case VarType::VAR_INTEGER:

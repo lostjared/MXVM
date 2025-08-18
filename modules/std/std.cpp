@@ -820,3 +820,53 @@ extern "C" void mxvm_std_set_program_args(mxvm::Program *program, std::vector<mx
 
     set_program_args(argc, argv);
 }
+
+extern "C" void mxvm_std_float_to_int(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("float_to_int requires 1 argument (float value).");
+    }
+
+    double value = 0.0;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_FLOAT) {
+            value = var.var_value.float_value;
+        } else if (var.type == mxvm::VarType::VAR_INTEGER) {
+            value = static_cast<double>(var.var_value.int_value);
+        } else {
+            throw mx::Exception("float_to_int argument must be a float or integer variable.");
+        }
+    } else {
+        value = static_cast<double>(operand[0].op_value);
+    }
+
+    int64_t result = static_cast<int64_t>(value);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_std_int_to_float(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("int_to_float requires 1 argument (integer value).");
+    }
+
+    int64_t value = 0;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (var.type == mxvm::VarType::VAR_INTEGER) {
+            value = var.var_value.int_value;
+        } else if (var.type == mxvm::VarType::VAR_FLOAT) {
+            value = static_cast<int64_t>(var.var_value.float_value);
+        } else {
+            throw mx::Exception("int_to_float argument must be an integer or float variable.");
+        }
+    } else {
+        value = operand[0].op_value;
+    }
+
+    double result = static_cast<double>(value);
+    program->vars["%rax"].type = mxvm::VarType::VAR_FLOAT;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_FLOAT;
+    program->vars["%rax"].var_value.float_value = result;
+}

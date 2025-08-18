@@ -71,3 +71,11 @@ const char *argv(int idx) {
     if (idx < 0 || idx >= g_argc) return NULL;
     return g_argv[idx];
 }
+
+int64_t float_to_int(double d) {
+    return (int64_t)d;
+}
+
+double int_to_float(int64_t i) {
+    return (double)i;
+}
