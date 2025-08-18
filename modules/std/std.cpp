@@ -790,3 +790,33 @@ extern "C" void mxvm_std_argv(mxvm::Program *program, std::vector<mxvm::Operand>
 extern "C" void mxvm_std_free_program_args(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     free_program_args();
 }
+
+extern "C" void mxvm_std_set_program_args(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("set_program_args requires 2 arguments (argc, argv)");
+    }
+
+    if (!program->isVariable(operand[0].op) || !program->isVariable(operand[1].op)) {
+        throw mx::Exception("set_program_args arguments must be variables");
+    }
+
+    mxvm::Variable &argc_var = program->getVariable(operand[0].op);
+    mxvm::Variable &argv_var = program->getVariable(operand[1].op);
+
+    if (argc_var.type != mxvm::VarType::VAR_INTEGER) {
+        throw mx::Exception("set_program_args first argument (argc) must be an integer");
+    }
+
+    if (argv_var.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("set_program_args second argument (argv) must be a pointer");
+    }
+
+    int argc = (int)argc_var.var_value.int_value;
+    const char **argv = (const char**)argv_var.var_value.ptr_value;
+
+    if (argv == nullptr && argc > 0) {
+        throw mx::Exception("set_program_args: argv pointer is null but argc > 0");
+    }
+
+    set_program_args(argc, argv);
+}

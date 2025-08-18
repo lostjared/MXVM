@@ -209,7 +209,8 @@ namespace mxvm {
         }
         func = (void*)dlsym(handle, name.c_str());
         if(func == nullptr) {
-            throw mx::Exception("Error could not find symbol: " + name + " in: " + mod);
+            char *dl_e = dlerror();
+            throw mx::Exception("Error could not find symbol: " + name + " in: " + mod + " Error: " + ((dl_e != nullptr) ? dl_e : ""));
         }
         char *dl_err = dlerror();
         if(dl_err != nullptr) {

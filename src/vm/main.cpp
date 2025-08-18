@@ -88,7 +88,22 @@ void createMakefile(Args *args);
 
 Args proc_args(int argc, char **argv) {
     Args args;
-    mx::Argz<std::string> argz(argc, argv);
+    std::vector<char*> v;
+    int stop = 0;
+    for(int i = 0; i < argc; ++i) {
+        if(std::string(argv[i]) != "--args") {
+            v.push_back(argv[i]);
+        } else {
+            stop = i;
+            break;
+        }
+    }
+    std::vector<std::string> arg_v;
+    for(int i = stop+1; i < argc; ++i) {
+        args.argv.push_back(argv[i]);
+    }
+
+    mx::Argz<std::string> argz(static_cast<int>(v.size()), v.data());
     args.platform_argc = argc;
     args.platform_argv = argv;
     argz.addOptionSingleValue('o', "output file")
@@ -205,17 +220,6 @@ Args proc_args(int argc, char **argv) {
     if(args.module_path.empty()) {
         std::cerr << Col("MXVM: Errror: ", mx::Color::RED) << "please set module path.\n";
         exit(EXIT_FAILURE);
-    }
-
-    bool add = false;
-    for(int i = 0; i < argc; ++i) {
-        if(std::string(argv[i]) == "--args") {
-            add = true; 
-            continue;
-        }
-        if(add == true) {
-            args.argv.push_back(argv[i]);
-        }
     }
 
     return args;
@@ -556,6 +560,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 #endif
 
+    
     try {
         std::string input_file(input);
         std::fstream file;
@@ -569,13 +574,62 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
         file.close();
         mxvm::Parser parser(stream.str());
         parser.scan();
-        
+        bool uses_std_module = false;
         parser.module_path = std::string(mod_path);
         parser.object_path = std::string(object_path);
         parser.include_path = std::string(include_path);
+
+        class ArgsRaii {
+        public:
+            ArgsRaii() = default;
+            void init(const std::vector<std::string> &argv, void *handle) {
+                std::vector<const char*> c_argv;
+                c_argv.push_back("mxvm"); 
+                for(const auto& arg : argv) {
+                    c_argv.push_back(arg.c_str());
+                }
+
+                void *set_args = (void*)dlsym(handle, "set_program_args");
+                using set_program_args_t = void(*)(int, const char **);
+                if (set_args) {
+                    auto func = reinterpret_cast<set_program_args_t>(set_args);
+                    func(static_cast<int>(c_argv.size()), c_argv.data());
+                    set = true;
+                    handle_ = handle;
+                }
+            }
+            ~ArgsRaii() {
+                void *free_args = (void*)dlsym(handle_, "free_program_args");
+                using set_program_args_t = void(*)();
+                if (free_args) {
+                    auto func = reinterpret_cast<set_program_args_t>(free_args);
+                    func();
+                    set = false;
+                }
+            }
+
+            bool set = false;
+            void *handle_ = nullptr;
+        };
+
         if(parser.generateProgramCode(mxvm::Mode::MODE_INTERPRET, program)) {
             if(program->object) {
                 throw mx::Exception("Requires one program object to execute");
+            }
+            ArgsRaii args_raii;
+
+            if(mxvm::Program::base != nullptr) {
+                void *handle = nullptr;
+                for(const auto &ext : mxvm::Program::base->external_functions) {
+                    if(ext.second.mod_name == "std") {
+                        uses_std_module = true;
+                        handle = ext.second.handle;
+                        break;
+                    }
+                }
+                if(uses_std_module) {
+                  args_raii.init(argv, handle);
+                }
             }
             program->flatten(program.get());
             exitCode = program->exec();
