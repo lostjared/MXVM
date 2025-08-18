@@ -102,7 +102,6 @@ Args proc_args(int argc, char **argv) {
     for(int i = stop+1; i < argc; ++i) {
         args.argv.push_back(argv[i]);
     }
-
     mx::Argz<std::string> argz(static_cast<int>(v.size()), v.data());
     args.platform_argc = argc;
     args.platform_argv = argv;
@@ -584,7 +583,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
             ArgsRaii() = default;
             void init(const std::vector<std::string> &argv, void *handle) {
                 std::vector<const char*> c_argv;
-                c_argv.push_back("mxvm"); 
+                c_argv.push_back("mxvmc"); 
                 for(const auto& arg : argv) {
                     c_argv.push_back(arg.c_str());
                 }
