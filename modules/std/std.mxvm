@@ -1,4 +1,8 @@
 module std {
+    extern argc
+    extern argv
+    extern set_program_args
+    extern free_program_args
     extern abs
     extern fabs
     extern sqrt

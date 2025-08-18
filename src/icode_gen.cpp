@@ -150,12 +150,6 @@ namespace mxvm {
             else
                 out << "\t.extern " << getPlatformSymbolName(e.mod + "_" + e.name) << "\n";
         }
-
-        
-        if(uses_std_module) {
-            out << "\t.extern " << getPlatformSymbolName("set_program_args") << "\n";
-            out << "\t.extern " << getPlatformSymbolName("free_program_args") << "\n";
-        }
     
         if(!this->object)  {
             out << "\t.p2align 4, 0x90\n";
@@ -1285,8 +1279,7 @@ namespace mxvm {
 
         // If using std module, clean up program args before exit
         if(uses_std_module) {
-            out << "\t# Clean up program arguments before exit\n";
-            out << "\tcall " << getPlatformSymbolName("mxvm_free_program_args") << "\n";
+            out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
         }
 
         if(!i.op1.op.empty()) {

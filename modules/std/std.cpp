@@ -8,7 +8,7 @@
 #include <cctype>
 #include "mxvm/mxvm.hpp"
 
-// Math functions
+
 extern "C" void mxvm_std_abs(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("abs requires 1 argument (value).");
@@ -754,3 +754,39 @@ extern "C" void mxvm_std_trunc(mxvm::Program *program, std::vector<mxvm::Operand
     program->vars["%rax"].var_value.float_value = r;
 }
 
+
+extern "C" void mxvm_std_argc(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    (void)operand;
+    int v = argc();
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = (int64_t)v;
+}
+
+extern "C" void mxvm_std_argv(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("argv(index) requires 1 argument");
+    }
+
+    int idx = 0;
+    if (operand[0].type == mxvm::OperandType::OP_CONSTANT) {
+        idx = (int)operand[0].op_value;
+    } else if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &v = program->getVariable(operand[0].op);
+        if (v.type != mxvm::VarType::VAR_INTEGER) {
+            throw mx::Exception("argv index must be an integer");
+        }
+        idx = (int)v.var_value.int_value;
+    } else {
+        throw mx::Exception("argv argument must be an index constant or integer variable");
+    }
+
+    const char *s = argv(idx);
+    program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
+    program->vars["%rax"].var_value.ptr_value = (void*)s; /* may be NULL */
+}
+
+extern "C" void mxvm_std_free_program_args(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    free_program_args();
+}

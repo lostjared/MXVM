@@ -288,6 +288,7 @@ int process_arguments(Args *args) {
                     if(ldf != nullptr) {
                         ldflags = ldf;
                     }
+                    ldflags += " -lm ";
                     
                     std::ostringstream modules_archives;
                     std::set<std::string> arch;
@@ -359,6 +360,9 @@ int process_arguments(Args *args) {
                     if(ldf != nullptr) {
                         ldflags = ldf;
                     }
+
+                    ldflags += " -lm ";
+
                     std::ostringstream modules_archives;
                     std::set<std::string> arch;
                     for(auto &m : mxvm::Program::base->external) {

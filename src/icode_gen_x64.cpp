@@ -198,6 +198,15 @@ namespace mxvm {
         std::unordered_map<int,std::string> labels_;
         for (auto &l : labels) labels_[l.second.first] = l.first;
 
+        // Check if std module is being used
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
+        }
+
         out << ".section .data\n";
 
         std::vector<std::string> var_names;
@@ -255,6 +264,7 @@ namespace mxvm {
 
         out << "\t.extern __acrt_iob_func\n";
 
+        
         for (auto &lbl : labels)
             if (lbl.second.second == true) out << "\t.globl " << name + "_" + lbl.first << "\n";
 
@@ -269,8 +279,17 @@ namespace mxvm {
             out << "\t.p2align 4, 0x90\n";
             out << ".globl main\n";
             out << "main:\n";
-                 out << "\tpush %rbp\n";
+            out << "\tpush %rbp\n";
             out << "\tmov %rsp, %rbp\n";
+            
+            if(uses_std_module) {
+                out << "\t# Set up program arguments for std module\n";
+                out << "\tmov %rcx, %r12\n";
+                out << "\tmov %rdx, %r13\n";
+                size_t total = x64_reserve_call_area(out, 0);
+                out << "\tcall set_program_args\n";
+                x64_release_call_area(out, total);
+            }
         }
 
         x64_sp_mod16 = 8; 
@@ -305,6 +324,53 @@ namespace mxvm {
         std::string mainFunc = " Object";
         if (root_name == name) mainFunc = " Program";
         std::cout << Col("MXVM: Compiled: ", mx::Color::BRIGHT_BLUE) << name << ".s" << mainFunc << Col(" platform: ", mx::Color::BRIGHT_CYAN) << "Windows" << "\n";
+    }
+
+
+    void Program::x64_gen_done(std::ostream &out, const Instruction&) {
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
+        }
+
+        if(uses_std_module && !this->object) {
+            size_t total = x64_reserve_call_area(out, 0);
+            out << "\tcall free_program_args\n";
+            x64_release_call_area(out, total);
+        }
+
+        out << "\txor %eax, %eax\n";
+        out << "\tleave\n";
+        out << "\tret\n";
+    }
+
+    void Program::x64_gen_ret(std::ostream &out, const Instruction&) {
+        out << "\tleave\n";
+        out << "\tret\n";
+    }
+
+    void Program::x64_gen_return(std::ostream &out, const Instruction &i) {
+        if (isVariable(i.op1.op)) out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        else throw mx::Exception("return requires variable");
+    }
+
+    void Program::x64_gen_neg(std::ostream &out, const Instruction &i) {
+        if (isVariable(i.op1.op)) {
+            Variable &v = getVariable(i.op1.op);
+            if (v.type == VarType::VAR_INTEGER) {
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op1);
+                out << "\tnegq %rcx\n";
+                out << "\tmovq %rcx, " << getMangledName(i.op1) << "(%rip)\n";
+            } else if (v.type == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                out << "\txorpd %xmm1, %xmm1\n";
+                out << "\tsubsd %xmm0, %xmm1\n";
+                out << "\tmovsd %xmm1, " << getMangledName(i.op1) << "(%rip)\n";
+            } else throw mx::Exception("neg requires float or integer");
+        } else throw mx::Exception("neg requires variable");
     }
 
     void Program::x64_generateInstruction(std::ostream &out, const Instruction &i) {
@@ -353,38 +419,6 @@ namespace mxvm {
             case NEG: x64_gen_neg(out, i); break;
             default: throw mx::Exception("Invalid or unsupported instruction");
         }
-    }
-
-    void Program::x64_gen_done(std::ostream &out, const Instruction&) {
-        out << "\txor %eax, %eax\n";
-        out << "\tleave\n";
-        out << "\tret\n";
-    }
-
-    void Program::x64_gen_ret(std::ostream &out, const Instruction&) {
-        out << "\tleave\n";
-        out << "\tret\n";
-    }
-
-    void Program::x64_gen_return(std::ostream &out, const Instruction &i) {
-        if (isVariable(i.op1.op)) out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-        else throw mx::Exception("return requires variable");
-    }
-
-    void Program::x64_gen_neg(std::ostream &out, const Instruction &i) {
-        if (isVariable(i.op1.op)) {
-            Variable &v = getVariable(i.op1.op);
-            if (v.type == VarType::VAR_INTEGER) {
-                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op1);
-                out << "\tnegq %rcx\n";
-                out << "\tmovq %rcx, " << getMangledName(i.op1) << "(%rip)\n";
-            } else if (v.type == VarType::VAR_FLOAT) {
-                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
-                out << "\txorpd %xmm1, %xmm1\n";
-                out << "\tsubsd %xmm0, %xmm1\n";
-                out << "\tmovsd %xmm1, " << getMangledName(i.op1) << "(%rip)\n";
-            } else throw mx::Exception("neg requires float or integer");
-        } else throw mx::Exception("neg requires variable");
     }
 
     void Program::x64_gen_invoke(std::ostream &out, const Instruction &i) {
@@ -942,6 +976,23 @@ namespace mxvm {
     }
 
     void Program::x64_gen_exit(std::ostream &out, const Instruction &i) {
+        // Check if std module is being used
+        bool uses_std_module = false;
+        for(const auto &e : external) {
+            if(e.mod == "std") {
+                uses_std_module = true;
+                break;
+            }
+        }
+
+        // If using std module, clean up program args before exit
+        if(uses_std_module) {
+            out << "\t# Clean up program arguments before exit\n";
+            size_t total = x64_reserve_call_area(out, 0);
+            out << "\tcall mxvm_free_program_args\n";
+            x64_release_call_area(out, total);
+        }
+
         if (!i.op1.op.empty()) {
             std::vector<Operand> opz; opz.push_back(i.op1);
             x64_generateFunctionCall(out, "exit", opz);
