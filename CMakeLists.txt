@@ -128,6 +128,7 @@ target_include_directories(mxvm PUBLIC
 )
 
 add_subdirectory(modules/io)
+add_subdirectory(modules/std)
 add_subdirectory(modules/string)
 add_compile_definitions()
 add_subdirectory(src/vm)

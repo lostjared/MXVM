@@ -37,6 +37,7 @@ install(TARGETS mxvm_sdl mxvm_std_static
 
 if(WIN32)
     install(TARGETS mxvm_sdl
-        RUNTIME DESTINATION lib/modules/sdl
+        RUNTIME DESTINATION lib/modules/std
     )
 endif()
+    
