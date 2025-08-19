@@ -9,6 +9,14 @@ namespace scan {
 
     Scanner::Scanner(const TString &b) : string_buffer{b} {}
 
+    void Scanner::removeEOL() {
+        for (int64_t i = tokens.size() - 1; i >= 0; --i) {
+            if (tokens[i].getTokenValue() == "\n" && tokens[i].getTokenType() == types::TokenType::TT_SYM) {
+                tokens.erase(tokens.begin() + i);
+            }
+        }
+    }
+
     uint64_t Scanner::parseLineNumber() {
         std::string lineNumberStr;
         while (true) {
@@ -261,7 +269,7 @@ namespace scan {
             "++", "--", ">>=", "<<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", 
             "==", "!=", ">=", "<=", ">>", "<<", "&&", "||", "->", ".", "&", "*", "+", 
             "-", "~", "!", "/", "%", ">", "<", "=", "^", "|", "?", ":", ";", ",", 
-            "(", ")", "[", "]", "{", "}", "->", ".","::", "$"
+            "(", ")", "[", "]", "{", "}", "->", ".","::", "$", ":="
         };
         return c_op.find(str) != c_op.end();
     }
