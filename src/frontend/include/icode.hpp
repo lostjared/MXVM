@@ -41,6 +41,9 @@ namespace pascal {
             if (usedStrings.count("fmt_int")) {
                 out << "        string fmt_int = \"%lld \"\n";
             }
+            if (usedStrings.count("fmt_str")) {
++               out << "        string fmt_str = \"%s \"\n";
++           }
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
             }
@@ -163,33 +166,34 @@ namespace pascal {
         void visit(ProcCallNode& node) override {
             std::string name = node.name;
             if (name == "writeln" || name == "write") {
-                // print each argument as integer
-                usedStrings.insert("fmt_int");
-                for (auto &arg : node.arguments) {
-                    std::string v = eval(arg.get());
-                    emit2("print", "fmt_int", v);
+
+                for(auto &arg : node.arguments) {
+                    ASTNode *a = arg.get();
+                    if(dynamic_cast<StringNode*>(a)) {
+                        usedStrings.insert("fmt_str");
+                        std::string v = eval(a);
+                        emit2("print", "fmt_str", v);
+                    } else {
+                        usedStrings.insert("fmt_int");
+                        std::string v = eval(a);
+                        emit2("print", "fmt_int", v);
+                    }
                 }
+
                 if (name == "writeln") {
                     usedStrings.insert("newline");
                     emit1("print", "newline");
                 }
                 return;
             }
-            // user procedure: evaluate args first (by side effect or future ABI)
+            
             for (auto &arg : node.arguments) (void)eval(arg.get());
             emit1("call", funcLabel("PROC_", name));
         }
 
         void visit(FuncCallNode& node) override {
-            // Evaluate args; place result convention into temp if your MXVM ABI returns via a known var.
-            // Here we just call; adapt to your ABI as needed.
             for (auto &arg : node.arguments) (void)eval(arg.get());
             emit1("call", funcLabel("FUNC_", node.name));
-            // If functions return via a known variable, capture it here:
-            // e.g., assume return is in vret:
-            // std::string t = newTemp();
-            // emit3("mov", t, "vret");
-            // pushValue(t);
         }
 
         void visit(BinaryOpNode& node) override {
