@@ -16,17 +16,21 @@ namespace pascal {
             : nextSlot(0), nextTemp(0), labelCounter(0) {}
 
         virtual ~CodeGenVisitor() = default;
+        std::string name = "App";
 
         void generate(ASTNode* root) {
             if (!root) return;
             instructions.clear();
             usedStrings.clear();
+            if (auto prog = dynamic_cast<ProgramNode*>(root)) {
+                name = prog->name;
+            }
             root->accept(*this);
             emit("done");
         }
 
         void writeTo(std::ostream& out) const {
-            out << "program PascalOutput {\n";
+            out << "program " << name << " {\n";
             out << "    section data {\n";
             for (int i = 0; i < nextSlot; ++i) {
                 out << "        int " << slotVar(i) << " = 0\n";
@@ -52,9 +56,9 @@ namespace pascal {
             out << "}\n";
         }
 
-        /* ====== AST Visitor ====== */
 
         void visit(ProgramNode& node) override {
+            name = node.name;
             if (node.block) node.block->accept(*this);
         }
 

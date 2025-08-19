@@ -4,7 +4,8 @@
 #include <fstream>
 #include <sstream>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char **argv) {
+    std::cout << "HERE!\n";
     try {
         std::string source;
         if(argc != 3) {
@@ -21,7 +22,7 @@ int main(int argc, char* argv[]) {
         source = buffer.str();       
         pascal::PascalParser parser(source);
         auto ast = parser.parseProgram();
-        if (ast) {
+        if (ast) {      
             pascal::CodeGenVisitor emiter;
             emiter.generate(ast.get());
             std::fstream file;
