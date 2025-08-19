@@ -5,7 +5,6 @@
 #include <sstream>
 
 int main(int argc, char **argv) {
-    std::cout << "HERE!\n";
     try {
         std::string source;
         if(argc != 3) {
