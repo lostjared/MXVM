@@ -53,6 +53,8 @@ namespace pascal {
                         for (auto &id : param->identifiers) {
                             if (paramIndex < 6) { 
                                 varSlot[id] = -2 - (paramIndex + 1);
+                                // Mark parameter registers as in use so they won't be reallocated
+                                regInUse[paramIndex + 1] = true;
                                 paramIndex++;
                             } else {
                                 int slot = newSlotFor(id);
@@ -83,6 +85,7 @@ namespace pascal {
                         for (auto &id : param->identifiers) {
                             if (paramIndex < 6) { 
                                 varSlot[id] = -2 - (paramIndex + 1);
+                                regInUse[paramIndex + 1] = true;
                                 paramIndex++;
                             } else {
                                 int slot = newSlotFor(id);
