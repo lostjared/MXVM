@@ -1,4 +1,3 @@
-
 #ifndef __CODEGEN_H_
 #define __CODEGEN_H_
 #include "ast.hpp"
@@ -8,12 +7,16 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <algorithm>
 
 namespace pascal {
     class CodeGenVisitor : public ASTVisitor {
     public:
         CodeGenVisitor()
-            : nextSlot(0), nextTemp(0), labelCounter(0) {}
+            : regInUse(registers.size(), false),
+              currentFunctionName(),
+              functionSetReturn(false),
+              nextSlot(0), nextTemp(0), labelCounter(0) {}
 
         virtual ~CodeGenVisitor() = default;
         std::string name = "App";
@@ -22,43 +25,132 @@ namespace pascal {
             if (!root) return;
             instructions.clear();
             usedStrings.clear();
+            prolog.clear();
+            deferredProcs.clear();
+            deferredFuncs.clear();
+            
+            for (size_t i = 0; i < regInUse.size(); i++) {
+                regInUse[i] = false;
+            }
+            
             if (auto prog = dynamic_cast<ProgramNode*>(root)) {
                 name = prog->name;
             }
+            
             root->accept(*this);
             emit("done");
+            
+            for (auto pn : deferredProcs) {
+                emitLabel(funcLabel("function PROC_", pn->name));
+                
+                for (size_t i = 0; i < regInUse.size(); i++) {
+                    regInUse[i] = false;
+                }
+                
+                int paramIndex = 0;
+                for (auto &p : pn->parameters) {
+                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                        for (auto &id : param->identifiers) {
+                            if (paramIndex < 6) { 
+                                varSlot[id] = -2 - (paramIndex + 1);
+                                paramIndex++;
+                            } else {
+                                int slot = newSlotFor(id);
+                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
+                                paramIndex++;
+                            }
+                        }
+                    }
+                }
+                
+                if (pn->block) pn->block->accept(*this);
+                emit("ret");
+            }
+            
+            for (auto fn : deferredFuncs) {
+                emitLabel(funcLabel("function FUNC_", fn->name));
+                
+                for (size_t i = 0; i < regInUse.size(); i++) {
+                    regInUse[i] = false;
+                }
+                
+                currentFunctionName = fn->name;
+                functionSetReturn = false;
+                
+                int paramIndex = 0;
+                for (auto &p : fn->parameters) {
+                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                        for (auto &id : param->identifiers) {
+                            if (paramIndex < 6) { 
+                                varSlot[id] = -2 - (paramIndex + 1);
+                                paramIndex++;
+                            } else {
+                                int slot = newSlotFor(id);
+                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
+                                paramIndex++;
+                            }
+                        }
+                    }
+                }
+                
+                if (fn->block) fn->block->accept(*this);
+                
+                if (!functionSetReturn) {
+                    emit3("mov", "rax", "0");
+                }
+                
+                emit("ret");
+                currentFunctionName.clear();
+                functionSetReturn = false;
+            }
+           
         }
 
         void writeTo(std::ostream& out) const {
             out << "program " << name << " {\n";
             out << "    section data {\n";
-            for (int i = 0; i < nextSlot; ++i) {
-                out << "        int " << slotVar(i) << " = 0\n";
+            
+            for (const auto& reg : registers) {
+                out << "        int " << reg << " = 0\n";
             }
+            
+            for (int i = 0; i < 8; ++i) {
+                out << "        int param" << i << " = 0\n";
+            }
+            
+            for (int i = 0; i < nextSlot; ++i) {
+                if (!isRegisterSlot(i) && !isTempVar(slotVar(i))) {
+                    out << "        int " << slotVar(i) << " = 0\n";
+                }
+            }
+            
             for (auto &s : stringLiterals) {
                 out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
             }
+            
             if (usedStrings.count("fmt_int")) {
                 out << "        string fmt_int = \"%lld \"\n";
             }
             if (usedStrings.count("fmt_str")) {
-               out << "        string fmt_str = \"%s \"\n";
+                out << "        string fmt_str = \"%s \"\n";
             }
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
             }
+            
             out << "    }\n";
             out << "    section code {\n";
             out << "    start:\n";
+            
             for (auto &s : prolog) out << "        " << s << "\n";
             for (auto &s : instructions) {
                 if (endsWithColon(s)) out << "    " << s << "\n";
                 else out << "        " << s << "\n";
             }
+            
             out << "    }\n";
             out << "}\n";
         }
-
 
         void visit(ProgramNode& node) override {
             name = node.name;
@@ -77,17 +169,11 @@ namespace pascal {
         }
 
         void visit(ProcDeclNode& node) override {
-            emitLabel(funcLabel("PROC_", node.name));
-            for (auto &p : node.parameters) if (p) p->accept(*this);
-            if (node.block) node.block->accept(*this);
-            emit("ret");
+            deferredProcs.push_back(&node);
         }
 
         void visit(FuncDeclNode& node) override {
-            emitLabel(funcLabel("FUNC_", node.name));
-            for (auto &p : node.parameters) if (p) p->accept(*this);
-            if (node.block) node.block->accept(*this);
-            emit("ret");
+            deferredFuncs.push_back(&node);
         }
 
         void visit(ParameterNode& node) override {
@@ -102,8 +188,16 @@ namespace pascal {
             std::string rhs = eval(node.expression.get());
             auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
             if (!varPtr) return;
-            int slot = newSlotFor(varPtr->name);
-            emit3("mov", slotVar(slot), rhs);
+            
+            if (!currentFunctionName.empty() && varPtr->name == currentFunctionName) {
+                emit3("mov", "rax", rhs);
+                functionSetReturn = true;
+            } else {
+                int slot = newSlotFor(varPtr->name);
+                emit3("mov", slotVar(slot), rhs);
+            }
+            
+            if (isReg(rhs)) freeReg(rhs);
         }
 
         void visit(IfStmtNode& node) override {
@@ -112,6 +206,8 @@ namespace pascal {
             std::string c = eval(node.condition.get());
             emit2("cmp", c, "0");
             emit1("je", elseL);
+            if (isReg(c)) freeReg(c);
+            
             if (node.thenStatement) node.thenStatement->accept(*this);
             emit1("jmp", endL);
             emitLabel(elseL);
@@ -126,6 +222,8 @@ namespace pascal {
             std::string c = eval(node.condition.get());
             emit2("cmp", c, "0");
             emit1("je", end);
+            if (isReg(c)) freeReg(c);
+            
             if (node.statement) node.statement->accept(*this);
             emit1("jmp", start);
             emitLabel(end);
@@ -135,6 +233,7 @@ namespace pascal {
             int slot = newSlotFor(node.variable);
             std::string startV = eval(node.startValue.get());
             emit3("mov", slotVar(slot), startV);
+            if (isReg(startV)) freeReg(startV);
 
             std::string loop = newLabel("FOR");
             std::string end  = newLabel("ENDFOR");
@@ -150,6 +249,7 @@ namespace pascal {
                 emit2("cmp", vr, endV);
                 emit1("jg", end);
             }
+            if (isReg(endV)) freeReg(endV);
 
             if (node.statement) node.statement->accept(*this);
 
@@ -166,17 +266,18 @@ namespace pascal {
         void visit(ProcCallNode& node) override {
             std::string name = node.name;
             if (name == "writeln" || name == "write") {
-
                 for(auto &arg : node.arguments) {
                     ASTNode *a = arg.get();
                     if(dynamic_cast<StringNode*>(a)) {
                         usedStrings.insert("fmt_str");
                         std::string v = eval(a);
                         emit2("print", "fmt_str", v);
+                        if (isReg(v)) freeReg(v);
                     } else {
                         usedStrings.insert("fmt_int");
                         std::string v = eval(a);
                         emit2("print", "fmt_int", v);
+                        if (isReg(v)) freeReg(v);
                     }
                 }
 
@@ -187,16 +288,57 @@ namespace pascal {
                 return;
             }
             
-            for (auto &arg : node.arguments) (void)eval(arg.get());
+            std::vector<std::string> argValues;
+            for (auto &arg : node.arguments) {
+                argValues.push_back(eval(arg.get()));
+            }
+            
+            // Visit ProcCallNode changes: avoid self-moves
+            for (size_t i = 0; i < argValues.size(); i++) {
+                if (i < 6) {
+                    // only emit move if source != destination (avoid mov rbx, rbx)
+                    if (registers[i+1] != argValues[i])
+                        emit3("mov", registers[i+1], argValues[i]);
+                } else {
+                    std::string paramVar = "param" + std::to_string(i);
+                    int paramSlot = newSlotFor(paramVar);
+                    emit3("mov", slotVar(paramSlot), argValues[i]);
+                }
+                if (isReg(argValues[i])) freeReg(argValues[i]);
+            }
+            
             emit1("call", funcLabel("PROC_", name));
         }
 
         void visit(FuncCallNode& node) override {
-            for (auto &arg : node.arguments) (void)eval(arg.get());
+            std::vector<std::string> argValues;
+            for (auto &arg : node.arguments) {
+                argValues.push_back(eval(arg.get()));
+            }
+            
+            // Visit FuncCallNode changes: avoid self-moves
+            for (size_t i = 0; i < argValues.size(); i++) {
+                if (i < 6) {
+                    if (registers[i+1] != argValues[i])
+                        emit3("mov", registers[i+1], argValues[i]);
+                } else {
+                    std::string paramVar = "param" + std::to_string(i);
+                    int paramSlot = newSlotFor(paramVar);
+                    emit3("mov", slotVar(paramSlot), argValues[i]);
+                }
+                if (isReg(argValues[i])) freeReg(argValues[i]);
+            }
+            
             emit1("call", funcLabel("FUNC_", node.name));
+            
+            pushValue("rax");
         }
 
         void visit(BinaryOpNode& node) override {
+            if (!node.left || !node.right) {
+                throw std::runtime_error("Binary operation missing operand");
+            }
+
             std::string a = eval(node.left.get());
             std::string b = eval(node.right.get());
 
@@ -219,8 +361,10 @@ namespace pascal {
                 case BinaryOpNode::OR:  pushLogicalOr(a, b);  break;
 
                 default: {
-                    std::string t = newTemp();
-                    pushValue(t); // undefined; avoid crash
+                    std::string t = allocReg();
+                    pushValue(t); 
+                    if (isReg(a)) freeReg(a);
+                    if (isReg(b)) freeReg(b);
                 }
             }
         }
@@ -229,7 +373,7 @@ namespace pascal {
             std::string v = eval(node.operand.get());
             switch (node.operator_) {
                 case UnaryOpNode::MINUS: {
-                    std::string t = newTemp();
+                    std::string t = allocReg();
                     emit3("mov", t, "0");
                     emit3("sub", t, v);
                     pushValue(t);
@@ -240,7 +384,7 @@ namespace pascal {
                     break;
                 }
                 case UnaryOpNode::NOT: {
-                    std::string t = newTemp();
+                    std::string t = allocReg();
                     std::string L1 = newLabel("NOT_TRUE");
                     std::string L2 = newLabel("NOT_END");
                     emit2("cmp", v, "0");
@@ -251,6 +395,7 @@ namespace pascal {
                     emit3("mov", t, "1");
                     emitLabel(L2);
                     pushValue(t);
+                    if (isReg(v)) freeReg(v);
                     break;
                 }
             }
@@ -262,9 +407,9 @@ namespace pascal {
         }
 
         void visit(NumberNode& node) override {
-            std::string t = newTemp();
-            emit3("mov", t, node.value);
-            pushValue(t);
+            std::string reg = allocReg();
+            emit3("mov", reg, node.value);
+            pushValue(reg);
         }
 
         void visit(StringNode& node) override {
@@ -273,17 +418,24 @@ namespace pascal {
         }
 
         void visit(BooleanNode& node) override {
-            std::string t = newTemp();
-            emit3("mov", t, node.value ? "1" : "0");
-            pushValue(t);
+            std::string reg = allocReg();
+            emit3("mov", reg, node.value ? "1" : "0");
+            pushValue(reg);
         }
 
         void visit(EmptyStmtNode& node) override {
-            // no-op
         }
 
     private:
-        /* ----- state ----- */
+        
+        const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
+        std::vector<bool> regInUse;
+        
+        std::vector<ProcDeclNode*> deferredProcs;
+        std::vector<FuncDeclNode*> deferredFuncs;
+        std::string currentFunctionName;
+        bool functionSetReturn;
+        
         int nextSlot;
         int nextTemp;
         int labelCounter;
@@ -294,16 +446,53 @@ namespace pascal {
 
         std::vector<std::string> evalStack;
 
-        std::unordered_map<std::string,std::string> stringLiterals; // sym -> literal
+        std::unordered_map<std::string,std::string> stringLiterals; 
         std::unordered_set<std::string> usedStrings;
 
-        /* ----- helpers ----- */
+        
         static bool endsWithColon(const std::string& s) {
             return !s.empty() && s.back() == ':';
         }
-
+        
+        bool isRegisterSlot(int slot) const {
+            return slot < -1; 
+        }
+        
+        bool isTempVar(const std::string& name) const {
+            return name.find("__t") != std::string::npos;
+        }
+        
         std::string slotVar(int slot) const {
+            if (slot < -1) {
+                int regIndex = -2 - slot;
+                if (regIndex >= 0 && regIndex < static_cast<int>(registers.size())) {
+                    return registers[regIndex];
+                }
+            }
             return "v" + std::to_string(slot);
+        }
+        
+        std::string allocReg() {
+            for (size_t i = 1; i < regInUse.size(); i++) { 
+                if (!regInUse[i]) {
+                    regInUse[i] = true;
+                    return registers[i];
+                }
+            }
+            return newTemp();
+        }
+        
+        void freeReg(const std::string& reg) {
+            for (size_t i = 0; i < registers.size(); i++) {
+                if (registers[i] == reg) {
+                    regInUse[i] = false;
+                    return;
+                }
+            }
+        }
+        
+        bool isReg(const std::string& name) const {
+            return std::find(registers.begin(), registers.end(), name) != registers.end();
         }
 
         int newSlotFor(const std::string& name) {
@@ -315,7 +504,6 @@ namespace pascal {
         }
 
         std::string newTemp() {
-            // temps are just more ints in data
             return slotVar(newSlotFor("__t" + std::to_string(nextTemp++)));
         }
 
@@ -368,9 +556,12 @@ namespace pascal {
             return key;
         }
 
-        /* eval stack helpers */
+        
         void pushValue(const std::string& v) { evalStack.push_back(v); }
         std::string popValue() {
+            if (evalStack.empty()) {
+                throw std::runtime_error("Evaluation stack underflow");
+            }
             std::string v = evalStack.back();
             evalStack.pop_back();
             return v;
@@ -379,17 +570,24 @@ namespace pascal {
         std::string eval(ASTNode* n) {
             if (!n) return "0";
             n->accept(*this);
+            if (evalStack.empty()) {
+                throw std::runtime_error("Expression produced no value");
+            }
             return popValue();
         }
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
-            std::string t = newTemp();
-            emit3(op, t, a, b);
-            pushValue(t);
+            std::string result = allocReg();
+            emit3("mov", result, a);
+            emit3(op, result, b);
+            pushValue(result);
+            
+            if (isReg(a) && a != result) freeReg(a);
+            if (isReg(b)) freeReg(b);
         }
 
         void pushCmpResult(const std::string& a, const std::string& b, const char* jop) {
-            std::string t  = newTemp();
+            std::string t = allocReg();
             std::string L1 = newLabel("CMP_TRUE");
             std::string L2 = newLabel("CMP_END");
             emit2("cmp", a, b);
@@ -400,10 +598,13 @@ namespace pascal {
             emit3("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
+            
+            if (isReg(a)) freeReg(a);
+            if (isReg(b)) freeReg(b);
         }
 
         void pushLogicalAnd(const std::string& a, const std::string& b) {
-            std::string t  = newTemp();
+            std::string t = allocReg();
             std::string L0 = newLabel("AND_ZERO");
             std::string L1 = newLabel("AND_END");
             emit2("cmp", a, "0");
@@ -416,10 +617,13 @@ namespace pascal {
             emit3("mov", t, "0");
             emitLabel(L1);
             pushValue(t);
+            
+            if (isReg(a)) freeReg(a);
+            if (isReg(b)) freeReg(b);
         }
 
         void pushLogicalOr(const std::string& a, const std::string& b) {
-            std::string t  = newTemp();
+            std::string t = allocReg();
             std::string L1 = newLabel("OR_ONE");
             std::string L2 = newLabel("OR_END");
             emit2("cmp", a, "0");
@@ -432,6 +636,9 @@ namespace pascal {
             emit3("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
+            
+            if (isReg(a)) freeReg(a);
+            if (isReg(b)) freeReg(b);
         }
     };
 
