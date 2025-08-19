@@ -42,8 +42,8 @@ namespace pascal {
                 out << "        string fmt_int = \"%lld \"\n";
             }
             if (usedStrings.count("fmt_str")) {
-+               out << "        string fmt_str = \"%s \"\n";
-+           }
+               out << "        string fmt_str = \"%s \"\n";
+            }
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
             }
