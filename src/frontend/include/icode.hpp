@@ -29,6 +29,7 @@ namespace pascal {
             deferredProcs.clear();
             deferredFuncs.clear();
             valueLocations.clear();
+            varTypes.clear();  
             
             for (size_t i = 0; i < regInUse.size(); i++) {
                 regInUse[i] = false;
@@ -52,13 +53,37 @@ namespace pascal {
                 for (auto &p : pn->parameters) {
                     if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
                         for (auto &id : param->identifiers) {
-                            if (paramIndex < 6) { 
-                                varSlot[id] = -2 - (paramIndex + 1);
-                                regInUse[paramIndex + 1] = true;
+                            if (paramIndex < 6) {
+                                if (!param->type.empty() && param->type == "string") {
+                                    varSlot[id] = newSlotFor(ptrRegisters[paramIndex]);
+                                    setVarType(id, VarType::STRING);
+                                } else {
+                                    varSlot[id] = -2 - (paramIndex + 1);
+                                    regInUse[paramIndex + 1] = true;
+                                    if (!param->type.empty()) {
+                                        if (param->type == "integer" || param->type == "boolean") {
+                                            setVarType(id, VarType::INT);
+                                        } else if (param->type == "real") {
+                                            setVarType(id, VarType::DOUBLE);
+                                        }
+                                   }
+                                }
                                 paramIndex++;
                             } else {
                                 int slot = newSlotFor(id);
                                 emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
+                                if (!param->type.empty()) {
+                                    if (param->type == "string") {
+                                        setVarType(id, VarType::STRING);
+                                        setSlotType(slot, VarType::STRING);
+                                    } else if (param->type == "integer" || param->type == "boolean") {
+                                        setVarType(id, VarType::INT);
+                                        setSlotType(slot, VarType::INT);
+                                    } else if (param->type == "real") {
+                                        setVarType(id, VarType::DOUBLE);
+                                        setSlotType(slot, VarType::DOUBLE);
+                                    }
+                                }
                                 paramIndex++;
                             }
                         }
@@ -71,14 +96,24 @@ namespace pascal {
             
             for (auto fn : deferredFuncs) {
                 emitLabel(funcLabel("function FUNC_", fn->name));
-                
                 for (size_t i = 0; i < regInUse.size(); i++) {
                     regInUse[i] = false;
                 }
-                
                 currentFunctionName = fn->name;
                 functionSetReturn = false;
-                
+
+                if (!fn->returnType.empty()) { 
+                    if (fn->returnType == "string") {
+                        setVarType(fn->name, VarType::STRING);
+                    }
+                    else if (fn->returnType == "integer" || fn->returnType == "boolean") {
+                        setVarType(fn->name, VarType::INT);
+                    }
+                    else if (fn->returnType == "real") {
+                        setVarType(fn->name, VarType::DOUBLE);
+                    }
+                }
+
                 int paramIndex = 0;
                 for (auto &p : fn->parameters) {
                     if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
@@ -86,22 +121,48 @@ namespace pascal {
                             if (paramIndex < 6) { 
                                 varSlot[id] = -2 - (paramIndex + 1);
                                 regInUse[paramIndex + 1] = true;
+                                if (!param->type.empty()) {
+                                    if (param->type == "string") {
+                                        setVarType(id, VarType::STRING);
+                                    }
+                                    else if (param->type == "integer" || param->type == "boolean") {
+                                        setVarType(id, VarType::INT);
+                                    }
+                                    else if (param->type == "real") {
+                                        setVarType(id, VarType::DOUBLE);
+                                    }
+                                }
                                 paramIndex++;
                             } else {
-                                int slot = newSlotFor(id);
+                                int slot = newSlotFor(id); 
                                 emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
+                                if (!param->type.empty()) {
+                                    if (param->type == "string") {
+                                        setVarType(id, VarType::STRING);
+                                    }
+                                    else if (param->type == "integer" || param->type == "boolean") {
+                                        setVarType(id, VarType::INT);
+                                    }
+                                    else if (param->type == "real") {
+                                        setVarType(id, VarType::DOUBLE);
+                                    }
+                                }
                                 paramIndex++;
                             }
                         }
                     }
                 }
-                
+
                 if (fn->block) fn->block->accept(*this);
-                
+
                 if (!functionSetReturn) {
-                    emit3("mov", "rax", "0");
+                    if (getVarType(fn->name) == VarType::STRING) {
+                        emit3("mov", "rax", emptyString());
+                    } else {
+                        emit3("mov", "rax", "0");
+                    }
                 }
-                
+
                 emit("ret");
                 currentFunctionName.clear();
                 functionSetReturn = false;
@@ -117,18 +178,39 @@ namespace pascal {
                 out << "        int " << reg << " = 0\n";
             }
             
+            for (const auto& preg : ptrRegisters) {
+                out << "        ptr " << preg << " = null\n";
+            }
+            
             for (int i = 0; i < 8; ++i) {
                 out << "        int param" << i << " = 0\n";
             }
             
             for (int i = 0; i < nextSlot; ++i) {
-                if (!isRegisterSlot(i) && !isTempVar(slotVar(i))) {
-                    out << "        int " << slotVar(i) << " = 0\n";
+                if (!isRegisterSlot(i) && !isTempVar(slotVar(i)) && !isPtrReg(slotVar(i))) {
+                    auto it = slotToType.find(i);
+                    if (it != slotToType.end()) {
+                        if (it->second == VarType::STRING) {
+                            out << "        string " << slotVar(i) << " = \"\"\n";
+                        } else if (it->second == VarType::PTR) {
+                            out << "        ptr " << slotVar(i) << " = null\n";
+                        } else {
+                            out << "        int " << slotVar(i) << " = 0\n";
+                        }
+                    } else {
+                        out << "        int " << slotVar(i) << " = 0\n";
+                    }
                 }
             }
             
+            if (needsEmptyString) {
+                out << "        string empty_str = \"\"\n";
+            }
+            
             for (auto &s : stringLiterals) {
-                out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
+                if (s.first != "empty_str") { 
+                    out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
+                }
             }
             
             if (usedStrings.count("fmt_int")) {
@@ -167,20 +249,93 @@ namespace pascal {
 
         void visit(VarDeclNode& node) override {
             for (auto &id : node.identifiers) {
-                newSlotFor(id);
+                int slot = newSlotFor(id);
+                
+                if (!node.type.empty()) {
+                    if (node.type == "string") {
+                        setVarType(id, VarType::PTR);
+                        setSlotType(slot, VarType::PTR);
+                        emit3("mov", slotVar(slot), emptyString());
+                    }
+                    else if (node.type == "integer" || node.type == "boolean") {
+                        setVarType(id, VarType::INT);
+                        setSlotType(slot, VarType::INT);
+                    }
+                    else if (node.type == "real") {
+                        setVarType(id, VarType::DOUBLE);
+                        setSlotType(slot, VarType::DOUBLE);
+                    }
+                    else if (node.type == "record") {
+                        setVarType(id, VarType::RECORD);
+                        setSlotType(slot, VarType::RECORD);
+                    }
+                }
             }
         }
 
         void visit(ProcDeclNode& node) override {
             deferredProcs.push_back(&node);
+            
+            FuncInfo info;
+            for (auto &p : node.parameters) {
+                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                    VarType t = VarType::INT; 
+                    if (!param->type.empty()) {
+                        if (param->type == "string") t = VarType::STRING;
+                        else if (param->type == "real") t = VarType::DOUBLE;
+                    }
+                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
+                        info.paramTypes.push_back(t);
+                    }
+                }
+            }
+            funcSignatures[node.name] = info;
         }
 
         void visit(FuncDeclNode& node) override {
             deferredFuncs.push_back(&node);
+
+            FuncInfo info;
+            if (!node.returnType.empty()) {
+                if (node.returnType == "string") info.returnType = VarType::STRING;
+                else if (node.returnType == "real") info.returnType = VarType::DOUBLE;
+                else info.returnType = VarType::INT;
+            }
+            
+            for (auto &p : node.parameters) {
+                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                    VarType t = VarType::INT; 
+                    if (!param->type.empty()) {
+                        if (param->type == "string") t = VarType::STRING;
+                        else if (param->type == "real") t = VarType::DOUBLE;
+                    }
+                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
+                        info.paramTypes.push_back(t);
+                    }
+                }
+            }
+            funcSignatures[node.name] = info;
         }
 
         void visit(ParameterNode& node) override {
-            for (auto &id : node.identifiers) newSlotFor(id);
+            for (auto &id : node.identifiers) {
+                int slot = newSlotFor(id);
+                
+                if (!node.type.empty()) {
+                    if (node.type == "string") {
+                        setVarType(id, VarType::STRING);
+                        setSlotType(slot, VarType::STRING);
+                    }
+                    else if (node.type == "integer" || node.type == "boolean") {
+                        setVarType(id, VarType::INT);
+                        setSlotType(slot, VarType::INT);
+                    }
+                    else if (node.type == "real") {
+                        setVarType(id, VarType::DOUBLE);
+                        setSlotType(slot, VarType::DOUBLE);
+                    }
+                }
+            }
         }
 
         void visit(CompoundStmtNode& node) override {
@@ -201,8 +356,14 @@ namespace pascal {
                 int slot = newSlotFor(varName);
                 std::string memLoc = slotVar(slot);
                 
-                if (rhs != memLoc) {
-                    emit3("mov", memLoc, rhs);
+                if (getVarType(varName) == VarType::STRING) {
+                    if (rhs != memLoc) {
+                        emit3("mov", memLoc, rhs);
+                    }
+                } else {
+                    if (rhs != memLoc) {
+                        emit3("mov", memLoc, rhs);
+                    }
                 }
                 
                 recordLocation(varName, {ValueLocation::MEMORY, memLoc});
@@ -279,7 +440,9 @@ namespace pascal {
             if (name == "writeln" || name == "write") {
                 for(auto &arg : node.arguments) {
                     ASTNode *a = arg.get();
-                    if(dynamic_cast<StringNode*>(a)) {
+                    if(dynamic_cast<StringNode*>(a) || 
+                       (dynamic_cast<VariableNode*>(a) && 
+                        isStringVar(dynamic_cast<VariableNode*>(a)->name))) {
                         usedStrings.insert("fmt_str");
                         std::string v = eval(a);
                         emit2("print", "fmt_str", v);
@@ -309,13 +472,37 @@ namespace pascal {
             }
             
             for (size_t i = 0; i < argValues.size(); i++) {
-                if (i < 6) {
-                    const std::string dest = registers[i+1];
-                    
-                    if (dest != argValues[i]) {
-                        emit3("mov", dest, argValues[i]);
+                std::string paramName;
+                VarType paramType = VarType::UNKNOWN;
+
+                if (i < node.arguments.size()) {
+                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
+                        paramName = varNode->name;
+                        paramType = getVarType(paramName);
+                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
+                        paramType = VarType::STRING;
                     }
-                    regInUse[i+1] = true;
+                }
+
+                auto sig_it = funcSignatures.find(name);
+                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
+                    if (sig_it->second.paramTypes[i] == VarType::STRING) {
+                        paramType = VarType::STRING;
+                    }
+                }
+
+                if (i < 6) {
+                    if (paramType == VarType::STRING) {
+                        if (i < ptrRegisters.size()) {
+                            emit3("mov", ptrRegisters[i], argValues[i]);
+                        }
+                    } else {
+                        const std::string dest = registers[i+1];
+                        if (dest != argValues[i]) {
+                            emit3("mov", dest, argValues[i]);
+                        }
+                        regInUse[i+1] = true;
+                    }
                 } else {
                     std::string paramVar = "param" + std::to_string(i);
                     int paramSlot = newSlotFor(paramVar);
@@ -330,21 +517,45 @@ namespace pascal {
         }
 
         void visit(FuncCallNode& node) override {
+            for (size_t i = 1; i <= 6; i++) {
+                regInUse[i] = false;
+            }
+            
             std::vector<std::string> argValues;
             for (auto &arg : node.arguments) {
                 argValues.push_back(eval(arg.get()));
             }
             
             for (size_t i = 0; i < argValues.size(); i++) {
+                std::string paramName;
+                VarType paramType = VarType::UNKNOWN;
+
+                if (i < node.arguments.size()) {
+                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
+                        paramName = varNode->name;
+                        paramType = getVarType(paramName);
+                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
+                        paramType = VarType::STRING;
+                    }
+                }
+
                 if (i < 6) {
-                    if (registers[i+1] != argValues[i])
-                        emit3("mov", registers[i+1], argValues[i]);
+                    const std::string dest = registers[i+1];
+
+                    if (paramType == VarType::STRING) {
+                        emit3("mov", dest, argValues[i]); 
+                    } else {
+                        emit3("mov", dest, argValues[i]);
+                    }
+                    regInUse[i+1] = true;
                 } else {
                     std::string paramVar = "param" + std::to_string(i);
                     int paramSlot = newSlotFor(paramVar);
                     emit3("mov", slotVar(paramSlot), argValues[i]);
                 }
-                if (isReg(argValues[i])) freeReg(argValues[i]);
+                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
+                    freeReg(argValues[i]);
+                }
             }
             
             emit1("call", funcLabel("FUNC_", node.name));
@@ -459,7 +670,50 @@ namespace pascal {
 
     private:
         
+        enum class VarType {
+            INT,
+            DOUBLE,
+            STRING,
+            RECORD,
+            PTR,     
+            UNKNOWN
+        };
+
+        struct FuncInfo {
+            std::vector<VarType> paramTypes;
+            VarType returnType = VarType::UNKNOWN;
+        };
+        std::unordered_map<std::string, FuncInfo> funcSignatures;
+
+        std::unordered_map<std::string, VarType> varTypes;
+        std::unordered_map<int, VarType> slotToType;
+        bool needsEmptyString = false;
+        
+        VarType getVarType(const std::string& name) const {
+            auto it = varTypes.find(name);
+            return it != varTypes.end() ? it->second : VarType::UNKNOWN;
+        }
+        
+        void setVarType(const std::string& name, VarType type) {
+            varTypes[name] = type;
+        }
+        
+        void setSlotType(int slot, VarType type) {
+            slotToType[slot] = type;
+        }
+        
+        bool isStringVar(const std::string& name) const {
+            VarType type = getVarType(name);
+            return type == VarType::STRING || type == VarType::PTR;
+        }
+        
+        std::string emptyString() {
+            needsEmptyString = true;
+            return "empty_str";
+        }
+        
         const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
+        const std::vector<std::string> ptrRegisters = {"arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
         std::vector<bool> regInUse;
         
         std::vector<ProcDeclNode*> deferredProcs;
@@ -480,11 +734,13 @@ namespace pascal {
         std::unordered_map<std::string,std::string> stringLiterals; 
         std::unordered_set<std::string> usedStrings;
 
-        struct ValueLocation {
-            enum Type { REGISTER, MEMORY, IMMEDIATE } type;
-            std::string location; 
-        };
-        std::unordered_map<std::string, ValueLocation> valueLocations;
+        std::unordered_map<int, std::string> slotToName;
+
+         struct ValueLocation {
+             enum Type { REGISTER, MEMORY, IMMEDIATE } type;
+             std::string location; 
+         };
+         std::unordered_map<std::string, ValueLocation> valueLocations;
 
         static bool endsWithColon(const std::string& s) {
             return !s.empty() && s.back() == ':';
@@ -499,6 +755,9 @@ namespace pascal {
         }
         
         std::string slotVar(int slot) const {
+            auto it = slotToName.find(slot);
+            if (it != slotToName.end()) return it->second;
+
             if (slot < -1) {
                 int regIndex = -2 - slot;
                 if (regIndex >= 0 && regIndex < static_cast<int>(registers.size())) {
@@ -515,9 +774,8 @@ namespace pascal {
                     return registers[i];
                 }
             }
-            return newTemp();
+            return newTemp();  
         }
-        
         void freeReg(const std::string& reg) {
             for (size_t i = 0; i < registers.size(); i++) {
                 if (registers[i] == reg) {
@@ -525,6 +783,10 @@ namespace pascal {
                     return;
                 }
             }
+        }
+
+        bool isPtrReg(const std::string& name) const {
+            return std::find(ptrRegisters.begin(), ptrRegisters.end(), name) != ptrRegisters.end();
         }
         
         bool isReg(const std::string& name) const {
@@ -536,6 +798,9 @@ namespace pascal {
             if (it != varSlot.end()) return it->second;
             int slot = nextSlot++;
             varSlot[name] = slot;
+            if (!name.empty() && name.find("__t") == std::string::npos) {
+                slotToName[slot] = name;
+            }
             return slot;
         }
 
@@ -638,7 +903,7 @@ namespace pascal {
             emit3(op, result, b);
             pushValue(result);
             
-            if (isReg(a) && a != result) freeReg(a);
+            if (isReg(a)) freeReg(a);
             if (isReg(b)) freeReg(b);
         }
 
@@ -703,7 +968,6 @@ namespace pascal {
             }
             return false;
         }
-
     };
 
 } 

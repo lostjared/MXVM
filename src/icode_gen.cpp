@@ -1184,6 +1184,12 @@ namespace mxvm {
                 Variable &v2 = getVariable(i.op2.op);
                 if(v2.type != v.type) {
 
+                    if(v.type == VarType::VAR_POINTER && v2.type == VarType::VAR_STRING) {
+                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                        return;        
+                    }
+
                     std::string s1;
                     std::ostringstream stream;
                     stream << v.type;
@@ -1208,10 +1214,11 @@ namespace mxvm {
                         generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
                         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
-                    case VarType::VAR_STRING:
-                        generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2);
-                        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-                    break;
+                    case VarType::VAR_STRING: {
+                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                        break;
+                    }
                     case VarType::VAR_BYTE:
                         generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2);
                         out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
