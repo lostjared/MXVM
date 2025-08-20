@@ -53,7 +53,6 @@ namespace pascal {
                         for (auto &id : param->identifiers) {
                             if (paramIndex < 6) { 
                                 varSlot[id] = -2 - (paramIndex + 1);
-                                // Mark parameter registers as in use so they won't be reallocated
                                 regInUse[paramIndex + 1] = true;
                                 paramIndex++;
                             } else {
@@ -291,23 +290,30 @@ namespace pascal {
                 return;
             }
             
+            for (size_t i = 1; i <= 6; i++) {
+                regInUse[i] = false;
+            }
+            
             std::vector<std::string> argValues;
             for (auto &arg : node.arguments) {
                 argValues.push_back(eval(arg.get()));
             }
             
-            // Visit ProcCallNode changes: avoid self-moves
             for (size_t i = 0; i < argValues.size(); i++) {
                 if (i < 6) {
-                    // only emit move if source != destination (avoid mov rbx, rbx)
-                    if (registers[i+1] != argValues[i])
-                        emit3("mov", registers[i+1], argValues[i]);
+                    const std::string dest = registers[i+1]; 
+                    if (dest != argValues[i]) {
+                        emit3("mov", dest, argValues[i]);
+                    }
+                    regInUse[i+1] = true;
                 } else {
                     std::string paramVar = "param" + std::to_string(i);
                     int paramSlot = newSlotFor(paramVar);
                     emit3("mov", slotVar(paramSlot), argValues[i]);
                 }
-                if (isReg(argValues[i])) freeReg(argValues[i]);
+                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
+                    freeReg(argValues[i]);
+                }
             }
             
             emit1("call", funcLabel("PROC_", name));
@@ -319,7 +325,6 @@ namespace pascal {
                 argValues.push_back(eval(arg.get()));
             }
             
-            // Visit FuncCallNode changes: avoid self-moves
             for (size_t i = 0; i < argValues.size(); i++) {
                 if (i < 6) {
                     if (registers[i+1] != argValues[i])
@@ -643,6 +648,14 @@ namespace pascal {
             if (isReg(a)) freeReg(a);
             if (isReg(b)) freeReg(b);
         }
+
+        bool isParmReg(const std::string& name) const {
+            for (size_t i = 1; i <= 6; i++) {
+                if (registers[i] == name) return true;
+            }
+            return false;
+        }
+
     };
 
 } 
