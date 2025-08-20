@@ -912,7 +912,14 @@ namespace mxvm {
         Variable &v = getVariable(i.op1.op);
         if (isVariable(i.op2.op)) {
             Variable &v2 = getVariable(i.op2.op);
-            if (v2.type != v.type) throw mx::Exception("mov type mismatch");
+            if (v2.type != v.type) {
+                if(v.type == VarType::VAR_POINTER  && v2.type == VarType::VAR_STRING) {
+                   out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+                   out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                   return;     
+                }
+                throw mx::Exception("mov type mismatch")
+            }
             switch (v.type) {
                 case VarType::VAR_INTEGER:
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
