@@ -28,6 +28,7 @@ namespace pascal {
             prolog.clear();
             deferredProcs.clear();
             deferredFuncs.clear();
+            valueLocations.clear();
             
             for (size_t i = 0; i < regInUse.size(); i++) {
                 regInUse[i] = false;
@@ -191,12 +192,20 @@ namespace pascal {
             auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
             if (!varPtr) return;
             
-            if (!currentFunctionName.empty() && varPtr->name == currentFunctionName) {
+            std::string varName = varPtr->name;
+            
+            if (!currentFunctionName.empty() && varName == currentFunctionName) {
                 emit3("mov", "rax", rhs);
                 functionSetReturn = true;
             } else {
-                int slot = newSlotFor(varPtr->name);
-                emit3("mov", slotVar(slot), rhs);
+                int slot = newSlotFor(varName);
+                std::string memLoc = slotVar(slot);
+                
+                if (rhs != memLoc) {
+                    emit3("mov", memLoc, rhs);
+                }
+                
+                recordLocation(varName, {ValueLocation::MEMORY, memLoc});
             }
             
             if (isReg(rhs)) freeReg(rhs);
@@ -301,7 +310,8 @@ namespace pascal {
             
             for (size_t i = 0; i < argValues.size(); i++) {
                 if (i < 6) {
-                    const std::string dest = registers[i+1]; 
+                    const std::string dest = registers[i+1];
+                    
                     if (dest != argValues[i]) {
                         emit3("mov", dest, argValues[i]);
                     }
@@ -410,11 +420,24 @@ namespace pascal {
         }
 
         void visit(VariableNode& node) override {
+            auto it = valueLocations.find(node.name);
+            if (it != valueLocations.end()) {
+                if (it->second.type == ValueLocation::REGISTER) {
+                    pushValue(it->second.location);
+                    return;
+                }
+            }
+            
             int slot = newSlotFor(node.name);
             pushValue(slotVar(slot));
         }
 
         void visit(NumberNode& node) override {
+            if (node.value.length() < 10) {
+                pushValue(node.value); 
+                return;
+            }
+            
             std::string reg = allocReg();
             emit3("mov", reg, node.value);
             pushValue(reg);
@@ -457,7 +480,12 @@ namespace pascal {
         std::unordered_map<std::string,std::string> stringLiterals; 
         std::unordered_set<std::string> usedStrings;
 
-        
+        struct ValueLocation {
+            enum Type { REGISTER, MEMORY, IMMEDIATE } type;
+            std::string location; 
+        };
+        std::unordered_map<std::string, ValueLocation> valueLocations;
+
         static bool endsWithColon(const std::string& s) {
             return !s.empty() && s.back() == ':';
         }
@@ -565,7 +593,16 @@ namespace pascal {
         }
 
         
-        void pushValue(const std::string& v) { evalStack.push_back(v); }
+        void pushValue(const std::string& v) { 
+            evalStack.push_back(v);
+            
+            if (isReg(v)) {
+                recordLocation(v, {ValueLocation::REGISTER, v});
+            }
+            else if (std::all_of(v.begin(), v.end(), [](char c) { 
+                return std::isdigit(c) || c == '-'; })) {
+            }
+        }
         std::string popValue() {
             if (evalStack.empty()) {
                 throw std::runtime_error("Evaluation stack underflow");
@@ -577,11 +614,22 @@ namespace pascal {
 
         std::string eval(ASTNode* n) {
             if (!n) return "0";
+            
+            if (auto num = dynamic_cast<NumberNode*>(n)) {
+                if (num->value.length() < 10) {
+                    return num->value;
+                }
+            }
+            
             n->accept(*this);
             if (evalStack.empty()) {
                 throw std::runtime_error("Expression produced no value");
             }
             return popValue();
+        }
+
+        void recordLocation(const std::string& var, ValueLocation loc) {
+            valueLocations[var] = loc;
         }
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
