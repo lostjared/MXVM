@@ -4,6 +4,69 @@
 #include <fstream>
 #include <sstream>
 
+
+std::string removeComments(const std::string &text) {
+    std::ostringstream stream;
+    enum State { CODE, BRACE_COMMENT, PAREN_COMMENT, STRING };
+    State state = CODE;
+    
+    for (size_t i = 0; i < text.length(); ++i) {
+        char c = text[i];
+        char next = (i + 1 < text.length()) ? text[i + 1] : '\0';
+        
+        switch (state) {
+            case CODE:
+                if (c == '{') {
+                    state = BRACE_COMMENT;
+                } else if (c == '(' && next == '*') {
+                    state = PAREN_COMMENT;
+                    i++; 
+                } else if (c == '\'') {
+                    stream << c;
+                    state = STRING;
+                } else if (c == '/' && next == '/') {
+                    
+                    while (i < text.length() && text[i] != '\n') {
+                        i++;
+                    }
+                    if (i < text.length()) {
+                        stream << '\n';
+                    }
+                } else {
+                    stream << c;
+                }
+                break;
+                
+            case BRACE_COMMENT:
+                if (c == '}') {
+                    state = CODE;
+                }
+                break;
+                
+            case PAREN_COMMENT:
+                if (c == '*' && next == ')') {
+                    state = CODE;
+                    i++; 
+                }
+                break;
+                
+            case STRING:
+                stream << c;
+                if (c == '\'') {
+                    if (next == '\'') {
+                        stream << next;
+                        i++; 
+                    } else {
+                        state = CODE;
+                    }
+                }
+                break;
+        }
+    }
+
+    return stream.str();
+}
+
 int main(int argc, char **argv) {
     try {
         std::string source;
@@ -19,7 +82,7 @@ int main(int argc, char **argv) {
         std::ostringstream buffer;
         buffer << file.rdbuf();
         source = buffer.str();       
-        pascal::PascalParser parser(source);
+        pascal::PascalParser parser(removeComments(source));
         auto ast = parser.parseProgram();
         if (ast) {      
             pascal::CodeGenVisitor emiter;
