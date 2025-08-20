@@ -1056,10 +1056,15 @@ namespace pascal {
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
             std::string result = allocReg();
-            emit3("mov", result, a);
-            emit3(op, result, b);
+            if (std::string(op) =="mul") {
+                emit3("mov", "rax", a);
+                emit1("mul", b);  
+                emit3("mov", result, "rax");
+            } else {
+                emit3("mov", result, a);
+                emit3(op, result, b);
+            }
             pushValue(result);
-            
             if (isReg(a)) freeReg(a);
             if (isReg(b)) freeReg(b);
         }
