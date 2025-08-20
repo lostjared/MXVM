@@ -391,7 +391,7 @@ namespace pascal {
 
         std::vector<std::unique_ptr<ASTNode>> statements;
         
-        // Parse statements until we reach "until"
+        
         while (!peekIs("until")) {
             statements.push_back(parseStatement());
             

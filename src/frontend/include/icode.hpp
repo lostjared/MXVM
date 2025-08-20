@@ -227,7 +227,7 @@ namespace pascal {
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
             }
-            
+            out << "        string input_buffer, 2048\n";
             out << "    }\n";
             out << "    section code {\n";
             out << "    start:\n";
@@ -524,6 +524,31 @@ namespace pascal {
                 if (name == "writeln") {
                     usedStrings.insert("newline");
                     emit1("print", "newline");
+                }
+                return;
+            }
+            
+            if (name == "readln") {
+                for (auto &arg : node.arguments) {
+                    if (auto varNode = dynamic_cast<VariableNode*>(arg.get())) {
+                        std::string varName = varNode->name;
+                        int slot = newSlotFor(varName);
+                        std::string memLoc = slotVar(slot);
+                        
+                        VarType varType = getVarType(varName);
+                        emit1("getline", "input_buffer");                
+                        if (varType == VarType::STRING || varType == VarType::PTR) {
+                            //emit2("mov", memLoc, tempStr);
+                        } else if (varType == VarType::INT || varType == VarType::UNKNOWN) {
+                            emit2("to_int", memLoc, "input_buffer");
+                        } else if (varType == VarType::DOUBLE) {
+                            emit2("to_float", memLoc,"input_buffer");
+                        } 
+                        recordLocation(varName, {ValueLocation::MEMORY, memLoc});
+                    } else {
+                        
+                        throw std::runtime_error("readln argument must be a variable");
+                    }
                 }
                 return;
             }
