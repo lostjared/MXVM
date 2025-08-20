@@ -157,9 +157,9 @@ namespace pascal {
 
                 if (!functionSetReturn) {
                     if (getVarType(fn->name) == VarType::STRING) {
-                        emit3("mov", "rax", emptyString());
+                        emit3("mov", "arg0", emptyString());  
                     } else {
-                        emit3("mov", "rax", "0");
+                        emit3("mov", "rax", "0");  
                     }
                 }
 
@@ -350,20 +350,18 @@ namespace pascal {
             std::string varName = varPtr->name;
             
             if (!currentFunctionName.empty() && varName == currentFunctionName) {
-                emit3("mov", "rax", rhs);
+                if (getVarType(currentFunctionName) == VarType::STRING) {
+                    emit3("mov", "arg0", rhs);  
+                } else {
+                    emit3("mov", "rax", rhs);   
+                }
                 functionSetReturn = true;
             } else {
                 int slot = newSlotFor(varName);
                 std::string memLoc = slotVar(slot);
                 
-                if (getVarType(varName) == VarType::STRING) {
-                    if (rhs != memLoc) {
-                        emit3("mov", memLoc, rhs);
-                    }
-                } else {
-                    if (rhs != memLoc) {
-                        emit3("mov", memLoc, rhs);
-                    }
+                if (rhs != memLoc) {
+                    emit3("mov", memLoc, rhs);
                 }
                 
                 recordLocation(varName, {ValueLocation::MEMORY, memLoc});
@@ -494,7 +492,15 @@ namespace pascal {
                 if (i < 6) {
                     if (paramType == VarType::STRING) {
                         if (i < ptrRegisters.size()) {
-                            emit3("mov", ptrRegisters[i], argValues[i]);
+                            if (ptrRegisters[i] != argValues[i]) {
+                                emit3("mov", ptrRegisters[i], argValues[i]);
+                            }
+                        } else {
+                            const std::string dest = registers[i+1];
+                            if (dest != argValues[i]) {
+                                emit3("mov", dest, argValues[i]);
+                            }
+                            regInUse[i+1] = true;
                         }
                     } else {
                         const std::string dest = registers[i+1];
@@ -560,7 +566,17 @@ namespace pascal {
             
             emit1("call", funcLabel("FUNC_", node.name));
             
-            pushValue("rax");
+            VarType returnType = VarType::INT;
+            auto sig_it = funcSignatures.find(node.name);
+            if (sig_it != funcSignatures.end()) {
+                returnType = sig_it->second.returnType;
+            }
+            
+            if (returnType == VarType::STRING) {
+                pushValue("arg0");  
+            } else {
+                pushValue("rax");   
+            }
         }
 
         void visit(BinaryOpNode& node) override {
@@ -713,7 +729,7 @@ namespace pascal {
         }
         
         const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
-        const std::vector<std::string> ptrRegisters = {"arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
+        const std::vector<std::string> ptrRegisters = {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
         std::vector<bool> regInUse;
         
         std::vector<ProcDeclNode*> deferredProcs;
