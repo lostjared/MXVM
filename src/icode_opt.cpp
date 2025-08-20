@@ -441,31 +441,6 @@ namespace mxvm {
                 }
             }
 
-            {
-                std::smatch m;
-                if (std::regex_match(line, m, re_mov_imm)) {
-                    const std::string imm = m[1].str();
-                    const std::string reg = m[2].str();
-                    if (imm == "0") { out.push_back("\txor " + reg + ", " + reg); continue; }
-
-                    if (i + 1 < lines.size()) {
-                        std::smatch m2;
-                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
-                            const std::string op_full = m2[1].str();
-                            const std::string src     = m2[2].str();
-                            const std::string dst     = m2[3].str();
-                            const std::string cmt     = (m2.size() >= 5) ? m2[4].str() : "";
-                            if (src == reg &&
-                                (op_full.rfind("cmp",0)==0 || op_full.rfind("add",0)==0 || op_full.rfind("sub",0)==0 ||
-                                op_full.rfind("and",0)==0 || op_full.rfind("or",0)==0  || op_full.rfind("xor",0)==0)) {
-                                out.push_back("\t" + op_full + " $" + imm + ", " + dst + cmt);
-                                ++i;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
 
             {
                 std::smatch m;
