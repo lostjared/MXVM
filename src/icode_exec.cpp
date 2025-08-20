@@ -250,6 +250,11 @@ namespace mxvm {
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
             dest.var_value = src.var_value;
+            if(dest.type == VarType::VAR_POINTER && dest.var_value.ptr_value == 0) {
+                if(!dest.var_value.str_value.empty()) {
+                    dest.var_value.ptr_value = dest.var_value.str_value.data();
+                }
+            }
         } else {
             setVariableFromConstant(dest, instr.op2.op);
         }
