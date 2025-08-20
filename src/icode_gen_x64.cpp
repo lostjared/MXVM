@@ -918,7 +918,7 @@ namespace mxvm {
                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
                    return;     
                 }
-                throw mx::Exception("mov type mismatch")
+                throw mx::Exception("mov type mismatch");
             }
             switch (v.type) {
                 case VarType::VAR_INTEGER:
