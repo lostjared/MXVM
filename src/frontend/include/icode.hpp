@@ -986,5 +986,7 @@ namespace pascal {
         }
     };
 
+    std::string mxvmOpt(const std::string &text);
+
 } 
 #endif

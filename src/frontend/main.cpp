@@ -29,7 +29,10 @@ int main(int argc, char **argv) {
             if(!file.is_open()) {
                 std::cerr << "Error could not open file: " << argv[2] << "\n";
             }
-            emiter.writeTo(file);
+            std::ostringstream output;
+            emiter.writeTo(output);
+            std::string opt = pascal::mxvmOpt(output.str());
+            file << opt << "\n";
             file.close();
         }
     } catch (const pascal::ParseException& e) {
