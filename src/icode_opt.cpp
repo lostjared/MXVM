@@ -179,11 +179,101 @@ namespace mxvm {
                 }
             }
 
+            std::regex re_store_load_store(
+                R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            if (i + 2 < lines.size()) {
+                std::smatch m1, m2, m3;
+                
+                // First: store reg1 to mem1
+                if (std::regex_match(lines[i], m1, re_store_load_store)) {
+                    const std::string reg1 = m1[1].str();
+                    const std::string mem1 = m1[2].str();
+                    
+                    // Second: load from mem1 to reg2
+                    std::string escaped_mem1 = std::regex_replace(mem1, std::regex(R"([\$\(\)])"), "\\$&");
+                    std::regex load_pattern(R"(^\s*movq?\s+)" + escaped_mem1 + 
+                                           R"(\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+                    
+                    if (std::regex_match(lines[i+1], m2, load_pattern)) {
+                        const std::string reg2 = m2[1].str();
+                        
+                        // Third: store reg2 to mem2
+                        std::regex store_pattern(R"(^\s*movq?\s+)" + reg2 + 
+                                                R"(\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
+                        
+                        if (std::regex_match(lines[i+2], m3, store_pattern)) {
+                            const std::string mem2 = m3[1].str();
+                            
+                            out.push_back(lines[i]);  // Keep first store
+                            
+                            // Generate direct store from original register to second memory location
+                            std::string optimized_store = "\tmovq " + reg1 + ", " + mem2;
+                            out.push_back(optimized_store);
+                            
+                            i += 2;  // Skip the next two instructions
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Track variables in registers for advanced optimization
+            std::unordered_map<std::string, std::string> reg_values;
+
+            // Pattern: A register is stored to memory and immediately reloaded
+            std::regex re_store_load(
+                R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            std::smatch store_match;
+            if (std::regex_match(lines[i], store_match, re_store_load)) {
+                const std::string reg = store_match[1].str();
+                const std::string mem = store_match[2].str();
+                
+                // Remember this store in case the next instruction loads it back
+                reg_values[mem] = reg;
+                
+                // Continue with normal processing
+                out.push_back(lines[i]);
+                continue;
+            }
+
+            // Pattern: Loading from memory that was just stored
+            std::regex re_load(
+                R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            std::smatch load_match;
+            if (std::regex_match(lines[i], load_match, re_load)) {
+                const std::string mem = load_match[1].str();
+                const std::string reg = load_match[2].str();
+                
+                // Check if we know which register already has this memory value
+                auto it = reg_values.find(mem);
+                if (it != reg_values.end()) {
+                    // Instead of loading from memory, copy from the register that has the value
+                    if (it->second != reg) { // Only emit if different registers
+                        out.push_back("\tmovq " + it->second + ", " + reg);
+                    }
+                    // Skip the load instruction
+                    continue;
+                }
+                
+                // If we don't know the value, process normally
+                out.push_back(lines[i]);
+                continue;
+            }
+
+            // For other instructions, clear our tracking since we don't know how they affect registers
+            reg_values.clear();
             out.push_back(lines[i]);
         }
 
         return out;
     }
+
 
     static std::vector<std::string> x64_opt_core_lines(const std::vector<std::string>& lines) {
     
@@ -216,8 +306,6 @@ namespace mxvm {
 
         std::vector<std::string> out;
         out.reserve(lines.size());
-
-        
         std::vector<int> frame_bytes;
 
         for (size_t i = 0; i < lines.size(); ++i) {
@@ -331,8 +419,144 @@ namespace mxvm {
                 }
             }
 
-            out.push_back(line);
+            std::regex re_store_load_store(
+                R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            if (i + 2 < lines.size()) {
+                std::smatch m1, m2, m3;
+                
+                
+                if (std::regex_match(lines[i], m1, re_store_load_store)) {
+                    const std::string reg1 = m1[1].str();
+                    const std::string mem1 = m1[2].str();
+                    
+                
+                    std::string escaped_mem1 = std::regex_replace(mem1, std::regex(R"([\$\(\)])"), "\\$&");
+                    std::regex load_pattern(R"(^\s*movq?\s+)" + escaped_mem1 + 
+                                           R"(\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+                    
+                    if (std::regex_match(lines[i+1], m2, load_pattern)) {
+                        const std::string reg2 = m2[1].str();
+                        
+                
+                        std::regex store_pattern(R"(^\s*movq?\s+)" + reg2 + 
+                                                R"(\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
+                        
+                        if (std::regex_match(lines[i+2], m3, store_pattern)) {
+                            const std::string mem2 = m3[1].str();
+                            
+                            out.push_back(lines[i]);  
+                            
+                            
+                            std::string optimized_store = "\tmovq " + reg1 + ", " + mem2;
+                            out.push_back(optimized_store);
+                            
+                            i += 2; 
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            
+            std::unordered_map<std::string, std::string> reg_values;
+
+            
+            std::regex re_store_load(
+                R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            std::smatch store_match;
+            if (std::regex_match(lines[i], store_match, re_store_load)) {
+                const std::string reg = store_match[1].str();
+                const std::string mem = store_match[2].str();
+                
+            
+                reg_values[mem] = reg;
+                
+            
+                out.push_back(lines[i]);
+                continue;
+            }
+
+            
+            std::regex re_load(
+                R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)",
+                std::regex::icase);
+
+            std::smatch load_match;
+            if (std::regex_match(lines[i], load_match, re_load)) {
+                const std::string mem = load_match[1].str();
+                const std::string reg = load_match[2].str();
+                
+            
+                auto it = reg_values.find(mem);
+                if (it != reg_values.end()) {
+            
+                    if (it->second != reg) { 
+                        out.push_back("\tmovq " + it->second + ", " + reg);
+                    }
+                    
+                    continue;
+                }
+                
+                
+                out.push_back(lines[i]);
+                continue;
+            }
+
+            
+            reg_values.clear();
+            out.push_back(lines[i]);
+
+            
+            if (i + 1 < lines.size()) {
+                std::smatch m1, m2;
+                
+            
+                std::regex re_store_reload(
+                    R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
+                    std::regex::icase);
+                    
+                if (std::regex_match(lines[i], m1, re_store_reload)) {
+                    const std::string reg = m1[1].str();
+                    const std::string mem = m1[2].str();
+                    
+            
+                    std::string escaped_mem = std::regex_replace(mem, std::regex(R"([\$\(\)])"), "\\$&");
+                    std::regex reload_pattern(R"(^\s*movq?\s+)" + escaped_mem + 
+                                         R"(\s*,\s*)" + reg + R"(\s*(?:[#;].*)?$)", std::regex::icase);
+                    
+            
+                    if (std::regex_match(lines[i+1], reload_pattern)) {
+                        out.push_back(lines[i]);  
+                        i += 1;  
+                        continue;
+                    }
+                    
+                    
+                    if (i + 2 < lines.size() && std::regex_match(lines[i+1], reload_pattern)) {
+                        std::smatch m3;
+                        std::regex re_load_other(
+                            R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)",
+                            std::regex::icase);
+                            
+                        if (std::regex_match(lines[i+2], m3, re_load_other)) {
+                            const std::string load_mem = m3[1].str();
+                            const std::string load_reg = m3[2].str();
+                            
+                    
+                            out.push_back(lines[i]);  
+                            out.push_back("\tmovq " + reg + ", " + load_reg);  
+                            i += 2;  
+                            continue;
+                        }
+                    }
+                }
+            }
         }
+
         return out;
     }
 
