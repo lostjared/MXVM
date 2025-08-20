@@ -88,6 +88,28 @@ void createMakefile(Args *args);
 
 Args proc_args(int argc, char **argv) {
     Args args;
+    std::string p = "linux";
+#ifdef _WIN32
+    p = "windows";
+#endif
+#ifdef __APPLE__
+    p = "macos";
+#endif
+#ifdef __linux__
+    p = "linux";
+#endif
+    if(p == "macos") {
+        args.platform = mxvm::Platform::DARWIN;
+        args.target = vm_target::x86_64_macos;
+    }
+    else if(p == "linux") {
+        args.platform = mxvm::Platform::LINUX;
+        args.target = vm_target::x86_64_linux;
+    } else if(p == "windows") {
+        args.platform = mxvm::Platform::WINX64;
+        args.target = vm_target::x86_64_windows;
+    }
+
     std::vector<char*> v;
     int stop = 0;
     for(int i = 0; i < argc; ++i) {
