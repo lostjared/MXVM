@@ -93,6 +93,7 @@ namespace pascal {
         std::unique_ptr<ASTNode> parseIfStatement();
         std::unique_ptr<ASTNode> parseWhileStatement();
         std::unique_ptr<ASTNode> parseForStatement();
+        std::unique_ptr<ASTNode> parseRepeatStatement();
 
         std::unique_ptr<ASTNode> parseExpression();
         std::unique_ptr<ASTNode> parseSimpleExpression();

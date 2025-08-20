@@ -286,6 +286,21 @@ namespace pascal {
         std::string toString() const override;
     };
 
+    class RepeatStmtNode : public ASTNode {
+    public:
+        std::vector<std::unique_ptr<ASTNode>> statements;
+        std::unique_ptr<ASTNode> condition;
+        
+        RepeatStmtNode(std::vector<std::unique_ptr<ASTNode>> stmts, std::unique_ptr<ASTNode> cond)
+            : statements(std::move(stmts)), condition(std::move(cond)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        
+        std::string toString() const override {
+            return "RepeatStmt";
+        }
+    };
+
     class ASTVisitor {
     public:
         virtual ~ASTVisitor() = default;
@@ -309,6 +324,7 @@ namespace pascal {
         virtual void visit(StringNode& node) = 0;
         virtual void visit(BooleanNode& node) = 0;
         virtual void visit(EmptyStmtNode& node) = 0;
+        virtual void visit(RepeatStmtNode& node) = 0;
     };
 
     class PrettyPrintVisitor : public ASTVisitor {
@@ -341,6 +357,7 @@ namespace pascal {
         void visit(StringNode& node) override;
         void visit(BooleanNode& node) override;
         void visit(EmptyStmtNode& node) override;
+        void visit(RepeatStmtNode& node) override;
     };
 
 } 

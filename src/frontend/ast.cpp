@@ -114,6 +114,10 @@ namespace pascal {
     std::string ForStmtNode::toString() const {
         return "ForStmt: " + variable + (isDownto ? " downto" : " to");
     }
+    
+    void RepeatStmtNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
 
     void ProcCallNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
@@ -421,6 +425,23 @@ namespace pascal {
     }
 
     void PrettyPrintVisitor::visit(EmptyStmtNode& node) {
+    }
+
+    void PrettyPrintVisitor::visit(RepeatStmtNode& node) {
+        printIndent();
+        out << "repeat" << std::endl;
+        indentLevel++;
+        for (size_t i = 0; i < node.statements.size(); ++i) {
+            node.statements[i]->accept(*this);
+            if (i < node.statements.size() - 1) {
+                out << ";";
+            }
+            out << std::endl;
+        }
+        indentLevel--;
+        printIndent();
+        out << "until ";
+        node.condition->accept(*this);
     }
 
 }

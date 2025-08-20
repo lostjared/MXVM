@@ -757,6 +757,23 @@ namespace pascal {
         void visit(EmptyStmtNode& node) override {
         }
 
+        void visit(RepeatStmtNode& node) override {
+            std::string startLabel = newLabel("REPEAT");
+            std::string endLabel = newLabel("UNTIL");
+            
+            emitLabel(startLabel);
+            
+            for (auto& stmt : node.statements) {
+                if (stmt) stmt->accept(*this);
+            }
+            
+            std::string condResult = eval(node.condition.get());
+            emit2("cmp", condResult, "0");
+            emit1("je", startLabel);
+            
+            if (isReg(condResult)) freeReg(condResult);
+        }
+
     private:
         
         enum class VarType {

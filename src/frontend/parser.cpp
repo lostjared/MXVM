@@ -290,6 +290,8 @@ namespace pascal {
             return parseWhileStatement();
         } else if (peekIs("for")) {
             return parseForStatement();
+        } else if (peekIs("repeat")) {  // Add this condition
+            return parseRepeatStatement();
         } else if (peekIs(types::TokenType::TT_ID)) {
             return parseAssignmentOrProcCall();
         } else {
@@ -381,6 +383,31 @@ namespace pascal {
 
         return std::make_unique<ForStmtNode>(variable, std::move(startValue), 
                                             std::move(endValue), isDownto, std::move(statement));
+    }
+
+    std::unique_ptr<ASTNode> PascalParser::parseRepeatStatement() {
+        expectToken("repeat");
+        next();
+
+        std::vector<std::unique_ptr<ASTNode>> statements;
+        
+        // Parse statements until we reach "until"
+        while (!peekIs("until")) {
+            statements.push_back(parseStatement());
+            
+            if (peekIs(";")) {
+                next();
+            } else if (!peekIs("until")) {
+                error("Expected ';' or 'until'");
+            }
+        }
+        
+        expectToken("until");
+        next();
+        
+        auto condition = parseExpression();
+        
+        return std::make_unique<RepeatStmtNode>(std::move(statements), std::move(condition));
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseExpression() {
