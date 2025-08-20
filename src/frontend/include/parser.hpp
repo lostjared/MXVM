@@ -19,7 +19,7 @@ namespace mxx {
 
     class XParser {
     public:
-        XParser() = default;
+        XParser() = delete;
         explicit XParser(const std::string &source)
             : scanner(source), token(nullptr), index(0) {
             scanner.scan();
@@ -69,7 +69,7 @@ namespace mxx {
 namespace pascal {
     class PascalParser : public mxx::XParser {
     public:
-        PascalParser() = default;
+        PascalParser() = delete;
         explicit PascalParser(const std::string& source) : mxx::XParser(source) {}
 
         std::unique_ptr<ASTNode> parseProgram();

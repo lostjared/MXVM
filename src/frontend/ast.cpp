@@ -208,7 +208,7 @@ namespace pascal {
         } else {
             s = "false";
         }
-        return "Boolean: " + value;
+        return "Boolean: " + s;
     }
 
     void EmptyStmtNode::accept(ASTVisitor& visitor) {
