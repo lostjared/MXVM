@@ -194,6 +194,8 @@ namespace pascal {
                             out << "        string " << slotVar(i) << " = \"\"\n";
                         } else if (it->second == VarType::PTR) {
                             out << "        ptr " << slotVar(i) << " = null\n";
+                        } else if (it->second == VarType::CHAR) {
+                            out << "        byte " << slotVar(i) << " = 0\n"; 
                         } else {
                             out << "        int " << slotVar(i) << " = 0\n";
                         }
@@ -252,12 +254,13 @@ namespace pascal {
                 std::string id = node.identifiers[i];
                 int slot = newSlotFor(id);
                 
+                
                 if (!node.type.empty()) {
                     if (node.type == "string") {
                         setVarType(id, VarType::PTR);
                         setSlotType(slot, VarType::PTR);
                         
-                  
+                
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
                             emit3("mov", slotVar(slot), init);
@@ -266,11 +269,23 @@ namespace pascal {
                             emit3("mov", slotVar(slot), emptyString());
                         }
                     }
+                    else if (node.type == "char") {
+                        setVarType(id, VarType::CHAR);
+                        setSlotType(slot, VarType::CHAR);
+                        
+                
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        } else {
+                            emit3("mov", slotVar(slot), "0");  
+                        }
+                    }
                     else if (node.type == "integer" || node.type == "boolean") {
                         setVarType(id, VarType::INT);
                         setSlotType(slot, VarType::INT);
                         
-                  
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
                             emit3("mov", slotVar(slot), init);
@@ -281,7 +296,6 @@ namespace pascal {
                         setVarType(id, VarType::DOUBLE);
                         setSlotType(slot, VarType::DOUBLE);
                         
-                  
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
                             emit3("mov", slotVar(slot), init);
@@ -292,7 +306,6 @@ namespace pascal {
                         setVarType(id, VarType::RECORD);
                         setSlotType(slot, VarType::RECORD);
                         
-                  
                     }
                 }
             }
@@ -696,8 +709,13 @@ namespace pascal {
         }
 
         void visit(StringNode& node) override {
-            std::string sym = internString(node.value);
-            pushValue(sym);
+            if (node.value.length() == 1) {
+                int asciiValue = static_cast<int>(node.value[0]);
+                pushValue(std::to_string(asciiValue));
+            } else {
+                std::string sym = internString(node.value);
+                pushValue(sym);
+            }
         }
 
         void visit(BooleanNode& node) override {
@@ -715,6 +733,7 @@ namespace pascal {
             INT,
             DOUBLE,
             STRING,
+            CHAR,
             RECORD,
             PTR,     
             UNKNOWN
@@ -898,6 +917,31 @@ namespace pascal {
             return key;
         }
 
+        std::string convertCharLiteral(const std::string& charLit) {
+            if (charLit.length() == 3 && charLit[0] == '\'' && charLit[2] == '\'') {
+                int asciiValue = static_cast<int>(charLit[1]);
+                return std::to_string(asciiValue);
+            }
+            
+            
+            if (charLit.length() == 4 && charLit[0] == '\'' && charLit[1] == '\\' && charLit[3] == '\'') {
+                char escapeChar = charLit[2];
+                int asciiValue = 0;
+                switch (escapeChar) {
+                    case 'n': asciiValue = 10; break;  
+                    case 't': asciiValue = 9; break;   
+                    case 'r': asciiValue = 13; break;  
+                    case '\\': asciiValue = 92; break; 
+                    case '\'': asciiValue = 39; break; 
+                    case '0': asciiValue = 0; break;   
+                    default: asciiValue = static_cast<int>(escapeChar); break;
+                }
+                return std::to_string(asciiValue);
+            }
+            
+            
+            return charLit;
+        }
         
         void pushValue(const std::string& v) { 
             evalStack.push_back(v);

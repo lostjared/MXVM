@@ -564,7 +564,7 @@ namespace pascal {
         std::string lower = token;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
         return lower == "integer" || lower == "real" || lower == "boolean" || 
-               lower == "char" || lower == "string";
+               lower == "char" || lower == "string" || lower == "record";  // Added "record"
     }
 
     bool PascalParser::isBuiltinProcedure(const std::string& name) {
