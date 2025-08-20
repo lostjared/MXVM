@@ -2,8 +2,10 @@
 #include <algorithm>
 #include <cctype>
 #include <set>
-namespace pascal {
 
+namespace pascal {
+    
+   
     void PascalParser::error(const std::string& message) {
         throw ParseException("Parse error: " + message + (token ? " at '" + token->getTokenValue() + "'" : " at end of input"));
     }
@@ -51,8 +53,9 @@ namespace pascal {
 
     std::vector<std::unique_ptr<ASTNode>> PascalParser::parseDeclarations() {
         std::vector<std::unique_ptr<ASTNode>> declarations;
+        
         if (match("var")) {  
-            while (peekIs(types::TokenType::TT_ID)  && !isKeyword(token->getTokenValue())) {
+            while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue())) {
                 std::vector<std::string> identifiers;
                 
                 identifiers.push_back(token->getTokenValue());
@@ -75,10 +78,23 @@ namespace pascal {
                 std::string type = token->getTokenValue();
                 next();  
                 
-                if (!match(";"))  
-                    error("Expected ';' after type");
-                    
-                declarations.push_back(std::make_unique<VarDeclNode>(std::move(identifiers), type));
+                std::unique_ptr<ASTNode> initializer = nullptr;
+                if (match(":=")) {  
+                    initializer = parseExpression();
+                }
+                
+                if (!match(";"))
+                    error("Expected ';' after variable declaration");
+
+                if (initializer) {
+                    std::vector<std::unique_ptr<ASTNode>> initializers;
+                    initializers.push_back(std::move(initializer));
+                    declarations.push_back(std::make_unique<VarDeclNode>(
+                        std::move(identifiers), type, std::move(initializers)));
+                } else {
+                    declarations.push_back(std::make_unique<VarDeclNode>(
+                        std::move(identifiers), type));
+                }
             }
         }
 
@@ -566,4 +582,4 @@ namespace pascal {
                lower == "exp" || lower == "trunc" || lower == "round";
     }
 
-} 
+}

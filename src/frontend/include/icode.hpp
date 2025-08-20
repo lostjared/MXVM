@@ -248,26 +248,51 @@ namespace pascal {
         }
 
         void visit(VarDeclNode& node) override {
-            for (auto &id : node.identifiers) {
+            for (size_t i = 0; i < node.identifiers.size(); i++) {
+                std::string id = node.identifiers[i];
                 int slot = newSlotFor(id);
                 
                 if (!node.type.empty()) {
                     if (node.type == "string") {
                         setVarType(id, VarType::PTR);
                         setSlotType(slot, VarType::PTR);
-                        emit3("mov", slotVar(slot), emptyString());
+                        
+                  
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        } else {
+                            emit3("mov", slotVar(slot), emptyString());
+                        }
                     }
                     else if (node.type == "integer" || node.type == "boolean") {
                         setVarType(id, VarType::INT);
                         setSlotType(slot, VarType::INT);
+                        
+                  
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        }
                     }
                     else if (node.type == "real") {
                         setVarType(id, VarType::DOUBLE);
                         setSlotType(slot, VarType::DOUBLE);
+                        
+                  
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        }
                     }
                     else if (node.type == "record") {
                         setVarType(id, VarType::RECORD);
                         setSlotType(slot, VarType::RECORD);
+                        
+                  
                     }
                 }
             }

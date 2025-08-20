@@ -46,9 +46,15 @@ namespace pascal {
     public:
         std::vector<std::string> identifiers;
         std::string type;
+        std::vector<std::unique_ptr<ASTNode>> initializers; 
         
-        VarDeclNode(std::vector<std::string> ids, const std::string& varType)
-            : identifiers(std::move(ids)), type(varType) {}
+        VarDeclNode(std::vector<std::string> ids, std::string t)
+            : identifiers(std::move(ids)), type(std::move(t)) {}
+        
+        VarDeclNode(std::vector<std::string> ids, std::string t, 
+                    std::vector<std::unique_ptr<ASTNode>> inits)
+            : identifiers(std::move(ids)), type(std::move(t)), 
+              initializers(std::move(inits)) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
