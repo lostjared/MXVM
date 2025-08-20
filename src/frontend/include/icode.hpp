@@ -227,7 +227,7 @@ namespace pascal {
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
             }
-            out << "        string input_buffer, 2048\n";
+            out << "        string input_buffer, 256\n";
             out << "    }\n";
             out << "    section code {\n";
             out << "    start:\n";
