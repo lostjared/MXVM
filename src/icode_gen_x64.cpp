@@ -181,6 +181,11 @@ namespace mxvm {
             }
         }
 
+        if (xmm_offset == 0) {
+            out << "\txor %eax, %eax\n";  
+        } else {
+            out << "\tmov $" << xmm_offset << ", %eax\n";  
+        }
         out << "\tcall " << name << "\n";
         x64_release_call_area(out, frame);
     }
