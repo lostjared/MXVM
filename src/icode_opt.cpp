@@ -345,29 +345,6 @@ namespace mxvm {
                 }
             }
 
-            /*
-            {
-                std::smatch m_load;
-                if (std::regex_match(line, m_load, re_mem_to_reg)) {
-                    const std::string mem = m_load[1].str();
-                    const std::string reg = m_load[2].str();
-
-                    auto it_mem = mem_contents.find(mem);
-                    if (it_mem != mem_contents.end() && it_mem->second.valid) {
-                        const std::string& source_reg = it_mem->second.location;
-                        if (source_reg != reg) {
-                            out.push_back("\tmovq " + source_reg + ", " + reg);
-                            reg_contents[reg] = {mem, true};
-                        }
-                        continue;
-                    }
-
-                    out.push_back(line);
-                    reg_contents[reg] = {mem, true};
-                    continue;
-                }
-            } */
-
             {
                 std::smatch m_store;
                 if (std::regex_match(line, m_store, re_reg_to_mem)) {
