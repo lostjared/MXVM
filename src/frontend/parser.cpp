@@ -109,15 +109,17 @@ namespace pascal {
         return declarations;
     }
 
-    bool PascalParser::isKeyword(const std::string& s) {
-        static const std::set<std::string> keywords = {
-            "program", "var", "procedure", "function", "begin", "end", "if", "then", "else",
-            "while", "do", "for", "to", "downto", "repeat", "until", "case", "of", "const", "type",
-            "array", "record", "div", "mod", "and", "or", "not", "xor", "shl", "shr", "in", "with"
-        };
-        return keywords.find(s) != keywords.end();
+    bool PascalParser::isKeyword(const std::string& token) {
+        std::string lower = token;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        return lower == "program" || lower == "var" || lower == "begin" || lower == "end" ||
+            lower == "if" || lower == "then" || lower == "else" || lower == "while" ||
+            lower == "do" || lower == "for" || lower == "to" || lower == "downto" ||
+            lower == "procedure" || lower == "function" || lower == "integer" ||
+            lower == "real" || lower == "boolean" || lower == "string" || lower == "char" ||
+            lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
+            lower == "and" || lower == "or" || lower == "not";  
     }
-
     std::unique_ptr<ASTNode> PascalParser::parseVarDeclaration() {
         expectToken("var");
         next();
@@ -314,21 +316,23 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseIfStatement() {
         expectToken("if");
         next();
-
+        
         auto condition = parseExpression();
-
+        
         expectToken("then");
         next();
-
-        auto thenStmt = parseStatement();
-
-        std::unique_ptr<ASTNode> elseStmt = nullptr;
+        
+        auto thenStatement = parseStatement();
+        
+        std::unique_ptr<ASTNode> elseStatement = nullptr;
         if (peekIs("else")) {
-            next(); 
-            elseStmt = parseStatement();
+            next();
+            elseStatement = parseStatement();  
         }
-
-        return std::make_unique<IfStmtNode>(std::move(condition), std::move(thenStmt), std::move(elseStmt));
+        
+        return std::make_unique<IfStmtNode>(std::move(condition), 
+                                             std::move(thenStatement),
+                                             std::move(elseStatement));
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseWhileStatement() {
@@ -382,11 +386,36 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseExpression() {
         auto left = parseSimpleExpression();
 
+        
         if (isRelationalOperator()) {
-            auto op = getRelationalOp();
+            std::string op = getRelationalOp();
             next();
             auto right = parseSimpleExpression();
-            return std::make_unique<BinaryOpNode>(std::move(left), op, std::move(right));
+            
+        
+            BinaryOpNode::OpType enumOp = BinaryOpNode::EQUAL; 
+            if (op == "=") enumOp = BinaryOpNode::EQUAL;
+            else if (op == "<>") enumOp = BinaryOpNode::NOT_EQUAL;
+            else if (op == "<") enumOp = BinaryOpNode::LESS;
+            else if (op == "<=") enumOp = BinaryOpNode::LESS_EQUAL;
+            else if (op == ">") enumOp = BinaryOpNode::GREATER;
+            else if (op == ">=") enumOp = BinaryOpNode::GREATER_EQUAL;
+            
+            left = std::make_unique<BinaryOpNode>(std::move(left), enumOp, std::move(right));
+        }
+
+        
+        while (peekIs("and") || peekIs("or")) {
+            BinaryOpNode::OpType op;
+            if (peekIs("and")) {
+                op = BinaryOpNode::AND;
+                next();
+            } else {
+                op = BinaryOpNode::OR;
+                next();
+            }
+            auto right = parseSimpleExpression();
+            left = std::make_unique<BinaryOpNode>(std::move(left), op, std::move(right));
         }
 
         return left;
@@ -396,17 +425,23 @@ namespace pascal {
         std::unique_ptr<ASTNode> result;
 
         if (peekIs("+") || peekIs("-")) {
-            auto op = getUnaryOp();
+            UnaryOpNode::Operator op = UnaryOpNode::PLUS;  
+            if (peekIs("+")) op = UnaryOpNode::PLUS;
+            else op = UnaryOpNode::MINUS;
             next();
+            
             auto operand = parseTerm();
             result = std::make_unique<UnaryOpNode>(op, std::move(operand));
         } else {
             result = parseTerm();
         }
 
-        while (isAddOperator()) {
-            auto op = getAddOp();
+        while (peekIs("+") || peekIs("-")) {
+            BinaryOpNode::OpType op;
+            if (peekIs("+")) op = BinaryOpNode::PLUS;
+            else op = BinaryOpNode::MINUS;
             next();
+            
             auto right = parseTerm();
             result = std::make_unique<BinaryOpNode>(std::move(result), op, std::move(right));
         }
@@ -418,8 +453,14 @@ namespace pascal {
         auto result = parseFactor();
 
         while (isMulOperator()) {
-            auto op = getMulOp();
+             
+            BinaryOpNode::OpType op = BinaryOpNode::MULTIPLY;  
+            if (peekIs("*")) op = BinaryOpNode::MULTIPLY;
+            else if (peekIs("/")) op = BinaryOpNode::DIVIDE;
+            else if (peekIs("div")) op = BinaryOpNode::DIV;
+            else if (peekIs("mod")) op = BinaryOpNode::MOD;
             next();
+            
             auto right = parseFactor();
             result = std::make_unique<BinaryOpNode>(std::move(result), op, std::move(right));
         }
@@ -450,10 +491,14 @@ namespace pascal {
             expectToken(")");
             next();
             return expr;
-        } else if (peekIs("not")) {
-            next(); 
+        } else if (peekIs("not") || peekIs("+") || peekIs("-")) {
+            UnaryOpNode::Operator op = UnaryOpNode::PLUS;  
+            if (peekIs("+")) op = UnaryOpNode::PLUS;
+            else if (peekIs("-")) op = UnaryOpNode::MINUS;
+            else if (peekIs("not")) op = UnaryOpNode::NOT;
+            next();
             auto operand = parseFactor();
-            return std::make_unique<UnaryOpNode>(UnaryOpNode::NOT, std::move(operand));
+            return std::make_unique<UnaryOpNode>(op, std::move(operand));
         } else if (peekIs(types::TokenType::TT_ID)) {
             std::string name = token->getTokenValue();
             next();
@@ -515,56 +560,45 @@ namespace pascal {
     }
 
     bool PascalParser::isAddOperator() {
-        return peekIs("+") || peekIs("-") || peekIs("or");
+        return peekIs("+") || peekIs("-");  
     }
 
     bool PascalParser::isMulOperator() {
-        return peekIs("*") || peekIs("/") || peekIs("div") || 
-               peekIs("mod") || peekIs("and");
+        return peekIs("*") || peekIs("/") || peekIs("div") || peekIs("mod");  
     }
 
-    BinaryOpNode::OpType PascalParser::getRelationalOp() {
-        if (peekIs("=")) return BinaryOpNode::EQUAL;
-        if (peekIs("<>")) return BinaryOpNode::NOT_EQUAL;
-        if (peekIs("<")) return BinaryOpNode::LESS;
-        if (peekIs("<=")) return BinaryOpNode::LESS_EQUAL;
-        if (peekIs(">")) return BinaryOpNode::GREATER;
-        if (peekIs(">=")) return BinaryOpNode::GREATER_EQUAL;
+    std::string PascalParser::getRelationalOp() {
+        if (peekIs("=")) return "=";
+        if (peekIs("<>")) return "<>";
+        if (peekIs("<")) return "<";
+        if (peekIs("<=")) return "<=";
+        if (peekIs(">")) return ">";
+        if (peekIs(">=")) return ">=";
         error("Invalid relational operator");
-        return BinaryOpNode::EQUAL;
+        return "=";
     }
 
-    BinaryOpNode::OpType PascalParser::getAddOp() {
-        if (peekIs("+")) return BinaryOpNode::PLUS;
-        if (peekIs("-")) return BinaryOpNode::MINUS;
-        if (peekIs("or")) return BinaryOpNode::OR;
+    std::string PascalParser::getAddOp() {
+        if (peekIs("+")) return "+";
+        if (peekIs("-")) return "-";
         error("Invalid add operator");
-        return BinaryOpNode::PLUS;
+        return "+";
     }
 
-    BinaryOpNode::OpType PascalParser::getMulOp() {
-        if (peekIs("*")) return BinaryOpNode::MULTIPLY;
-        if (peekIs("/")) return BinaryOpNode::DIVIDE;
-        if (peekIs("div")) return BinaryOpNode::DIV;
-        if (peekIs("mod")) return BinaryOpNode::MOD;
-        if (peekIs("and")) return BinaryOpNode::AND;
+    std::string PascalParser::getMulOp() {
+        if (peekIs("*")) return "*";
+        if (peekIs("/")) return "/";
+        if (peekIs("div")) return "div";
+        if (peekIs("mod")) return "mod";
         error("Invalid multiply operator");
-        return BinaryOpNode::MULTIPLY;
-    }
-
-    UnaryOpNode::OpType PascalParser::getUnaryOp() {
-        if (peekIs("+")) return UnaryOpNode::PLUS;
-        if (peekIs("-")) return UnaryOpNode::MINUS;
-        if (peekIs("not")) return UnaryOpNode::NOT;
-        error("Invalid unary operator");
-        return UnaryOpNode::PLUS;
+        return "*";
     }
 
     bool PascalParser::isType(const std::string& token) {
         std::string lower = token;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
         return lower == "integer" || lower == "real" || lower == "boolean" || 
-               lower == "char" || lower == "string" || lower == "record";  // Added "record"
+               lower == "char" || lower == "string" || lower == "record"; 
     }
 
     bool PascalParser::isBuiltinProcedure(const std::string& name) {

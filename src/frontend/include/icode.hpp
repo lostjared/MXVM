@@ -195,7 +195,7 @@ namespace pascal {
                         } else if (it->second == VarType::PTR) {
                             out << "        ptr " << slotVar(i) << " = null\n";
                         } else if (it->second == VarType::CHAR) {
-                            out << "        byte " << slotVar(i) << " = 0\n"; 
+                            out << "        int " << slotVar(i) << " = 0\n"; 
                         } else {
                             out << "        int " << slotVar(i) << " = 0\n";
                         }
@@ -220,6 +220,9 @@ namespace pascal {
             }
             if (usedStrings.count("fmt_str")) {
                 out << "        string fmt_str = \"%s \"\n";
+            }
+            if (usedStrings.count("fmt_chr")) {
+                out << "        string fmt_chr = \"%c \"\n";
             }
             if (usedStrings.count("newline")) {
                 out << "        string newline = \"\\n\"\n";
@@ -320,6 +323,7 @@ namespace pascal {
                     VarType t = VarType::INT; 
                     if (!param->type.empty()) {
                         if (param->type == "string") t = VarType::STRING;
+                        else if (param->type == "char") t = VarType::CHAR;
                         else if (param->type == "real") t = VarType::DOUBLE;
                     }
                     for (size_t i = 0; i < param->identifiers.size(); ++i) {
@@ -336,6 +340,7 @@ namespace pascal {
             FuncInfo info;
             if (!node.returnType.empty()) {
                 if (node.returnType == "string") info.returnType = VarType::STRING;
+                else if (node.returnType == "char") info.returnType = VarType::CHAR;
                 else if (node.returnType == "real") info.returnType = VarType::DOUBLE;
                 else info.returnType = VarType::INT;
             }
@@ -345,6 +350,7 @@ namespace pascal {
                     VarType t = VarType::INT; 
                     if (!param->type.empty()) {
                         if (param->type == "string") t = VarType::STRING;
+                        else if (param->type == "char") t = VarType::CHAR;
                         else if (param->type == "real") t = VarType::DOUBLE;
                     }
                     for (size_t i = 0; i < param->identifiers.size(); ++i) {
@@ -476,14 +482,38 @@ namespace pascal {
             if (name == "writeln" || name == "write") {
                 for(auto &arg : node.arguments) {
                     ASTNode *a = arg.get();
-                    if(dynamic_cast<StringNode*>(a) || 
-                       (dynamic_cast<VariableNode*>(a) && 
-                        isStringVar(dynamic_cast<VariableNode*>(a)->name))) {
-                        usedStrings.insert("fmt_str");
-                        std::string v = eval(a);
-                        emit2("print", "fmt_str", v);
-                        if (isReg(v)) freeReg(v);
-                    } else {
+                    if (auto strNode = dynamic_cast<StringNode*>(a)) {
+                        if (strNode->value.length() == 1) {
+                            usedStrings.insert("fmt_chr");  
+                            std::string v = eval(a);
+                            emit2("print", "fmt_chr", v);   
+                            if (isReg(v)) freeReg(v);
+                        } else {
+                            usedStrings.insert("fmt_str");
+                            std::string v = eval(a);
+                            emit2("print", "fmt_str", v);
+                            if (isReg(v)) freeReg(v);
+                        }
+                    } 
+                    else if (auto varNode = dynamic_cast<VariableNode*>(a)) {
+                        if (getVarType(varNode->name) == VarType::CHAR) {
+                            usedStrings.insert("fmt_chr");
+                            std::string v = eval(a);
+                            emit2("print", "fmt_chr", v);
+                            if (isReg(v)) freeReg(v);
+                        } else if (isStringVar(varNode->name)) {
+                            usedStrings.insert("fmt_str");
+                            std::string v = eval(a);
+                            emit2("print", "fmt_str", v);
+                            if (isReg(v)) freeReg(v);
+                        } else {
+                            usedStrings.insert("fmt_int");
+                            std::string v = eval(a);
+                            emit2("print", "fmt_int", v);
+                            if (isReg(v)) freeReg(v);
+                        }
+                    } 
+                    else {
                         usedStrings.insert("fmt_int");
                         std::string v = eval(a);
                         emit2("print", "fmt_int", v);

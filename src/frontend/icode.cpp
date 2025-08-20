@@ -39,7 +39,7 @@ namespace pascal {
         std::vector<size_t> linesToRemove;
         
         std::vector<std::string> systemVars = {
-            "rax", "fmt_int", "fmt_str", "newline"
+            "rax", "fmt_int", "fmt_str", "fmt_chr", "newline"
         };
         
         for (auto& sysVar : systemVars) {

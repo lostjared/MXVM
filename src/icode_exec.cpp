@@ -614,8 +614,8 @@ namespace mxvm {
                     if(o->name == variable.first && !o->isVariable(variable.second->getTokenValue())) {
                         throw mx::Exception("Syntax Error: Argument variable not defined: Object: " + 
                             variable.first + " variable: " + 
-                            variable.second->getTokenValue() + // Use -> instead of .
-                            " at line " + std::to_string(variable.second->getLine())); // Use -> instead of .
+                            variable.second->getTokenValue() + 
+                            " at line " + std::to_string(variable.second->getLine())); 
                     }
                 }
             }}

@@ -147,7 +147,7 @@ namespace pascal {
             case GREATER_EQUAL: return ">=";
             case AND: return "and";
             case OR: return "or";
-            default: return "?";
+            default: return "unknown";
         }
     }
 
@@ -156,13 +156,16 @@ namespace pascal {
     }
 
     std::string UnaryOpNode::toString() const {
-        std::string op;
-        switch (operator_) {
-            case PLUS: op = "+"; break;
-            case MINUS: op = "-"; break;
-            case NOT: op = "not"; break;
+        return "UnaryOp: " + opToString(operator_);
+    }
+
+    std::string UnaryOpNode::opToString(Operator op) {
+        switch (op) {
+            case PLUS: return "+";
+            case MINUS: return "-";
+            case NOT: return "not";
+            default: return "unknown";
         }
-        return "UnaryOp: " + op;
     }
 
     void FuncCallNode::accept(ASTVisitor& visitor) {
@@ -420,4 +423,4 @@ namespace pascal {
     void PrettyPrintVisitor::visit(EmptyStmtNode& node) {
     }
 
-} 
+}

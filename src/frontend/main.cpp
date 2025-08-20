@@ -104,6 +104,8 @@ int main(int argc, char **argv) {
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
+    } catch(const scan::ScanExcept &e) {
+        std::cerr << "Syntax Error: " << e.why() << std::endl;
     }
     return 0;
 }

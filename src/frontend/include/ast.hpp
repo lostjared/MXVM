@@ -132,7 +132,7 @@ namespace pascal {
     public:
         std::unique_ptr<ASTNode> condition;
         std::unique_ptr<ASTNode> thenStatement;
-        std::unique_ptr<ASTNode> elseStatement;
+        std::unique_ptr<ASTNode> elseStatement; 
         
         IfStmtNode(std::unique_ptr<ASTNode> cond, 
                    std::unique_ptr<ASTNode> thenStmt,
@@ -189,36 +189,39 @@ namespace pascal {
 
     class BinaryOpNode : public ASTNode {
     public:
-        enum OpType { 
-            PLUS, MINUS, MULTIPLY, DIVIDE, DIV, MOD,
-            EQUAL, NOT_EQUAL, LESS, LESS_EQUAL, GREATER, GREATER_EQUAL,
-            AND, OR
-        };
+        enum OpType { PLUS, MINUS, MULTIPLY, DIVIDE, DIV, MOD, EQUAL, NOT_EQUAL, LESS, LESS_EQUAL, GREATER, GREATER_EQUAL, AND, OR };
         
-        std::unique_ptr<ASTNode> left;
-        OpType operator_;
-        std::unique_ptr<ASTNode> right;
+        
+        std::unique_ptr<ASTNode> left;   
+        OpType operator_;                
+        std::unique_ptr<ASTNode> right;  
         
         BinaryOpNode(std::unique_ptr<ASTNode> l, OpType op, std::unique_ptr<ASTNode> r)
             : left(std::move(l)), operator_(op), right(std::move(r)) {}
         
+        BinaryOpNode(OpType op, std::unique_ptr<ASTNode> l, std::unique_ptr<ASTNode> r)
+            : left(std::move(l)), operator_(op), right(std::move(r)) {}
+        
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
+        
         static std::string opToString(OpType op);
     };
 
     class UnaryOpNode : public ASTNode {
     public:
-        enum OpType { PLUS, MINUS, NOT };
+        enum Operator { PLUS, MINUS, NOT };
         
-        OpType operator_;
+        Operator operator_;
         std::unique_ptr<ASTNode> operand;
         
-        UnaryOpNode(OpType op, std::unique_ptr<ASTNode> operand_)
-            : operator_(op), operand(std::move(operand_)) {}
+        UnaryOpNode(Operator op, std::unique_ptr<ASTNode> operandNode)
+            : operator_(op), operand(std::move(operandNode)) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
+        
+        static std::string opToString(Operator op);
     };
 
     class FuncCallNode : public ASTNode {

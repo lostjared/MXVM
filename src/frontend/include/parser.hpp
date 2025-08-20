@@ -16,7 +16,6 @@ namespace pascal {
 }
 
 namespace mxx {
-
     class XParser {
     public:
         XParser() = delete;
@@ -106,10 +105,12 @@ namespace pascal {
         bool isRelationalOperator();
         bool isAddOperator();
         bool isMulOperator();
-        BinaryOpNode::OpType getRelationalOp();
-        BinaryOpNode::OpType getAddOp();
-        BinaryOpNode::OpType getMulOp();
-        UnaryOpNode::OpType getUnaryOp();
+        
+        
+        std::string getRelationalOp();
+        std::string getAddOp();
+        std::string getMulOp();
+        std::string getUnaryOp();  
 
         bool isType(const std::string& token);
         bool isBuiltinProcedure(const std::string& name);
