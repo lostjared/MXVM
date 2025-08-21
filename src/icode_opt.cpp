@@ -30,7 +30,7 @@ namespace mxvm {
         return std::regex_search(line, re_label);
     }
 
-    // ---------------- core (generic) ----------------
+    
 
     static std::vector<std::string> opt_core_lines(const std::vector<std::string>& lines) {
         std::regex re_mov_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
@@ -53,7 +53,6 @@ namespace mxvm {
 
         auto clobber_reg = [&](const std::string& reg){
             reg_contents.erase(reg);
-            // Any mem alias that depended on this reg is now unsafe
             for (auto it = mem_contents.begin(); it != mem_contents.end(); ) {
                 if (it->second.location == reg) it = mem_contents.erase(it);
                 else ++it;
@@ -69,7 +68,6 @@ namespace mxvm {
                 continue;
             }
 
-            // ALU modifies dest reg → clobber
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_modifies_reg)) {
@@ -79,7 +77,6 @@ namespace mxvm {
                 }
             }
 
-            // mov mem -> reg (reg is clobbered)
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_mem_to_reg)) {
@@ -102,7 +99,6 @@ namespace mxvm {
                 }
             }
 
-            // mov reg -> mem
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_reg_to_mem)) {
@@ -114,7 +110,6 @@ namespace mxvm {
                 }
             }
 
-            // mov reg -> reg (dst is clobbered)
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_mov_reg)) {
@@ -133,7 +128,6 @@ namespace mxvm {
                 }
             }
 
-            // Unknown effect → be safe
             invalidate_tracking();
             out.push_back(line);
         }
@@ -141,8 +135,7 @@ namespace mxvm {
         return out;
     }
 
-    // ---------------- x64 (with frame detection) ----------------
-
+    
     static std::vector<std::string> x64_opt_core_lines(const std::vector<std::string>& lines) {
         std::regex re_mov_reg(R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_mem_to_reg(R"(^\s*movq?\s+([A-Za-z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
@@ -222,7 +215,6 @@ namespace mxvm {
                 continue;
             }
 
-            // ALU modifies dest reg → clobber
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_modifies_reg)) {
@@ -232,7 +224,6 @@ namespace mxvm {
                 }
             }
 
-            // mov reg -> mem
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_reg_to_mem)) {
@@ -244,7 +235,7 @@ namespace mxvm {
                 }
             }
 
-            // mov reg -> reg (dst is clobbered)
+
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_mov_reg)) {
@@ -263,7 +254,6 @@ namespace mxvm {
                 }
             }
 
-            // mov mem -> reg (reg is clobbered)
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_mem_to_reg)) {
@@ -286,7 +276,6 @@ namespace mxvm {
                 }
             }
 
-            // Unknown effect → be safe
             invalidate_tracking();
             out.push_back(line);
         }
@@ -294,7 +283,7 @@ namespace mxvm {
         return out;
     }
 
-    // ---------------- Darwin call prefixing (unchanged) ----------------
+
 
     static std::string darwin_prefix_calls(const std::string& line,
                                            const std::unordered_set<std::string>& macos_functions) {
@@ -418,7 +407,6 @@ namespace mxvm {
         return out;
     }
 
-    // ---------------- Windows tiny pass (unchanged) ----------------
 
     static std::vector<std::string> opt_x64_windows_lines(const std::vector<std::string> &lines) {
         static const std::regex add_rx(R"(^\s*addq?\s+\$([0-9]+|0x[0-9a-fA-F]+)\s*,\s*%rsp\s*(?:#.*)?$)");
@@ -461,7 +449,6 @@ namespace mxvm {
         return lines;
     }
 
-    // ---------------- entry ----------------
 
     std::string Program::gen_optimize(const std::string &code, const Platform &platform_name) {
         std::vector<std::string> lines;
