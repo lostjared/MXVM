@@ -31,7 +31,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmpr9k8ba9j.js
+// include: /tmp/tmpsofu5jho.js
 
   Module['expectedDataFileDownloads'] ??= 0;
   Module['expectedDataFileDownloads']++;
@@ -144,6 +144,7 @@ var REMOTE_PACKAGE_SIZE = metadata['remote_package_size'];
 Module['FS_createPath']("/", "include", true, true);
 Module['FS_createPath']("/include", "io", true, true);
 Module['FS_createPath']("/include", "sdl", true, true);
+Module['FS_createPath']("/include", "std", true, true);
 Module['FS_createPath']("/include", "string", true, true);
 
       /** @constructor */
@@ -211,25 +212,25 @@ Module['FS_createPath']("/include", "string", true, true);
     }
 
     }
-    loadPackage({"files": [{"filename": "/include/io/io.mxvm", "start": 0, "end": 136}, {"filename": "/include/sdl/sdl.mxvm", "start": 136, "end": 1679}, {"filename": "/include/string/string.mxvm", "start": 1679, "end": 1827}], "remote_package_size": 1827});
+    loadPackage({"files": [{"filename": "/include/io/io.mxvm", "start": 0, "end": 136}, {"filename": "/include/sdl/sdl.mxvm", "start": 136, "end": 1679}, {"filename": "/include/std/std.mxvm", "start": 1679, "end": 2548}, {"filename": "/include/string/string.mxvm", "start": 2548, "end": 2696}], "remote_package_size": 2696});
 
   })();
 
-// end include: /tmp/tmpr9k8ba9j.js
-// include: /tmp/tmp_hg_sxtn.js
+// end include: /tmp/tmpsofu5jho.js
+// include: /tmp/tmpsxsalmys.js
 
     // All the pre-js content up to here must remain later on, we need to run
     // it.
     if (Module['$ww'] || (typeof ENVIRONMENT_IS_PTHREAD != 'undefined' && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != 'undefined' && ENVIRONMENT_IS_AUDIO_WORKLET)) Module['preRun'] = [];
     var necessaryPreJSTasks = Module['preRun'].slice();
-  // end include: /tmp/tmp_hg_sxtn.js
-// include: /tmp/tmp87toqorz.js
+  // end include: /tmp/tmpsxsalmys.js
+// include: /tmp/tmprqvzbhyh.js
 
     if (!Module['preRun']) throw 'Module.preRun should exist because file support used it; did a pre-js delete it?';
     necessaryPreJSTasks.forEach((task) => {
       if (Module['preRun'].indexOf(task) < 0) throw 'All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?';
     });
-  // end include: /tmp/tmp87toqorz.js
+  // end include: /tmp/tmprqvzbhyh.js
 
 
 var arguments_ = [];
