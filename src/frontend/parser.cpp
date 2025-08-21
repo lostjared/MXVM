@@ -426,7 +426,6 @@ namespace pascal {
             next();
             auto right = parseSimpleExpression();
             
-        
             BinaryOpNode::OpType enumOp = BinaryOpNode::EQUAL; 
             if (op == "=") enumOp = BinaryOpNode::EQUAL;
             else if (op == "<>") enumOp = BinaryOpNode::NOT_EQUAL;
@@ -458,10 +457,12 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseSimpleExpression() {
         std::unique_ptr<ASTNode> result;
 
-        if (peekIs("+") || peekIs("-")) {
+        
+        if (peekIs("+") || peekIs("-") || peekIs("not")) {
             UnaryOpNode::Operator op = UnaryOpNode::PLUS;  
             if (peekIs("+")) op = UnaryOpNode::PLUS;
-            else op = UnaryOpNode::MINUS;
+            else if (peekIs("-")) op = UnaryOpNode::MINUS;
+            else if (peekIs("not")) op = UnaryOpNode::NOT;
             next();
             
             auto operand = parseTerm();
@@ -470,6 +471,7 @@ namespace pascal {
             result = parseTerm();
         }
 
+        
         while (peekIs("+") || peekIs("-")) {
             BinaryOpNode::OpType op;
             if (peekIs("+")) op = BinaryOpNode::PLUS;
@@ -526,14 +528,6 @@ namespace pascal {
             expectToken(")");
             next();
             return expr;
-        } else if (peekIs("not") || peekIs("+") || peekIs("-")) {
-            UnaryOpNode::Operator op = UnaryOpNode::PLUS;  
-            if (peekIs("+")) op = UnaryOpNode::PLUS;
-            else if (peekIs("-")) op = UnaryOpNode::MINUS;
-            else if (peekIs("not")) op = UnaryOpNode::NOT;
-            next();
-            auto operand = parseFactor();
-            return std::make_unique<UnaryOpNode>(op, std::move(operand));
         } else if (peekIs(types::TokenType::TT_ID)) {
             std::string name = token->getTokenValue();
             next();
