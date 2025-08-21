@@ -175,10 +175,16 @@ namespace pascal {
             auto it = slotToName.find(slot);
             if (it != slotToName.end()) return it->second;
 
-            if (slot < -1) {
+            if (slot < -1 && slot >= -10) { 
                 int regIndex = -2 - slot;
                 if (regIndex >= 0 && regIndex < static_cast<int>(registers.size())) {
                     return registers[regIndex];
+                }
+            }
+            if (slot <= -100) { 
+                int regIndex = -100 - slot;
+                if (regIndex >= 0 && regIndex < static_cast<int>(floatRegisters.size())) {
+                    return floatRegisters[regIndex];
                 }
             }
             return "v" + std::to_string(slot);
@@ -365,48 +371,25 @@ namespace pascal {
         }
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
-           
             bool isFloatOp = isFloatReg(a) || isFloatReg(b) || 
                              isRealNumber(a) || isRealNumber(b) ||
                              a.find("real_const_") != std::string::npos ||
                              b.find("real_const_") != std::string::npos;
             
-            std::string result;
-            if (isFloatOp) {
-                result = allocFloatReg();
-            } else {
-                result = allocReg();
-            }
-            
-           
             std::string leftOp = a;
             std::string rightOp = b;
             
-            if (isRealNumber(leftOp) && leftOp.find("real_const_") == std::string::npos) {
-                std::string constName = generateRealConstantName();
-                realConstants[constName] = leftOp;
-                usedRealConstants.insert(constName);
-                leftOp = constName;
-            }
-            
-            if (isRealNumber(rightOp) && rightOp.find("real_const_") == std::string::npos) {
-                std::string constName = generateRealConstantName();
-                realConstants[constName] = rightOp;
-                usedRealConstants.insert(constName);
-                rightOp = constName;
-            }
-            
-            if (std::string(op) == "mul") {
-                emit3("mov", result, leftOp);
-                emit3("mul", result, rightOp);
+            if (isReg(leftOp)) {
+                emit3(op, leftOp, rightOp);
+                pushValue(leftOp); 
+                if (isReg(b)) freeReg(b); 
             } else {
+                std::string result = isFloatOp ? allocFloatReg() : allocReg();
                 emit3("mov", result, leftOp);
                 emit3(op, result, rightOp);
+                pushValue(result);
+                if (isReg(b)) freeReg(b);
             }
-            
-            pushValue(result);
-            if (isReg(a)) freeReg(a);
-            if (isReg(b)) freeReg(b);
         }
 
         void pushCmpResult(const std::string& a, const std::string& b, const char* jop) {
@@ -611,20 +594,11 @@ namespace pascal {
                     if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
                         for (auto &id : param->identifiers) {
                            if (paramIndex < 6) {
-                                if (!param->type.empty() && param->type == "string") {
-                                    int slot = newSlotFor(id);
-                                    emit3("mov", slotVar(slot), ptrRegisters[paramIndex]);
-                                    setVarType(id, VarType::STRING);
-                                    setSlotType(slot, VarType::STRING); 
-                                } 
-                                else if (!param->type.empty() && param->type == "real") {
-                                    int slot = newSlotFor(id);
-                                    emit3("mov", slotVar(slot), floatRegisters[paramIndex]);
+                                if (!param->type.empty() && param->type == "real") {
                                     setVarType(id, VarType::DOUBLE);
-                                    setSlotType(slot, VarType::DOUBLE); 
+                                    recordLocation(id, {ValueLocation::REGISTER, floatRegisters[paramIndex]});
                                 } 
                                 else {
-                                    
                                     int slot = newSlotFor(id); 
                                     varSlot[id] = slot;        
                                     
@@ -1410,15 +1384,20 @@ namespace pascal {
 
         void visit(VariableNode& node) override {
             auto it = valueLocations.find(node.name);
-            if (it != valueLocations.end()) {
-                if (it->second.type == ValueLocation::REGISTER) {
-                    pushValue(it->second.location);
-                    return;
-                }
-            }
-            
+            if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
+                pushValue(it->second.location);
+                return;
+            }            
             int slot = newSlotFor(node.name);
-            pushValue(slotVar(slot));
+            std::string memVar = slotVar(slot);
+            std::string reg;
+            if (getVarType(node.name) == VarType::DOUBLE) {
+                reg = allocFloatReg();
+            } else {
+                reg = allocReg();
+            }
+            emit3("mov", reg, memVar);
+            pushValue(reg);
         }
 
         void visit(NumberNode& node) override {
