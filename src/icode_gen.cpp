@@ -1185,8 +1185,8 @@ namespace mxvm {
                 if(v2.type != v.type) {
 
                     if(v.type == VarType::VAR_POINTER && v2.type == VarType::VAR_STRING) {
-                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
-                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdx\n";
+                        out << "\tmovq %rdx, " << getMangledName(i.op1.op) << "(%rip)\n";
                         return;        
                     }
 
@@ -1202,26 +1202,26 @@ namespace mxvm {
                 }
                 switch(v.type) {
                     case VarType::VAR_INTEGER:
-                        generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
-                        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                        generateLoadVar(out, VarType::VAR_INTEGER, "%rdx", i.op2);
+                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                     case VarType::VAR_POINTER:
                     case VarType::VAR_EXTERN:
-                        generateLoadVar(out, v.type, "%rax", i.op2);
-                        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                        generateLoadVar(out, v.type, "%rdx", i.op2);
+                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                     case VarType::VAR_FLOAT:
-                        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
-                        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                        out << "\tmovsd %xmm1, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                     case VarType::VAR_STRING: {
-                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
-                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rdx\n";
+                        out << "\tmovq %rdx, " << getMangledName(i.op1.op) << "(%rip)\n";
                         break;
                     }
                     case VarType::VAR_BYTE:
-                        generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2);
-                        out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
+                        generateLoadVar(out, VarType::VAR_BYTE, "%rdx", i.op2);
+                        out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                 default:
                     throw mx::Exception("type not supported for mov instruction.");
@@ -1241,12 +1241,13 @@ namespace mxvm {
             if(isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if(v.type == VarType::VAR_INTEGER) {
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    // Use less common registers to avoid clobbering and optimizer bugs
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op1);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op2);
                     if(arth == "mul")
                         arth = "imul";
-                    out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    out << "\t" << arth << "q %r11, %r10\n";
+                    out << "\tmovq %r10, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
@@ -1263,12 +1264,13 @@ namespace mxvm {
             if(isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if(v.type == VarType::VAR_INTEGER) {
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    // Use less common registers to avoid clobbering and optimizer bugs
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op2);
+                    generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op3);
                     if(arth == "mul")
                         arth = "imul";
-                    out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    out << "\t" << arth << "q %r11, %r10\n";
+                    out << "\tmovq %r10, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if(v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out,VarType::VAR_FLOAT,"%xmm0", i.op2);
                     generateLoadVar(out,VarType::VAR_FLOAT, "%xmm1", i.op3);

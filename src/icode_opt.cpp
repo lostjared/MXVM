@@ -5,6 +5,7 @@
 #include <regex>
 #include <cctype>
 #include <unordered_set>
+#include <unordered_map>
 
 namespace mxvm {
 
@@ -25,259 +26,139 @@ namespace mxvm {
     }
 
     static bool is_label(const std::string& line) {
-        static const std::regex re_label(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)");
+        static const std::regex re_label(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)"); 
         return std::regex_search(line, re_label);
     }
 
+    // ---------------- core (generic) ----------------
+
     static std::vector<std::string> opt_core_lines(const std::vector<std::string>& lines) {
-        std::regex re_mov_imm(R"(^\s*mov[a-z]*\s+\$(-?\d+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_bin_op(R"(^\s*((?:add|sub|and|or|xor|cmp)[a-z]*)\s+(\%[a-z0-9]+|\$-?[0-9]+)\s*,\s*(\%[a-z0-9]+)\s*(?:([#;].*))?$)", std::regex::icase);
         std::regex re_mov_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_add_one(R"(^\s*add[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_sub_one(R"(^\s*sub[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_mul_pow2(R"(^\s*(?:imul|mul)[a-z]*\s+\$(\d+)\s*,\s*(%[a-z0-9]+)(?:\s*,\s*(%[a-z0-9]+))?\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_cmp_zero(R"(^\s*cmp[a-z]*\s+\$0\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_mem_to_reg(R"(^\s*mov[a-z]*\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_reg_to_mem(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_reg_to_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mem_to_reg(R"(^\s*mov[a-z]*\s+([A-Za-z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_reg_to_mem(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([A-Za-z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_call_instr(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
+        std::regex re_call_or_jmp(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
 
         std::vector<std::string> out;
         out.reserve(lines.size());
 
-        struct ValueInfo {
-            std::string location;  
-            bool valid = true;     
-        };
-        std::unordered_map<std::string, ValueInfo> reg_contents;  
-        std::unordered_map<std::string, ValueInfo> mem_contents;  
+        struct ValueInfo { std::string location; bool valid = true; };
+        std::unordered_map<std::string, ValueInfo> reg_contents;
+        std::unordered_map<std::string, ValueInfo> mem_contents;
 
-        
         auto invalidate_tracking = [&]() {
             reg_contents.clear();
             mem_contents.clear();
         };
 
+        auto clobber_reg = [&](const std::string& reg){
+            reg_contents.erase(reg);
+            // Any mem alias that depended on this reg is now unsafe
+            for (auto it = mem_contents.begin(); it != mem_contents.end(); ) {
+                if (it->second.location == reg) it = mem_contents.erase(it);
+                else ++it;
+            }
+        };
+
         for (size_t i = 0; i < lines.size(); ++i) {
             const std::string& line = lines[i];
-            std::smatch m;
 
-        
-            if (is_label(line) || std::regex_search(line, re_call_instr)) {
+            if (is_label(line) || std::regex_search(line, re_call_or_jmp)) {
                 out.push_back(line);
                 invalidate_tracking();
                 continue;
             }
 
-        
-            std::smatch m_mod;
-            if (std::regex_match(line, m_mod, re_modifies_reg)) {
-                const std::string reg = m_mod[1].str();
-                reg_contents.erase(reg);  
-                out.push_back(line);
-                continue;
+            // ALU modifies dest reg → clobber
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_modifies_reg)) {
+                    clobber_reg(m[1].str());
+                    out.push_back(line);
+                    continue;
+                }
             }
 
-            
-            std::smatch m_load;
-            if (std::regex_match(line, m_load, re_mem_to_reg)) {
-                const std::string mem = m_load[1].str();
-                const std::string reg = m_load[2].str();
-                
-            
-                auto it_mem = mem_contents.find(mem);
-                if (it_mem != mem_contents.end() && it_mem->second.valid) {
-                    const std::string& source_reg = it_mem->second.location;
-                    
-            
-                    if (source_reg != reg) {
-                        out.push_back("\tmovq " + source_reg + ", " + reg);
+            // mov mem -> reg (reg is clobbered)
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mem_to_reg)) {
+                    const std::string mem = m[1].str();
+                    const std::string reg = m[2].str();
+
+                    clobber_reg(reg);
+
+                    auto it = mem_contents.find(mem);
+                    if (it != mem_contents.end() && it->second.valid) {
+                        const std::string& src_reg = it->second.location;
+                        if (src_reg != reg) out.push_back("\tmovq " + src_reg + ", " + reg);
                         reg_contents[reg] = {mem, true};
-                    }
-            
-                    continue;
-                }
-                
-            
-                out.push_back(line);
-                reg_contents[reg] = {mem, true};
-                continue;
-            }
-
-            
-            std::smatch m_store;
-            if (std::regex_match(line, m_store, re_reg_to_mem)) {
-                const std::string reg = m_store[1].str();
-                const std::string mem = m_store[2].str();
-                
-            
-                mem_contents[mem] = {reg, true};
-                
-            
-                out.push_back(line);
-                
-            
-                if (i + 1 < lines.size()) {
-                    std::smatch m_next;
-                    if (std::regex_match(lines[i+1], m_next, re_mem_to_reg)) {
-                        const std::string next_mem = m_next[1].str();
-                        const std::string next_reg = m_next[2].str();
-                        
-                        if (next_mem == mem) {
-                            if (next_reg != reg) {
-                                out.push_back("\tmovq " + reg + ", " + next_reg);
-                                reg_contents[next_reg] = {mem, true};
-                            }
-                            i++;  
-                            continue;
-                        }
-                    }
-                }
-                continue;
-            }
-
-            
-            std::smatch m_reg_move;
-            if (std::regex_match(line, m_reg_move, re_reg_to_reg)) {
-                const std::string src_reg = m_reg_move[1].str();
-                const std::string dst_reg = m_reg_move[2].str();
-                
-            
-                if (src_reg == dst_reg) {
-                    continue;
-                }
-                
-            
-                auto it_src = reg_contents.find(src_reg);
-                if (it_src != reg_contents.end()) {
-                    reg_contents[dst_reg] = it_src->second;
-                } else {
-                    reg_contents[dst_reg] = {src_reg, true};
-                }
-                
-                out.push_back(line);
-                continue;
-            }
-
-            
-            if (std::regex_match(line, m, re_cmp_zero)) {
-                out.push_back("\ttest " + m[1].str() + ", " + m[1].str());
-                invalidate_tracking();
-                continue;
-            }
-            
-            if (std::regex_match(line, m, re_add_one)) {
-                out.push_back("\tinc " + m[1].str());
-                invalidate_tracking();
-                continue;
-            }
-            
-            if (std::regex_match(line, m, re_sub_one)) {
-                out.push_back("\tdec " + m[1].str());
-                invalidate_tracking();
-                continue;
-            }
-            
-            if (std::regex_match(line, m, re_mov_imm) && m[1].str() == "0") {
-                out.push_back("\txor " + m[2].str() + ", " + m[2].str());
-                invalidate_tracking();
-                continue;
-            }
-            
-            
-            if (i + 2 < lines.size()) {
-                std::smatch m1, m2, m3;
-                std::regex re_store_load_store(
-                    R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
-                    std::regex::icase);
-                    
-                if (std::regex_match(line, m1, re_store_load_store)) {
-                    const std::string reg1 = m1[1].str();
-                    const std::string mem1 = m1[2].str();
-                    
-            
-                    std::string escaped_mem1 = std::regex_replace(mem1, std::regex(R"([\$\(\)])"), "\\$&");
-                    std::regex load_pattern(R"(^\s*movq?\s+)" + escaped_mem1 + 
-                                           R"(\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-                    
-                    if (std::regex_match(lines[i+1], m2, load_pattern)) {
-                        const std::string reg2 = m2[1].str();
-                        
-            
-                        std::regex store_pattern(R"(^\s*movq?\s+)" + reg2 + 
-                                                R"(\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
-                        
-                        if (std::regex_match(lines[i+2], m3, store_pattern)) {
-                            const std::string mem2 = m3[1].str();
-                            
-            
-                            out.push_back(lines[i]);  
-                            
-                            
-                            std::string optimized_store = "\tmovq " + reg1 + ", " + mem2;
-                            out.push_back(optimized_store);
-                            
-                            i += 2;  
-                            continue;
-                        }
-                    }
-                }
-            }
-            
-            
-            if (i + 1 < lines.size()) {
-                std::smatch m1, m2;
-                std::regex re_store_reload(
-                    R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
-                    std::regex::icase);
-                    
-                if (std::regex_match(line, m1, re_store_reload)) {
-                    const std::string reg = m1[1].str();
-                    const std::string mem = m1[2].str();
-                    
-            
-                    std::string escaped_mem = std::regex_replace(mem, std::regex(R"([\$\(\)])"), "\\$&");
-                    std::regex reload_pattern(R"(^\s*movq?\s+)" + escaped_mem + 
-                                             R"(\s*,\s*)" + reg + R"(\s*(?:[#;].*)?$)", std::regex::icase);
-                    
-                    if (std::regex_match(lines[i+1], reload_pattern)) {
-                        out.push_back(lines[i]); 
-                        i += 1;  
                         continue;
                     }
+
+                    out.push_back(line);
+                    reg_contents[reg] = {mem, true};
+                    continue;
                 }
             }
+
+            // mov reg -> mem
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_reg_to_mem)) {
+                    const std::string reg = m[1].str();
+                    const std::string mem = m[2].str();
+                    mem_contents[mem] = {reg, true};
+                    out.push_back(line);
+                    continue;
+                }
+            }
+
+            // mov reg -> reg (dst is clobbered)
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mov_reg)) {
+                    const std::string src = m[1].str();
+                    const std::string dst = m[2].str();
+                    if (src == dst) continue;
+
+                    clobber_reg(dst);
+
+                    auto it_src = reg_contents.find(src);
+                    if (it_src != reg_contents.end()) reg_contents[dst] = it_src->second;
+                    else reg_contents[dst] = {src, true};
+
+                    out.push_back(line);
+                    continue;
+                }
+            }
+
+            // Unknown effect → be safe
             invalidate_tracking();
             out.push_back(line);
         }
+
         return out;
     }
 
+    // ---------------- x64 (with frame detection) ----------------
 
     static std::vector<std::string> x64_opt_core_lines(const std::vector<std::string>& lines) {
-        std::regex re_mov_imm(R"(^\s*mov[a-z]*\s+\$(-?\d+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_bin_op(R"(^\s*((?:add|sub|and|or|xor|cmp)[a-z]*)\s+(\%[a-z0-9]+|\$-?[0-9]+)\s*,\s*(\%[a-z0-9]+)\s*(?:([#;].*))?$)", std::regex::icase);
-        std::regex re_mov_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_add_one(R"(^\s*add[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_sub_one(R"(^\s*sub[a-z]*\s+\$1\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_mul_pow2(R"(^\s*(?:imul|mul)[a-z]*\s+\$(\d+)\s*,\s*(%[a-z0-9]+)(?:\s*,\s*(%[a-z0-9]+))?\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_cmp_zero(R"(^\s*cmp[a-z]*\s+\$0\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_mem_load_store(R"(^\s*mov[a-z]*\s+([^%][^,]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_mem_store(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([^%][^,]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mov_reg(R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_mem_to_reg(R"(^\s*movq?\s+([A-Za-z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_reg_to_mem(R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([A-Za-z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_call_or_jmp(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
 
-        std::regex re_sub_rsp(R"(^\s*sub\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_add_rsp(R"(^\s*add\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
-
-        auto is_label = [](const std::string& line) {
+        auto local_is_label = [](const std::string& s){
             static const std::regex re(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)"); 
-            return std::regex_search(line, re);
+            return std::regex_search(s, re);
         };
         auto has_call_or_ret = [](const std::string& s){
             return s.find(" call ") != std::string::npos ||
-                s.find("\tcall ") != std::string::npos ||
-                s.find(" ret") != std::string::npos ||
-                s.find("\tret") != std::string::npos;
+                   s.find("\tcall ") != std::string::npos ||
+                   s.find(" ret")   != std::string::npos ||
+                   s.find("\tret")  != std::string::npos;
         };
         auto touches_rsp = [](const std::string& s){
             return s.find("%rsp") != std::string::npos || s.find("(%rsp") != std::string::npos;
@@ -287,24 +168,30 @@ namespace mxvm {
         out.reserve(lines.size());
         std::vector<int> frame_bytes;
 
+        std::regex re_sub_rsp(R"(^\s*sub\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_add_rsp(R"(^\s*add\s+\$([0-9]+)\s*,\s*%rsp\s*(?:[#;].*)?$)", std::regex::icase);
+
         struct ValueInfo { std::string location; bool valid = true; };
         std::unordered_map<std::string, ValueInfo> reg_contents;
         std::unordered_map<std::string, ValueInfo> mem_contents;
+
         auto invalidate_tracking = [&]() {
             reg_contents.clear();
             mem_contents.clear();
         };
 
-        std::regex re_mem_to_reg(R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_reg_to_mem(R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_reg_to_reg(R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-        std::regex re_call_instr(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
+        auto clobber_reg = [&](const std::string& reg){
+            reg_contents.erase(reg);
+            for (auto it = mem_contents.begin(); it != mem_contents.end(); ) {
+                if (it->second.location == reg) it = mem_contents.erase(it);
+                else ++it;
+            }
+        };
 
         for (size_t i = 0; i < lines.size(); ++i) {
-            const std::string line = lines[i];
+            const std::string& line = lines[i];
 
-            if (is_label(line)) {
+            if (local_is_label(line)) {
                 out.push_back(line);
                 invalidate_tracking();
                 continue;
@@ -329,262 +216,85 @@ namespace mxvm {
                 continue;
             }
 
-            if (has_call_or_ret(line) || touches_rsp(line) || std::regex_search(line, re_call_instr)) {
+            if (has_call_or_ret(line) || touches_rsp(line) || std::regex_search(line, re_call_or_jmp)) {
                 out.push_back(line);
                 invalidate_tracking();
                 continue;
             }
 
+            // ALU modifies dest reg → clobber
             {
-                std::smatch m_mod;
-                if (std::regex_match(line, m_mod, re_modifies_reg)) {
-                    const std::string reg = m_mod[1].str();
-                    reg_contents.erase(reg);
+                std::smatch m;
+                if (std::regex_match(line, m, re_modifies_reg)) {
+                    clobber_reg(m[1].str());
                     out.push_back(line);
                     continue;
                 }
             }
 
+            // mov reg -> mem
             {
-                std::smatch m_store;
-                if (std::regex_match(line, m_store, re_reg_to_mem)) {
-                    const std::string reg = m_store[1].str();
-                    const std::string mem = m_store[2].str();
-
+                std::smatch m;
+                if (std::regex_match(line, m, re_reg_to_mem)) {
+                    const std::string reg = m[1].str();
+                    const std::string mem = m[2].str();
                     mem_contents[mem] = {reg, true};
                     out.push_back(line);
-
-                    if (i + 1 < lines.size()) {
-                        std::smatch m_next;
-                        if (std::regex_match(lines[i+1], m_next, re_mem_to_reg)) {
-                            const std::string next_mem = m_next[1].str();
-                            const std::string next_reg = m_next[2].str();
-                            if (next_mem == mem) {
-                                if (next_reg != reg) {
-                                    out.push_back("\tmovq " + reg + ", " + next_reg);
-                                    reg_contents[next_reg] = {mem, true};
-                                }
-                                i++;
-                                continue;
-                            }
-                        }
-                    }
                     continue;
                 }
             }
 
-            {
-                std::smatch m_reg_move;
-                if (std::regex_match(line, m_reg_move, re_reg_to_reg)) {
-                    const std::string src_reg = m_reg_move[1].str();
-                    const std::string dst_reg = m_reg_move[2].str();
-                    if (src_reg == dst_reg) continue;
-
-                    auto it_src = reg_contents.find(src_reg);
-                    if (it_src != reg_contents.end()) reg_contents[dst_reg] = it_src->second;
-                    else reg_contents[dst_reg] = {src_reg, true};
-
-                    out.push_back(line);
-                    continue;
-                }
-            }
-
-            {
-                std::smatch m;
-                if (std::regex_match(line, m, re_cmp_zero)) {
-                    out.push_back("\ttest " + m[1].str() + ", " + m[1].str());
-                    continue;
-                }
-            }
-
-            {
-                std::smatch m;
-                if (std::regex_match(line, m, re_add_one)) { out.push_back("\tinc " + m[1].str()); continue; }
-                if (std::regex_match(line, m, re_sub_one)) { out.push_back("\tdec " + m[1].str()); continue; }
-            }
-
-            {
-                std::smatch m;
-                if (std::regex_match(line, m, re_mul_pow2)) {
-                    int imm = std::stoi(m[1].str());
-                    const std::string src = m[2].str();
-                    const std::string dst = (m.size() > 3 && !m[3].str().empty()) ? m[3].str() : src;
-                    if (imm == 3 || imm == 5 || imm == 9) {
-                        if (src != dst) out.push_back("\tmov " + src + ", " + dst);
-                        if (imm == 3)      out.push_back("\tlea (" + dst + "," + dst + ",2), " + dst);
-                        else if (imm == 5) out.push_back("\tlea (" + dst + "," + dst + ",4), " + dst);
-                        else               out.push_back("\tlea (" + dst + "," + dst + ",8), " + dst);
-                        continue;
-                    }
-                }
-            }
-
-            {
-                std::smatch m;
-                if (std::regex_match(line, m, re_mov_imm)) {
-                    const std::string imm = m[1].str();
-                    const std::string reg = m[2].str();
-                    if (imm == "0") { out.push_back("\txor " + reg + ", " + reg); continue; }
-
-                    if (i + 1 < lines.size()) {
-                        std::smatch m2;
-                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
-                            const std::string op_full = m2[1].str();
-                            const std::string src     = m2[2].str();
-                            const std::string dst     = m2[3].str();
-                            const std::string cmt     = (m2.size() >= 5) ? m2[4].str() : "";
-                            if (src == reg &&
-                                (op_full.rfind("cmp",0)==0 || op_full.rfind("add",0)==0 || op_full.rfind("sub",0)==0 ||
-                                op_full.rfind("and",0)==0 || op_full.rfind("or",0)==0  || op_full.rfind("xor",0)==0)) {
-                                out.push_back("\t" + op_full + " $" + imm + ", " + dst + cmt);
-                                ++i;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
-
+            // mov reg -> reg (dst is clobbered)
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_mov_reg)) {
-                    const std::string src_reg = m[1].str();
-                    const std::string dst_reg = m[2].str();
-                    if (i + 1 < lines.size()) {
-                        std::smatch m2;
-                        if (std::regex_match(lines[i + 1], m2, re_bin_op)) {
-                            const std::string op_full = m2[1].str();
-                            const std::string op_src  = m2[2].str();
-                            const std::string op_dst  = m2[3].str();
-                            const std::string cmt     = (m2.size() >= 5) ? m2[4].str() : "";
-                            if (op_src == dst_reg) {
-                                out.push_back("\t" + op_full + " " + src_reg + ", " + op_dst + cmt);
-                                ++i;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
+                    const std::string src = m[1].str();
+                    const std::string dst = m[2].str();
+                    if (src == dst) continue;
 
-            std::regex re_store_load_store(
-                R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
-                std::regex::icase);
+                    clobber_reg(dst);
 
-            if (i + 2 < lines.size()) {
-                std::smatch m1, m2, m3;
-                if (std::regex_match(lines[i], m1, re_store_load_store)) {
-                    const std::string reg1 = m1[1].str();
-                    const std::string mem1 = m1[2].str();
+                    auto it_src = reg_contents.find(src);
+                    if (it_src != reg_contents.end()) reg_contents[dst] = it_src->second;
+                    else reg_contents[dst] = {src, true};
 
-                    std::string escaped_mem1 = std::regex_replace(mem1, std::regex(R"([\$\(\)])"), "\\$&");
-                    std::regex load_pattern(R"(^\s*movq?\s+)" + escaped_mem1 +
-                                            R"(\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
-
-                    if (std::regex_match(lines[i+1], m2, load_pattern)) {
-                        const std::string reg2 = m2[1].str();
-
-                        std::regex store_pattern(R"(^\s*movq?\s+)" + reg2 +
-                                                R"(\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
-
-                        if (std::regex_match(lines[i+2], m3, store_pattern)) {
-                            const std::string mem2 = m3[1].str();
-                            out.push_back(lines[i]);
-                            std::string optimized_store = "\tmovq " + reg1 + ", " + mem2;
-                            out.push_back(optimized_store);
-                            i += 2;
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            {
-                std::unordered_map<std::string, std::string> reg_values;
-
-                std::regex re_store_load(
-                    R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
-                    std::regex::icase);
-
-                std::smatch store_match;
-                if (std::regex_match(lines[i], store_match, re_store_load)) {
-                    const std::string reg = store_match[1].str();
-                    const std::string mem = store_match[2].str();
-                    reg_values[mem] = reg;
-                    out.push_back(lines[i]);
+                    out.push_back(line);
                     continue;
                 }
+            }
 
-                std::regex re_load(
-                    R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)",
-                    std::regex::icase);
+            // mov mem -> reg (reg is clobbered)
+            {
+                std::smatch m;
+                if (std::regex_match(line, m, re_mem_to_reg)) {
+                    const std::string mem = m[1].str();
+                    const std::string reg = m[2].str();
 
-                std::smatch load_match;
-                if (std::regex_match(lines[i], load_match, re_load)) {
-                    const std::string mem = load_match[1].str();
-                    const std::string reg = load_match[2].str();
+                    clobber_reg(reg);
 
-                    auto it = reg_values.find(mem);
-                    if (it != reg_values.end()) {
-                        if (it->second != reg) {
-                            out.push_back("\tmovq " + it->second + ", " + reg);
-                        }
+                    auto it = mem_contents.find(mem);
+                    if (it != mem_contents.end() && it->second.valid) {
+                        const std::string& src_reg = it->second.location;
+                        if (src_reg != reg) out.push_back("\tmovq " + src_reg + ", " + reg);
+                        reg_contents[reg] = {mem, true};
                         continue;
                     }
 
-                    out.push_back(lines[i]);
+                    out.push_back(line);
+                    reg_contents[reg] = {mem, true};
                     continue;
                 }
             }
 
-            {
-                if (i + 1 < lines.size()) {
-                    std::smatch m1, m2;
-                    std::regex re_store_reload(
-                        R"(^\s*movq?\s+(%[a-z0-9]+)\s*,\s*([a-zA-Z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)",
-                        std::regex::icase);
-
-                    if (std::regex_match(lines[i], m1, re_store_reload)) {
-                        const std::string reg = m1[1].str();
-                        const std::string mem = m1[2].str();
-
-                        std::string escaped_mem = std::regex_replace(mem, std::regex(R"([\$\(\)])"), "\\$&");
-                        std::regex reload_pattern(R"(^\s*movq?\s+)" + escaped_mem +
-                                                R"(\s*,\s*)" + reg + R"(\s*(?:[#;].*)?$)", std::regex::icase);
-
-                        if (std::regex_match(lines[i+1], reload_pattern)) {
-                            out.push_back(lines[i]);
-                            i += 1;
-                            continue;
-                        }
-
-                        if (i + 2 < lines.size() && std::regex_match(lines[i+1], reload_pattern)) {
-                            std::smatch m3;
-                            std::regex re_load_other(
-                                R"(^\s*movq?\s+([a-zA-Z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)",
-                                std::regex::icase);
-
-                            if (std::regex_match(lines[i+2], m3, re_load_other)) {
-                                const std::string load_mem = m3[1].str();
-                                const std::string load_reg = m3[2].str();
-                                out.push_back(lines[i]);
-                                out.push_back("\tmovq " + reg + ", " + load_reg);
-                                i += 2;
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
-
+            // Unknown effect → be safe
             invalidate_tracking();
-            out.push_back(lines[i]);
+            out.push_back(line);
         }
 
         return out;
     }
 
-
+    // ---------------- Darwin call prefixing (unchanged) ----------------
 
     static std::string darwin_prefix_calls(const std::string& line,
                                            const std::unordered_set<std::string>& macos_functions) {
@@ -601,7 +311,7 @@ namespace mxvm {
 
             result.append(line, last, pos - last);
 
-            std::string piece = m.str(); 
+            std::string piece = m.str();
             if (fn == "main" || macos_functions.count(fn)) {
                 const auto fnpos = piece.rfind(fn);
                 if (fnpos != std::string::npos) piece.replace(fnpos, fn.size(), "_" + fn);
@@ -617,7 +327,7 @@ namespace mxvm {
     static std::vector<std::string> opt_darwin_lines(const std::vector<std::string>& lines) {
         std::vector<std::string> out;
         out.reserve(lines.size());
-  
+
         std::regex re_stdin_access(R"(movq?\s+stdin\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
         std::regex re_stdout_access(R"(movq?\s+stdout\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
         std::regex re_stderr_access(R"(movq?\s+stderr\(%rip\)\s*,\s*(%\w+))", std::regex::icase);
@@ -678,24 +388,24 @@ namespace mxvm {
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
             }
-    
+
             std::regex re_single_stdout(R"(^\s*movq?\s+_stdout\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
             if (std::regex_search(line, m, re_single_stdout)) {
-                std::string r = m[1].str();  
+                std::string r = m[1].str();
                 out.push_back("\tmovq ___stdoutp@GOTPCREL(%rip), %rax");
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
             }
             std::regex re_single_stderr(R"(^\s*movq?\s+_stderr\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
             if (std::regex_search(line, m, re_single_stderr)) {
-                std::string r = m[1].str();  
+                std::string r = m[1].str();
                 out.push_back("\tmovq ___stderrp@GOTPCREL(%rip), %rax");
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
             }
             std::regex re_single_stdin(R"(^\s*movq?\s+_stdin\(%rip\)\s*,\s*(%\w+)\s*(?:[#;].*)?$)", std::regex::icase);
             if (std::regex_search(line, m, re_single_stdin)) {
-                std::string r = m[1].str();  
+                std::string r = m[1].str();
                 out.push_back("\tmovq ___stdinp@GOTPCREL(%rip), %rax");
                 out.push_back("\tmovq (%rax), " + r);
                 continue;
@@ -708,7 +418,9 @@ namespace mxvm {
         return out;
     }
 
-  static std::vector<std::string> opt_x64_windows_lines(const std::vector<std::string> &lines) {
+    // ---------------- Windows tiny pass (unchanged) ----------------
+
+    static std::vector<std::string> opt_x64_windows_lines(const std::vector<std::string> &lines) {
         static const std::regex add_rx(R"(^\s*addq?\s+\$([0-9]+|0x[0-9a-fA-F]+)\s*,\s*%rsp\s*(?:#.*)?$)");
         static const std::regex sub_rx(R"(^\s*subq?\s+\$([0-9]+|0x[0-9a-fA-F]+)\s*,\s*%rsp\s*(?:#.*)?$)");
 
@@ -749,6 +461,8 @@ namespace mxvm {
         return lines;
     }
 
+    // ---------------- entry ----------------
+
     std::string Program::gen_optimize(const std::string &code, const Platform &platform_name) {
         std::vector<std::string> lines;
         {
@@ -757,19 +471,15 @@ namespace mxvm {
             while (std::getline(stream, s)) lines.push_back(s);
         }
 
-        std::vector<std::string> final_lines;
-
-        if(platform == Platform::WINX64) {
-             final_lines = x64_opt_core_lines(lines);
-             auto lines = opt_x64_windows_lines(final_lines);
-             return join_lines(lines);
-        }
-        else {
-            std::vector<std::string> core  = opt_core_lines(lines);
-            std::vector<std::string> final_lines =
-            (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
-                                           : opt_linux_lines(core);
-            return join_lines(final_lines);
+        if (platform_name == Platform::WINX64) {
+            auto core = x64_opt_core_lines(lines);
+            auto win  = opt_x64_windows_lines(core);
+            return join_lines(win);
+        } else {
+            auto core = opt_core_lines(lines);
+            auto os   = (platform_name == Platform::DARWIN) ? opt_darwin_lines(core)
+                                                            : opt_linux_lines(core);
+            return join_lines(os);
         }
     }
 }

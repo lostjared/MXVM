@@ -394,6 +394,7 @@ namespace pascal {
             std::string varName = varPtr->name;
             
             if (!currentFunctionName.empty() && varName == currentFunctionName) {
+                // Function return value handling is fine
                 if (getVarType(currentFunctionName) == VarType::STRING) {
                     emit3("mov", "arg0", rhs);  
                 } else {
@@ -404,10 +405,21 @@ namespace pascal {
                 int slot = newSlotFor(varName);
                 std::string memLoc = slotVar(slot);
                 
-                if (rhs != memLoc) {
+                auto it = valueLocations.find(varName);
+                if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
+                    freeReg(it->second.location);
+                }
+                
+                if (!isReg(rhs) && rhs != memLoc) {
+                    std::string tempReg = allocReg();
+                    emit3("mov", tempReg, rhs);
+                    emit3("mov", memLoc, tempReg);
+                    freeReg(tempReg);
+                } else if (rhs != memLoc) {
                     emit3("mov", memLoc, rhs);
                 }
                 
+                // Update the tracking for this variable
                 recordLocation(varName, {ValueLocation::MEMORY, memLoc});
             }
             
