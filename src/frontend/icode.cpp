@@ -22,7 +22,6 @@ namespace pascal {
         while (b > a && (unsigned char)s[b-1] <= ' ') --b;
         return s.substr(a, b-a);
     }
-
     static void locate_sections(const std::vector<std::string>& lines,
                                 size_t& dataStart, size_t& dataEnd,
                                 size_t& codeStart, size_t& codeEnd) {
@@ -43,6 +42,37 @@ namespace pascal {
             if (dataStart && dataEnd && codeStart && codeEnd) break;
         }
     }
+    static std::unordered_set<std::string> collect_used(const std::vector<std::string>& lines,
+                                                        size_t codeStart, size_t codeEnd) {
+        std::string code;
+        for (size_t i = codeStart; i <= codeEnd && i < lines.size(); ++i) {
+            code += lines[i];
+            code.push_back('\n');
+        }
+        std::unordered_set<std::string> used = {"rax","fmt_int","fmt_str","fmt_chr","fmt_float","newline"};
+        std::regex varUsagePattern("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b");
+        for (auto it = std::sregex_iterator(code.begin(), code.end(), varUsagePattern);
+             it != std::sregex_iterator(); ++it) used.insert((*it).str(1));
+        return used;
+    }
+    static void sweep_unused_data(std::vector<std::string>& lines) {
+        size_t dS=0,dE=0,cS=0,cE=0;
+        locate_sections(lines, dS, dE, cS, cE);
+        if (!dS || !cS) return;
+        auto used = collect_used(lines, cS, cE);
+        std::regex decl("^\\s*(export)?\\s*(int|string|ptr|float|double)\\s+([A-Za-z_][A-Za-z0-9_]*)");
+        std::vector<size_t> erase;
+        for (size_t i = dS; i <= dE && i < lines.size(); ++i) {
+            std::smatch m;
+            if (std::regex_search(lines[i], m, decl)) {
+                bool isExport = m[1].length() > 0;
+                std::string name = m[3];
+                if (!isExport && !used.count(name)) erase.push_back(i);
+            }
+        }
+        std::sort(erase.begin(), erase.end(), std::greater<size_t>());
+        for (auto idx : erase) if (idx < lines.size()) lines.erase(lines.begin() + idx);
+    }
 
     std::string mxvmOpt(const std::string &text) {
         std::vector<std::string> lines;
@@ -60,38 +90,12 @@ namespace pascal {
             return out;
         }
 
-        std::string codeSection;
-        for (size_t i = codeStart; i <= codeEnd && i < lines.size(); ++i) {
-            codeSection += lines[i];
-            codeSection.push_back('\n');
-        }
-
-        std::unordered_set<std::string> usedVars = {"rax","fmt_int","fmt_str","fmt_chr","fmt_float","newline"};
-        std::regex varUsagePattern("\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b");
-        for (auto it = std::sregex_iterator(codeSection.begin(), codeSection.end(), varUsagePattern);
-             it != std::sregex_iterator(); ++it) {
-            usedVars.insert((*it).str(1));
-        }
-
-        if (dataStart) {
-            std::regex varDeclPattern("^\\s*(export)?\\s*(int|string|ptr|float|double)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*=");
-            std::vector<size_t> eraseData;
-            for (size_t i = dataStart; i <= dataEnd && i < lines.size(); ++i) {
-                std::smatch m;
-                if (std::regex_search(lines[i], m, varDeclPattern)) {
-                    bool isExport = m[1].length() > 0;
-                    std::string name = m[3];
-                    if (!isExport && !usedVars.count(name)) eraseData.push_back(i);
-                }
-            }
-            std::sort(eraseData.begin(), eraseData.end(), std::greater<size_t>());
-            for (auto idx : eraseData) if (idx < lines.size()) lines.erase(lines.begin() + idx);
-            locate_sections(lines, dataStart, dataEnd, codeStart, codeEnd);
-            if (!codeStart) {
-                std::string out;
-                for (auto &ln : lines) out += ln + "\n";
-                return out;
-            }
+        sweep_unused_data(lines);
+        locate_sections(lines, dataStart, dataEnd, codeStart, codeEnd);
+        if (!codeStart) {
+            std::string out;
+            for (auto &ln : lines) out += ln + "\n";
+            return out;
         }
 
         size_t cStart = codeStart, cEnd = std::min(codeEnd, lines.size() ? lines.size()-1 : 0);
@@ -162,6 +166,8 @@ namespace pascal {
         finalLines.insert(finalLines.end(), pass2.begin(), pass2.end());
         if (cEnd + 1 < lines.size())
             finalLines.insert(finalLines.end(), lines.begin() + cEnd + 1, lines.end());
+
+        sweep_unused_data(finalLines);
 
         std::string result;
         for (auto &ln : finalLines) result += ln + "\n";
