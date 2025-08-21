@@ -496,14 +496,15 @@ namespace pascal {
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseFactor() {
-        if (!token) {
-            error("Unexpected end of input");
-        }
-
         if (peekIs(types::TokenType::TT_NUM)) {
             std::string value = token->getTokenValue();
             next();
-            return std::make_unique<NumberNode>(value, true);
+            
+            bool isReal = value.find('.') != std::string::npos ||
+                          value.find('e') != std::string::npos ||
+                          value.find('E') != std::string::npos;
+            
+            return std::make_unique<NumberNode>(value, !isReal, isReal);
         } else if (peekIs(types::TokenType::TT_STR)) {
             std::string value = token->getTokenValue();
             next();
@@ -641,6 +642,31 @@ namespace pascal {
         return lower == "abs" || lower == "sqr" || lower == "sqrt" || 
                lower == "sin" || lower == "cos" || lower == "ln" || 
                lower == "exp" || lower == "trunc" || lower == "round";
+    }
+
+    BinaryOpNode::OpType PascalParser::getComparisonOperator(const std::string& op) {
+        if (op == "=") return BinaryOpNode::EQUAL;
+        if (op == "<>") return BinaryOpNode::NOT_EQUAL;
+        if (op == "<") return BinaryOpNode::LESS;
+        if (op == "<=") return BinaryOpNode::LESS_EQUAL;
+        if (op == ">") return BinaryOpNode::GREATER;
+        if (op == ">=") return BinaryOpNode::GREATER_EQUAL;
+        throw std::runtime_error("Unknown comparison operator: " + op);
+    }
+
+    BinaryOpNode::OpType PascalParser::getLogicalOperator(const std::string& op) {
+        if (op == "and") return BinaryOpNode::AND;
+        if (op == "or") return BinaryOpNode::OR;
+        throw std::runtime_error("Unknown logical operator: " + op);
+    }
+
+    BinaryOpNode::OpType PascalParser::getArithmeticOperator(const std::string& op) {
+        if (op == "+") return BinaryOpNode::PLUS;
+        if (op == "-") return BinaryOpNode::MINUS;
+        if (op == "*") return BinaryOpNode::MULTIPLY;
+        if (op == "/") return BinaryOpNode::DIVIDE;
+        if (op == "mod") return BinaryOpNode::MOD;
+        throw std::runtime_error("Unknown arithmetic operator: " + op);
     }
 
 }

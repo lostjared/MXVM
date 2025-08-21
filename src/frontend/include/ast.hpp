@@ -250,9 +250,10 @@ namespace pascal {
     public:
         std::string value;
         bool isInteger;
+        bool isReal;
         
-        NumberNode(const std::string& val, bool integer = true) 
-            : value(val), isInteger(integer) {}
+        NumberNode(const std::string& val, bool integer = true, bool real = false) 
+            : value(val), isInteger(integer), isReal(real) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;

@@ -20,6 +20,8 @@ namespace pascal {
             virtual bool canHandle(const std::string& funcName) const = 0;
             virtual void generate(CodeGenVisitor& visitor, const std::string& funcName, 
                                 const std::vector<std::unique_ptr<ASTNode>>& arguments) = 0;
+            virtual bool generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+                                  const std::vector<std::unique_ptr<ASTNode>>& arguments);
         };
 
     class BuiltinFunctionRegistry {
@@ -49,8 +51,14 @@ namespace pascal {
 
     
     class MathFunctionHandler : public BuiltinFunctionHandler {
-    
+    public:
+        bool canHandle(const std::string& funcName) const override;
+        void generate(CodeGenVisitor& visitor, const std::string& funcName, 
+                    const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
+        bool generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+                            const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
     };
+
 
     class StringFunctionHandler : public BuiltinFunctionHandler {
     
@@ -58,752 +66,21 @@ namespace pascal {
 
 
     class CodeGenVisitor : public ASTVisitor {
-        BuiltinFunctionRegistry builtinRegistry;
-    public:
-        friend class IOFunctionHandler;
-        CodeGenVisitor()
-            : regInUse(registers.size(), false),
-              currentFunctionName(),
-              functionSetReturn(false),
-              nextSlot(0), nextTemp(0), labelCounter(0) 
-        {
-            initializeBuiltins(); 
-        }
-
-        virtual ~CodeGenVisitor() = default;
-
-        void initializeBuiltins() {
-            builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
-            // Uncomment these when implemented
-            // builtinRegistry.registerHandler(std::make_unique<MathFunctionHandler>());
-            // builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
-        }
-
-        std::string name = "App";
-
-        void generate(ASTNode* root) {
-            if (!root) return;
-            instructions.clear();
-            usedStrings.clear();
-            prolog.clear();
-            deferredProcs.clear();
-            deferredFuncs.clear();
-            valueLocations.clear();
-            varTypes.clear();  
-            
-            for (size_t i = 0; i < regInUse.size(); i++) {
-                regInUse[i] = false;
-            }
-            
-            if (auto prog = dynamic_cast<ProgramNode*>(root)) {
-                name = prog->name;
-            }
-            
-            root->accept(*this);
-            emit("done");
-            
-            for (auto pn : deferredProcs) {
-                emitLabel(funcLabel("function PROC_", pn->name));
-                
-                for (size_t i = 0; i < regInUse.size(); i++) {
-                    regInUse[i] = false;
-                }
-                
-                int paramIndex = 0;
-                for (auto &p : pn->parameters) {
-                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                        for (auto &id : param->identifiers) {
-                            if (paramIndex < 6) {
-                                if (!param->type.empty() && param->type == "string") {
-                                    varSlot[id] = newSlotFor(ptrRegisters[paramIndex]);
-                                    setVarType(id, VarType::STRING);
-                                } else {
-                                    varSlot[id] = -2 - (paramIndex + 1);
-                                    regInUse[paramIndex + 1] = true;
-                                    if (!param->type.empty()) {
-                                        if (param->type == "integer" || param->type == "boolean") {
-                                            setVarType(id, VarType::INT);
-                                        } else if (param->type == "real") {
-                                            setVarType(id, VarType::DOUBLE);
-                                        }
-                                   }
-                                }
-                                paramIndex++;
-                            } else {
-                                int slot = newSlotFor(id);
-                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
-                                if (!param->type.empty()) {
-                                    if (param->type == "string") {
-                                        setVarType(id, VarType::STRING);
-                                        setSlotType(slot, VarType::STRING);
-                                    } else if (param->type == "integer" || param->type == "boolean") {
-                                        setVarType(id, VarType::INT);
-                                        setSlotType(slot, VarType::INT);
-                                    } else if (param->type == "real") {
-                                        setVarType(id, VarType::DOUBLE);
-                                        setSlotType(slot, VarType::DOUBLE);
-                                    }
-                                }
-                                paramIndex++;
-                            }
-                        }
-                    }
-                }
-                
-                if (pn->block) pn->block->accept(*this);
-                emit("ret");
-            }
-            
-            for (auto fn : deferredFuncs) {
-                emitLabel(funcLabel("function FUNC_", fn->name));
-                for (size_t i = 0; i < regInUse.size(); i++) {
-                    regInUse[i] = false;
-                }
-                currentFunctionName = fn->name;
-                functionSetReturn = false;
-
-                if (!fn->returnType.empty()) { 
-                    if (fn->returnType == "string") {
-                        setVarType(fn->name, VarType::STRING);
-                    }
-                    else if (fn->returnType == "integer" || fn->returnType == "boolean") {
-                        setVarType(fn->name, VarType::INT);
-                    }
-                    else if (fn->returnType == "real") {
-                        setVarType(fn->name, VarType::DOUBLE);
-                    }
-                }
-
-                int paramIndex = 0;
-                for (auto &p : fn->parameters) {
-                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                        for (auto &id : param->identifiers) {
-                            if (paramIndex < 6) { 
-                                varSlot[id] = -2 - (paramIndex + 1);
-                                regInUse[paramIndex + 1] = true;
-                                if (!param->type.empty()) {
-                                    if (param->type == "string") {
-                                        setVarType(id, VarType::STRING);
-                                    }
-                                    else if (param->type == "integer" || param->type == "boolean") {
-                                        setVarType(id, VarType::INT);
-                                    }
-                                    else if (param->type == "real") {
-                                        setVarType(id, VarType::DOUBLE);
-                                    }
-                                }
-                                paramIndex++;
-                            } else {
-                                int slot = newSlotFor(id); 
-                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
-                                if (!param->type.empty()) {
-                                    if (param->type == "string") {
-                                        setVarType(id, VarType::STRING);
-                                    }
-                                    else if (param->type == "integer" || param->type == "boolean") {
-                                        setVarType(id, VarType::INT);
-                                    }
-                                    else if (param->type == "real") {
-                                        setVarType(id, VarType::DOUBLE);
-                                    }
-                                }
-                                paramIndex++;
-                            }
-                        }
-                    }
-                }
-
-                if (fn->block) fn->block->accept(*this);
-
-                if (!functionSetReturn) {
-                    if (getVarType(fn->name) == VarType::STRING) {
-                        emit3("mov", "arg0", emptyString());  
-                    } else {
-                        emit3("mov", "rax", "0");  
-                    }
-                }
-
-                emit("ret");
-                currentFunctionName.clear();
-                functionSetReturn = false;
-            }
-           
-        }
-
-        void writeTo(std::ostream& out) const {
-            out << "program " << name << " {\n";
-            out << "    section data {\n";
-            
-            for (const auto& reg : registers) {
-                out << "        int " << reg << " = 0\n";
-            }
-            
-            for (const auto& preg : ptrRegisters) {
-                out << "        ptr " << preg << " = null\n";
-            }
-            
-            for (int i = 0; i < 8; ++i) {
-                out << "        int param" << i << " = 0\n";
-            }
-            
-            for (int i = 0; i < nextSlot; ++i) {
-                if (!isRegisterSlot(i) && !isTempVar(slotVar(i)) && !isPtrReg(slotVar(i))) {
-                    auto it = slotToType.find(i);
-                    if (it != slotToType.end()) {
-                        if (it->second == VarType::STRING) {
-                            out << "        string " << slotVar(i) << " = \"\"\n";
-                        } else if (it->second == VarType::PTR) {
-                            out << "        ptr " << slotVar(i) << " = null\n";
-                        } else if (it->second == VarType::CHAR) {
-                            out << "        int " << slotVar(i) << " = 0\n"; 
-                        } else {
-                            out << "        int " << slotVar(i) << " = 0\n";
-                        }
-                    } else {
-                        out << "        int " << slotVar(i) << " = 0\n";
-                    }
-                }
-            }
-            
-            if (needsEmptyString) {
-                out << "        string empty_str = \"\"\n";
-            }
-            
-            for (auto &s : stringLiterals) {
-                if (s.first != "empty_str") { 
-                    out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
-                }
-            }
-            
-            if (usedStrings.count("fmt_int")) {
-                out << "        string fmt_int = \"%lld \"\n";
-            }
-            if (usedStrings.count("fmt_str")) {
-                out << "        string fmt_str = \"%s \"\n";
-            }
-            if (usedStrings.count("fmt_chr")) {
-                out << "        string fmt_chr = \"%c \"\n";
-            }
-            if (usedStrings.count("newline")) {
-                out << "        string newline = \"\\n\"\n";
-            }
-            out << "        string input_buffer, 256\n";
-            out << "    }\n";
-            out << "    section code {\n";
-            out << "    start:\n";
-            
-            for (auto &s : prolog) out << "        " << s << "\n";
-            for (auto &s : instructions) {
-                if (endsWithColon(s)) out << "    " << s << "\n";
-                else out << "        " << s << "\n";
-            }
-            
-            out << "    }\n";
-            out << "}\n";
-        }
-
-        void visit(ProgramNode& node) override {
-            name = node.name;
-            if (node.block) node.block->accept(*this);
-        }
-
-        void visit(BlockNode& node) override {
-            for (auto &d : node.declarations) if (d) d->accept(*this);
-            if (node.compoundStatement) node.compoundStatement->accept(*this);
-        }
-
-        void visit(VarDeclNode& node) override {
-            for (size_t i = 0; i < node.identifiers.size(); i++) {
-                std::string id = node.identifiers[i];
-                int slot = newSlotFor(id);
-                
-                
-                if (!node.type.empty()) {
-                    if (node.type == "string") {
-                        setVarType(id, VarType::PTR);
-                        setSlotType(slot, VarType::PTR);
-                        
-                
-                        if (i < node.initializers.size() && node.initializers[i]) {
-                            std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
-                            if (isReg(init)) freeReg(init);
-                        } else {
-                            emit3("mov", slotVar(slot), emptyString());
-                        }
-                    }
-                    else if (node.type == "char") {
-                        setVarType(id, VarType::CHAR);
-                        setSlotType(slot, VarType::CHAR);
-                        
-                
-                        if (i < node.initializers.size() && node.initializers[i]) {
-                            std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
-                            if (isReg(init)) freeReg(init);
-                        } else {
-                            emit3("mov", slotVar(slot), "0");  
-                        }
-                    }
-                    else if (node.type == "integer" || node.type == "boolean") {
-                        setVarType(id, VarType::INT);
-                        setSlotType(slot, VarType::INT);
-                        
-                        if (i < node.initializers.size() && node.initializers[i]) {
-                            std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
-                            if (isReg(init)) freeReg(init);
-                        }
-                    }
-                    else if (node.type == "real") {
-                        setVarType(id, VarType::DOUBLE);
-                        setSlotType(slot, VarType::DOUBLE);
-                        
-                        if (i < node.initializers.size() && node.initializers[i]) {
-                            std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
-                            if (isReg(init)) freeReg(init);
-                        }
-                    }
-                    else if (node.type == "record") {
-                        setVarType(id, VarType::RECORD);
-                        setSlotType(slot, VarType::RECORD);
-                        
-                    }
-                }
-            }
-        }
-
-        void visit(ProcDeclNode& node) override {
-            deferredProcs.push_back(&node);
-            
-            FuncInfo info;
-            for (auto &p : node.parameters) {
-                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                    VarType t = VarType::INT; 
-                    if (!param->type.empty()) {
-                        if (param->type == "string") t = VarType::STRING;
-                        else if (param->type == "char") t = VarType::CHAR;
-                        else if (param->type == "real") t = VarType::DOUBLE;
-                    }
-                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
-                        info.paramTypes.push_back(t);
-                    }
-                }
-            }
-            funcSignatures[node.name] = info;
-        }
-
-        void visit(FuncDeclNode& node) override {
-            deferredFuncs.push_back(&node);
-
-            FuncInfo info;
-            if (!node.returnType.empty()) {
-                if (node.returnType == "string") info.returnType = VarType::STRING;
-                else if (node.returnType == "char") info.returnType = VarType::CHAR;
-                else if (node.returnType == "real") info.returnType = VarType::DOUBLE;
-                else info.returnType = VarType::INT;
-            }
-            
-            for (auto &p : node.parameters) {
-                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                    VarType t = VarType::INT; 
-                    if (!param->type.empty()) {
-                        if (param->type == "string") t = VarType::STRING;
-                        else if (param->type == "char") t = VarType::CHAR;
-                        else if (param->type == "real") t = VarType::DOUBLE;
-                    }
-                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
-                        info.paramTypes.push_back(t);
-                    }
-                }
-            }
-            funcSignatures[node.name] = info;
-        }
-
-        void visit(ParameterNode& node) override {
-            for (auto &id : node.identifiers) {
-                int slot = newSlotFor(id);
-                
-                if (!node.type.empty()) {
-                    if (node.type == "string") {
-                        setVarType(id, VarType::STRING);
-                        setSlotType(slot, VarType::STRING);
-                    }
-                    else if (node.type == "integer" || node.type == "boolean") {
-                        setVarType(id, VarType::INT);
-                        setSlotType(slot, VarType::INT);
-                    }
-                    else if (node.type == "real") {
-                        setVarType(id, VarType::DOUBLE);
-                        setSlotType(slot, VarType::DOUBLE);
-                    }
-                }
-            }
-        }
-
-        void visit(CompoundStmtNode& node) override {
-            for (auto &stmt : node.statements) if (stmt) stmt->accept(*this);
-        }
-
-        void visit(AssignmentNode& node) override {
-            std::string rhs = eval(node.expression.get());
-            auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
-            if (!varPtr) return;
-            
-            std::string varName = varPtr->name;
-            
-            if (!currentFunctionName.empty() && varName == currentFunctionName) {
-                if (getVarType(currentFunctionName) == VarType::STRING) {
-                    emit3("mov", "arg0", rhs);  
-                } else {
-                    emit3("mov", "rax", rhs);   
-                }
-                functionSetReturn = true;
-            } else {
-                int slot = newSlotFor(varName);
-                std::string memLoc = slotVar(slot);
-                
-                auto it = valueLocations.find(varName);
-                if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
-                    freeReg(it->second.location);
-                }
-                
-                if (!isReg(rhs) && rhs != memLoc) {
-                    std::string tempReg = allocReg();
-                    emit3("mov", tempReg, rhs);
-                    emit3("mov", memLoc, tempReg);
-                    freeReg(tempReg);
-                } else if (rhs != memLoc) {
-                    emit3("mov", memLoc, rhs);
-                }
-                
-                
-                recordLocation(varName, {ValueLocation::MEMORY, memLoc});
-            }
-            
-            if (isReg(rhs)) freeReg(rhs);
-        }
-
-        void visit(IfStmtNode& node) override {
-            std::string elseL = newLabel("ELSE");
-            std::string endL  = newLabel("ENDIF");
-            std::string c = eval(node.condition.get());
-            emit2("cmp", c, "0");
-            emit1("je", elseL);
-            if (isReg(c)) freeReg(c);
-            
-            if (node.thenStatement) node.thenStatement->accept(*this);
-            emit1("jmp", endL);
-            emitLabel(elseL);
-            if (node.elseStatement) node.elseStatement->accept(*this);
-            emitLabel(endL);
-        }
-
-        void visit(WhileStmtNode& node) override {
-            std::string start = newLabel("WHILE");
-            std::string end   = newLabel("ENDWHILE");
-            emitLabel(start);
-            std::string c = eval(node.condition.get());
-            emit2("cmp", c, "0");
-            emit1("je", end);
-            if (isReg(c)) freeReg(c);
-            
-            if (node.statement) node.statement->accept(*this);
-            emit1("jmp", start);
-            emitLabel(end);
-        }
-
-        void visit(ForStmtNode& node) override {
-            int slot = newSlotFor(node.variable);
-            std::string startV = eval(node.startValue.get());
-            emit3("mov", slotVar(slot), startV);
-            if (isReg(startV)) freeReg(startV);
-
-            std::string loop = newLabel("FOR");
-            std::string end  = newLabel("ENDFOR");
-            emitLabel(loop);
-
-            std::string endV = eval(node.endValue.get());
-            std::string vr   = slotVar(slot);
-
-            if (node.isDownto) {
-                emit2("cmp", vr, endV);
-                emit1("jl", end);
-            } else {
-                emit2("cmp", vr, endV);
-                emit1("jg", end);
-            }
-            if (isReg(endV)) freeReg(endV);
-
-            if (node.statement) node.statement->accept(*this);
-
-            if (node.isDownto) {
-                emit3("sub", vr, "1");
-            } else {
-                emit3("add", vr, "1");
-            }
-
-            emit1("jmp", loop);
-            emitLabel(end);
-        }
-
-        void visit(ProcCallNode& node) override {
-            std::string name = node.name;
-            
-            auto handler = builtinRegistry.findHandler(name);
-            if (handler) {
-                handler->generate(*this, name, node.arguments);
-                return;
-            }
-            
-            for (size_t i = 1; i <= 6; i++) {
-                regInUse[i] = false;
-            }
-            
-            std::vector<std::string> argValues;
-            for (auto &arg : node.arguments) {
-                argValues.push_back(eval(arg.get()));
-            }
-            
-            for (size_t i = 0; i < argValues.size(); i++) {
-                std::string paramName;
-                VarType paramType = VarType::UNKNOWN;
-
-                if (i < node.arguments.size()) {
-                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
-                        paramName = varNode->name;
-                        paramType = getVarType(paramName);
-                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
-                        paramType = VarType::STRING;
-                    }
-                }
-
-                auto sig_it = funcSignatures.find(name);
-                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
-                    if (sig_it->second.paramTypes[i] == VarType::STRING) {
-                        paramType = VarType::STRING;
-                    }
-                }
-
-                if (i < 6) {
-                    if (paramType == VarType::STRING) {
-                        if (i < ptrRegisters.size()) {
-                            if (ptrRegisters[i] != argValues[i]) {
-                                emit3("mov", ptrRegisters[i], argValues[i]);
-                            }
-                        } else {
-                            const std::string dest = registers[i+1];
-                            if (dest != argValues[i]) {
-                                emit3("mov", dest, argValues[i]);
-                            }
-                            regInUse[i+1] = true;
-                        }
-                    } else {
-                        const std::string dest = registers[i+1];
-                        if (dest != argValues[i]) {
-                            emit3("mov", dest, argValues[i]);
-                        }
-                        regInUse[i+1] = true;
-                    }
-                } else {
-                    std::string paramVar = "param" + std::to_string(i);
-                    int paramSlot = newSlotFor(paramVar);
-                    emit3("mov", slotVar(paramSlot), argValues[i]);
-                }
-                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
-                    freeReg(argValues[i]);
-                }
-            }
-            
-            emit1("call", funcLabel("PROC_", name));
-        }
-
-        void visit(FuncCallNode& node) override {
-            for (size_t i = 1; i <= 6; i++) {
-                regInUse[i] = false;
-            }
-            
-            std::vector<std::string> argValues;
-            for (auto &arg : node.arguments) {
-                argValues.push_back(eval(arg.get()));
-            }
-            
-            for (size_t i = 0; i < argValues.size(); i++) {
-                std::string paramName;
-                VarType paramType = VarType::UNKNOWN;
-
-                if (i < node.arguments.size()) {
-                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
-                        paramName = varNode->name;
-                        paramType = getVarType(paramName);
-                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
-                        paramType = VarType::STRING;
-                    }
-                }
-
-                if (i < 6) {
-                    const std::string dest = registers[i+1];
-
-                    if (paramType == VarType::STRING) {
-                        emit3("mov", dest, argValues[i]); 
-                    } else {
-                        emit3("mov", dest, argValues[i]);
-                    }
-                    regInUse[i+1] = true;
-                } else {
-                    std::string paramVar = "param" + std::to_string(i);
-                    int paramSlot = newSlotFor(paramVar);
-                    emit3("mov", slotVar(paramSlot), argValues[i]);
-                }
-                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
-                    freeReg(argValues[i]);
-                }
-            }
-            
-            emit1("call", funcLabel("FUNC_", node.name));
-            
-            VarType returnType = VarType::INT;
-            auto sig_it = funcSignatures.find(node.name);
-            if (sig_it != funcSignatures.end()) {
-                returnType = sig_it->second.returnType;
-            }
-            
-            if (returnType == VarType::STRING) {
-                pushValue("arg0");  
-            } else {
-                pushValue("rax");   
-            }
-        }
-
-        void visit(BinaryOpNode& node) override {
-            if (!node.left || !node.right) {
-                throw std::runtime_error("Binary operation missing operand");
-            }
-
-            std::string a = eval(node.left.get());
-            std::string b = eval(node.right.get());
-
-            switch (node.operator_) {
-                case BinaryOpNode::PLUS:      pushTri("add", a, b); break;
-                case BinaryOpNode::MINUS:     pushTri("sub", a, b); break;
-                case BinaryOpNode::MULTIPLY:  pushTri("mul", a, b); break;
-                case BinaryOpNode::DIVIDE:    pushTri("div", a, b); break;
-                case BinaryOpNode::DIV:       pushTri("idiv", a, b); break;
-                case BinaryOpNode::MOD:       pushTri("mod", a, b); break;
-
-                case BinaryOpNode::EQUAL:         pushCmpResult(a, b, "je");  break;
-                case BinaryOpNode::NOT_EQUAL:     pushCmpResult(a, b, "jne"); break;
-                case BinaryOpNode::LESS:          pushCmpResult(a, b, "jl");  break;
-                case BinaryOpNode::LESS_EQUAL:    pushCmpResult(a, b, "jle"); break;
-                case BinaryOpNode::GREATER:       pushCmpResult(a, b, "jg");  break;
-                case BinaryOpNode::GREATER_EQUAL: pushCmpResult(a, b, "jge"); break;
-
-                case BinaryOpNode::AND: pushLogicalAnd(a, b); break;
-                case BinaryOpNode::OR:  pushLogicalOr(a, b);  break;
-
-                default: {
-                    std::string t = allocReg();
-                    pushValue(t); 
-                    if (isReg(a)) freeReg(a);
-                    if (isReg(b)) freeReg(b);
-                }
-            }
-        }
-
-        void visit(UnaryOpNode& node) override {
-            std::string v = eval(node.operand.get());
-            switch (node.operator_) {
-                case UnaryOpNode::MINUS: {
-                    std::string t = allocReg();
-                    emit3("mov", t, "0");
-                    emit3("sub", t, v);
-                    pushValue(t);
-                    break;
-                }
-                case UnaryOpNode::PLUS: {
-                    pushValue(v);
-                    break;
-                }
-                case UnaryOpNode::NOT: {
-                    std::string t = allocReg();
-                    std::string L1 = newLabel("NOT_TRUE");
-                    std::string L2 = newLabel("NOT_END");
-                    emit2("cmp", v, "0");
-                    emit1("je", L1);
-                    emit3("mov", t, "0");
-                    emit1("jmp", L2);
-                    emitLabel(L1);
-                    emit3("mov", t, "1");
-                    emitLabel(L2);
-                    pushValue(t);
-                    if (isReg(v)) freeReg(v);
-                    break;
-                }
-            }
-        }
-
-        void visit(VariableNode& node) override {
-            auto it = valueLocations.find(node.name);
-            if (it != valueLocations.end()) {
-                if (it->second.type == ValueLocation::REGISTER) {
-                    pushValue(it->second.location);
-                    return;
-                }
-            }
-            
-            int slot = newSlotFor(node.name);
-            pushValue(slotVar(slot));
-        }
-
-        void visit(NumberNode& node) override {
-            if (node.value.length() < 10) {
-                pushValue(node.value); 
-                return;
-            }
-            
-            std::string reg = allocReg();
-            emit3("mov", reg, node.value);
-            pushValue(reg);
-        }
-
-        void visit(StringNode& node) override {
-            if (node.value.length() == 1) {
-                int asciiValue = static_cast<int>(node.value[0]);
-                pushValue(std::to_string(asciiValue));
-            } else {
-                std::string sym = internString(node.value);
-                pushValue(sym);
-            }
-        }
-
-        void visit(BooleanNode& node) override {
-            std::string reg = allocReg();
-            emit3("mov", reg, node.value ? "1" : "0");
-            pushValue(reg);
-        }
-
-        void visit(EmptyStmtNode& node) override {
-        }
-
-        void visit(RepeatStmtNode& node) override {
-            std::string startLabel = newLabel("REPEAT");
-            std::string endLabel = newLabel("UNTIL");
-            
-            emitLabel(startLabel);
-            
-            for (auto& stmt : node.statements) {
-                if (stmt) stmt->accept(*this);
-            }
-            
-            std::string condResult = eval(node.condition.get());
-            emit2("cmp", condResult, "0");
-            emit1("je", startLabel);
-            
-            if (isReg(condResult)) freeReg(condResult);
-        }
-
     private:
+        std::unordered_set<std::string> usedRealConstants;  
+        int realConstantCounter = 0;
+        
+    
+        std::string generateRealConstantName() {
+            return "real_const_" + std::to_string(realConstantCounter++);
+        }
+        
+    
+        bool isRealNumber(const std::string& str) const {
+            return str.find('.') != std::string::npos || 
+                   str.find('e') != std::string::npos || 
+                   str.find('E') != std::string::npos;
+        }
         
         enum class VarType {
             INT,
@@ -848,9 +125,13 @@ namespace pascal {
             return "empty_str";
         }
         
+        
         const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
         const std::vector<std::string> ptrRegisters = {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
+        const std::vector<std::string> floatRegisters = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9"};
+        
         std::vector<bool> regInUse;
+        std::vector<bool> floatRegInUse;  
         
         std::vector<ProcDeclNode*> deferredProcs;
         std::vector<FuncDeclNode*> deferredFuncs;
@@ -921,12 +202,37 @@ namespace pascal {
             }
         }
 
+        
+        std::string allocFloatReg() {
+            for (size_t i = 0; i < floatRegInUse.size(); ++i) {
+                if (!floatRegInUse[i]) {
+                    floatRegInUse[i] = true;
+                    return floatRegisters[i];
+                }
+            }
+            throw std::runtime_error("No available floating-point registers");
+        }
+        
+        void freeFloatReg(const std::string& reg) {
+            for (size_t i = 0; i < floatRegisters.size(); ++i) {
+                if (floatRegisters[i] == reg) {
+                    floatRegInUse[i] = false;
+                    return;
+                }
+            }
+        }
+        
+        bool isFloatReg(const std::string& name) const {
+            return std::find(floatRegisters.begin(), floatRegisters.end(), name) != floatRegisters.end();
+        }
+        
         bool isPtrReg(const std::string& name) const {
             return std::find(ptrRegisters.begin(), ptrRegisters.end(), name) != ptrRegisters.end();
         }
         
         bool isReg(const std::string& name) const {
-            return std::find(registers.begin(), registers.end(), name) != registers.end();
+            return std::find(registers.begin(), registers.end(), name) != registers.end() ||
+                   std::find(floatRegisters.begin(), floatRegisters.end(), name) != floatRegisters.end();
         }
 
         int newSlotFor(const std::string& name) {
@@ -1059,14 +365,45 @@ namespace pascal {
         }
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
-            std::string result = allocReg();
-            if (std::string(op) == "mul") {
-                emit3("mov", result, a);
-                emit3("mul", result, b);  
+           
+            bool isFloatOp = isFloatReg(a) || isFloatReg(b) || 
+                             isRealNumber(a) || isRealNumber(b) ||
+                             a.find("real_const_") != std::string::npos ||
+                             b.find("real_const_") != std::string::npos;
+            
+            std::string result;
+            if (isFloatOp) {
+                result = allocFloatReg();
             } else {
-                emit3("mov", result, a);
-                emit3(op, result, b);
+                result = allocReg();
             }
+            
+           
+            std::string leftOp = a;
+            std::string rightOp = b;
+            
+            if (isRealNumber(leftOp) && leftOp.find("real_const_") == std::string::npos) {
+                std::string constName = generateRealConstantName();
+                realConstants[constName] = leftOp;
+                usedRealConstants.insert(constName);
+                leftOp = constName;
+            }
+            
+            if (isRealNumber(rightOp) && rightOp.find("real_const_") == std::string::npos) {
+                std::string constName = generateRealConstantName();
+                realConstants[constName] = rightOp;
+                usedRealConstants.insert(constName);
+                rightOp = constName;
+            }
+            
+            if (std::string(op) == "mul") {
+                emit3("mov", result, leftOp);
+                emit3("mul", result, rightOp);
+            } else {
+                emit3("mov", result, leftOp);
+                emit3(op, result, rightOp);
+            }
+            
             pushValue(result);
             if (isReg(a)) freeReg(a);
             if (isReg(b)) freeReg(b);
@@ -1132,6 +469,1019 @@ namespace pascal {
                 if (registers[i] == name) return true;
             }
             return false;
+        }
+        
+    public:
+        friend class IOFunctionHandler;
+        friend class MathFunctionHandler;
+        BuiltinFunctionRegistry builtinRegistry;
+
+        CodeGenVisitor()
+            : regInUse(registers.size(), false),
+              floatRegInUse(floatRegisters.size(), false), 
+              currentFunctionName(),
+              functionSetReturn(false),
+              nextSlot(0), nextTemp(0), labelCounter(0) 
+        {
+            initializeBuiltins(); 
+        }
+
+        virtual ~CodeGenVisitor() = default;
+
+        void initializeBuiltins() {
+            builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
+            builtinRegistry.registerHandler(std::make_unique<MathFunctionHandler>());
+            // builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
+        }
+
+        std::string name = "App";
+
+        void generate(ASTNode* root) {
+            if (!root) return;
+            instructions.clear();
+            usedStrings.clear();
+            prolog.clear();
+            deferredProcs.clear();
+            deferredFuncs.clear();
+            valueLocations.clear();
+            varTypes.clear();  
+            
+            for (size_t i = 0; i < regInUse.size(); i++) {
+                regInUse[i] = false;
+            }
+            
+            if (auto prog = dynamic_cast<ProgramNode*>(root)) {
+                name = prog->name;
+            }
+            
+            root->accept(*this);
+            emit("done");
+            
+            for (auto pn : deferredProcs) {
+                emitLabel(funcLabel("function PROC_", pn->name));
+                
+                for (size_t i = 0; i < regInUse.size(); i++) {
+                    regInUse[i] = false;
+                }
+                for (size_t i = 0; i < floatRegInUse.size(); i++) {
+                    floatRegInUse[i] = false;
+                }
+                
+                int paramIndex = 0;
+                for (auto &p : pn->parameters) {
+                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                        for (auto &id : param->identifiers) {
+                            if (paramIndex < 6) {
+                                if (!param->type.empty() && param->type == "string") {
+                                    int slot = newSlotFor(id);
+                                    emit3("mov", slotVar(slot), ptrRegisters[paramIndex]);
+                                    setVarType(id, VarType::STRING);
+                                } 
+                                else if (!param->type.empty() && param->type == "real") {
+                                    int slot = newSlotFor(id);
+                                    emit3("mov", slotVar(slot), floatRegisters[paramIndex]);
+                                    setVarType(id, VarType::DOUBLE);
+                                } 
+                                else {
+                                    // Integer parameter handling
+                                    int slot = newSlotFor(id); // Add this line to get explicit slot
+                                    varSlot[id] = slot;        // Track the slot
+                                    
+                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]); // Add this
+                                    regInUse[paramIndex + 1] = true;
+                                    
+                                    if (!param->type.empty()) {
+                                        if (param->type == "integer" || param->type == "boolean") {
+                                            setVarType(id, VarType::INT);
+                                            setSlotType(slot, VarType::INT); // Add this line
+                                        }
+                                    }
+                                }
+                                paramIndex++;
+                            } else {
+                                int slot = newSlotFor(id);
+                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
+                                if (!param->type.empty()) {
+                                    if (param->type == "string") {
+                                        setVarType(id, VarType::STRING);
+                                        setSlotType(slot, VarType::STRING);
+                                    } else if (param->type == "integer" || param->type == "boolean") {
+                                        setVarType(id, VarType::INT);
+                                        setSlotType(slot, VarType::INT);
+                                    } else if (param->type == "real") {
+                                        setVarType(id, VarType::DOUBLE);
+                                        setSlotType(slot, VarType::DOUBLE);
+                                    }
+                                }
+                                paramIndex++;
+                            }
+                        }
+                    }
+                }
+                
+                if (pn->block) pn->block->accept(*this);
+                emit("ret");
+            }
+            
+            for (auto fn : deferredFuncs) {
+                emitLabel(funcLabel("function FUNC_", fn->name));
+                for (size_t i = 0; i < regInUse.size(); i++) {
+                    regInUse[i] = false;
+                }
+                for (size_t i = 0; i < floatRegInUse.size(); i++) {
+                    floatRegInUse[i] = false;
+                }
+                currentFunctionName = fn->name;
+                functionSetReturn = false;
+
+                if (!fn->returnType.empty()) { 
+                    if (fn->returnType == "string") {
+                        setVarType(fn->name, VarType::STRING);
+                    }
+                    else if (fn->returnType == "integer" || fn->returnType == "boolean") {
+                        setVarType(fn->name, VarType::INT);
+                    }
+                    else if (fn->returnType == "real") {
+                        setVarType(fn->name, VarType::DOUBLE);
+                    }
+                }
+
+                int paramIndex = 0;
+                for (auto &p : fn->parameters) {
+                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                        for (auto &id : param->identifiers) {
+                           if (paramIndex < 6) {
+                                if (!param->type.empty() && param->type == "string") {
+                                    int slot = newSlotFor(id);
+                                    emit3("mov", slotVar(slot), ptrRegisters[paramIndex]);
+                                    setVarType(id, VarType::STRING);
+                                    setSlotType(slot, VarType::STRING); 
+                                } 
+                                else if (!param->type.empty() && param->type == "real") {
+                                    int slot = newSlotFor(id);
+                                    emit3("mov", slotVar(slot), floatRegisters[paramIndex]);
+                                    setVarType(id, VarType::DOUBLE);
+                                    setSlotType(slot, VarType::DOUBLE); 
+                                } 
+                                else {
+                                    
+                                    int slot = newSlotFor(id); 
+                                    varSlot[id] = slot;        
+                                    
+                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]);
+                                    regInUse[paramIndex + 1] = true;
+                                    
+                                    if (!param->type.empty()) {
+                                        if (param->type == "integer" || param->type == "boolean") {
+                                            setVarType(id, VarType::INT);
+                                            setSlotType(slot, VarType::INT); 
+                                        }
+                                    }
+                                }
+                                paramIndex++;
+                            }
+                        }
+                    }
+                }
+
+                if (fn->block) fn->block->accept(*this);
+
+                if (!functionSetReturn) {
+                    VarType funcReturnType = getVarType(fn->name);
+                    if (funcReturnType == VarType::STRING) {
+                        emit3("mov", "arg0", emptyString());  
+                    } else if (funcReturnType == VarType::DOUBLE) {
+                        
+                        std::string zeroConstName = generateRealConstantName();
+                        realConstants[zeroConstName] = "0.0";
+                        usedRealConstants.insert(zeroConstName);
+                        emit3("mov", "xmm0", zeroConstName);
+                    } else {
+                        emit3("mov", "rax", "0");  
+                    }
+                }
+
+                emit("ret");
+                currentFunctionName.clear();
+                functionSetReturn = false;
+            }
+           
+        }
+
+        void emit_invoke(const std::string& funcName, const std::vector<std::string>& params) {
+            std::string instruction = "invoke " + funcName;
+            for (const auto& param : params) {
+                instruction += ", " + param;
+            }
+            emit(instruction);
+        }
+
+        void writeTo(std::ostream& out) const {
+            out << "program " << name << " {\n";
+            out << "    section module { std }\n";
+            out << "    section data {\n";
+            
+            
+            for (const auto& reg : registers) {
+                out << "        int " << reg << " = 0\n";
+            }
+            
+            
+            for (const auto& floatReg : floatRegisters) {
+                out << "        float " << floatReg << " = 0.0\n";
+            }
+            
+            for (const auto& p : ptrRegisters) {
+                 out << "        ptr " << p << " = null\n";
+            }
+            
+            for (const auto& constant : realConstants) {
+                out << "        float " << constant.first << " = " << constant.second << "\n";
+            }
+            
+            
+            for (int i = 0; i < nextSlot; ++i) {
+                if (!isRegisterSlot(i) && !isTempVar(slotVar(i)) && !isPtrReg(slotVar(i))) {
+                    auto it = slotToType.find(i);
+                    if (it != slotToType.end()) {
+                        if (it->second == VarType::STRING) {
+                            out << "        string " << slotVar(i) << " = \"\"\n";
+                        } else if (it->second == VarType::PTR) {
+                            out << "        ptr " << slotVar(i) << " = null\n";
+                        } else if (it->second == VarType::CHAR) {
+                            out << "        int " << slotVar(i) << " = 0\n"; 
+                        } else if (it->second == VarType::DOUBLE) {
+                            out << "        float " << slotVar(i) << " = 0.0\n";
+                        } else {
+                            out << "        int " << slotVar(i) << " = 0\n";
+                        }
+                    } else {
+                        out << "        int " << slotVar(i) << " = 0\n";
+                    }
+                }
+            }
+            
+            if (needsEmptyString) {
+                out << "        string empty_str = \"\"\n";
+            }
+            
+            for (auto &s : stringLiterals) {
+                if (s.first != "empty_str") { 
+                    out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
+                }
+            }
+            
+            if (usedStrings.count("fmt_int")) {
+                out << "        string fmt_int = \"%lld \"\n";
+            }
+            if (usedStrings.count("fmt_str")) {
+                out << "        string fmt_str = \"%s \"\n";
+            }
+            if (usedStrings.count("fmt_chr")) {
+                out << "        string fmt_chr = \"%c \"\n";
+            }
+            if (usedStrings.count("fmt_float")) {
+                out << "        string fmt_float = \"%.6f \"\n";
+            }
+            if (usedStrings.count("newline")) {
+                out << "        string newline = \"\\n\"\n";
+            }
+            out << "        string input_buffer, 256\n";
+            out << "    }\n";
+            out << "    section code {\n";
+            out << "    start:\n";
+            
+            for (auto &s : prolog) out << "        " << s << "\n";
+            for (auto &s : instructions) {
+                if (endsWithColon(s)) out << "    " << s << "\n";
+                else out << "        " << s << "\n";
+            }
+            
+            out << "    }\n";
+            out << "}\n";
+        }
+
+        void visit(ProgramNode& node) override {
+            name = node.name;
+            if (node.block) node.block->accept(*this);
+        }
+
+        void visit(BlockNode& node) override {
+            for (auto &d : node.declarations) if (d) d->accept(*this);
+            if (node.compoundStatement) node.compoundStatement->accept(*this);
+        }
+
+        void visit(VarDeclNode& node) override {
+            for (size_t i = 0; i < node.identifiers.size(); i++) {
+                std::string id = node.identifiers[i];
+                int slot = newSlotFor(id);
+                
+                if (!node.type.empty()) {
+                    if (node.type == "string") {
+                        setVarType(id, VarType::PTR);
+                        setSlotType(slot, VarType::PTR);
+                        
+                
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        } else {
+                            emit3("mov", slotVar(slot), emptyString());
+                        }
+                    }
+                    else if (node.type == "char") {
+                        setVarType(id, VarType::CHAR);
+                        setSlotType(slot, VarType::CHAR);
+                        
+                
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        } else {
+                            emit3("mov", slotVar(slot), "0");  
+                        }
+                    }
+                    else if (node.type == "integer" || node.type == "boolean") {
+                        setVarType(id, VarType::INT);
+                        setSlotType(slot, VarType::INT);
+                        
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            std::string init = eval(node.initializers[i].get());
+                            emit3("mov", slotVar(slot), init);
+                            if (isReg(init)) freeReg(init);
+                        }
+                    }
+                    else if (node.type == "real") {
+                        setVarType(id, VarType::DOUBLE);
+                        setSlotType(slot, VarType::DOUBLE);
+                        
+                        if (i < node.initializers.size() && node.initializers[i]) {
+                            auto init = node.initializers[i].get();
+                            if (auto numNode = dynamic_cast<NumberNode*>(init)) {
+                                if (numNode->isReal || isRealNumber(numNode->value)) {
+                                    std::string constName = generateRealConstantName();
+                                    realConstants[constName] = numNode->value;
+                                    usedRealConstants.insert(constName);
+                                    emit3("mov", slotVar(slot), constName);
+                                } else {
+                                    std::string constName = generateRealConstantName();
+                                    realConstants[constName] = numNode->value + ".0";
+                                    usedRealConstants.insert(constName);
+                                    emit3("mov", slotVar(slot), constName);
+                                }
+                            } else {
+                                std::string init = eval(node.initializers[i].get());
+                                emit3("mov", slotVar(slot), init);
+                                if (isReg(init)) freeReg(init);
+                            }
+                        } else {
+                            std::string zeroConstName = generateRealConstantName();
+                            realConstants[zeroConstName] = "0.0";
+                            usedRealConstants.insert(zeroConstName);
+                            emit3("mov", slotVar(slot), zeroConstName);
+                        }
+                    }
+                    else if (node.type == "record") {
+                        setVarType(id, VarType::RECORD);
+                        setSlotType(slot, VarType::RECORD);
+                        
+                    }
+                }
+            }
+        }
+
+        void visit(ProcDeclNode& node) override {
+            deferredProcs.push_back(&node);
+            
+            FuncInfo info;
+            for (auto &p : node.parameters) {
+                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
+                    VarType t = VarType::INT; 
+                    if (!param->type.empty()) {
+                        if (param->type == "string") t = VarType::STRING;
+                        else if (param->type == "char") t = VarType::CHAR;
+                        else if (param->type == "real") t = VarType::DOUBLE;
+                    }
+                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
+                        info.paramTypes.push_back(t);
+                    }
+                }
+            }
+            funcSignatures[node.name] = info;
+        }
+
+        void visit(FuncDeclNode& node) override {
+            
+            FuncInfo funcInfo;
+            funcInfo.returnType = getTypeFromString(node.returnType);
+            for (auto& param : node.parameters) {
+                if (auto paramNode = dynamic_cast<ParameterNode*>(param.get())) {
+                    for (size_t i = 0; i < paramNode->identifiers.size(); i++) {
+                        funcInfo.paramTypes.push_back(getTypeFromString(paramNode->type));
+                    }
+                }
+            }
+            
+            funcSignatures[node.name] = funcInfo;
+            deferredFuncs.push_back(&node);
+            setVarType(node.name, getTypeFromString(node.returnType));
+        }
+
+        void visit(ParameterNode& node) override {
+            for (auto &id : node.identifiers) {
+                int slot = newSlotFor(id);
+                
+                if (!node.type.empty()) {
+                    if (node.type == "string") {
+                        setVarType(id, VarType::STRING);
+                        setSlotType(slot, VarType::STRING);
+                    }
+                    else if (node.type == "integer" || node.type == "boolean") {
+                        setVarType(id, VarType::INT);
+                        setSlotType(slot, VarType::INT);
+                    }
+                    else if (node.type == "real") {
+                        setVarType(id, VarType::DOUBLE);
+                        setSlotType(slot, VarType::DOUBLE);
+                    }
+                }
+            }
+        }
+
+        void visit(CompoundStmtNode& node) override {
+            for (auto &stmt : node.statements) if (stmt) stmt->accept(*this);
+        }
+
+        void visit(AssignmentNode& node) override {
+            auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
+            if (!varPtr) return;
+            
+            std::string varName = varPtr->name;
+            
+            // Handle assignment expression evaluation
+            std::string rhs;
+            if (auto numNode = dynamic_cast<NumberNode*>(node.expression.get())) {
+                // Direct number assignment
+                if (numNode->isReal || isRealNumber(numNode->value)) {
+                    // Create a constant for this real number
+                    std::string constName = generateRealConstantName();
+                    realConstants[constName] = numNode->value;
+                    usedRealConstants.insert(constName);
+                    rhs = constName;
+                } else {
+                    rhs = numNode->value;
+                }
+            } else {
+                // Complex expression
+                rhs = eval(node.expression.get());
+            }
+            
+            if (!currentFunctionName.empty() && varName == currentFunctionName) {
+                VarType funcReturnType = getVarType(currentFunctionName);
+                if (funcReturnType == VarType::STRING) {
+                    emit3("mov", "arg0", rhs);  
+                } else if (funcReturnType == VarType::DOUBLE) {
+                    emit3("mov", "xmm0", rhs);  // Real functions return via xmm0
+                } else {
+                    emit3("mov", "rax", rhs);   // Integer/boolean functions return via rax
+                }
+                functionSetReturn = true;
+            } else {
+                int slot = newSlotFor(varName);
+                std::string memLoc = slotVar(slot);
+                VarType varType = getVarType(varName);
+                
+                
+                if (varType == VarType::DOUBLE && std::all_of(rhs.begin(), rhs.end(), 
+                    [](char c) { return std::isdigit(c) || c == '-'; })) {
+                
+                    std::string constName = generateRealConstantName();
+                    realConstants[constName] = rhs + ".0";
+                    usedRealConstants.insert(constName);
+                    rhs = constName;
+                }
+                
+                auto it = valueLocations.find(varName);
+                if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
+                    freeReg(it->second.location);
+                }
+                
+                emit3("mov", memLoc, rhs);
+                recordLocation(varName, {ValueLocation::MEMORY, memLoc});
+            }
+            
+            if (isReg(rhs)) freeReg(rhs);
+        }
+
+        void visit(IfStmtNode& node) override {
+            std::string elseL = newLabel("ELSE");
+            std::string endL  = newLabel("ENDIF");
+            std::string c = eval(node.condition.get());
+            emit2("cmp", c, "0");
+            emit1("je", elseL);
+            if (isReg(c)) freeReg(c);
+            
+            if (node.thenStatement) node.thenStatement->accept(*this);
+            emit1("jmp", endL);
+            emitLabel(elseL);
+            if (node.elseStatement) node.elseStatement->accept(*this);
+            emitLabel(endL);
+        }
+
+        void visit(WhileStmtNode& node) override {
+            std::string start = newLabel("WHILE");
+            std::string end   = newLabel("ENDWHILE");
+            emitLabel(start);
+            std::string c = eval(node.condition.get());
+            emit2("cmp", c, "0");
+            emit1("je", end);
+            if (isReg(c)) freeReg(c);
+            
+            if (node.statement) node.statement->accept(*this);
+            emit1("jmp", start);
+            emitLabel(end);
+        }
+
+        void visit(ForStmtNode& node) override {
+            int slot = newSlotFor(node.variable);
+            std::string startV = eval(node.startValue.get());
+            emit3("mov", slotVar(slot), startV);
+            if (isReg(startV)) freeReg(startV);
+
+            std::string loop = newLabel("FOR");
+            std::string end  = newLabel("ENDFOR");
+            emitLabel(loop);
+
+            std::string endV = eval(node.endValue.get());
+            std::string vr   = slotVar(slot);
+
+            if (node.isDownto) {
+                emit2("cmp", vr, endV);
+                emit1("jl", end);
+            } else {
+                emit2("cmp", vr, endV);
+                emit1("jg", end);
+            }
+            if (isReg(endV)) freeReg(endV);
+
+            if (node.statement) node.statement->accept(*this);
+
+            if (node.isDownto) {
+                emit3("sub", vr, "1");
+            } else {
+                emit3("add", vr, "1");
+            }
+
+            emit1("jmp", loop);
+            emitLabel(end);
+        }
+
+         VarType getTypeFromString(const std::string& typeName) const {
+            if (typeName.empty()) {
+                return VarType::UNKNOWN;
+            }
+            
+            if (typeName == "integer" || typeName == "boolean") {
+                return VarType::INT;
+            }
+            else if (typeName == "real") {
+                return VarType::DOUBLE;
+            }
+            else if (typeName == "string") {
+                return VarType::STRING;
+            }
+            else if (typeName == "char") {
+                return VarType::CHAR;
+            }
+            else if (typeName == "record") {
+                return VarType::RECORD;
+            }
+            else if (typeName == "pointer" || typeName == "^") {
+                return VarType::PTR;
+            }
+            
+            return VarType::UNKNOWN;
+        }
+
+        void visit(ProcCallNode& node) override {
+            std::string name = node.name;
+            
+            auto handler = builtinRegistry.findHandler(name);
+            if (handler) {
+                handler->generate(*this, name, node.arguments);
+                return;
+            }
+            
+            
+            for (size_t i = 1; i <= 6; i++) {
+                regInUse[i] = false;
+            }
+            for (size_t i = 0; i < floatRegInUse.size(); i++) {
+                floatRegInUse[i] = false;
+            }
+            
+            std::vector<std::string> argValues;
+            for (auto &arg : node.arguments) {
+                argValues.push_back(eval(arg.get()));
+            }
+            
+            
+            auto sig_it = funcSignatures.find(name);
+            
+            for (size_t i = 0; i < argValues.size(); i++) {
+                VarType paramType = VarType::INT; 
+                
+                
+                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
+                    paramType = sig_it->second.paramTypes[i];
+                } else if (i < node.arguments.size()) {
+                
+                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
+                        paramType = getVarType(varNode->name);
+                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
+                        paramType = VarType::STRING;
+                    } else if (auto numNode = dynamic_cast<NumberNode*>(node.arguments[i].get())) {
+                        paramType = (numNode->isReal || isRealNumber(numNode->value)) ? VarType::DOUBLE : VarType::INT;
+                    }
+                }
+
+                if (i < 6) {
+                    if (paramType == VarType::STRING) {
+                        if (i < ptrRegisters.size()) {
+                            emit3("mov", ptrRegisters[i], argValues[i]);
+                        }
+                    } else if (paramType == VarType::DOUBLE) {
+                
+                        std::string floatReg = floatRegisters[i];
+                        emit3("mov", floatReg, argValues[i]);
+                        floatRegInUse[i] = true;
+                    } else {
+                
+                        const std::string dest = registers[i+1];
+                        emit3("mov", dest, argValues[i]);
+                        regInUse[i+1] = true;
+                    }
+                } else {
+                    std::string paramVar = "param" + std::to_string(i);
+                    int paramSlot = newSlotFor(paramVar);
+                    emit3("mov", slotVar(paramSlot), argValues[i]);
+                }
+                
+                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
+                    freeReg(argValues[i]);
+                }
+            }
+            
+            emit1("call", funcLabel("PROC_", name));
+        }
+
+        void visit(FuncCallNode& node) override {
+
+            auto handler = builtinRegistry.findHandler(node.name);
+            if (handler) {
+                bool handled = handler->generateWithResult(*this, node.name, node.arguments);
+                if (handled) {
+                    return; 
+                }
+            }
+
+            for (size_t i = 1; i <= 6; i++) {
+                regInUse[i] = false;
+            }
+            for (size_t i = 0; i < floatRegInUse.size(); i++) {
+                floatRegInUse[i] = false;
+            }
+            
+            std::vector<std::string> argValues;
+            for (auto &arg : node.arguments) {
+                argValues.push_back(eval(arg.get()));
+            }
+            
+            auto sig_it = funcSignatures.find(node.name);
+            
+            for (size_t i = 0; i < argValues.size(); i++) {
+                VarType paramType = VarType::INT; // Default
+                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
+                    paramType = sig_it->second.paramTypes[i];
+                } else if (i < node.arguments.size()) {
+                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
+                        paramType = getVarType(varNode->name);
+                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
+                        paramType = VarType::STRING;
+                    } else if (auto numNode = dynamic_cast<NumberNode*>(node.arguments[i].get())) {
+                        paramType = (numNode->isReal || isRealNumber(numNode->value)) ? VarType::DOUBLE : VarType::INT;
+                    } else {
+                        paramType = getExpressionType(node.arguments[i].get());
+                    }
+                }
+
+                if (i < 6) {
+                    if (paramType == VarType::STRING) {
+                        if (i < ptrRegisters.size()) {
+                            emit3("mov", ptrRegisters[i], argValues[i]);
+                        }
+                    } else if (paramType == VarType::DOUBLE) {
+                        emit3("mov", floatRegisters[i], argValues[i]);
+                        floatRegInUse[i] = true;
+                    } else {
+                        const std::string dest = registers[i+1];
+                        emit3("mov", dest, argValues[i]);
+                        regInUse[i+1] = true;
+                    }
+                } else {
+                    std::string paramVar = "param" + std::to_string(i);
+                    int paramSlot = newSlotFor(paramVar);
+                    emit3("mov", slotVar(paramSlot), argValues[i]);
+                }
+                
+                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
+                    freeReg(argValues[i]);
+                }
+            }
+            
+            emit1("call", funcLabel("FUNC_", node.name));
+
+            
+            VarType returnType = VarType::INT;
+            if (sig_it != funcSignatures.end()) {
+                returnType = sig_it->second.returnType;
+            }
+            
+            std::string result;
+            if (returnType == VarType::STRING) {
+                result = allocReg();
+                emit3("mov", result, "arg0");  
+            } else if (returnType == VarType::DOUBLE) {
+                result = allocFloatReg();
+                emit3("mov", result, "xmm0");
+            } else {
+                result = allocReg();
+                emit3("mov", result, "rax");
+            }
+            
+            pushValue(result);
+        }
+
+        void visit(BinaryOpNode& node) override {
+            std::string left = eval(node.left.get());
+            std::string right = eval(node.right.get());
+            VarType leftType = getExpressionType(node.left.get());
+            VarType rightType = getExpressionType(node.right.get());
+            
+            VarType resultType = VarType::INT;
+            
+            bool needsFloatOp = (leftType == VarType::DOUBLE || rightType == VarType::DOUBLE ||
+                                node.operator_ == BinaryOpNode::DIVIDE);
+            
+            if (needsFloatOp) {
+                resultType = VarType::DOUBLE;
+                if (isRealNumber(left) && left.find("real_const_") == std::string::npos) {
+                    std::string constName = generateRealConstantName();
+                    realConstants[constName] = left;
+                    usedRealConstants.insert(constName);
+                    left = constName;
+                }
+                
+                if (isRealNumber(right) && right.find("real_const_") == std::string::npos) {
+                    std::string constName = generateRealConstantName();
+                    realConstants[constName] = right;
+                    usedRealConstants.insert(constName);
+                    right = constName;
+                }
+                
+                
+                if (leftType == VarType::INT) {
+                    if (std::all_of(left.begin(), left.end(), [](char c) { 
+                        return std::isdigit(c) || c == '-'; })) {
+                        std::string constName = generateRealConstantName();
+                        realConstants[constName] = left + ".0";
+                        usedRealConstants.insert(constName);
+                        left = constName;
+                    } else {
+                        std::string newLeft = allocFloatReg();
+                        emit2("to_float", newLeft, left);
+                        if (isReg(left)) freeReg(left);
+                        left = newLeft;
+                    }
+                } else if (leftType == VarType::DOUBLE && !isFloatReg(left) && 
+                           left.find("real_const_") == std::string::npos) {
+                    std::string newLeft = allocFloatReg();
+                    emit3("mov", newLeft, left);
+                    if (isReg(left)) freeReg(left);
+                    left = newLeft;
+                }
+                
+                if (rightType == VarType::INT) {
+                    if (std::all_of(right.begin(), right.end(), [](char c) { 
+                        return std::isdigit(c) || c == '-'; })) {
+                        std::string constName = generateRealConstantName();
+                        realConstants[constName] = right + ".0";
+                        usedRealConstants.insert(constName);
+                        right = constName;
+                    } else {
+                        std::string newRight = allocFloatReg();
+                        emit2("to_float", newRight, right);
+                        if (isReg(right)) freeReg(right);
+                        right = newRight;
+                    }
+                } else if (rightType == VarType::DOUBLE && !isFloatReg(right) && 
+                           right.find("real_const_") == std::string::npos) {
+                    std::string newRight = allocFloatReg();
+                    emit3("mov", newRight, right);
+                    if (isReg(right)) freeReg(right);
+                    right = newRight;
+                }
+            }
+            
+            switch (node.operator_) {
+                case BinaryOpNode::PLUS:
+                    pushTri("add", left, right);
+                    break;
+                    
+                case BinaryOpNode::MINUS:
+                    pushTri("sub", left, right);
+                    break;
+                    
+                case BinaryOpNode::MULTIPLY:
+                    pushTri("mul", left, right);
+                    break;
+                    
+                case BinaryOpNode::DIVIDE:
+                    pushTri("div", left, right);
+                    break;
+                    
+                case BinaryOpNode::MOD:
+                    if (resultType == VarType::DOUBLE) {
+                        std::string result = allocFloatReg(); 
+                        emit_invoke("fmod", {left, right});
+                        emit1("return", result);
+                        pushValue(result);
+                        if (isReg(left)) freeReg(left);
+                        if (isReg(right)) freeReg(right);
+                        return; 
+                    } else {
+                        pushTri("mod", left, right);
+                    }
+                    break;
+                    
+                
+                case BinaryOpNode::EQUAL:
+                    pushCmpResult(left, right, "je");
+                    break;
+                    
+                case BinaryOpNode::NOT_EQUAL:
+                    pushCmpResult(left, right, "jne");
+                    break;
+                    
+                case BinaryOpNode::LESS:
+                    pushCmpResult(left, right, "jl");
+                    break;
+                    
+                case BinaryOpNode::LESS_EQUAL:
+                    pushCmpResult(left, right, "jle");
+                    break;
+                    
+                case BinaryOpNode::GREATER:
+                    pushCmpResult(left, right, "jg");
+                    break;
+                    
+                case BinaryOpNode::GREATER_EQUAL:
+                    pushCmpResult(left, right, "jge");
+                    break;
+                    
+                
+                case BinaryOpNode::AND:
+                    pushLogicalAnd(left, right);
+                    break;
+                    
+                case BinaryOpNode::OR:
+                    pushLogicalOr(left, right);
+                    break;
+                    
+                default:
+                    throw std::runtime_error("Unknown binary operator");
+            }
+            
+        }
+
+        VarType getExpressionType(ASTNode* node) {
+            if (auto numNode = dynamic_cast<NumberNode*>(node)) {
+                return numNode->isReal ? VarType::DOUBLE : VarType::INT;
+            }
+            if (auto varNode = dynamic_cast<VariableNode*>(node)) {
+                return getVarType(varNode->name);
+            }
+            return VarType::UNKNOWN;
+        }
+
+        void visit(UnaryOpNode& node) override {
+            std::string v = eval(node.operand.get());
+            switch (node.operator_) {
+                case UnaryOpNode::MINUS: {
+                    std::string t = allocReg();
+                    emit3("mov", t, "0");
+                    emit3("sub", t, v);
+                    pushValue(t);
+                    break;
+                }
+                case UnaryOpNode::PLUS: {
+                    pushValue(v);
+                    break;
+                }
+                case UnaryOpNode::NOT: {
+                    std::string t = allocReg();
+                    std::string L1 = newLabel("NOT_TRUE");
+                    std::string L2 = newLabel("NOT_END");
+                    emit2("cmp", v, "0");
+                    emit1("je", L1);
+                    emit3("mov", t, "0");
+                    emit1("jmp", L2);
+                    emitLabel(L1);
+                    emit3("mov", t, "1");
+                    emitLabel(L2);
+                    pushValue(t);
+                    if (isReg(v)) freeReg(v);
+                    break;
+                }
+            }
+        }
+
+        void visit(VariableNode& node) override {
+            auto it = valueLocations.find(node.name);
+            if (it != valueLocations.end()) {
+                if (it->second.type == ValueLocation::REGISTER) {
+                    pushValue(it->second.location);
+                    return;
+                }
+            }
+            
+            int slot = newSlotFor(node.name);
+            pushValue(slotVar(slot));
+        }
+
+        void visit(NumberNode& node) override {
+            if (node.isReal || isRealNumber(node.value)) {
+                std::string constName = generateRealConstantName();
+                usedRealConstants.insert(constName);
+                realConstants[constName] = node.value;
+                pushValue(constName);
+            } else {
+                pushValue(node.value);
+            }
+        }
+
+        void visit(StringNode& node) override {
+            if (node.value.length() == 1) {
+                int asciiValue = static_cast<int>(node.value[0]);
+                pushValue(std::to_string(asciiValue));
+            } else {
+                std::string sym = internString(node.value);
+                pushValue(sym);
+            }
+        }
+
+        void visit(BooleanNode& node) override {
+            std::string reg = allocReg();
+            emit3("mov", reg, node.value ? "1" : "0");
+            pushValue(reg);
+        }
+
+        void visit(EmptyStmtNode& node) override {
+        }
+
+        void visit(RepeatStmtNode& node) override {
+            std::string startLabel = newLabel("REPEAT");
+            std::string endLabel = newLabel("UNTIL");
+            
+            emitLabel(startLabel);
+            
+            for (auto& stmt : node.statements) {
+                if (stmt) stmt->accept(*this);
+            }
+            
+            std::string condResult = eval(node.condition.get());
+            emit2("cmp", condResult, "0");
+            emit1("je", startLabel);
+            
+            if (isReg(condResult)) freeReg(condResult);
+        }
+
+    private:
+        std::unordered_map<std::string, std::string> realConstants;
+    
+        void generateDataSection() {
+            for (const auto& constant : realConstants) {
+                emit("real " + constant.first + " = " + constant.second);
+            }
+            
+            if (usedStrings.count("fmt_float")) {
+                emit("string fmt_float = \"%.6f \"");
+            }
+            if (usedStrings.count("fmt_double")) {
+                emit("string fmt_double = \"%.6f\"");
+            }
         }
     };
 
