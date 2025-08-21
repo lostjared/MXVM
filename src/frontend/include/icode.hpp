@@ -8,17 +8,77 @@
 #include <string>
 #include <utility>
 #include <algorithm>
+#include <memory>
 
 namespace pascal {
-    class CodeGenVisitor : public ASTVisitor {
+
+    class CodeGenVisitor;  
+
+    class BuiltinFunctionHandler {
+        public:
+            virtual ~BuiltinFunctionHandler() = default;
+            virtual bool canHandle(const std::string& funcName) const = 0;
+            virtual void generate(CodeGenVisitor& visitor, const std::string& funcName, 
+                                const std::vector<std::unique_ptr<ASTNode>>& arguments) = 0;
+        };
+
+    class BuiltinFunctionRegistry {
+        private:
+            std::vector<std::unique_ptr<BuiltinFunctionHandler>> handlers;  
+
+        public:
+            void registerHandler(std::unique_ptr<BuiltinFunctionHandler> handler) {  
+                handlers.push_back(std::move(handler));
+            }
+            
+            BuiltinFunctionHandler* findHandler(const std::string& funcName) {
+                for(auto& handler : handlers) {
+                    if(handler->canHandle(funcName)) {  
+                        return handler.get();
+                    }
+                }
+                return nullptr;
+            }
+    };
+
+    class IOFunctionHandler : public BuiltinFunctionHandler {
     public:
+        bool canHandle(const std::string& funcName) const override;
+        void generate(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) override;  
+    };
+
+    
+    class MathFunctionHandler : public BuiltinFunctionHandler {
+    
+    };
+
+    class StringFunctionHandler : public BuiltinFunctionHandler {
+    
+    };
+
+
+    class CodeGenVisitor : public ASTVisitor {
+        BuiltinFunctionRegistry builtinRegistry;
+    public:
+        friend class IOFunctionHandler;
         CodeGenVisitor()
             : regInUse(registers.size(), false),
               currentFunctionName(),
               functionSetReturn(false),
-              nextSlot(0), nextTemp(0), labelCounter(0) {}
+              nextSlot(0), nextTemp(0), labelCounter(0) 
+        {
+            initializeBuiltins(); 
+        }
 
         virtual ~CodeGenVisitor() = default;
+
+        void initializeBuiltins() {
+            builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
+            // Uncomment these when implemented
+            // builtinRegistry.registerHandler(std::make_unique<MathFunctionHandler>());
+            // builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
+        }
+
         std::string name = "App";
 
         void generate(ASTNode* root) {
@@ -394,7 +454,6 @@ namespace pascal {
             std::string varName = varPtr->name;
             
             if (!currentFunctionName.empty() && varName == currentFunctionName) {
-                // Function return value handling is fine
                 if (getVarType(currentFunctionName) == VarType::STRING) {
                     emit3("mov", "arg0", rhs);  
                 } else {
@@ -419,7 +478,7 @@ namespace pascal {
                     emit3("mov", memLoc, rhs);
                 }
                 
-                // Update the tracking for this variable
+                
                 recordLocation(varName, {ValueLocation::MEMORY, memLoc});
             }
             
@@ -491,77 +550,10 @@ namespace pascal {
 
         void visit(ProcCallNode& node) override {
             std::string name = node.name;
-            if (name == "writeln" || name == "write") {
-                for(auto &arg : node.arguments) {
-                    ASTNode *a = arg.get();
-                    if (auto strNode = dynamic_cast<StringNode*>(a)) {
-                        if (strNode->value.length() == 1) {
-                            usedStrings.insert("fmt_chr");  
-                            std::string v = eval(a);
-                            emit2("print", "fmt_chr", v);   
-                            if (isReg(v)) freeReg(v);
-                        } else {
-                            usedStrings.insert("fmt_str");
-                            std::string v = eval(a);
-                            emit2("print", "fmt_str", v);
-                            if (isReg(v)) freeReg(v);
-                        }
-                    } 
-                    else if (auto varNode = dynamic_cast<VariableNode*>(a)) {
-                        if (getVarType(varNode->name) == VarType::CHAR) {
-                            usedStrings.insert("fmt_chr");
-                            std::string v = eval(a);
-                            emit2("print", "fmt_chr", v);
-                            if (isReg(v)) freeReg(v);
-                        } else if (isStringVar(varNode->name)) {
-                            usedStrings.insert("fmt_str");
-                            std::string v = eval(a);
-                            emit2("print", "fmt_str", v);
-                            if (isReg(v)) freeReg(v);
-                        } else {
-                            usedStrings.insert("fmt_int");
-                            std::string v = eval(a);
-                            emit2("print", "fmt_int", v);
-                            if (isReg(v)) freeReg(v);
-                        }
-                    } 
-                    else {
-                        usedStrings.insert("fmt_int");
-                        std::string v = eval(a);
-                        emit2("print", "fmt_int", v);
-                        if (isReg(v)) freeReg(v);
-                    }
-                }
-
-                if (name == "writeln") {
-                    usedStrings.insert("newline");
-                    emit1("print", "newline");
-                }
-                return;
-            }
             
-            if (name == "readln") {
-                for (auto &arg : node.arguments) {
-                    if (auto varNode = dynamic_cast<VariableNode*>(arg.get())) {
-                        std::string varName = varNode->name;
-                        int slot = newSlotFor(varName);
-                        std::string memLoc = slotVar(slot);
-                        
-                        VarType varType = getVarType(varName);
-                        emit1("getline", "input_buffer");                
-                        if (varType == VarType::STRING || varType == VarType::PTR) {
-                            //emit2("mov", memLoc, tempStr);
-                        } else if (varType == VarType::INT || varType == VarType::UNKNOWN) {
-                            emit2("to_int", memLoc, "input_buffer");
-                        } else if (varType == VarType::DOUBLE) {
-                            emit2("to_float", memLoc,"input_buffer");
-                        } 
-                        recordLocation(varName, {ValueLocation::MEMORY, memLoc});
-                    } else {
-                        
-                        throw std::runtime_error("readln argument must be a variable");
-                    }
-                }
+            auto handler = builtinRegistry.findHandler(name);
+            if (handler) {
+                handler->generate(*this, name, node.arguments);
                 return;
             }
             
@@ -1068,10 +1060,9 @@ namespace pascal {
 
         void pushTri(const char* op, const std::string& a, const std::string& b) {
             std::string result = allocReg();
-            if (std::string(op) =="mul") {
-                emit3("mov", "rax", a);
-                emit1("mul", b);  
-                emit3("mov", result, "rax");
+            if (std::string(op) == "mul") {
+                emit3("mov", result, a);
+                emit3("mul", result, b);  
             } else {
                 emit3("mov", result, a);
                 emit3(op, result, b);
