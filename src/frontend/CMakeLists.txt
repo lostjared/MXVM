@@ -6,7 +6,8 @@ add_executable(mxx
     parser.cpp
     expr.cpp
     ast.cpp
-    icode.cpp                 
+    icode.cpp
+    icode_imp.cpp                 
     main.cpp)
 target_include_directories(mxx
     PRIVATE
