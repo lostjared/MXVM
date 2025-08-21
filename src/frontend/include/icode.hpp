@@ -216,7 +216,6 @@ namespace pascal {
                 }
             }
         }
-
         
         std::string allocFloatReg() {
             for (size_t i = 0; i < floatRegInUse.size(); ++i) {
@@ -905,12 +904,9 @@ namespace pascal {
             
             std::string varName = varPtr->name;
             
-            // Handle assignment expression evaluation
             std::string rhs;
             if (auto numNode = dynamic_cast<NumberNode*>(node.expression.get())) {
-                // Direct number assignment
                 if (numNode->isReal || isRealNumber(numNode->value)) {
-                    // Create a constant for this real number
                     std::string constName = generateRealConstantName();
                     realConstants[constName] = numNode->value;
                     usedRealConstants.insert(constName);
@@ -919,7 +915,6 @@ namespace pascal {
                     rhs = numNode->value;
                 }
             } else {
-                // Complex expression
                 rhs = eval(node.expression.get());
             }
             
@@ -928,9 +923,9 @@ namespace pascal {
                 if (funcReturnType == VarType::STRING) {
                     emit3("mov", "arg0", rhs);  
                 } else if (funcReturnType == VarType::DOUBLE) {
-                    emit3("mov", "xmm0", rhs);  // Real functions return via xmm0
+                    emit3("mov", "xmm0", rhs);  
                 } else {
-                    emit3("mov", "rax", rhs);   // Integer/boolean functions return via rax
+                    emit3("mov", "rax", rhs);   
                 }
                 functionSetReturn = true;
             } else {
@@ -1456,6 +1451,57 @@ namespace pascal {
             emit1("je", startLabel);
             
             if (isReg(condResult)) freeReg(condResult);
+        }
+
+        void visit(CaseStmtNode& node) override {
+            std::string switchExpr = eval(node.expression.get());
+            std::string endLabel = newLabel("CASE_END");
+            std::vector<std::string> branchLabels;
+            
+            
+            for (size_t i = 0; i < node.branches.size(); i++) {
+                branchLabels.push_back(newLabel("CASE_" + std::to_string(i)));
+            }
+            
+            std::string elseLabel = newLabel("CASE_ELSE");
+            
+            
+            for (size_t i = 0; i < node.branches.size(); i++) {
+                auto& branch = node.branches[i];
+                
+                for (auto& value : branch->values) {
+                    std::string caseValue = eval(value.get());
+                    emit2("cmp", switchExpr, caseValue);
+                    emit1("je", branchLabels[i]);
+                    if (isReg(caseValue)) freeReg(caseValue);
+                }
+            }
+            
+            
+            if (node.elseStatement) {
+                emit1("jmp", elseLabel);
+            } else {
+                emit1("jmp", endLabel);
+            }
+            
+            
+            for (size_t i = 0; i < node.branches.size(); i++) {
+                emitLabel(branchLabels[i]);
+                if (node.branches[i]->statement) {
+                    node.branches[i]->statement->accept(*this);
+                }
+                emit1("jmp", endLabel);
+            }
+            
+            
+            if (node.elseStatement) {
+                emitLabel(elseLabel);
+                node.elseStatement->accept(*this);
+            }
+            
+            emitLabel(endLabel);
+            
+            if (isReg(switchExpr)) freeReg(switchExpr);
         }
 
     private:

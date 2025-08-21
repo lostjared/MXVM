@@ -51,11 +51,16 @@ namespace pascal {
         return std::make_unique<BlockNode>(std::move(declarations), std::move(compoundStmt));
     }
 
+
     std::vector<std::unique_ptr<ASTNode>> PascalParser::parseDeclarations() {
         std::vector<std::unique_ptr<ASTNode>> declarations;
         
         if (match("var")) {  
-            while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue())) {
+            while (peekIs(types::TokenType::TT_ID)) {
+                if (isKeyword(token->getTokenValue())) {
+                    break; 
+                }
+                
                 std::vector<std::string> identifiers;
                 
                 identifiers.push_back(token->getTokenValue());
@@ -108,7 +113,6 @@ namespace pascal {
 
         return declarations;
     }
-
     bool PascalParser::isKeyword(const std::string& token) {
         std::string lower = token;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -118,7 +122,8 @@ namespace pascal {
             lower == "procedure" || lower == "function" || lower == "integer" ||
             lower == "real" || lower == "boolean" || lower == "string" || lower == "char" ||
             lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
-            lower == "and" || lower == "or" || lower == "not";  
+            lower == "and" || lower == "or" || lower == "not" || 
+            lower == "case" || lower == "of" || lower == "repeat" || lower == "until";  
     }
     std::unique_ptr<ASTNode> PascalParser::parseVarDeclaration() {
         expectToken("var");
@@ -290,8 +295,10 @@ namespace pascal {
             return parseWhileStatement();
         } else if (peekIs("for")) {
             return parseForStatement();
-        } else if (peekIs("repeat")) {  // Add this condition
+        } else if (peekIs("repeat")) {  
             return parseRepeatStatement();
+        } else if (peekIs("case")) {  
+            return parseCaseStatement();
         } else if (peekIs(types::TokenType::TT_ID)) {
             return parseAssignmentOrProcCall();
         } else {
@@ -667,6 +674,57 @@ namespace pascal {
         if (op == "/") return BinaryOpNode::DIVIDE;
         if (op == "mod") return BinaryOpNode::MOD;
         throw std::runtime_error("Unknown arithmetic operator: " + op);
+    }
+
+    std::unique_ptr<ASTNode> PascalParser::parseCaseStatement() {
+        expectToken("case");
+        next();
+        
+        auto expression = parseExpression();
+        
+        expectToken("of");
+        next();
+        
+        std::vector<std::unique_ptr<CaseStmtNode::CaseBranch>> branches;
+
+        while (!peekIs("end") && !peekIs("else")) {
+            std::vector<std::unique_ptr<ASTNode>> values;
+            
+            values.push_back(parseExpression());
+            
+            while (peekIs(",")) {
+                next(); 
+                values.push_back(parseExpression());
+            }
+            
+            expectToken(":");
+            next();
+            
+            auto statement = parseStatement();
+            
+            branches.push_back(std::make_unique<CaseStmtNode::CaseBranch>(
+                std::move(values), std::move(statement)));
+            
+            if (peekIs(";")) {
+                next();
+            }
+        }
+        
+        std::unique_ptr<ASTNode> elseStatement = nullptr;
+        if (peekIs("else")) {
+            next();
+            elseStatement = parseStatement();
+            if (peekIs(";")) {
+                next();
+            }
+        }
+        
+        expectToken("end");
+        next();
+        
+        return std::make_unique<CaseStmtNode>(std::move(expression), 
+                                              std::move(branches), 
+                                              std::move(elseStatement));
     }
 
 }

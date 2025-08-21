@@ -175,6 +175,30 @@ namespace pascal {
         std::string toString() const override;
     };
 
+    class CaseStmtNode : public ASTNode {
+    public:
+        struct CaseBranch {
+            std::vector<std::unique_ptr<ASTNode>> values; 
+            std::unique_ptr<ASTNode> statement;
+            
+            CaseBranch(std::vector<std::unique_ptr<ASTNode>> vals, std::unique_ptr<ASTNode> stmt)
+                : values(std::move(vals)), statement(std::move(stmt)) {}
+        };
+        
+        std::unique_ptr<ASTNode> expression;
+        std::vector<std::unique_ptr<CaseBranch>> branches;
+        std::unique_ptr<ASTNode> elseStatement;  
+        
+        CaseStmtNode(std::unique_ptr<ASTNode> expr, 
+                    std::vector<std::unique_ptr<CaseBranch>> branches,
+                    std::unique_ptr<ASTNode> elseStmt = nullptr)
+            : expression(std::move(expr)), branches(std::move(branches)), elseStatement(std::move(elseStmt)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+
     class ProcCallNode : public ASTNode {
     public:
         std::string name;
@@ -326,6 +350,7 @@ namespace pascal {
         virtual void visit(BooleanNode& node) = 0;
         virtual void visit(EmptyStmtNode& node) = 0;
         virtual void visit(RepeatStmtNode& node) = 0;
+        virtual void visit(CaseStmtNode& node) = 0;
     };
 
     class PrettyPrintVisitor : public ASTVisitor {
@@ -337,7 +362,7 @@ namespace pascal {
         
     public:
         PrettyPrintVisitor(std::ostream& output) : out(output), indentLevel(0) {}
-        
+    
         void visit(ProgramNode& node) override;
         void visit(BlockNode& node) override;
         void visit(VarDeclNode& node) override;
@@ -359,6 +384,7 @@ namespace pascal {
         void visit(BooleanNode& node) override;
         void visit(EmptyStmtNode& node) override;
         void visit(RepeatStmtNode& node) override;
+        void visit(CaseStmtNode& node) override;
     };
 
 } 

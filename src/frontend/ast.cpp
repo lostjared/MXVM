@@ -444,4 +444,49 @@ namespace pascal {
         node.condition->accept(*this);
     }
 
+    void CaseStmtNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string CaseStmtNode::toString() const {
+        return "CaseStmt: " + std::to_string(branches.size()) + " branches";
+    }
+
+    void PrettyPrintVisitor::visit(CaseStmtNode& node) {
+        printIndent();
+        out << "case ";
+        node.expression->accept(*this);
+        out << " of" << std::endl;
+        
+        indentLevel++;
+        for (auto& branch : node.branches) {
+            printIndent();
+            for (size_t i = 0; i < branch->values.size(); i++) {
+                if (i > 0) out << ", ";
+                branch->values[i]->accept(*this);
+            }
+            out << ":" << std::endl;
+            
+            indentLevel++;
+            if (branch->statement) {
+                branch->statement->accept(*this);
+            }
+            indentLevel--;
+            out << ";" << std::endl;
+        }
+        
+        if (node.elseStatement) {
+            printIndent();
+            out << "else" << std::endl;
+            indentLevel++;
+            node.elseStatement->accept(*this);
+            indentLevel--;
+            out << std::endl;
+        }
+        
+        indentLevel--;
+        printIndent();
+        out << "end";
+    }
+
 }
