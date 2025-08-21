@@ -129,112 +129,136 @@ namespace pascal {
            funcName == "random" || funcName == "round";
 }
 
-    void MathFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName,
-                const std::vector<std::unique_ptr<ASTNode>>& arguments) {
-
-        throw std::runtime_error("Math functions must return a value");
-    }
-
-        bool MathFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+        void MathFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName,
                     const std::vector<std::unique_ptr<ASTNode>>& arguments) {
-    if (arguments.empty() && funcName != "random") {
-        throw std::runtime_error("Math function requires at least one argument");
-    }
-    
-    if (funcName == "abs") {
-        if (arguments.size() != 1) {
-            throw std::runtime_error("abs function requires exactly 1 argument");
-        }
-        std::string arg = visitor.eval(arguments[0].get());
-        visitor.emit_invoke("abs", {arg});
-        if (visitor.isReg(arg)) visitor.freeReg(arg);
-    }
-    else if (funcName == "sqrt") {
-        if (arguments.size() != 1) {
-            throw std::runtime_error("sqrt function requires exactly 1 argument");
-        }
-        std::string arg = visitor.eval(arguments[0].get());
-        visitor.emit_invoke("sqrt", {arg});
-        if (visitor.isReg(arg)) visitor.freeReg(arg);
-    }
-    else if (funcName == "sin") {
-        if (arguments.size() != 1) {
-            throw std::runtime_error("sin function requires exactly 1 argument");
-        }
-        std::string arg = visitor.eval(arguments[0].get());
-        visitor.emit_invoke("sin", {arg});
-        if (visitor.isReg(arg)) visitor.freeReg(arg);
-    }
-    else if (funcName == "cos") {
-        if (arguments.size() != 1) {
-            throw std::runtime_error("cos function requires exactly 1 argument");
-        }
-        std::string arg = visitor.eval(arguments[0].get());
-        visitor.emit_invoke("cos", {arg});
-        if (visitor.isReg(arg)) visitor.freeReg(arg);
-    }
-    else if (funcName == "random") {
-        if (arguments.empty()) {
-            visitor.emit_invoke("random", {});
-        } else if (arguments.size() == 1) {
-            std::string maxVal = visitor.eval(arguments[0].get());
-            visitor.emit_invoke("random_max", {maxVal});
-            if (visitor.isReg(maxVal)) visitor.freeReg(maxVal);
-        } else if (arguments.size() == 2) {
-            std::string minVal = visitor.eval(arguments[0].get());
-            std::string maxVal = visitor.eval(arguments[1].get());
-            visitor.emit_invoke("random_range", {minVal, maxVal});
-            if (visitor.isReg(minVal)) visitor.freeReg(minVal);
-            if (visitor.isReg(maxVal)) visitor.freeReg(maxVal);
-        } else {
-            throw std::runtime_error("random function accepts 0, 1, or 2 arguments");
-        }
-    }
-    else if (funcName == "round") {
-        if (arguments.size() != 1) {
-            throw std::runtime_error("round function requires exactly 1 argument");
-        }
-        std::string arg = visitor.eval(arguments[0].get());
-        visitor.emit_invoke("round", {arg});
-        if (visitor.isReg(arg)) visitor.freeReg(arg);
-    }
-    else if (funcName == "power" || funcName == "pow") {
-        if (arguments.size() != 2) {
-            throw std::runtime_error("power function requires exactly 2 arguments");
-        }
-        std::string base = visitor.eval(arguments[0].get());
-        std::string exponent = visitor.eval(arguments[1].get());
-        visitor.emit_invoke("power", {base, exponent});
-        if (visitor.isReg(base)) visitor.freeReg(base);
-        if (visitor.isReg(exponent)) visitor.freeReg(exponent);
-    }
-    else if (funcName == "min") {
-        if (arguments.size() != 2) {
-            throw std::runtime_error("min function requires exactly 2 arguments");
-        }
-        std::string arg1 = visitor.eval(arguments[0].get());
-        std::string arg2 = visitor.eval(arguments[1].get());
-        visitor.emit_invoke("min", {arg1, arg2});
-        if (visitor.isReg(arg1)) visitor.freeReg(arg1);
-        if (visitor.isReg(arg2)) visitor.freeReg(arg2);
-    }
-    else if (funcName == "max") {
-        if (arguments.size() != 2) {
-            throw std::runtime_error("max function requires exactly 2 arguments");
-        }
-        std::string arg1 = visitor.eval(arguments[0].get());
-        std::string arg2 = visitor.eval(arguments[1].get());
-        visitor.emit_invoke("max", {arg1, arg2});
-        if (visitor.isReg(arg1)) visitor.freeReg(arg1);
-        if (visitor.isReg(arg2)) visitor.freeReg(arg2);
-    }
-    
-    
-    std::string result = visitor.allocFloatReg();  
-    visitor.emit1("return", result);
-    visitor.pushValue(result);
-    
-    return true;
-}
 
+            throw std::runtime_error("Math functions must return a value");
+        }
+
+            bool MathFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+                        const std::vector<std::unique_ptr<ASTNode>>& arguments) {
+        if (arguments.empty() && funcName != "random") {
+            throw std::runtime_error("Math function requires at least one argument");
+        }
+        
+        if (funcName == "abs") {
+            if (arguments.size() != 1) {
+                throw std::runtime_error("abs function requires exactly 1 argument");
+            }
+            std::string arg = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("abs", {arg});
+            if (visitor.isReg(arg)) visitor.freeReg(arg);
+        }
+        else if (funcName == "sqrt") {
+            if (arguments.size() != 1) {
+                throw std::runtime_error("sqrt function requires exactly 1 argument");
+            }
+            std::string arg = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("sqrt", {arg});
+            if (visitor.isReg(arg)) visitor.freeReg(arg);
+        }
+        else if (funcName == "sin") {
+            if (arguments.size() != 1) {
+                throw std::runtime_error("sin function requires exactly 1 argument");
+            }
+            std::string arg = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("sin", {arg});
+            if (visitor.isReg(arg)) visitor.freeReg(arg);
+        }
+        else if (funcName == "cos") {
+            if (arguments.size() != 1) {
+                throw std::runtime_error("cos function requires exactly 1 argument");
+            }
+            std::string arg = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("cos", {arg});
+            if (visitor.isReg(arg)) visitor.freeReg(arg);
+        }
+        else if (funcName == "random") {
+            if (arguments.empty()) {
+                visitor.emit_invoke("random", {});
+            } else if (arguments.size() == 1) {
+                std::string maxVal = visitor.eval(arguments[0].get());
+                visitor.emit_invoke("random_max", {maxVal});
+                if (visitor.isReg(maxVal)) visitor.freeReg(maxVal);
+            } else if (arguments.size() == 2) {
+                std::string minVal = visitor.eval(arguments[0].get());
+                std::string maxVal = visitor.eval(arguments[1].get());
+                visitor.emit_invoke("random_range", {minVal, maxVal});
+                if (visitor.isReg(minVal)) visitor.freeReg(minVal);
+                if (visitor.isReg(maxVal)) visitor.freeReg(maxVal);
+            } else {
+                throw std::runtime_error("random function accepts 0, 1, or 2 arguments");
+            }
+        }
+        else if (funcName == "round") {
+            if (arguments.size() != 1) {
+                throw std::runtime_error("round function requires exactly 1 argument");
+            }
+            std::string arg = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("round", {arg});
+            if (visitor.isReg(arg)) visitor.freeReg(arg);
+        }
+        else if (funcName == "power" || funcName == "pow") {
+            if (arguments.size() != 2) {
+                throw std::runtime_error("power function requires exactly 2 arguments");
+            }
+            std::string base = visitor.eval(arguments[0].get());
+            std::string exponent = visitor.eval(arguments[1].get());
+            visitor.emit_invoke("power", {base, exponent});
+            if (visitor.isReg(base)) visitor.freeReg(base);
+            if (visitor.isReg(exponent)) visitor.freeReg(exponent);
+        }
+        else if (funcName == "min") {
+            if (arguments.size() != 2) {
+                throw std::runtime_error("min function requires exactly 2 arguments");
+            }
+            std::string arg1 = visitor.eval(arguments[0].get());
+            std::string arg2 = visitor.eval(arguments[1].get());
+            visitor.emit_invoke("min", {arg1, arg2});
+            if (visitor.isReg(arg1)) visitor.freeReg(arg1);
+            if (visitor.isReg(arg2)) visitor.freeReg(arg2);
+        }
+        else if (funcName == "max") {
+            if (arguments.size() != 2) {
+                throw std::runtime_error("max function requires exactly 2 arguments");
+            }
+            std::string arg1 = visitor.eval(arguments[0].get());
+            std::string arg2 = visitor.eval(arguments[1].get());
+            visitor.emit_invoke("max", {arg1, arg2});
+            if (visitor.isReg(arg1)) visitor.freeReg(arg1);
+            if (visitor.isReg(arg2)) visitor.freeReg(arg2);
+        }
+        
+        
+        std::string result = visitor.allocFloatReg();  
+        visitor.emit1("return", result);
+        visitor.pushValue(result);
+        
+        return true;
+    }
+
+    bool StdFunctionHandler::canHandle(const std::string& funcName) const {
+        return funcName == "halt" || funcName == "system";
+    }
+    
+    void StdFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) {
+        if(funcName == "halt" && arguments.size() == 1) {
+            std::string val = visitor.eval(arguments[0].get());
+            visitor.emit1("exit", val);
+            if (visitor.isReg(val)) visitor.freeReg(val);                
+        } 
+    }
+    
+    bool StdFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments)  {
+        if(funcName == "system" && arguments.size() == 1) {
+            std::string value = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("system", {value});
+            if (visitor.isReg(value)) visitor.freeReg(value);                
+            std::string result = visitor.allocReg();
+            visitor.emit1("return", result);
+            visitor.pushValue(result);
+            return true;
+        }
+        return false;
+    }
 }

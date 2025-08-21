@@ -60,6 +60,15 @@ namespace pascal {
     };
 
 
+     class StdFunctionHandler : public BuiltinFunctionHandler {
+    public:
+        bool canHandle(const std::string& funcName) const override;
+        void generate(CodeGenVisitor& visitor, const std::string& funcName, 
+                    const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
+        bool generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+                            const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
+    };
+
     class StringFunctionHandler : public BuiltinFunctionHandler {
     
     };
@@ -457,6 +466,8 @@ namespace pascal {
     public:
         friend class IOFunctionHandler;
         friend class MathFunctionHandler;
+        friend class StdFunctionHandler;
+
         BuiltinFunctionRegistry builtinRegistry;
 
         CodeGenVisitor()
@@ -474,7 +485,7 @@ namespace pascal {
         void initializeBuiltins() {
             builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
             builtinRegistry.registerHandler(std::make_unique<MathFunctionHandler>());
-            // builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
+            builtinRegistry.registerHandler(std::make_unique<StdFunctionHandler>());
         }
 
         std::string name = "App";
