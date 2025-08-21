@@ -2,7 +2,7 @@ program Fibonacci;
 var
   n: integer;
   a, b, temp: integer;
-  i: Integer;
+  i: integer;
   code: integer;
 begin
   a := 0;
