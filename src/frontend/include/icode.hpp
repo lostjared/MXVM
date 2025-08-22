@@ -665,7 +665,7 @@ namespace pascal {
             out << "\tsection module {\n ";
             bool first = true;
             for (const auto& mod : usedModules) {
-                if (!first) out << ", ";
+                if (!first) out << ",\n";
                 out << "\t\t" << mod;
                 first = false;
             }

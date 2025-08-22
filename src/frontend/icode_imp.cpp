@@ -262,8 +262,14 @@ namespace pascal {
                 visitor.emit_invoke("abs", {a});
                 visitor.emit("return " + resultReg); 
                 visitor.pushValue(resultReg);
-
                 if (visitor.isReg(a)) visitor.freeReg(a);
+                return true;
+            } else if (funcName == "rand") {
+                if (arguments.size() != 0) throw std::runtime_error("rand requires 0 argument");
+                visitor.emit_invoke("rand", {});
+                std::string resultReg = visitor.allocReg();
+                visitor.emit("return " + resultReg); 
+                visitor.pushValue(resultReg);
                 return true;
             }
 
