@@ -511,4 +511,37 @@ namespace pascal {
         printIndent();
         out << "end";
     }
+
+    void ArrayTypeNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ArrayTypeNode::toString() const {
+        return "ArrayType: " + elementType + "[" + 
+               lowerBound->toString() + ".." + upperBound->toString() + "]";
+    }
+
+    void ArrayDeclarationNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ArrayDeclarationNode::toString() const {
+        return "ArrayDecl: " + name + " of " + arrayType->toString();
+    }
+
+    void ArrayAccessNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ArrayAccessNode::toString() const {
+        return "ArrayAccess: " + arrayName + "[" + index->toString() + "]";
+    }
+
+    void ArrayAssignmentNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ArrayAssignmentNode::toString() const {
+        return "ArrayAssignment: " + arrayName + "[" + index->toString() + "] := " + value->toString();
+    }
 }

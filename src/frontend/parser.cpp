@@ -4,8 +4,7 @@
 #include <set>
 
 namespace pascal {
-    
-   
+
     void PascalParser::error(const std::string& message) {
         throw ParseException("Parse error: " + message + (token ? " at '" + token->getTokenValue() + "'" : " at end of input"));
     }
@@ -22,18 +21,14 @@ namespace pascal {
         expectToken("program");
         int lineNum = token->getLine();
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string programName = token->getTokenValue();
         next();
-
         expectToken(";");
         next();
-
         auto block = parseBlock();
         auto programNode = std::make_unique<ProgramNode>(programName, std::move(block));
         programNode->setLineNumber(lineNum);
-
         expectToken(".");
         return programNode;
     }
@@ -57,76 +52,76 @@ namespace pascal {
         return blockNode;
     }
 
-
     bool PascalParser::isKeyword(const std::string& token) {
         std::string lower = token;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
         return lower == "program" || lower == "var" || lower == "begin" || lower == "end" ||
-            lower == "if" || lower == "then" || lower == "else" || lower == "while" ||
-            lower == "do" || lower == "for" || lower == "to" || lower == "downto" ||
-            lower == "procedure" || lower == "function" || lower == "integer" ||
-            lower == "real" || lower == "boolean" || lower == "string" || lower == "char" ||
-            lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
-            lower == "and" || lower == "or" || lower == "not" || 
-            lower == "case" || lower == "of" || lower == "repeat" || lower == "until";  
+               lower == "if" || lower == "then" || lower == "else" || lower == "while" ||
+               lower == "do" || lower == "for" || lower == "to" || lower == "downto" ||
+               lower == "procedure" || lower == "function" || lower == "integer" ||
+               lower == "real" || lower == "boolean" || lower == "string" || lower == "char" ||
+               lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
+               lower == "and" || lower == "or" || lower == "not" ||
+               lower == "case" || lower == "of" || lower == "repeat" || lower == "until" || lower == "array" || lower == "of";
     }
-    std::unique_ptr<ASTNode> PascalParser::parseVarDeclaration() {
-        expectToken("var");
-        int lineNum = token->getLine();
-        next();
 
-        std::vector<std::string> identifiers;
-        expectToken(types::TokenType::TT_ID);
-        identifiers.push_back(token->getTokenValue());
+    std::unique_ptr<ASTNode> PascalParser::parseArrayDeclaration(const std::string& varName) {
+        if (!peekIs("array")) error("Expected 'array' keyword");
         next();
-
-        while (peekIs(",")) {
-            next(); 
-            expectToken(types::TokenType::TT_ID);
-            identifiers.push_back(token->getTokenValue());
+        if (!peekIs("[")) error("Expected '[' after 'array'");
+        next();
+        auto lowerBound = parseExpression();
+        if (!peekIs("..")) error("Expected '..' in array bounds");
+        next();
+        auto upperBound = parseExpression();
+        if (!peekIs("]")) error("Expected ']' after array bounds");
+        next();
+        if (!peekIs("of")) error("Expected 'of' after array bounds");
+        next();
+        if (!peekIs(types::TokenType::TT_ID)) error("Expected type identifier after 'of'");
+        std::string elementType = token->getTokenValue();
+        next();
+        auto arrayType = std::make_unique<ArrayTypeNode>(elementType, std::move(lowerBound), std::move(upperBound));
+        std::vector<std::unique_ptr<ASTNode>> initializers;
+        if (peekIs(":=")) {
+            next();
+            if (!peekIs("(")) error("Expected '(' after ':=' in array initialization");
+            next();
+            if (!peekIs(")")) {
+                do {
+                    initializers.push_back(parseExpression());
+                    if (peekIs(",")) next(); else break;
+                } while (true);
+            }
+            if (!peekIs(")")) error("Expected ')' after array initializers");
             next();
         }
+        return std::make_unique<ArrayDeclarationNode>(varName, std::move(arrayType), std::move(initializers));
+    }
 
-        expectToken(":");
-        next();
-
-        expectToken(types::TokenType::TT_ID);
-        std::string type = token->getTokenValue();
-        next();
-
-        expectToken(";");
-        next();
-
-        auto varDeclNode = std::make_unique<VarDeclNode>(std::move(identifiers), type);
-        varDeclNode->setLineNumber(lineNum);
-        return varDeclNode;
+    bool PascalParser::isArrayAccess() {
+        return peekIs(types::TokenType::TT_ID);
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {
         expectToken("procedure");
         int lineNum = token->getLine();
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string procName = token->getTokenValue();
         next();
-
         std::vector<std::unique_ptr<ASTNode>> parameters;
         if (peekIs("(")) {
-            next(); 
+            next();
             parameters = parseParameterList();
             expectToken(")");
             next();
         }
-
         expectToken(";");
         next();
-
         auto block = parseBlock();
-
         expectToken(";");
         next();
-
         auto procDeclNode = std::make_unique<ProcDeclNode>(procName, std::move(parameters), std::move(block));
         procDeclNode->setLineNumber(lineNum);
         return procDeclNode;
@@ -136,34 +131,26 @@ namespace pascal {
         expectToken("function");
         int lineNum = token->getLine();
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string funcName = token->getTokenValue();
         next();
-
         std::vector<std::unique_ptr<ASTNode>> parameters;
         if (peekIs("(")) {
-            next(); 
+            next();
             parameters = parseParameterList();
             expectToken(")");
             next();
         }
-
         expectToken(":");
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string returnType = token->getTokenValue();
         next();
-
         expectToken(";");
         next();
-
         auto block = parseBlock();
-
         expectToken(";");
         next();
-
         auto funcDeclNode = std::make_unique<FuncDeclNode>(funcName, std::move(parameters), returnType, std::move(block));
         funcDeclNode->setLineNumber(lineNum);
         return funcDeclNode;
@@ -171,16 +158,13 @@ namespace pascal {
 
     std::vector<std::unique_ptr<ASTNode>> PascalParser::parseParameterList() {
         std::vector<std::unique_ptr<ASTNode>> parameters;
-
         if (!peekIs(")")) {
             parameters.push_back(parseParameter());
-
             while (peekIs(";")) {
-                next(); 
+                next();
                 parameters.push_back(parseParameter());
             }
         }
-
         return parameters;
     }
 
@@ -191,26 +175,21 @@ namespace pascal {
             isVar = true;
             next();
         }
-
         std::vector<std::string> identifiers;
         expectToken(types::TokenType::TT_ID);
         identifiers.push_back(token->getTokenValue());
         next();
-
         while (peekIs(",")) {
-            next(); 
+            next();
             expectToken(types::TokenType::TT_ID);
             identifiers.push_back(token->getTokenValue());
             next();
         }
-
         expectToken(":");
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string type = token->getTokenValue();
         next();
-
         auto parameterNode = std::make_unique<ParameterNode>(std::move(identifiers), type, isVar);
         parameterNode->setLineNumber(lineNum);
         return parameterNode;
@@ -220,23 +199,18 @@ namespace pascal {
         expectToken("begin");
         int lineNum = token->getLine();
         next();
-
         std::vector<std::unique_ptr<ASTNode>> statements;
-
         if (!peekIs("end")) {
             statements.push_back(parseStatement());
-
             while (peekIs(";")) {
-                next(); 
+                next();
                 if (!peekIs("end")) {
                     statements.push_back(parseStatement());
                 }
             }
         }
-
         expectToken("end");
         next();
-
         auto compoundStmtNode = std::make_unique<CompoundStmtNode>(std::move(statements));
         compoundStmtNode->setLineNumber(lineNum);
         return compoundStmtNode;
@@ -248,7 +222,7 @@ namespace pascal {
             emptyNode->setLineNumber(1);
             return emptyNode;
         }
-
+        
         if (peekIs("begin")) {
             return parseCompoundStatement();
         } else if (peekIs("if")) {
@@ -257,12 +231,40 @@ namespace pascal {
             return parseWhileStatement();
         } else if (peekIs("for")) {
             return parseForStatement();
-        } else if (peekIs("repeat")) {  
+        } else if (peekIs("repeat")) {
             return parseRepeatStatement();
-        } else if (peekIs("case")) {  
+        } else if (peekIs("case")) {
             return parseCaseStatement();
         } else if (peekIs(types::TokenType::TT_ID)) {
-            return parseAssignmentOrProcCall();
+            
+            std::string name = token->getTokenValue();
+            int lineNum = token->getLine();
+            next();
+            
+            if (peekIs("[")) {
+            
+                expectToken("[");
+                next();
+                auto index = parseExpression();
+                expectToken("]");
+                next();
+                expectToken(":=");
+                next();
+                auto value = parseExpression();
+                return std::make_unique<ArrayAssignmentNode>(name, std::move(index), std::move(value));
+            } else if (peekIs(":=")) {
+            
+                next();
+                auto variable = std::make_unique<VariableNode>(name);
+                variable->setLineNumber(lineNum);
+                auto expression = parseExpression();
+                auto assignmentNode = std::make_unique<AssignmentNode>(std::move(variable), std::move(expression));
+                assignmentNode->setLineNumber(lineNum);
+                return assignmentNode;
+            } else {
+            
+                return parseProcedureCall(name);
+            }
         } else {
             auto emptyNode = std::make_unique<EmptyStmtNode>();
             emptyNode->setLineNumber(token ? token->getLine() : 1);
@@ -275,10 +277,8 @@ namespace pascal {
         std::string name = token->getTokenValue();
         int lineNum = token->getLine();
         next();
-
         if (peekIs(":=")) {
-            next(); 
-            
+            next();
             auto variable = std::make_unique<VariableNode>(name);
             variable->setLineNumber(lineNum);
             auto expression = parseExpression();
@@ -294,23 +294,16 @@ namespace pascal {
         expectToken("if");
         int lineNum = token->getLine();
         next();
-        
         auto condition = parseExpression();
-        
         expectToken("then");
         next();
-        
         auto thenStatement = parseStatement();
-        
         std::unique_ptr<ASTNode> elseStatement = nullptr;
         if (peekIs("else")) {
             next();
-            elseStatement = parseStatement();  
+            elseStatement = parseStatement();
         }
-        
-        auto ifStmtNode = std::make_unique<IfStmtNode>(std::move(condition), 
-                                         std::move(thenStatement),
-                                         std::move(elseStatement));
+        auto ifStmtNode = std::make_unique<IfStmtNode>(std::move(condition), std::move(thenStatement), std::move(elseStatement));
         ifStmtNode->setLineNumber(lineNum);
         return ifStmtNode;
     }
@@ -319,14 +312,10 @@ namespace pascal {
         expectToken("while");
         int lineNum = token->getLine();
         next();
-
         auto condition = parseExpression();
-
         expectToken("do");
         next();
-
         auto statement = parseStatement();
-
         auto whileStmtNode = std::make_unique<WhileStmtNode>(std::move(condition), std::move(statement));
         whileStmtNode->setLineNumber(lineNum);
         return whileStmtNode;
@@ -336,16 +325,12 @@ namespace pascal {
         expectToken("for");
         int lineNum = token->getLine();
         next();
-
         expectToken(types::TokenType::TT_ID);
         std::string variable = token->getTokenValue();
         next();
-
         expectToken(":=");
         next();
-
         auto startValue = parseExpression();
-
         bool isDownto = false;
         if (peekIs("to")) {
             next();
@@ -355,16 +340,11 @@ namespace pascal {
         } else {
             error("Expected 'to' or 'downto' in for loop");
         }
-
         auto endValue = parseExpression();
-
         expectToken("do");
         next();
-
         auto statement = parseStatement();
-
-        auto forStmtNode = std::make_unique<ForStmtNode>(variable, std::move(startValue), 
-                                        std::move(endValue), isDownto, std::move(statement));
+        auto forStmtNode = std::make_unique<ForStmtNode>(variable, std::move(startValue), std::move(endValue), isDownto, std::move(statement));
         forStmtNode->setLineNumber(lineNum);
         return forStmtNode;
     }
@@ -373,24 +353,18 @@ namespace pascal {
         expectToken("repeat");
         int lineNum = token->getLine();
         next();
-
         std::vector<std::unique_ptr<ASTNode>> statements;
-        
         while (!peekIs("until")) {
             statements.push_back(parseStatement());
-            
             if (peekIs(";")) {
                 next();
             } else if (!peekIs("until")) {
                 error("Expected ';' or 'until'");
             }
         }
-        
         expectToken("until");
         next();
-        
         auto condition = parseExpression();
-        
         auto repeatStmtNode = std::make_unique<RepeatStmtNode>(std::move(statements), std::move(condition));
         repeatStmtNode->setLineNumber(lineNum);
         return repeatStmtNode;
@@ -399,24 +373,20 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseExpression() {
         int lineNum = token ? token->getLine() : 1;
         auto left = parseSimpleExpression();
-
         if (isRelationalOperator()) {
             std::string op = getRelationalOp();
             next();
             auto right = parseSimpleExpression();
-            
-            BinaryOpNode::OpType enumOp = BinaryOpNode::EQUAL; 
+            BinaryOpNode::OpType enumOp = BinaryOpNode::EQUAL;
             if (op == "=") enumOp = BinaryOpNode::EQUAL;
             else if (op == "<>") enumOp = BinaryOpNode::NOT_EQUAL;
             else if (op == "<") enumOp = BinaryOpNode::LESS;
             else if (op == "<=") enumOp = BinaryOpNode::LESS_EQUAL;
             else if (op == ">") enumOp = BinaryOpNode::GREATER;
             else if (op == ">=") enumOp = BinaryOpNode::GREATER_EQUAL;
-            
             left = std::make_unique<BinaryOpNode>(std::move(left), enumOp, std::move(right));
             left->setLineNumber(lineNum);
         }
-
         while (peekIs("and") || peekIs("or")) {
             BinaryOpNode::OpType op;
             if (peekIs("and")) {
@@ -430,59 +400,50 @@ namespace pascal {
             left = std::make_unique<BinaryOpNode>(std::move(left), op, std::move(right));
             left->setLineNumber(lineNum);
         }
-
         return left;
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseSimpleExpression() {
         std::unique_ptr<ASTNode> result;
         int lineNum = token ? token->getLine() : 1;
-
         if (peekIs("+") || peekIs("-") || peekIs("not")) {
-            UnaryOpNode::Operator op = UnaryOpNode::PLUS;  
+            UnaryOpNode::Operator op = UnaryOpNode::PLUS;
             if (peekIs("+")) op = UnaryOpNode::PLUS;
             else if (peekIs("-")) op = UnaryOpNode::MINUS;
             else if (peekIs("not")) op = UnaryOpNode::NOT;
             next();
-            
             auto operand = parseTerm();
             result = std::make_unique<UnaryOpNode>(op, std::move(operand));
             result->setLineNumber(lineNum);
         } else {
             result = parseTerm();
         }
-
         while (peekIs("+") || peekIs("-")) {
             BinaryOpNode::OpType op;
             if (peekIs("+")) op = BinaryOpNode::PLUS;
             else op = BinaryOpNode::MINUS;
             next();
-            
             auto right = parseTerm();
             result = std::make_unique<BinaryOpNode>(std::move(result), op, std::move(right));
             result->setLineNumber(lineNum);
         }
-
         return result;
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseTerm() {
         int lineNum = token ? token->getLine() : 1;
         auto result = parseFactor();
-
         while (isMulOperator()) {
-            BinaryOpNode::OpType op = BinaryOpNode::MULTIPLY;  
+            BinaryOpNode::OpType op = BinaryOpNode::MULTIPLY;
             if (peekIs("*")) op = BinaryOpNode::MULTIPLY;
             else if (peekIs("/")) op = BinaryOpNode::DIVIDE;
             else if (peekIs("div")) op = BinaryOpNode::DIV;
             else if (peekIs("mod")) op = BinaryOpNode::MOD;
             next();
-            
             auto right = parseFactor();
             result = std::make_unique<BinaryOpNode>(std::move(result), op, std::move(right));
             result->setLineNumber(lineNum);
         }
-
         return result;
     }
 
@@ -492,11 +453,7 @@ namespace pascal {
         if (peekIs(types::TokenType::TT_NUM)) {
             std::string value = token->getTokenValue();
             next();
-            
-            bool isReal = value.find('.') != std::string::npos ||
-                          value.find('e') != std::string::npos ||
-                          value.find('E') != std::string::npos;
-            
+            bool isReal = value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos;
             auto numberNode = std::make_unique<NumberNode>(value, !isReal, isReal);
             numberNode->setLineNumber(lineNum);
             return numberNode;
@@ -513,7 +470,7 @@ namespace pascal {
             booleanNode->setLineNumber(lineNum);
             return booleanNode;
         } else if (peekIs("(")) {
-            next(); 
+            next();
             auto expr = parseExpression();
             expectToken(")");
             next();
@@ -521,10 +478,22 @@ namespace pascal {
         } else if (peekIs(types::TokenType::TT_ID)) {
             std::string name = token->getTokenValue();
             next();
-
-            if (peekIs("(")) {
+            
+            if (peekIs("[")) {
+                
+                expectToken("[");
+                next();
+                auto index = parseExpression();
+                expectToken("]");
+                next();
+                auto node = std::make_unique<ArrayAccessNode>(name, std::move(index));
+                node->setLineNumber(lineNum);
+                return node;
+            } else if (peekIs("(")) {
+                
                 return parseFunctionCall(name);
             } else {
+                
                 auto variableNode = std::make_unique<VariableNode>(name);
                 variableNode->setLineNumber(lineNum);
                 return variableNode;
@@ -538,14 +507,12 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseProcedureCall(const std::string& name) {
         int lineNum = token ? token->getLine() : 1;
         std::vector<std::unique_ptr<ASTNode>> arguments;
-
         if (peekIs("(")) {
-            next(); 
+            next();
             arguments = parseArgumentList();
             expectToken(")");
             next();
         }
-
         auto procCallNode = std::make_unique<ProcCallNode>(name, std::move(arguments));
         procCallNode->setLineNumber(lineNum);
         return procCallNode;
@@ -554,13 +521,11 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseFunctionCall(const std::string& name) {
         int lineNum = token ? token->getLine() : 1;
         std::vector<std::unique_ptr<ASTNode>> arguments;
-
         expectToken("(");
         next();
         arguments = parseArgumentList();
         expectToken(")");
         next();
-
         auto funcCallNode = std::make_unique<FuncCallNode>(name, std::move(arguments));
         funcCallNode->setLineNumber(lineNum);
         return funcCallNode;
@@ -570,52 +535,32 @@ namespace pascal {
         expectToken("case");
         int lineNum = token->getLine();
         next();
-        
         auto expression = parseExpression();
-        
         expectToken("of");
         next();
-        
         std::vector<std::unique_ptr<CaseStmtNode::CaseBranch>> branches;
-
         while (!peekIs("end") && !peekIs("else")) {
             std::vector<std::unique_ptr<ASTNode>> values;
-            
             values.push_back(parseExpression());
-            
             while (peekIs(",")) {
-                next(); 
+                next();
                 values.push_back(parseExpression());
             }
-            
             expectToken(":");
             next();
-            
             auto statement = parseStatement();
-            
-            branches.push_back(std::make_unique<CaseStmtNode::CaseBranch>(
-                std::move(values), std::move(statement)));
-            
-            if (peekIs(";")) {
-                next();
-            }
+            branches.push_back(std::make_unique<CaseStmtNode::CaseBranch>(std::move(values), std::move(statement)));
+            if (peekIs(";")) next();
         }
-        
         std::unique_ptr<ASTNode> elseStatement = nullptr;
         if (peekIs("else")) {
             next();
             elseStatement = parseStatement();
-            if (peekIs(";")) {
-                next();
-            }
+            if (peekIs(";")) next();
         }
-        
         expectToken("end");
         next();
-        
-        auto caseStmtNode = std::make_unique<CaseStmtNode>(std::move(expression), 
-                                          std::move(branches), 
-                                          std::move(elseStatement));
+        auto caseStmtNode = std::make_unique<CaseStmtNode>(std::move(expression), std::move(branches), std::move(elseStatement));
         caseStmtNode->setLineNumber(lineNum);
         return caseStmtNode;
     }
@@ -624,118 +569,118 @@ namespace pascal {
         expectToken("const");
         int lineNum = token->getLine();
         next();
-        
         std::vector<std::unique_ptr<ConstDeclNode::ConstAssignment>> assignments;
-        
         do {
             expectToken(types::TokenType::TT_ID);
             std::string identifier = token->getTokenValue();
             next();
-            
             expectToken("=");
             next();
-            
             auto value = parseExpression();
-            
-            assignments.push_back(
-                std::make_unique<ConstDeclNode::ConstAssignment>(identifier, std::move(value))
-            );
-            
+            assignments.push_back(std::make_unique<ConstDeclNode::ConstAssignment>(identifier, std::move(value)));
             expectToken(";");
             next();
-            
         } while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue()));
-        
         auto constDeclNode = std::make_unique<ConstDeclNode>(std::move(assignments));
         constDeclNode->setLineNumber(lineNum);
         return constDeclNode;
     }
 
-    // Update the parseDeclarations method to set line numbers for VarDeclNode
+    std::unique_ptr<ASTNode> PascalParser::parseVarDeclaration() {
+        std::vector<std::string> identifiers;
+        std::vector<std::unique_ptr<ASTNode>> initializers;
+        
+        do {
+            if (!peekIs(types::TokenType::TT_ID)) {
+                error("Expected identifier in variable declaration");
+            }
+            
+            std::string identifier = token->getTokenValue();
+            if (isKeyword(identifier) && (identifier == "procedure" || identifier == "function" || identifier == "begin")) {
+                error("Unexpected keyword '" + identifier + "' in variable declaration");
+            }
+            
+            identifiers.push_back(identifier);
+            next();
+            
+            if (peekIs(",")) {
+                next();
+            } else {
+                break;
+            }
+        } while (true);
+        
+        if (!peekIs(":")) {
+            error("Expected ':' after variable identifier(s)");
+        }
+        next(); 
+        
+        std::unique_ptr<ASTNode> declNode; 
+        
+        
+        if (peekIs("array")) {
+        
+            if (identifiers.size() > 1) {
+                error("Cannot declare multiple arrays in one statement");
+            }
+            
+            declNode = parseArrayDeclaration(identifiers[0]);
+        } else {
+        
+            if (!peekIs(types::TokenType::TT_ID)) {
+                error("Expected type identifier");
+            }
+            std::string type = token->getTokenValue();
+            next();
+            
+        
+            if (peekIs(":=")) {
+                next();
+                initializers.push_back(parseExpression());
+            }
+            
+            declNode = std::make_unique<VarDeclNode>(std::move(identifiers), type, std::move(initializers));
+        }
+        
+        if (!peekIs(";")) {
+            error("Expected ';' after variable declaration");
+        }
+        next(); 
+        
+        return declNode;
+    }
+
     std::vector<std::unique_ptr<ASTNode>> PascalParser::parseDeclarations() {
         std::vector<std::unique_ptr<ASTNode>> declarations;
         
         while (peekIs("const") || peekIs("var") || peekIs("procedure") || peekIs("function")) {
             if (peekIs("const")) {
                 declarations.push_back(parseConstDeclaration());
-            }
-            else if (peekIs("var")) {
-                if (match("var")) {  
-                    while (peekIs(types::TokenType::TT_ID)) {
-                        if (isKeyword(token->getTokenValue())) {
-                            break; 
-                        }
-                        
-                        int varLineNum = token->getLine();
-                        std::vector<std::string> identifiers;
-                        
-                        identifiers.push_back(token->getTokenValue());
-                        next();  
-                        
-                        while (match(",")) {  
-                            if (!peekIs(types::TokenType::TT_ID))
-                                error("Expected identifier after comma");
-                                
-                            identifiers.push_back(token->getTokenValue());
-                            next();  
-                        }
-                        
-                        if (!match(":"))  
-                            error("Expected ':' after identifiers found: " + token->getTokenValue() + " on Line: " + std::to_string(token->getLine()));
-                            
-                        if (!peekIs(types::TokenType::TT_ID))
-                            error("Expected type name");
-                            
-                        std::string type = token->getTokenValue();
-                        next();  
-                        
-                        std::unique_ptr<ASTNode> initializer = nullptr;
-                        if (match(":=")) {  
-                            initializer = parseExpression();
-                        }
-                        
-                        if (!match(";"))
-                            error("Expected ';' after variable declaration");
-
-                        if (initializer) {
-                            std::vector<std::unique_ptr<ASTNode>> initializers;
-                            initializers.push_back(std::move(initializer));
-                            auto varDeclNode = std::make_unique<VarDeclNode>(
-                                std::move(identifiers), type, std::move(initializers));
-                            varDeclNode->setLineNumber(varLineNum);
-                            declarations.push_back(std::move(varDeclNode));
-                        } else {
-                            auto varDeclNode = std::make_unique<VarDeclNode>(
-                                std::move(identifiers), type);
-                            varDeclNode->setLineNumber(varLineNum);
-                            declarations.push_back(std::move(varDeclNode));
-                        }
+            } else if (peekIs("var")) {
+                if (match("var")) {
+                    while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue())) {
+                        auto decl = parseVarDeclaration();
+                        declarations.push_back(std::move(decl));
                     }
                 }
-            }
-            else if (peekIs("procedure")) {
+            } else if (peekIs("procedure")) {
                 declarations.push_back(parseProcedureDeclaration());
-            }
-            else if (peekIs("function")) {
+            } else if (peekIs("function")) {
                 declarations.push_back(parseFunctionDeclaration());
             }
         }
-        
         return declarations;
     }
 
     std::vector<std::unique_ptr<ASTNode>> PascalParser::parseArgumentList() {
         std::vector<std::unique_ptr<ASTNode>> arguments;
-
         if (!peekIs(")")) {
             arguments.push_back(parseExpression());
-
             while (peekIs(",")) {
-                next(); 
+                next();
                 arguments.push_back(parseExpression());
             }
         }
-
         return arguments;
     }
 
@@ -744,8 +689,7 @@ namespace pascal {
     }
 
     bool PascalParser::isRelationalOperator() {
-        return peekIs("=") || peekIs("<>") || peekIs("<") || 
-            peekIs("<=") || peekIs(">") || peekIs(">=");
+        return peekIs("=") || peekIs("<>") || peekIs("<") || peekIs("<=") || peekIs(">") || peekIs(">=");
     }
 
     std::string PascalParser::getRelationalOp() {

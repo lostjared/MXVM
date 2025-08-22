@@ -117,11 +117,13 @@ namespace pascal {
         BinaryOpNode::OpType getLogicalOperator(const std::string& op);
         BinaryOpNode::OpType getArithmeticOperator(const std::string& op);
         std::string tokenTypeToString(types::TokenType type);
-
         bool isType(const std::string& token);
         bool isBuiltinProcedure(const std::string& name);
         bool isBuiltinFunction(const std::string& name);
         bool isKeyword(const std::string& s);
+        std::unique_ptr<ASTNode> parseArrayType();
+        std::unique_ptr<ASTNode> parseArrayDeclaration(const std::string& varName);
+        bool isArrayAccess(); 
     };
 }
 

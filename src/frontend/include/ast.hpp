@@ -149,6 +149,65 @@ namespace pascal {
         std::string toString() const override;
     };
 
+    enum class VarType;
+
+    class ArrayTypeNode : public ASTNode {
+    public:
+        std::string elementType;  
+        std::unique_ptr<ASTNode> lowerBound;
+        std::unique_ptr<ASTNode> upperBound;
+        
+        ArrayTypeNode(std::string elementType, std::unique_ptr<ASTNode> lowerBound, 
+                     std::unique_ptr<ASTNode> upperBound)
+            : elementType(std::move(elementType)), lowerBound(std::move(lowerBound)), 
+              upperBound(std::move(upperBound)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ArrayDeclarationNode : public ASTNode {
+    public:
+        std::string name;
+        std::unique_ptr<ArrayTypeNode> arrayType;
+        std::vector<std::unique_ptr<ASTNode>> initializers;
+        
+        ArrayDeclarationNode(std::string name, std::unique_ptr<ArrayTypeNode> arrayType,
+                            std::vector<std::unique_ptr<ASTNode>> initializers = {})
+            : name(std::move(name)), arrayType(std::move(arrayType)), 
+              initializers(std::move(initializers)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ArrayAccessNode : public ASTNode {
+    public:
+        std::string arrayName;
+        std::unique_ptr<ASTNode> index;
+        
+        ArrayAccessNode(std::string arrayName, std::unique_ptr<ASTNode> index)
+            : arrayName(std::move(arrayName)), index(std::move(index)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ArrayAssignmentNode : public ASTNode {
+    public:
+        std::string arrayName;
+        std::unique_ptr<ASTNode> index;
+        std::unique_ptr<ASTNode> value;
+        
+        ArrayAssignmentNode(std::string arrayName, std::unique_ptr<ASTNode> index,
+                           std::unique_ptr<ASTNode> value)
+            : arrayName(std::move(arrayName)), index(std::move(index)), 
+              value(std::move(value)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
     class IfStmtNode : public ASTNode {
     public:
         std::unique_ptr<ASTNode> condition;
@@ -373,6 +432,10 @@ namespace pascal {
         virtual void visit(EmptyStmtNode& node) = 0;
         virtual void visit(RepeatStmtNode& node) = 0;
         virtual void visit(CaseStmtNode& node) = 0;
+        virtual void visit(ArrayTypeNode& node) = 0;
+        virtual void visit(ArrayDeclarationNode& node) = 0;
+        virtual void visit(ArrayAccessNode& node) = 0;
+        virtual void visit(ArrayAssignmentNode& node) = 0;
     };
 
     class PrettyPrintVisitor : public ASTVisitor {

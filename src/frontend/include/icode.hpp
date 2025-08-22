@@ -76,6 +76,7 @@ namespace pascal {
 
     class CodeGenVisitor : public ASTVisitor {
     private:
+      
         std::unordered_set<std::string> usedRealConstants;  
         int realConstantCounter = 0;
         std::set<std::string> usedModules;
@@ -84,7 +85,6 @@ namespace pascal {
             return "real_const_" + std::to_string(realConstantCounter++);
         }
         
-    
         bool isRealNumber(const std::string& str) const {
             return str.find('.') != std::string::npos || 
                    str.find('e') != std::string::npos || 
@@ -98,7 +98,10 @@ namespace pascal {
             CHAR,
             RECORD,
             PTR,     
-            UNKNOWN
+            UNKNOWN,
+            ARRAY_INT,
+            ARRAY_DOUBLE,
+            ARRAY_STRING
         };
 
         struct FuncInfo {
@@ -478,7 +481,7 @@ namespace pascal {
             }
             return false;
         }
-        
+
     public:
         friend class IOFunctionHandler;
         friend class MathFunctionHandler;
@@ -1553,6 +1556,170 @@ namespace pascal {
 
     private:
         std::unordered_map<std::string, std::string> realConstants;
+
+        // Add array support structures
+        struct ArrayInfo {
+            std::string elementType;
+            int lowerBound;
+            int upperBound;
+            int size;
+            int elementSize;
+        };
+        
+        std::unordered_map<std::string, ArrayInfo> arrayInfo;
+        
+        int getArrayElementSize(const std::string& elementType) {
+            if (elementType == "integer" || elementType == "boolean") return 8;
+            if (elementType == "real") return 8;
+            if (elementType == "char") return 1;
+            if (elementType == "string") return 8; 
+            return 8; 
+        }
+
+        void visit(ArrayTypeNode& node) override {
+        }
+
+        void visit(ArrayDeclarationNode& node) override {
+            std::string arrayName = node.name;
+    
+    
+            std::string lowerBoundStr = node.arrayType->lowerBound->toString();
+            std::string upperBoundStr = node.arrayType->upperBound->toString();
+    
+            int lowerBound = 0, upperBound = 0;
+            try {
+                lowerBound = std::stoi(lowerBoundStr);
+                upperBound = std::stoi(upperBoundStr);
+            } catch (...) {
+                throw std::runtime_error("Array bounds must be constant integers");
+            }
+            
+            int size = upperBound - lowerBound + 1;
+            int elementSize = getArrayElementSize(node.arrayType->elementType);
+            
+            ArrayInfo info;
+            info.elementType = node.arrayType->elementType;
+            info.lowerBound = lowerBound;
+            info.upperBound = upperBound;
+            info.size = size;
+            info.elementSize = elementSize;
+            arrayInfo[arrayName] = info;
+            
+            setVarType(arrayName, VarType::PTR);
+            
+            std::string sizeReg = allocReg();
+            std::string countReg = allocReg();
+            std::string resultReg = allocReg();
+            
+            emit3("mov", countReg, std::to_string(size));
+            emit3("mov", sizeReg, std::to_string(elementSize));
+            emit_invoke("calloc", {countReg, sizeReg});
+            emit1("return", resultReg);  
+            emit3("mov", arrayName, resultReg);
+            
+            freeReg(sizeReg);
+            freeReg(countReg);
+            freeReg(resultReg);
+            
+            for (size_t i = 0; i < node.initializers.size() && i < static_cast<size_t>(size); i++) {
+                std::string value = eval(node.initializers[i].get());
+                std::string offsetReg = allocReg();
+                std::string addrReg = allocReg();
+                
+                emit3("mov", offsetReg, std::to_string(i * elementSize));
+                emit3("mov", addrReg, arrayName);
+                emit3("add", addrReg, offsetReg);
+                
+                if (node.arrayType->elementType == "integer") {
+                    emit3("store", addrReg, value);
+                } else if (node.arrayType->elementType == "real") {
+                    emit3("fstore", addrReg, value);
+                } else {
+                    emit3("store", addrReg, value); 
+                }
+                
+                freeReg(offsetReg);
+                freeReg(addrReg);
+                if (isReg(value)) freeReg(value);
+            }
+        }
+
+        void visit(ArrayAccessNode& node) override {
+            auto it = arrayInfo.find(node.arrayName);
+            if (it == arrayInfo.end()) {
+                throw std::runtime_error("Unknown array: " + node.arrayName);
+            }
+            
+            ArrayInfo& info = it->second;
+            std::string indexValue = eval(node.index.get());
+            
+            std::string adjustedIndexReg = allocReg();
+            std::string offsetReg = allocReg();
+            std::string addrReg = allocReg();
+            std::string resultReg = allocReg();
+            
+            emit3("mov", adjustedIndexReg, indexValue);
+            emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
+            
+            emit3("mov", offsetReg, adjustedIndexReg);
+            emit3("mul", offsetReg, std::to_string(info.elementSize));
+            
+            emit3("mov", addrReg, node.arrayName);
+            emit3("add", addrReg, offsetReg);
+            
+            
+            if (info.elementType == "integer") {
+                emit3("load", resultReg, addrReg);
+            } else if (info.elementType == "real") {
+                emit3("fload", resultReg, addrReg);
+            } else {
+                emit3("load", resultReg, addrReg); 
+            }
+            
+            pushValue(resultReg);
+            
+            freeReg(adjustedIndexReg);
+            freeReg(offsetReg);
+            freeReg(addrReg);
+            if (isReg(indexValue)) freeReg(indexValue);
+        }
+
+        void visit(ArrayAssignmentNode& node) override {
+            auto it = arrayInfo.find(node.arrayName);
+            if (it == arrayInfo.end()) {
+                throw std::runtime_error("Unknown array: " + node.arrayName);
+            }
+            
+            ArrayInfo& info = it->second;
+            std::string indexValue = eval(node.index.get());
+            std::string value = eval(node.value.get());
+            
+            std::string adjustedIndexReg = allocReg();
+            std::string offsetReg = allocReg();
+            std::string addrReg = allocReg();
+            
+            emit3("mov", adjustedIndexReg, indexValue);
+            emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
+            
+            emit3("mov", offsetReg, adjustedIndexReg);
+            emit3("mul", offsetReg, std::to_string(info.elementSize));
+            
+            emit3("mov", addrReg, node.arrayName);
+            emit3("add", addrReg, offsetReg);
+            if (info.elementType == "integer") {
+                emit3("store", addrReg, value);
+            } else if (info.elementType == "real") {
+                emit3("fstore", addrReg, value);
+            } else {
+                emit3("store", addrReg, value);
+            }
+            
+            freeReg(adjustedIndexReg);
+            freeReg(offsetReg);
+            freeReg(addrReg);
+            if (isReg(indexValue)) freeReg(indexValue);
+            if (isReg(value)) freeReg(value);
+        }
     };
 
     std::string mxvmOpt(const std::string &text);
