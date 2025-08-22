@@ -644,10 +644,11 @@ namespace mxvm {
     }
 
     void Program::x64_gen_to_float(std::ostream &out, const Instruction &i) {
-        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
-        size_t total = x64_reserve_call_area(out, 0);
-        out << "\tcall atof\n";
-        x64_release_call_area(out, total);
+        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) {
+            throw mx::Exception("TO_FLOAT requires variable operands");
+        }
+        x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+        out << "\tcvtsi2sdq %rax, %xmm0\n";
         out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
     }
 
@@ -936,8 +937,20 @@ namespace mxvm {
         if (isVariable(i.op2.op)) t2 = getVariable(i.op2.op).type;
 
         if (t1 == VarType::VAR_FLOAT || t2 == VarType::VAR_FLOAT) {
-            x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
-            x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+            if (t1 == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+            } else { 
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
+                out << "\tcvtsi2sdq %rax, %xmm0\n";
+            }
+
+            if (t2 == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+            } else { 
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
+                out << "\tcvtsi2sdq %rax, %xmm1\n";
+            }
+            
             out << "\tcomisd %xmm1, %xmm0\n";
             last_cmp_type = CMP_FLOAT;
         } else if (t1 == VarType::VAR_POINTER && (t2 == VarType::VAR_INTEGER || t2 == VarType::VAR_BYTE)) {
