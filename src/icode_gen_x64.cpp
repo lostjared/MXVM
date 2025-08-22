@@ -1001,7 +1001,7 @@ namespace mxvm {
         if(uses_std_module) {
             out << "\t# Clean up program arguments before exit\n";
             size_t total = x64_reserve_call_area(out, 0);
-            out << "\tcall mxvm_free_program_args\n";
+            out << "\tcall free_program_args\n";
             x64_release_call_area(out, total);
         }
 
