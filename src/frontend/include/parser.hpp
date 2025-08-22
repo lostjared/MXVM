@@ -116,7 +116,7 @@ namespace pascal {
         BinaryOpNode::OpType getComparisonOperator(const std::string& op);
         BinaryOpNode::OpType getLogicalOperator(const std::string& op);
         BinaryOpNode::OpType getArithmeticOperator(const std::string& op);
-   
+        std::string tokenTypeToString(types::TokenType type);
 
         bool isType(const std::string& token);
         bool isBuiltinProcedure(const std::string& name);

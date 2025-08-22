@@ -461,6 +461,14 @@ namespace pascal {
             }
             return false;
         }
+
+    private:
+        void checkVariableExists(const std::string& name, int line) const {
+            if (varTypes.find(name) == varTypes.end()) {
+                throw std::runtime_error("Error on line " + std::to_string(line) + 
+                                        ": Undefined variable '" + name + "'");
+            }
+        }
         
     public:
         friend class IOFunctionHandler;
@@ -536,17 +544,17 @@ namespace pascal {
                                     setVarType(id, VarType::DOUBLE);
                                 } 
                                 else {
-                                    // Integer parameter handling
-                                    int slot = newSlotFor(id); // Add this line to get explicit slot
-                                    varSlot[id] = slot;        // Track the slot
+                                   
+                                    int slot = newSlotFor(id); 
+                                    varSlot[id] = slot;        
                                     
-                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]); // Add this
+                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]); 
                                     regInUse[paramIndex + 1] = true;
                                     
                                     if (!param->type.empty()) {
                                         if (param->type == "integer" || param->type == "boolean") {
                                             setVarType(id, VarType::INT);
-                                            setSlotType(slot, VarType::INT); // Add this line
+                                            setSlotType(slot, VarType::INT); 
                                         }
                                     }
                                 }
@@ -915,6 +923,10 @@ namespace pascal {
             if (!varPtr) return;
             
             std::string varName = varPtr->name;
+
+            if (currentFunctionName.empty() || varName != currentFunctionName) {
+                checkVariableExists(varName, varPtr->getLineNumber());
+            }
             
             std::string rhs;
             if (auto numNode = dynamic_cast<NumberNode*>(node.expression.get())) {
@@ -997,6 +1009,8 @@ namespace pascal {
         }
 
         void visit(ForStmtNode& node) override {
+            checkVariableExists(node.variable, node.getLineNumber());
+
             int slot = newSlotFor(node.variable);
             std::string startV = eval(node.startValue.get());
             emit3("mov", slotVar(slot), startV);
@@ -1155,7 +1169,7 @@ namespace pascal {
             auto sig_it = funcSignatures.find(node.name);
             
             for (size_t i = 0; i < argValues.size(); i++) {
-                VarType paramType = VarType::INT; // Default
+                VarType paramType = VarType::INT; 
                 if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
                     paramType = sig_it->second.paramTypes[i];
                 } else if (i < node.arguments.size()) {
@@ -1402,6 +1416,8 @@ namespace pascal {
         }
 
         void visit(VariableNode& node) override {
+            checkVariableExists(node.name, node.getLineNumber());
+
             auto it = valueLocations.find(node.name);
             if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
                 pushValue(it->second.location);

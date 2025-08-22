@@ -11,11 +11,14 @@ namespace pascal {
     class ASTVisitor;
 
     class ASTNode {
+        int line_number = 0;
     public:
         virtual ~ASTNode() = default;
         virtual void accept(ASTVisitor& visitor) = 0;
         virtual std::string toString() const = 0;
         virtual void print(std::ostream& out, int indent = 0) const;
+        void setLineNumber(int line) { line_number = line; }
+        int getLineNumber() const { return line_number; }
     };
 
     class ProgramNode : public ASTNode {

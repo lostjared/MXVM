@@ -147,7 +147,9 @@ namespace pascal {
                         visitor.recordLocation(varName, {CodeGenVisitor::ValueLocation::MEMORY, memLoc});
                     } 
                     else {
-                        throw std::runtime_error("readln argument must be a variable");
+                        int lineNum = arg->getLineNumber();
+                        throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                                ": readln argument must be a variable");
                     }
                 }
             }
@@ -160,30 +162,44 @@ namespace pascal {
         void StdFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName, 
                                     const std::vector<std::unique_ptr<ASTNode>>& arguments)  {
             visitor.usedModules.insert("std");
+            
+            int lineNum = arguments.empty() ? 1 : arguments[0]->getLineNumber();
+            
             std::vector<std::string> args;
             for (auto& arg : arguments) {
                 args.push_back(visitor.eval(arg.get()));
             }
 
             if (funcName == "srand") {
-                if (arguments.size() != 1) throw std::runtime_error("srand requires 1 argument");
+                if (arguments.size() != 1) 
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": srand requires 1 argument");
                 visitor.emit_invoke("srand", args);
             }
             else if (funcName == "free") {
-                if (arguments.size() != 1) throw std::runtime_error("free requires 1 argument");
+                if (arguments.size() != 1) 
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": free requires 1 argument");
                 visitor.emit_invoke("free", args);
             }
             else if (funcName == "halt") {
-                if (arguments.size() != 1) throw std::runtime_error("exit requires 1 argument");
+                if (arguments.size() != 1) 
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": halt requires 1 argument");
                 visitor.emit("exit " + args[0]);
             }
+            
             for (const std::string& arg : args) {
                 if (visitor.isReg(arg)) visitor.freeReg(arg);
             }
         }
+
         bool StdFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
                                                     const std::vector<std::unique_ptr<ASTNode>>& arguments)  {
             visitor.usedModules.insert("std");
+            
+            int lineNum = arguments.empty() ? 1 : arguments[0]->getLineNumber();
+            
             std::unordered_set<std::string> floatMathFuncs = {
                 "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh",
                 "exp", "log", "log10", "sqrt", "pow", "fmod", "ceil", "floor", "fabs",
@@ -193,7 +209,8 @@ namespace pascal {
             if (floatMathFuncs.find(funcName) != floatMathFuncs.end()) {
                 int requiredArgs = (funcName == "pow" || funcName == "fmod" || funcName == "hypot") ? 2 : 1;
                 if (static_cast<int>(arguments.size()) != requiredArgs)
-                    throw std::runtime_error(funcName + " requires " + std::to_string(requiredArgs) + " argument(s)");
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": " + funcName + " requires " + std::to_string(requiredArgs) + " argument(s)");
 
                 std::vector<std::string> args;
                 args.reserve(arguments.size());
@@ -255,7 +272,9 @@ namespace pascal {
                 return true;
             }
             else if (funcName == "abs") {
-                if (arguments.size() != 1) throw std::runtime_error("abs requires 1 argument");
+                if (arguments.size() != 1) 
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": abs requires 1 argument");
                 std::string a = visitor.eval(arguments[0].get());
                 
                 std::string resultReg = visitor.allocReg();
@@ -265,7 +284,9 @@ namespace pascal {
                 if (visitor.isReg(a)) visitor.freeReg(a);
                 return true;
             } else if (funcName == "rand") {
-                if (arguments.size() != 0) throw std::runtime_error("rand requires 0 argument");
+                if (arguments.size() != 0) 
+                    throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                            ": rand requires 0 arguments");
                 visitor.emit_invoke("rand", {});
                 std::string resultReg = visitor.allocReg();
                 visitor.emit("return " + resultReg); 
@@ -310,6 +331,9 @@ namespace pascal {
 
     void SDLFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) {
         visitor.usedModules.insert("sdl");
+        
+        int lineNum = arguments.empty() ? 1 : arguments[0]->getLineNumber();
+        
         std::vector<std::string> args;
         args.reserve(arguments.size());
         for (auto& arg : arguments) args.push_back(visitor.eval(arg.get()));
@@ -319,159 +343,237 @@ namespace pascal {
         };
 
         if (funcName == "sdl_init") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_init requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_init requires 0 arguments");
             visitor.emit_invoke("init", {});
         }
-        if (funcName == "sdl_quit") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_quit requires 0 arguments");
+        else if (funcName == "sdl_quit") {
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_quit requires 0 arguments");
             visitor.emit_invoke("quit", {});
         }
         else if (funcName == "sdl_destroy_window") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_destroy_window requires 1 argument (window_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_destroy_window requires 1 argument (window_id)");
             visitor.emit_invoke("destroy_window", args);
         }
         else if (funcName == "sdl_destroy_renderer") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_destroy_renderer requires 1 argument (renderer_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_destroy_renderer requires 1 argument (renderer_id)");
             visitor.emit_invoke("destroy_renderer", args);
         }
         else if (funcName == "sdl_set_window_title") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_set_window_title requires 2 arguments (window_id, title)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_window_title requires 2 arguments (window_id, title)");
             visitor.emit_invoke("set_window_title", args);
         }
         else if (funcName == "sdl_set_window_position") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_set_window_position requires 3 arguments (window_id, x, y)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_window_position requires 3 arguments (window_id, x, y)");
             visitor.emit_invoke("set_window_position", args);
         }
         else if (funcName == "sdl_get_window_size") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_get_window_size requires 3 arguments (window_id, w_var, h_var)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_window_size requires 3 arguments (window_id, w_var, h_var)");
             visitor.emit_invoke("get_window_size", args);
         }
         else if (funcName == "sdl_set_window_fullscreen") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_set_window_fullscreen requires 2 arguments (window_id, fullscreen)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_window_fullscreen requires 2 arguments (window_id, fullscreen)");
             visitor.emit_invoke("set_window_fullscreen", args);
         }
         else if (funcName == "sdl_set_window_icon") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_set_window_icon requires 2 arguments (window_id, path)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_window_icon requires 2 arguments (window_id, path)");
             visitor.emit_invoke("set_window_icon", args);
         }
         else if (funcName == "sdl_set_draw_color") {
-            if (arguments.size() != 5) throw std::runtime_error("sdl_set_draw_color requires 5 arguments (renderer_id, r, g, b, a)");
+            if (arguments.size() != 5) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_draw_color requires 5 arguments (renderer_id, r, g, b, a)");
             visitor.emit_invoke("set_draw_color", args);
         }
         else if (funcName == "sdl_clear") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_clear requires 1 argument (renderer_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_clear requires 1 argument (renderer_id)");
             visitor.emit_invoke("clear", args);
         }
         else if (funcName == "sdl_present") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_present requires 1 argument (renderer_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_present requires 1 argument (renderer_id)");
             visitor.emit_invoke("present", args);
         }
         else if (funcName == "sdl_draw_point") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_draw_point requires 3 arguments (renderer_id, x, y)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_draw_point requires 3 arguments (renderer_id, x, y)");
             visitor.emit_invoke("draw_point", args);
         }
         else if (funcName == "sdl_draw_line") {
-            if (arguments.size() != 5) throw std::runtime_error("sdl_draw_line requires 5 arguments (renderer_id, x1, y1, x2, y2)");
+            if (arguments.size() != 5) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_draw_line requires 5 arguments (renderer_id, x1, y1, x2, y2)");
             visitor.emit_invoke("draw_line", args);
         }
         else if (funcName == "sdl_draw_rect") {
-            if (arguments.size() != 5) throw std::runtime_error("sdl_draw_rect requires 5 arguments (renderer_id, x, y, w, h)");
+            if (arguments.size() != 5) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_draw_rect requires 5 arguments (renderer_id, x, y, w, h)");
             visitor.emit_invoke("draw_rect", args);
         }
         else if (funcName == "sdl_fill_rect") {
-            if (arguments.size() != 5) throw std::runtime_error("sdl_fill_rect requires 5 arguments (renderer_id, x, y, w, h)");
+            if (arguments.size() != 5) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_fill_rect requires 5 arguments (renderer_id, x, y, w, h)");
             visitor.emit_invoke("fill_rect", args);
         }
         else if (funcName == "sdl_get_mouse_state") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_get_mouse_state requires 2 arguments (x_var, y_var)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_mouse_state requires 2 arguments (x_var, y_var)");
             visitor.emit_invoke("get_mouse_state", args);
         }
         else if (funcName == "sdl_get_relative_mouse_state") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_get_relative_mouse_state requires 2 arguments (x_var, y_var)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_relative_mouse_state requires 2 arguments (x_var, y_var)");
             visitor.emit_invoke("get_relative_mouse_state", args);
         }
         else if (funcName == "sdl_get_keyboard_state") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_get_keyboard_state requires 1 argument (numkeys_var)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_keyboard_state requires 1 argument (numkeys_var)");
             visitor.emit_invoke("get_keyboard_state", args);
         }
         else if (funcName == "sdl_show_cursor") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_show_cursor requires 1 argument (show)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_show_cursor requires 1 argument (show)");
             visitor.emit_invoke("show_cursor", args);
         }
         else if (funcName == "sdl_free_surface") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_free_surface requires 1 argument (surf_ptr)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_free_surface requires 1 argument (surf_ptr)");
             visitor.emit_invoke("free_surface", args);
         }
         else if (funcName == "sdl_set_clipboard_text") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_set_clipboard_text requires 1 argument (text)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_clipboard_text requires 1 argument (text)");
             visitor.emit_invoke("set_clipboard_text", args);
         }
         else if (funcName == "sdl_destroy_texture") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_destroy_texture requires 1 argument (texture_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_destroy_texture requires 1 argument (texture_id)");
             visitor.emit_invoke("destroy_texture", args);
         }
         else if (funcName == "sdl_render_texture") {
-            if (arguments.size() != 10) throw std::runtime_error("sdl_render_texture requires 10 arguments (renderer_id, texture_id, src_x, src_y, src_w, src_h, dst_x, dst_y, dst_w, dst_h)");
+            if (arguments.size() != 10) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_render_texture requires 10 arguments (renderer_id, texture_id, src_x, src_y, src_w, src_h, dst_x, dst_y, dst_w, dst_h)");
             visitor.emit_invoke("render_texture", args);
         }
         else if (funcName == "sdl_delay") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_delay requires 1 argument (ms)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_delay requires 1 argument (ms)");
             visitor.emit_invoke("delay", args);
         }
         else if (funcName == "sdl_close_audio") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_close_audio requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_close_audio requires 0 arguments");
             visitor.emit_invoke("close_audio", {});
         }
         else if (funcName == "sdl_pause_audio") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_pause_audio requires 1 argument (pause_on)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_pause_audio requires 1 argument (pause_on)");
             visitor.emit_invoke("pause_audio", args);
         }
         else if (funcName == "sdl_free_wav") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_free_wav requires 1 argument (audio_buf)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_free_wav requires 1 argument (audio_buf)");
             visitor.emit_invoke("free_wav", args);
         }
         else if (funcName == "sdl_queue_audio") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_queue_audio requires 2 arguments (data, len)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_queue_audio requires 2 arguments (data, len)");
             visitor.emit_invoke("queue_audio", args);
         }
         else if (funcName == "sdl_clear_queued_audio") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_clear_queued_audio requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_clear_queued_audio requires 0 arguments");
             visitor.emit_invoke("clear_queued_audio", {});
         }
         else if (funcName == "sdl_update_texture") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_update_texture requires 3 arguments (texture_id, pixels, pitch)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_update_texture requires 3 arguments (texture_id, pixels, pitch)");
             visitor.emit_invoke("update_texture", args);
         }
         else if (funcName == "sdl_unlock_texture") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_unlock_texture requires 1 argument (texture_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_unlock_texture requires 1 argument (texture_id)");
             visitor.emit_invoke("unlock_texture", args);
         }
         else if (funcName == "sdl_quit_text") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_quit_text requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_quit_text requires 0 arguments");
             visitor.emit_invoke("quit_text", {});
         }
         else if (funcName == "sdl_draw_text") {
-            if (arguments.size() != 9) throw std::runtime_error("sdl_draw_text requires 9 arguments (renderer_id, font_id, text, x, y, r, g, b, a)");
+            if (arguments.size() != 9) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_draw_text requires 9 arguments (renderer_id, font_id, text, x, y, r, g, b, a)");
             visitor.emit_invoke("draw_text", args);
         }
         else if (funcName == "sdl_set_render_target") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_set_render_target requires 2 arguments (renderer_id, target_id)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_set_render_target requires 2 arguments (renderer_id, target_id)");
             visitor.emit_invoke("set_render_target", args);
         }
         else if (funcName == "sdl_destroy_render_target") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_destroy_render_target requires 1 argument (target_id)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_destroy_render_target requires 1 argument (target_id)");
             visitor.emit_invoke("destroy_render_target", args);
         }
         else if (funcName == "sdl_present_scaled") {
-            if (arguments.size() != 4) throw std::runtime_error("sdl_present_scaled requires 4 arguments (renderer_id, target_id, src_width, src_height)");
+            if (arguments.size() != 4) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_present_scaled requires 4 arguments (renderer_id, target_id, src_width, src_height)");
             visitor.emit_invoke("present_scaled", args);
         }
         else if (funcName == "sdl_present_stretched") {
-            if (arguments.size() != 4) throw std::runtime_error("sdl_present_stretched requires 4 arguments (renderer_id, target_id, dst_width, dst_height)");
+            if (arguments.size() != 4) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_present_stretched requires 4 arguments (renderer_id, target_id, dst_width, dst_height)");
             visitor.emit_invoke("present_stretched", args);
         }
         else if (funcName == "sdl_lock_texture") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_lock_texture requires 3 arguments (texture_id, pixels_var, pitch_var)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_lock_texture requires 3 arguments (texture_id, pixels_var, pitch_var)");
             visitor.emit_invoke("lock_texture", args);
         }
 
@@ -480,6 +582,9 @@ namespace pascal {
 
     bool SDLFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) {
         visitor.usedModules.insert("sdl");
+        
+        int lineNum = arguments.empty() ? 1 : arguments[0]->getLineNumber();
+        
         std::vector<std::string> args;
         args.reserve(arguments.size());
         for (auto& arg : arguments) args.push_back(visitor.eval(arg.get()));
@@ -496,173 +601,227 @@ namespace pascal {
         };
 
         if (funcName == "sdl_init") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_init requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_init requires 0 arguments");
             std::string r = emitCallWithReturn("init");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_create_window") {
-            if (arguments.size() != 6) throw std::runtime_error("sdl_create_window requires 6 arguments (title, x, y, w, h, flags)");
+            if (arguments.size() != 6) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_create_window requires 6 arguments (title, x, y, w, h, flags)");
             std::string r = emitCallWithReturn("create_window");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_create_renderer") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_create_renderer requires 3 arguments (window_id, index, flags)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_create_renderer requires 3 arguments (window_id, index, flags)");
             std::string r = emitCallWithReturn("create_renderer");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_poll_event") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_poll_event requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_poll_event requires 0 arguments");
             std::string r = emitCallWithReturn("poll_event");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_event_type") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_event_type requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_event_type requires 0 arguments");
             std::string r = emitCallWithReturn("get_event_type");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_key_code") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_key_code requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_key_code requires 0 arguments");
             std::string r = emitCallWithReturn("get_key_code");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_mouse_x") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_mouse_x requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_mouse_x requires 0 arguments");
             std::string r = emitCallWithReturn("get_mouse_x");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_mouse_y") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_mouse_y requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_mouse_y requires 0 arguments");
             std::string r = emitCallWithReturn("get_mouse_y");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_mouse_button") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_mouse_button requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_mouse_button requires 0 arguments");
             std::string r = emitCallWithReturn("get_mouse_button");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_mouse_buttons") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_mouse_buttons requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_mouse_buttons requires 0 arguments");
             std::string r = emitCallWithReturn("get_mouse_buttons");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_relative_mouse_x") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_relative_mouse_x requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_relative_mouse_x requires 0 arguments");
             std::string r = emitCallWithReturn("get_relative_mouse_x");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_relative_mouse_y") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_relative_mouse_y requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_relative_mouse_y requires 0 arguments");
             std::string r = emitCallWithReturn("get_relative_mouse_y");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_relative_mouse_buttons") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_relative_mouse_buttons requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_relative_mouse_buttons requires 0 arguments");
             std::string r = emitCallWithReturn("get_relative_mouse_buttons");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_is_key_pressed") {
-            if (arguments.size() != 1) throw std::runtime_error("sdl_is_key_pressed requires 1 argument (scancode)");
+            if (arguments.size() != 1) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_is_key_pressed requires 1 argument (scancode)");
             std::string r = emitCallWithReturn("is_key_pressed");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_get_num_keys") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_num_keys requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_num_keys requires 0 arguments");
             std::string r = emitCallWithReturn("get_num_keys");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_get_clipboard_text") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_clipboard_text requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_clipboard_text requires 0 arguments");
             std::string r = emitCallWithReturn("get_clipboard_text");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_create_rgb_surface") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_create_rgb_surface requires 3 arguments (width, height, depth)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_create_rgb_surface requires 3 arguments (width, height, depth)");
             std::string r = emitCallWithReturn("create_rgb_surface");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_blit_surface") {
-            if (arguments.size() != 4) throw std::runtime_error("sdl_blit_surface requires 4 arguments (src_ptr, dst_ptr, x, y)");
+            if (arguments.size() != 4) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_blit_surface requires 4 arguments (src_ptr, dst_ptr, x, y)");
             std::string r = emitCallWithReturn("blit_surface");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_create_texture") {
-            if (arguments.size() != 5) throw std::runtime_error("sdl_create_texture requires 5 arguments (renderer_id, format, access, w, h)");
+            if (arguments.size() != 5) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_create_texture requires 5 arguments (renderer_id, format, access, w, h)");
             std::string r = emitCallWithReturn("create_texture");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_load_texture") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_load_texture requires 2 arguments (renderer_id, file_path)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_load_texture requires 2 arguments (renderer_id, file_path)");
             std::string r = emitCallWithReturn("load_texture");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_get_ticks") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_ticks requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_ticks requires 0 arguments");
             std::string r = emitCallWithReturn("get_ticks");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_open_audio") {
-            if (arguments.size() != 4) throw std::runtime_error("sdl_open_audio requires 4 arguments (freq, format, channels, samples)");
+            if (arguments.size() != 4) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_open_audio requires 4 arguments (freq, format, channels, samples)");
             std::string r = emitCallWithReturn("open_audio");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_load_wav") {
-            if (arguments.size() != 4) throw std::runtime_error("sdl_load_wav requires 4 arguments (file_path, audio_buf_var, audio_len_var, audio_spec_var)");
+            if (arguments.size() != 4) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_load_wav requires 4 arguments (file_path, audio_buf_var, audio_len_var, audio_spec_var)");
             std::string r = emitCallWithReturn("load_wav");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_get_queued_audio_size") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_get_queued_audio_size requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_get_queued_audio_size requires 0 arguments");
             std::string r = emitCallWithReturn("get_queued_audio_size");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_init_text") {
-            if (arguments.size() != 0) throw std::runtime_error("sdl_init_text requires 0 arguments");
+            if (arguments.size() != 0) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_init_text requires 0 arguments");
             std::string r = emitCallWithReturn("init_text");
             visitor.pushValue(r);
             return true;
         }
         else if (funcName == "sdl_load_font") {
-            if (arguments.size() != 2) throw std::runtime_error("sdl_load_font requires 2 arguments (file, ptsize)");
+            if (arguments.size() != 2) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_load_font requires 2 arguments (file, ptsize)");
             std::string r = emitCallWithReturn("load_font");
             visitor.pushValue(r);
             freeArgs();
             return true;
         }
         else if (funcName == "sdl_create_render_target") {
-            if (arguments.size() != 3) throw std::runtime_error("sdl_create_render_target requires 3 arguments (renderer_id, width, height)");
+            if (arguments.size() != 3) 
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
+                                        ": sdl_create_render_target requires 3 arguments (renderer_id, width, height)");
             std::string r = emitCallWithReturn("create_render_target");
             visitor.pushValue(r);
             freeArgs();
