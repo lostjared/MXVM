@@ -1215,66 +1215,29 @@ namespace pascal {
             std::string right = eval(node.right.get());
             VarType leftType = getExpressionType(node.left.get());
             VarType rightType = getExpressionType(node.right.get());
-            
             VarType resultType = VarType::INT;
             
-            bool needsFloatOp = (leftType == VarType::DOUBLE || rightType == VarType::DOUBLE ||
-                                node.operator_ == BinaryOpNode::DIVIDE);
+            bool needsFloatOp = (leftType == VarType::DOUBLE || rightType == VarType::DOUBLE);
             
-            if (needsFloatOp) {
+            if (node.operator_ == BinaryOpNode::DIVIDE) {
+                needsFloatOp = true;
                 resultType = VarType::DOUBLE;
-                if (isRealNumber(left) && left.find("real_const_") == std::string::npos) {
-                    std::string constName = generateRealConstantName();
-                    realConstants[constName] = left;
-                    usedRealConstants.insert(constName);
-                    left = constName;
-                }
+            }
+            
+            if (node.operator_ == BinaryOpNode::DIV) {
+                needsFloatOp = false;
+                resultType = VarType::INT;
                 
-                if (isRealNumber(right) && right.find("real_const_") == std::string::npos) {
-                    std::string constName = generateRealConstantName();
-                    realConstants[constName] = right;
-                    usedRealConstants.insert(constName);
-                    right = constName;
-                }
-                
-                if (leftType == VarType::INT) {
-                    if (std::all_of(left.begin(), left.end(), [](char c) { 
-                        return std::isdigit(c) || c == '-'; })) {
-                        std::string constName = generateRealConstantName();
-                        realConstants[constName] = left + ".0";
-                        usedRealConstants.insert(constName);
-                        left = constName;
-                    } else {
-                        std::string newLeft = allocFloatReg();
-                        emit2("to_float", newLeft, left);
-                        if (isReg(left)) freeReg(left);
-                        left = newLeft;
-                    }
-                } else if (leftType == VarType::DOUBLE && !isFloatReg(left) && 
-                           left.find("real_const_") == std::string::npos) {
-                    std::string newLeft = allocFloatReg();
-                    emit3("mov", newLeft, left);
+                if (leftType == VarType::DOUBLE) {
+                    std::string newLeft = allocReg();
+                    emit2("to_int", newLeft, left);
                     if (isReg(left)) freeReg(left);
                     left = newLeft;
                 }
                 
-                if (rightType == VarType::INT) {
-                    if (std::all_of(right.begin(), right.end(), [](char c) { 
-                        return std::isdigit(c) || c == '-'; })) {
-                        std::string constName = generateRealConstantName();
-                        realConstants[constName] = right + ".0";
-                        usedRealConstants.insert(constName);
-                        right = constName;
-                    } else {
-                        std::string newRight = allocFloatReg();
-                        emit2("to_float", newRight, right);
-                        if (isReg(right)) freeReg(right);
-                        right = newRight;
-                    }
-                } else if (rightType == VarType::DOUBLE && !isFloatReg(right) && 
-                           right.find("real_const_") == std::string::npos) {
-                    std::string newRight = allocFloatReg();
-                    emit3("mov", newRight, right);
+                if (rightType == VarType::DOUBLE) {
+                    std::string newRight = allocReg();
+                    emit2("to_int", newRight, right);
                     if (isReg(right)) freeReg(right);
                     right = newRight;
                 }
@@ -1294,6 +1257,10 @@ namespace pascal {
                     break;
                     
                 case BinaryOpNode::DIVIDE:
+                    pushTri("div", left, right);
+                    break;
+                    
+                case BinaryOpNode::DIV:
                     pushTri("div", left, right);
                     break;
                     
