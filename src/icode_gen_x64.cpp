@@ -43,7 +43,6 @@ namespace mxvm {
 
     void Program::x64_release_call_area(std::ostream &out, size_t total) {
         out << "\tadd $" << total << ", %rsp\n";
-        // Undo the mod we added in reserve
         x64_sp_mod16 = (unsigned)((x64_sp_mod16 + (unsigned)((16 - (total & 15)) & 15)) & 15);
     }
 
