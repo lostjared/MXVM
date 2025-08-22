@@ -107,6 +107,9 @@ namespace pascal {
                             if (exprType == CodeGenVisitor::VarType::DOUBLE) {
                                 visitor.usedStrings.insert("fmt_float");
                                 visitor.emit2("print", "fmt_float", v);
+                            } else if (exprType == CodeGenVisitor::VarType::CHAR) {
+                                visitor.usedStrings.insert("fmt_chr");
+                                visitor.emit2("print", "fmt_chr", v);
                             } else {
                                 visitor.usedStrings.insert("fmt_int");
                                 visitor.emit2("print", "fmt_int", v);

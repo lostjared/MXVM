@@ -99,7 +99,8 @@ namespace pascal {
             STRING,
             CHAR,
             RECORD,
-            PTR,     
+            PTR,    
+            BOOL, 
             UNKNOWN,
             ARRAY_INT,
             ARRAY_DOUBLE,
@@ -1368,13 +1369,40 @@ namespace pascal {
         }
 
         VarType getExpressionType(ASTNode* node) {
-            if (auto numNode = dynamic_cast<NumberNode*>(node)) {
+            if (dynamic_cast<NumberNode*>(node)) {
+                auto numNode = static_cast<NumberNode*>(node);
                 return numNode->isReal ? VarType::DOUBLE : VarType::INT;
+            }
+            if (dynamic_cast<StringNode*>(node)) {
+                auto strNode = static_cast<StringNode*>(node);
+                return strNode->value.length() == 1 ? VarType::CHAR : VarType::STRING;
+            }
+            if (dynamic_cast<BooleanNode*>(node)) {
+                return VarType::BOOL;
             }
             if (auto varNode = dynamic_cast<VariableNode*>(node)) {
                 return getVarType(varNode->name);
             }
-            return VarType::UNKNOWN;
+            if (auto arrayAccessNode = dynamic_cast<ArrayAccessNode*>(node)) {
+                auto it = arrayInfo.find(arrayAccessNode->arrayName);
+                if (it != arrayInfo.end()) {
+                    const std::string& typeStr = it->second.elementType;
+                    if (typeStr == "integer") return VarType::INT;
+                    if (typeStr == "real") return VarType::DOUBLE;
+                    if (typeStr == "char") return VarType::CHAR;
+                    if (typeStr == "string") return VarType::STRING;
+                    if (typeStr == "boolean") return VarType::BOOL;
+                }
+            }
+            if (auto binOpNode = dynamic_cast<BinaryOpNode*>(node)) {
+                VarType leftType = getExpressionType(binOpNode->left.get());
+                VarType rightType = getExpressionType(binOpNode->right.get());
+                if (leftType == VarType::DOUBLE || rightType == VarType::DOUBLE) {
+                    return VarType::DOUBLE;
+                }
+                return leftType;
+            }
+            return VarType::INT;
         }
 
         void visit(UnaryOpNode& node) override {
