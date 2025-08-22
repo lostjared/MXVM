@@ -485,13 +485,16 @@ namespace mxvm {
     }
     
     std::unique_ptr<InstructionNode> Parser::parseCodeInstruction(uint64_t& index) {
-        static std::unordered_map<std::string, Inc> instructionMap = {
+       static std::unordered_map<std::string, Inc> instructionMap = {
             {"mov", MOV}, {"load", LOAD}, {"store", STORE},
             {"add", ADD}, {"sub", SUB}, {"mul", MUL}, {"div", DIV},
             {"or", OR}, {"and", AND}, {"xor", XOR}, {"not", NOT}, {"mod", MOD},
-            {"cmp", CMP}, {"jmp", JMP}, {"je", JE}, {"jne", JNE},
+            {"cmp", CMP}, {"fcmp", FCMP}, {"jmp", JMP}, {"je", JE}, {"jne", JNE},
             {"jl", JL}, {"jle", JLE}, {"jg", JG}, {"jge", JGE},
             {"jz", JZ}, {"jnz", JNZ}, {"ja", JA}, {"jb", JB},
+            {"jae", JAE}, {"jbe", JBE}, {"jc", JC}, {"jnc", JNC},
+            {"jp", JP}, {"jnp", JNP}, {"jo", JO}, {"jno", JNO},
+            {"js", JS}, {"jns", JNS},
             {"print", PRINT}, {"exit", EXIT}, {"alloc", ALLOC}, {"free", FREE},
             {"getline", GETLINE}, {"push", PUSH}, {"pop", POP}, {"stack_load", STACK_LOAD},
             {"stack_store", STACK_STORE}, {"stack_sub", STACK_SUB}, {"call", CALL}, {"ret", RET},

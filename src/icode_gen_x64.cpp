@@ -1,4 +1,3 @@
-// mxvm/icode_x64.cpp
 #include "mxvm/icode.hpp"
 
 #include <algorithm>
@@ -133,13 +132,13 @@ namespace mxvm {
                                            std::vector<Operand> &args) {
         xmm_offset = 0;
 
-        // # of stack arguments (beyond first 4)
+        
         const size_t stack_args = (args.size() > 4) ? (args.size() - 4) : 0;
         const size_t spill_bytes = stack_args * 8;
 
         size_t frame = x64_reserve_call_area(out, spill_bytes);
 
-        // Stack args go at 32(%rsp), 40(%rsp), ...
+        
         for (size_t i = 4; i < args.size(); i++) {
             const size_t off = 32 + 8 * (i - 4);
 
@@ -161,7 +160,7 @@ namespace mxvm {
             }
         }
 
-        // Register args by position: RCX, RDX, R8, R9 or XMM0..XMM3
+        
         static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
         for (size_t i = 0; i < args.size() && i < 4; i++) {
             if (isVariable(args[i].op) && is_stdio_name(args[i].op)) {
@@ -202,7 +201,7 @@ namespace mxvm {
         std::unordered_map<int,std::string> labels_;
         for (auto &l : labels) labels_[l.second.first] = l.first;
 
-        // Check if std module is being used
+        
         bool uses_std_module = false;
         for(const auto &e : external) {
             if(e.mod == "std") {
@@ -308,7 +307,7 @@ namespace mxvm {
                     out << name + "_" + l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
-                    x64_sp_mod16 = 8; // new prologue
+                    x64_sp_mod16 = 8; 
                     break;
                 }
             }
@@ -378,6 +377,10 @@ namespace mxvm {
     }
 
     void Program::x64_generateInstruction(std::ostream &out, const Instruction &i) {
+        
+        if (i.instruction < JMP || i.instruction > JNS) {
+            last_cmp_type = CMP_NONE;
+        }
         switch (i.instruction) {
             case ADD: x64_gen_arth(out, "add", i); break;
             case SUB: x64_gen_arth(out, "sub", i); break;
@@ -421,6 +424,39 @@ namespace mxvm {
             case INVOKE: x64_gen_invoke(out, i); break;
             case RETURN: x64_gen_return(out, i); break;
             case NEG: x64_gen_neg(out, i); break;
+        case FCMP:
+            x64_gen_fcmp(out, i);
+            break;
+        case JAE:
+            x64_gen_jae(out, i);
+            break;
+        case JBE:
+            x64_gen_jbe(out, i);
+            break;
+        case JC:
+            x64_gen_jc(out, i);
+            break;
+        case JNC:
+            x64_gen_jnc(out, i);
+            break;
+        case JP:
+            x64_gen_jp(out, i);
+            break;
+        case JNP:
+            x64_gen_jnp(out, i);
+            break;
+        case JO:
+            x64_gen_jo(out, i);
+            break;
+        case JNO:
+            x64_gen_jno(out, i);
+            break;
+        case JS:
+            x64_gen_js(out, i);
+            break;
+        case JNS:
+            x64_gen_jns(out, i);
+            break;
             default: throw mx::Exception("Invalid or unsupported instruction");
         }
     }
@@ -721,26 +757,26 @@ namespace mxvm {
         if (dest.type != VarType::VAR_STRING || dest.var_value.buffer_size == 0)
             throw mx::Exception("GETLINE: needs string buffer");
 
-        // r8 = stdin
+        
         out << "\txor %ecx, %ecx\n";
         size_t t0 = x64_reserve_call_area(out, 0);
         out << "\tcall __acrt_iob_func\n";
         x64_release_call_area(out, t0);
         out << "\tmov %rax, %r8\n";
 
-        // fgets(buf, size, stdin)
+        
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rdx\n";
         size_t total = x64_reserve_call_area(out, 0);
         out << "\tcall fgets\n";
         x64_release_call_area(out, total);
 
-        // if (fgets == NULL) skip trimming
+        
         static size_t over_count = 0;
         out << "\ttest %rax, %rax\n";
         out << "\tje .over" << over_count << "\n";
 
-        // strlen(buf) and strip trailing '\n'
+        
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         size_t tlen = x64_reserve_call_area(out, 0);
         out << "\tcall strlen\n";
@@ -835,7 +871,7 @@ namespace mxvm {
         }
         out << "\tshl $3, %rcx\n";
         out << "\taddq %rcx, %rsp\n";
-        // Update alignment tracker when the count is a known constant.
+        
         if (!i.op1.op.empty() && !isVariable(i.op1.op)) {
             unsigned long long n = std::stoull(i.op1.op, nullptr, 0);
             if (n & 1ull) x64_sp_mod16 ^= 8;
@@ -876,10 +912,18 @@ namespace mxvm {
             if (pos == labels.end()) throw mx::Exception("Jump must have valid label: " + i.op1.op);
             const char* m = nullptr;
             switch (i.instruction) {
-                case JMP: m = "jmp"; break; case JE: m = "je"; break; case JNE: m = "jne"; break;
-                case JL: m = "jl"; break; case JLE: m = "jle"; break; case JG: m = "jg"; break;
-                case JGE: m = "jge"; break; case JZ: m = "jz"; break; case JNZ: m = "jnz"; break;
-                case JA: m = "ja"; break; case JB: m = "jb"; break; default: break;
+                case JMP: m = "jmp"; break;
+                case JE:  m = "je";  break;
+                case JNE: m = "jne"; break;
+                case JL:  m = (last_cmp_type == CMP_FLOAT) ? "jb" : "jl"; break;
+                case JLE: m = (last_cmp_type == CMP_FLOAT) ? "jbe" : "jle"; break;
+                case JG:  m = (last_cmp_type == CMP_FLOAT) ? "ja" : "jg"; break;
+                case JGE: m = (last_cmp_type == CMP_FLOAT) ? "jae" : "jge"; break;
+                case JZ:  m = "jz";  break;
+                case JNZ: m = "jnz"; break;
+                case JA:  m = "ja";  break;
+                case JB:  m = "jb";  break;
+                default: break;
             }
             out << "\t" << m << " ." << i.op1.op << "\n";
         } else throw mx::Exception("Jump requires label");
@@ -895,14 +939,17 @@ namespace mxvm {
             x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
             x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
             out << "\tcomisd %xmm1, %xmm0\n";
+            last_cmp_type = CMP_FLOAT;
         } else if (t1 == VarType::VAR_POINTER && (t2 == VarType::VAR_INTEGER || t2 == VarType::VAR_BYTE)) {
             x64_generateLoadVar(out, t1, "%rax", i.op1);
             x64_generateLoadVar(out, t2, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
+            last_cmp_type = CMP_INTEGER;
         } else {
             x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
             x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
+            last_cmp_type = CMP_INTEGER;
         }
     }
 
@@ -987,7 +1034,7 @@ namespace mxvm {
     }
 
     void Program::x64_gen_exit(std::ostream &out, const Instruction &i) {
-        // Check if std module is being used
+        
         bool uses_std_module = false;
         for(const auto &e : external) {
             if(e.mod == "std") {
@@ -996,7 +1043,7 @@ namespace mxvm {
             }
         }
 
-        // If using std module, clean up program args before exit
+        
         if(uses_std_module) {
             out << "\t# Clean up program arguments before exit\n";
             size_t total = x64_reserve_call_area(out, 0);
@@ -1008,5 +1055,56 @@ namespace mxvm {
             std::vector<Operand> opz; opz.push_back(i.op1);
             x64_generateFunctionCall(out, "exit", opz);
         } else throw mx::Exception("exit requires argument");
+    }
+
+    void Program::x64_gen_fcmp(std::ostream &out, const Instruction &i) {
+        if (i.op2.op.empty()) {
+            throw mx::Exception("FCMP requires two operands");
+        }
+        
+        x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+        x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+        out << "\tcomisd %xmm1, %xmm0\n";
+        last_cmp_type = CMP_FLOAT;
+    }
+
+       void Program::x64_gen_jae(std::ostream &out, const Instruction &i) {
+        out << "\tjae ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jbe(std::ostream &out, const Instruction &i) {
+        out << "\tjbe ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jc(std::ostream &out, const Instruction &i) {
+        out << "\tjc ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jnc(std::ostream &out, const Instruction &i) {
+        out << "\tjnc ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jp(std::ostream &out, const Instruction &i) {
+        out << "\tjp ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jnp(std::ostream &out, const Instruction &i) {
+        out << "\tjnp ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jo(std::ostream &out, const Instruction &i) {
+        out << "\tjo ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jno(std::ostream &out, const Instruction &i) {
+        out << "\tjno ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_js(std::ostream &out, const Instruction &i) {
+        out << "\tjs ." << i.op1.op << "\n";
+    }
+
+    void Program::x64_gen_jns(std::ostream &out, const Instruction &i) {
+        out << "\tjns ." << i.op1.op << "\n";
     }
 }

@@ -417,6 +417,23 @@ namespace pascal {
             if (isReg(b)) freeReg(b);
         }
 
+        void pushFloatCmpResult(const std::string& a, const std::string& b, const char* jop) {
+            std::string t = allocReg();
+            std::string L1 = newLabel("CMP_TRUE");
+            std::string L2 = newLabel("CMP_END");
+            emit2("fcmp", a, b);  
+            emit1(jop, L1);
+            emit3("mov", t, "0");
+            emit1("jmp", L2);
+            emitLabel(L1);
+            emit3("mov", t, "1");
+            emitLabel(L2);
+            pushValue(t);
+            
+            if (isReg(a)) freeReg(a);
+            if (isReg(b)) freeReg(b);
+        }
+
         void pushLogicalAnd(const std::string& a, const std::string& b) {
             std::string t = allocReg();
             std::string L0 = newLabel("AND_ZERO");
@@ -460,14 +477,6 @@ namespace pascal {
                 if (registers[i] == name) return true;
             }
             return false;
-        }
-
-    private:
-        void checkVariableExists(const std::string& name, int line) const {
-            if (varTypes.find(name) == varTypes.end()) {
-                throw std::runtime_error("Error on line " + std::to_string(line) + 
-                                        ": Undefined variable '" + name + "'");
-            }
         }
         
     public:
@@ -544,7 +553,7 @@ namespace pascal {
                                     setVarType(id, VarType::DOUBLE);
                                 } 
                                 else {
-                                   
+                                    
                                     int slot = newSlotFor(id); 
                                     varSlot[id] = slot;        
                                     
@@ -876,6 +885,86 @@ namespace pascal {
             funcSignatures[node.name] = info;
         }
 
+        VarType getTypeFromString(const std::string& typeStr) {
+            if (typeStr == "integer" || typeStr == "boolean") {
+                return VarType::INT;
+            } else if (typeStr == "real") {
+                return VarType::DOUBLE;
+            } else if (typeStr == "string") {
+                return VarType::STRING;
+            } else if (typeStr == "char") {
+                return VarType::CHAR;
+            } else {
+                return VarType::UNKNOWN;
+            }
+        }
+
+          void visit(ProcCallNode& node) override {
+            
+            auto handler = builtinRegistry.findHandler(node.name);
+            if (handler) {
+                handler->generate(*this, node.name, node.arguments);
+                return;
+            }
+            
+            
+            std::vector<std::string> args;
+            for (auto& arg : node.arguments) {
+                std::string argValue = eval(arg.get());
+                args.push_back(argValue);
+            }
+            
+            emit_invoke(node.name, args);
+            
+            
+            for (const auto& arg : args) {
+                if (isReg(arg)) freeReg(arg);
+            }
+        }
+
+        void visit(FuncCallNode& node) override {
+            
+            auto handler = builtinRegistry.findHandler(node.name);
+            if (handler) {
+                if (handler->generateWithResult(*this, node.name, node.arguments)) {
+                    return; 
+                }
+            }
+            
+            std::vector<std::string> args;
+            for (auto& arg : node.arguments) {
+                std::string argValue = eval(arg.get());
+                args.push_back(argValue);
+            }
+            
+    
+            auto it = funcSignatures.find(node.name);
+            VarType returnType = VarType::INT; 
+            if (it != funcSignatures.end()) {
+                returnType = it->second.returnType;
+            }
+            
+            emit_invoke(node.name, args);
+        
+            std::string resultReg;
+            if (returnType == VarType::DOUBLE) {
+                resultReg = allocFloatReg();
+                emit1("return", resultReg);
+            } else if (returnType == VarType::STRING) {
+                resultReg = allocReg();
+                emit1("return", resultReg);
+            } else {
+                resultReg = allocReg();
+                emit1("return", resultReg);
+            }
+            
+            pushValue(resultReg);
+            
+            for (const auto& arg : args) {
+                if (isReg(arg)) freeReg(arg);
+            }
+        }
+
         void visit(FuncDeclNode& node) override {
             
             FuncInfo funcInfo;
@@ -923,10 +1012,6 @@ namespace pascal {
             if (!varPtr) return;
             
             std::string varName = varPtr->name;
-
-            if (currentFunctionName.empty() || varName != currentFunctionName) {
-                checkVariableExists(varName, varPtr->getLineNumber());
-            }
             
             std::string rhs;
             if (auto numNode = dynamic_cast<NumberNode*>(node.expression.get())) {
@@ -1009,10 +1094,34 @@ namespace pascal {
         }
 
         void visit(ForStmtNode& node) override {
-            checkVariableExists(node.variable, node.getLineNumber());
-
             int slot = newSlotFor(node.variable);
             std::string startV = eval(node.startValue.get());
+            
+            VarType startType = getExpressionType(node.startValue.get());
+            VarType endType = getExpressionType(node.endValue.get());
+            bool isFloatLoop = (startType == VarType::DOUBLE || endType == VarType::DOUBLE);
+            
+            if (isFloatLoop) {
+            
+                setVarType(node.variable, VarType::DOUBLE);
+                setSlotType(slot, VarType::DOUBLE);
+                
+            
+                if (startType == VarType::INT) {
+                    if (std::all_of(startV.begin(), startV.end(), [](char c) { return std::isdigit(c) || c == '-'; })) {
+                        std::string constName = generateRealConstantName();
+                        realConstants[constName] = startV + ".0";
+                        usedRealConstants.insert(constName);
+                        startV = constName;
+                    } else {
+                        std::string floatReg = allocFloatReg();
+                        emit2("to_float", floatReg, startV);
+                        if (isReg(startV)) freeReg(startV);
+                        startV = floatReg;
+                    }
+                }
+            }
+            
             emit3("mov", slotVar(slot), startV);
             if (isReg(startV)) freeReg(startV);
 
@@ -1023,212 +1132,78 @@ namespace pascal {
             std::string endV = eval(node.endValue.get());
             std::string vr   = slotVar(slot);
 
-            if (node.isDownto) {
-                emit2("cmp", vr, endV);
-                emit1("jl", end);
+            if (isFloatLoop) {
+            
+                if (endType == VarType::INT) {
+                    if (std::all_of(endV.begin(), endV.end(), [](char c) { return std::isdigit(c) || c == '-'; })) {
+                        std::string constName = generateRealConstantName();
+                        realConstants[constName] = endV + ".0";
+                        usedRealConstants.insert(constName);
+                        endV = constName;
+                    } else {
+                        std::string floatReg = allocFloatReg();
+                        emit2("to_float", floatReg, endV);
+                        if (isReg(endV)) freeReg(endV);
+                        endV = floatReg;
+                    }
+                }
+                
+            
+                std::string vrFloat = allocFloatReg();
+                emit2("to_float", vrFloat, vr);
+                
+            
+                emit2("fcmp", vrFloat, endV);
+                if (node.isDownto) {
+                    emit1("jb", end);  
+                } else {
+                    emit1("ja", end);  
+                }
+                
+                freeFloatReg(vrFloat); 
             } else {
-                emit2("cmp", vr, endV);
-                emit1("jg", end);
+                if (node.isDownto) {
+                    emit2("cmp", vr, endV);
+                    emit1("jl", end);
+                } else {
+                    emit2("cmp", vr, endV);
+                    emit1("jg", end);
+                }
             }
+            
             if (isReg(endV)) freeReg(endV);
 
             if (node.statement) node.statement->accept(*this);
 
-            if (node.isDownto) {
-                emit3("sub", vr, "1");
+            
+            if (isFloatLoop) {
+            
+                std::string oneConstName = generateRealConstantName();
+                realConstants[oneConstName] = "1.0";
+                usedRealConstants.insert(oneConstName);
+                
+                std::string vrFloat = allocFloatReg();
+                emit3("mov", vrFloat, vr);
+                
+                if (node.isDownto) {
+                    emit3("sub", vrFloat, oneConstName);
+                } else {
+                    emit3("add", vrFloat, oneConstName);
+                }
+                
+                emit3("mov", vr, vrFloat);
+                freeFloatReg(vrFloat);
             } else {
-                emit3("add", vr, "1");
+            
+                if (node.isDownto) {
+                    emit3("sub", vr, "1");
+                } else {
+                    emit3("add", vr, "1");
+                }
             }
 
             emit1("jmp", loop);
             emitLabel(end);
-        }
-
-         VarType getTypeFromString(const std::string& typeName) const {
-            if (typeName.empty()) {
-                return VarType::UNKNOWN;
-            }
-            
-            if (typeName == "integer" || typeName == "boolean") {
-                return VarType::INT;
-            }
-            else if (typeName == "real") {
-                return VarType::DOUBLE;
-            }
-            else if (typeName == "string") {
-                return VarType::STRING;
-            }
-            else if (typeName == "char") {
-                return VarType::CHAR;
-            }
-            else if (typeName == "record") {
-                return VarType::RECORD;
-            }
-            else if (typeName == "pointer" || typeName == "^") {
-                return VarType::PTR;
-            }
-            
-            return VarType::UNKNOWN;
-        }
-
-        void visit(ProcCallNode& node) override {
-            std::string name = node.name;
-            
-            auto handler = builtinRegistry.findHandler(name);
-
-            if (handler) {
-                handler->generate(*this, name, node.arguments);
-                return;
-            }
-            
-            
-            for (size_t i = 1; i <= 6; i++) {
-                regInUse[i] = false;
-            }
-            for (size_t i = 0; i < floatRegInUse.size(); i++) {
-                floatRegInUse[i] = false;
-            }
-            
-            std::vector<std::string> argValues;
-            for (auto &arg : node.arguments) {
-                argValues.push_back(eval(arg.get()));
-            }
-            
-            
-            auto sig_it = funcSignatures.find(name);
-            
-            for (size_t i = 0; i < argValues.size(); i++) {
-                VarType paramType = VarType::INT; 
-                
-                
-                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
-                    paramType = sig_it->second.paramTypes[i];
-                } else if (i < node.arguments.size()) {
-                
-                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
-                        paramType = getVarType(varNode->name);
-                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
-                        paramType = VarType::STRING;
-                    } else if (auto numNode = dynamic_cast<NumberNode*>(node.arguments[i].get())) {
-                        paramType = (numNode->isReal || isRealNumber(numNode->value)) ? VarType::DOUBLE : VarType::INT;
-                    }
-                }
-
-                if (i < 6) {
-                    if (paramType == VarType::STRING) {
-                        if (i < ptrRegisters.size()) {
-                            emit3("mov", ptrRegisters[i], argValues[i]);
-                        }
-                    } else if (paramType == VarType::DOUBLE) {
-                
-                        std::string floatReg = floatRegisters[i];
-                        emit3("mov", floatReg, argValues[i]);
-                        floatRegInUse[i] = true;
-                    } else {
-                
-                        const std::string dest = registers[i+1];
-                        emit3("mov", dest, argValues[i]);
-                        regInUse[i+1] = true;
-                    }
-                } else {
-                    std::string paramVar = "param" + std::to_string(i);
-                    int paramSlot = newSlotFor(paramVar);
-                    emit3("mov", slotVar(paramSlot), argValues[i]);
-                }
-                
-                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
-                    freeReg(argValues[i]);
-                }
-            }
-            
-            emit1("call", funcLabel("PROC_", name));
-        }
-
-        void visit(FuncCallNode& node) override {
-
-            auto handler = builtinRegistry.findHandler(node.name);
-            if (handler) {
-                bool handled = handler->generateWithResult(*this, node.name, node.arguments);
-                if (handled) {
-                    return; 
-                }
-            }
-
-            for (size_t i = 1; i <= 6; i++) {
-                regInUse[i] = false;
-            }
-            for (size_t i = 0; i < floatRegInUse.size(); i++) {
-                floatRegInUse[i] = false;
-            }
-            
-            std::vector<std::string> argValues;
-            for (auto &arg : node.arguments) {
-                argValues.push_back(eval(arg.get()));
-            }
-            
-            auto sig_it = funcSignatures.find(node.name);
-            
-            for (size_t i = 0; i < argValues.size(); i++) {
-                VarType paramType = VarType::INT; 
-                if (sig_it != funcSignatures.end() && i < sig_it->second.paramTypes.size()) {
-                    paramType = sig_it->second.paramTypes[i];
-                } else if (i < node.arguments.size()) {
-                    if (auto varNode = dynamic_cast<VariableNode*>(node.arguments[i].get())) {
-                        paramType = getVarType(varNode->name);
-                    } else if (dynamic_cast<StringNode*>(node.arguments[i].get())) {
-                        paramType = VarType::STRING;
-                    } else if (auto numNode = dynamic_cast<NumberNode*>(node.arguments[i].get())) {
-                        paramType = (numNode->isReal || isRealNumber(numNode->value)) ? VarType::DOUBLE : VarType::INT;
-                    } else {
-                        paramType = getExpressionType(node.arguments[i].get());
-                    }
-                }
-
-                if (i < 6) {
-                    if (paramType == VarType::STRING) {
-                        if (i < ptrRegisters.size()) {
-                            emit3("mov", ptrRegisters[i], argValues[i]);
-                        }
-                    } else if (paramType == VarType::DOUBLE) {
-                        emit3("mov", floatRegisters[i], argValues[i]);
-                        floatRegInUse[i] = true;
-                    } else {
-                        const std::string dest = registers[i+1];
-                        emit3("mov", dest, argValues[i]);
-                        regInUse[i+1] = true;
-                    }
-                } else {
-                    std::string paramVar = "param" + std::to_string(i);
-                    int paramSlot = newSlotFor(paramVar);
-                    emit3("mov", slotVar(paramSlot), argValues[i]);
-                }
-                
-                if (isReg(argValues[i]) && !isParmReg(argValues[i])) {
-                    freeReg(argValues[i]);
-                }
-            }
-            
-            emit1("call", funcLabel("FUNC_", node.name));
-
-            
-            VarType returnType = VarType::INT;
-            if (sig_it != funcSignatures.end()) {
-                returnType = sig_it->second.returnType;
-            }
-            
-            std::string result;
-            if (returnType == VarType::STRING) {
-                result = allocReg();
-                emit3("mov", result, "arg0");  
-            } else if (returnType == VarType::DOUBLE) {
-                result = allocFloatReg();
-                emit3("mov", result, "xmm0");
-            } else {
-                result = allocReg();
-                emit3("mov", result, "rax");
-            }
-            
-            pushValue(result);
         }
 
         void visit(BinaryOpNode& node) override {
@@ -1257,7 +1232,6 @@ namespace pascal {
                     usedRealConstants.insert(constName);
                     right = constName;
                 }
-                
                 
                 if (leftType == VarType::INT) {
                     if (std::all_of(left.begin(), left.end(), [](char c) { 
@@ -1333,32 +1307,54 @@ namespace pascal {
                     }
                     break;
                     
-                
                 case BinaryOpNode::EQUAL:
-                    pushCmpResult(left, right, "je");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "je");
+                    } else {
+                        pushCmpResult(left, right, "je");
+                    }
                     break;
                     
                 case BinaryOpNode::NOT_EQUAL:
-                    pushCmpResult(left, right, "jne");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "jne");
+                    } else {
+                        pushCmpResult(left, right, "jne");
+                    }
                     break;
                     
                 case BinaryOpNode::LESS:
-                    pushCmpResult(left, right, "jl");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "jb");  
+                    } else {
+                        pushCmpResult(left, right, "jl");
+                    }
                     break;
                     
                 case BinaryOpNode::LESS_EQUAL:
-                    pushCmpResult(left, right, "jle");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "jbe"); 
+                    } else {
+                        pushCmpResult(left, right, "jle");
+                    }
                     break;
                     
                 case BinaryOpNode::GREATER:
-                    pushCmpResult(left, right, "jg");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "ja");  
+                    } else {
+                        pushCmpResult(left, right, "jg");
+                    }
                     break;
                     
                 case BinaryOpNode::GREATER_EQUAL:
-                    pushCmpResult(left, right, "jge");
+                    if (needsFloatOp) {
+                        pushFloatCmpResult(left, right, "jae"); 
+                    } else {
+                        pushCmpResult(left, right, "jge");
+                    }
                     break;
                     
-                
                 case BinaryOpNode::AND:
                     pushLogicalAnd(left, right);
                     break;
@@ -1370,7 +1366,6 @@ namespace pascal {
                 default:
                     throw std::runtime_error("Unknown binary operator");
             }
-            
         }
 
         VarType getExpressionType(ASTNode* node) {
@@ -1416,8 +1411,6 @@ namespace pascal {
         }
 
         void visit(VariableNode& node) override {
-            checkVariableExists(node.name, node.getLineNumber());
-
             auto it = valueLocations.find(node.name);
             if (it != valueLocations.end() && it->second.type == ValueLocation::REGISTER) {
                 pushValue(it->second.location);

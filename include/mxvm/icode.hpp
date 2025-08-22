@@ -190,11 +190,13 @@ namespace mxvm {
         bool zero_flag = false;
         bool less_flag = false;
         bool greater_flag = false;
+        bool carry_flag;  
         int xmm_offset = 0;
         std::vector<std::string> args;
         bool main_function;
         bool object_external = false;
-        
+        enum LastCmpType { CMP_NONE, CMP_INTEGER, CMP_FLOAT };
+        LastCmpType last_cmp_type = CMP_NONE;
     public:    
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
@@ -231,6 +233,17 @@ namespace mxvm {
         void gen_invoke(std::ostream &out, const Instruction &i);
         void gen_return(std::ostream &out, const Instruction &i);
         void gen_neg(std::ostream &out, const Instruction &i);
+        void gen_fcmp(std::ostream &out, const Instruction &i);
+        void gen_jae(std::ostream &out, const Instruction &i);
+        void gen_jbe(std::ostream &out, const Instruction &i);
+        void gen_jc(std::ostream &out, const Instruction &i);
+        void gen_jnc(std::ostream &out, const Instruction &i);
+        void gen_jp(std::ostream &out, const Instruction &i);
+        void gen_jnp(std::ostream &out, const Instruction &i);
+        void gen_jo(std::ostream &out, const Instruction &i);
+        void gen_jno(std::ostream &out, const Instruction &i);
+        void gen_js(std::ostream &out, const Instruction &i);
+        void gen_jns(std::ostream &out, const Instruction &i);
         std::string gen_optimize(const std::string  &code, const Platform &platform);
         std::string optimize_darwin(const std::string &code);
         std::string optimize_core(const std::string &code);
@@ -271,7 +284,17 @@ namespace mxvm {
         void x64_gen_mov(std::ostream &out, const Instruction &i);
         void x64_gen_arth(std::ostream &out, std::string arth, const Instruction &i);
         void x64_gen_exit(std::ostream &out, const Instruction &i);
-
+        void x64_gen_fcmp(std::ostream &out, const Instruction &i);
+        void x64_gen_jae(std::ostream &out, const Instruction &i);
+        void x64_gen_jbe(std::ostream &out, const Instruction &i);
+        void x64_gen_jc(std::ostream &out, const Instruction &i);
+        void x64_gen_jnc(std::ostream &out, const Instruction &i);
+        void x64_gen_jp(std::ostream &out, const Instruction &i);
+        void x64_gen_jnp(std::ostream &out, const Instruction &i);
+        void x64_gen_jo(std::ostream &out, const Instruction &i);
+        void x64_gen_jno(std::ostream &out, const Instruction &i);
+        void x64_gen_js(std::ostream &out, const Instruction &i);
+        void x64_gen_jns(std::ostream &out, const Instruction &i);
         // code interpretation
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
@@ -316,6 +339,17 @@ namespace mxvm {
         void exec_invoke(const Instruction  &instr);
         void exec_return(const Instruction &instr);
         void exec_neg(const Instruction &instr);
+        void exec_fcmp(const Instruction& instr);
+        void exec_jae(const Instruction& instr);
+        void exec_jbe(const Instruction& instr);
+        void exec_jc(const Instruction& instr);
+        void exec_jnc(const Instruction& instr);
+        void exec_jp(const Instruction& instr);
+        void exec_jnp(const Instruction& instr);
+        void exec_jo(const Instruction& instr);
+        void exec_jno(const Instruction& instr);
+        void exec_js(const Instruction& instr);
+        void exec_jns(const Instruction& instr);
 
         Variable& getVariable(const std::string& name);
         bool isVariable(const std::string& name);

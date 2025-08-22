@@ -8,7 +8,7 @@
 #include<sstream>
 #include<optional>
 
-enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN , NEG};
+enum Inc { NULL_INC = 0, MOV, LOAD, STORE, ADD, SUB, MUL, DIV, OR, AND, XOR, NOT, MOD, CMP, JMP, JE, JNE, JL, JLE, JG, JGE, JZ, JNZ, JA, JB, PRINT, EXIT, ALLOC, FREE, GETLINE, PUSH, POP, STACK_LOAD, STACK_STORE, STACK_SUB, CALL, RET, STRING_PRINT, DONE, TO_INT, TO_FLOAT, INVOKE, RETURN, NEG, FCMP, JAE, JBE, JC, JNC, JP, JNP, JO, JNO, JS, JNS };
 
 inline std::vector<std::string> IncType { 
     "NULL",     // NULL_INC = 0
@@ -20,7 +20,7 @@ inline std::vector<std::string> IncType {
     "mul",      // MUL = 6
     "div",      // DIV = 7
     "or",       // OR = 8
-    "and",      // AND = 9  (was missing!)
+    "and",      // AND = 9
     "xor",      // XOR = 10
     "not",      // NOT = 11
     "mod",      // MOD = 12
@@ -39,7 +39,7 @@ inline std::vector<std::string> IncType {
     "print",    // PRINT = 25
     "exit",     // EXIT = 26
     "alloc",    // ALLOC = 27
-    "free",     // FREE =  28
+    "free",     // FREE = 28
     "getline",  // GETLINE = 29
     "push",     // PUSH = 30
     "pop",      // POP = 31
@@ -51,10 +51,21 @@ inline std::vector<std::string> IncType {
     "string_print", // STRING_PRINT = 37
     "done",     // DONE = 38
     "to_int",   // TO_INT = 39
-    "to_float", // TO_INT = 40
-    "invoke", // INVOKE = 41
-    "return", // RETURN = 42
-    "neg" // NEG = 43
+    "to_float", // TO_FLOAT = 40
+    "invoke",   // INVOKE = 41
+    "return",   // RETURN = 42
+    "neg",      // NEG = 43
+    "fcmp",     // FCMP = 44 (floating-point compare)
+    "jae",      // JAE = 45 (jump if above or equal, unsigned)
+    "jbe",      // JBE = 46 (jump if below or equal, unsigned)
+    "jc",       // JC = 47 (jump if carry)
+    "jnc",      // JNC = 48 (jump if no carry)
+    "jp",       // JP = 49 (jump if parity)
+    "jnp",      // JNP = 50 (jump if no parity)
+    "jo",       // JO = 51 (jump if overflow)
+    "jno",      // JNO = 52 (jump if no overflow)
+    "js",       // JS = 53 (jump if sign)
+    "jns"       // JNS = 54 (jump if no sign)
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);

@@ -121,6 +121,9 @@ namespace mxvm {
                 case CMP:
                     exec_cmp(instr);
                     break;
+                case FCMP:
+                    exec_fcmp(instr);
+                    break;
                 case JMP:
                     exec_jmp(instr);
                     continue;
@@ -153,6 +156,36 @@ namespace mxvm {
                     continue;
                 case JB:
                     exec_jb(instr);
+                    continue;
+                case JAE:
+                    exec_jae(instr);
+                    continue;
+                case JBE:
+                    exec_jbe(instr);
+                    continue;
+                case JC:
+                    exec_jc(instr);
+                    continue;
+                case JNC:
+                    exec_jnc(instr);
+                    continue;
+                case JP:
+                    exec_jp(instr);
+                    continue;
+                case JNP:
+                    exec_jnp(instr);
+                    continue;
+                case JO:
+                    exec_jo(instr);
+                    continue;
+                case JNO:
+                    exec_jno(instr);
+                    continue;
+                case JS:
+                    exec_js(instr);
+                    continue;
+                case JNS:
+                    exec_jns(instr);
                     continue;
                 case LOAD:
                     exec_load(instr);
@@ -1474,8 +1507,8 @@ namespace mxvm {
                         } catch(...) {
                             v.var_value.int_value = 0;
                         }
-                    } else {
-                        throw mx::Exception("to_int second argument must be a string");
+                    } else if(s.type == VarType::VAR_FLOAT) {
+                        v.var_value.int_value = static_cast<int>(s.var_value.float_value);
                     }
                 } else {
                     throw mx::Exception("to_int second argument must be a variable");
@@ -1502,9 +1535,9 @@ namespace mxvm {
                             v.var_value.float_value = 0.0;
                             v.var_value.type = VarType::VAR_FLOAT;
                         }
-                    } else {
-                        throw mx::Exception("to_float second argument must be a string");
-                    }
+                    } else if(s.type == VarType::VAR_INTEGER || s.type == VarType::VAR_BYTE || s.type == VarType::VAR_POINTER || s.type == VarType::VAR_EXTERN) {
+                        v.var_value.float_value = static_cast<int64_t>(s.var_value.int_value);
+                    } 
                 } else {
                     throw mx::Exception("to_float second argument must be a variable");
                 }
@@ -1671,4 +1704,102 @@ namespace mxvm {
         }
         throw mx::Exception("Could not create variable from operand: " + op.op);
     }
+
+    void Program::exec_fcmp(const Instruction& instr) {
+        Variable* var1 = nullptr;
+        Variable* var2 = nullptr;
+        Variable temp1, temp2;
+        
+        if (isVariable(instr.op1.op)) {
+            var1 = &getVariable(instr.op1.op);
+        } else {
+            temp1 = createTempVariable(VarType::VAR_FLOAT, instr.op1.op);
+            var1 = &temp1;
+        }
+        if (isVariable(instr.op2.op)) {
+            var2 = &getVariable(instr.op2.op);
+        } else {
+            temp2 = createTempVariable(VarType::VAR_FLOAT, instr.op2.op);
+            var2 = &temp2;
+        }
+        
+        // Reset all flags
+        zero_flag = false;
+        less_flag = false;
+        greater_flag = false;
+        carry_flag = false;
+        
+        // Convert to double for comparison
+        double val1, val2;
+        if (var1->type == VarType::VAR_FLOAT) {
+            val1 = var1->var_value.float_value;
+        } else if (var1->type == VarType::VAR_INTEGER || var1->type == VarType::VAR_BYTE) {
+            val1 = static_cast<double>(var1->var_value.int_value);
+        } else {
+            throw mx::Exception("FCMP: unsupported operand type for var1");
+        }
+        
+        if (var2->type == VarType::VAR_FLOAT) {
+            val2 = var2->var_value.float_value;
+        } else if (var2->type == VarType::VAR_INTEGER || var2->type == VarType::VAR_BYTE) {
+            val2 = static_cast<double>(var2->var_value.int_value);
+        } else {
+            throw mx::Exception("FCMP: unsupported operand type for var2");
+        }
+        
+        // Set flags based on comparison
+        if (val1 == val2) {
+            zero_flag = true;
+        } else if (val1 < val2) {
+            less_flag = true;
+            carry_flag = true;  // For unsigned comparisons
+        } else {
+            greater_flag = true;
+        }
+    }
+
+    void Program::exec_jae(const Instruction& instr) {
+        if (greater_flag || zero_flag) exec_jmp(instr);
+        else pc++;
+    }
+
+    void Program::exec_jbe(const Instruction& instr) {
+        if (less_flag || zero_flag) exec_jmp(instr);
+        else pc++;
+    }
+
+    void Program::exec_jc(const Instruction& instr) {
+        if (carry_flag) exec_jmp(instr);
+        else pc++;
+    }
+
+    void Program::exec_jnc(const Instruction& instr) {
+        if (!carry_flag) exec_jmp(instr);
+        else pc++;
+    }
+
+    void Program::exec_jp(const Instruction& instr) {
+        pc++;
+    }
+
+    void Program::exec_jnp(const Instruction& instr) {
+        exec_jmp(instr);
+    }
+
+    void Program::exec_jo(const Instruction& instr) {
+        pc++;
+    }
+
+    void Program::exec_jno(const Instruction& instr) {
+        exec_jmp(instr);
+    }
+
+    void Program::exec_js(const Instruction& instr) {
+        pc++;
+    }
+
+    void Program::exec_jns(const Instruction& instr) {
+        exec_jmp(instr);
+    }
+
 }

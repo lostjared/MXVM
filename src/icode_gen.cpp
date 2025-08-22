@@ -26,7 +26,7 @@ namespace mxvm {
             labels_[l.second.first] = l.first;
         }
 
-        // Check if std module is being used
+        
         bool uses_std_module = false;
         for(const auto &e : external) {
             if(e.mod == "std") {
@@ -204,6 +204,9 @@ namespace mxvm {
 
 
     void Program::generateInstruction(std::ostream &out, const Instruction  &i) {
+        if (i.instruction < JMP || i.instruction > JNS) {
+            last_cmp_type = CMP_NONE;
+        }
         switch(i.instruction) {
             case ADD:
                 gen_arth(out, "add", i);
@@ -310,6 +313,39 @@ namespace mxvm {
                 break;
             case NEG:
                 gen_neg(out, i);
+                break;
+            case FCMP:
+                gen_fcmp(out, i);
+                break;
+            case JAE:
+                gen_jae(out, i);
+                break;
+            case JBE:
+                gen_jbe(out, i);
+                break;
+            case JC:
+                gen_jc(out, i);
+                break;
+            case JNC:
+                gen_jnc(out, i);
+                break;
+            case JP:
+                gen_jp(out, i);
+                break;
+            case JNP:
+                gen_jnp(out, i);
+                break;
+            case JO:
+                gen_jo(out, i);
+                break;
+            case JNO:
+                gen_jno(out, i);
+                break;
+            case JS:
+                gen_js(out, i);
+                break;
+            case JNS:
+                gen_jns(out, i);
                 break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
@@ -572,7 +608,7 @@ namespace mxvm {
         bool elemSizeKnown = true;
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
-                elemSizeKnown = false;                             // dynamic element size in %rdx
+                elemSizeKnown = false;                             
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rdx", i.vop[0]);
             } else {
                 elemSize = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
@@ -655,39 +691,111 @@ namespace mxvm {
     }
 
     void Program::gen_to_int(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) {
-            throw mx::Exception("to_int requires two variables (dest int, src string)");
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("to_int requires destination variable (dest int)");
         }
+        if (i.op2.op.empty()) {
+            throw mx::Exception("to_int requires source operand");
+        }
+
         Variable &dest = getVariable(i.op1.op);
-        Variable &src = getVariable(i.op2.op);
         if (dest.type != VarType::VAR_INTEGER) {
             throw mx::Exception("to_int: first argument must be an integer variable");
         }
-        if (src.type != VarType::VAR_STRING) {
-            throw mx::Exception("to_int: second argument must be a string variable");
-        }
-        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
-        out << "\tcall " << getPlatformSymbolName("atol") << "\n";
-        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-    }
 
-    void Program::gen_to_float(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op) || !isVariable(i.op2.op)) {
-            throw mx::Exception("to_float requires two variables (dest float, src string)");
+        if (isVariable(i.op2.op)) {
+            Variable &src = getVariable(i.op2.op);
+            switch (src.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %xmm0\n";
+                    out << "\tcvttsd2si %xmm0, %rax\n";
+                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_STRING:
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rdi\n";
+                    out << "\tcall " << getPlatformSymbolName("atol") << "\n";
+                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                default:
+                    throw mx::Exception("to_int: unsupported source variable type");
+            }
         }
+        else if (i.op2.type == OperandType::OP_CONSTANT) {
+            out << "\tmovq $" << i.op2.op << ", %rax\n";
+            out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+        }
+        else {
+            throw mx::Exception("to_int: unsupported source operand");
+        }
+    }
+    void Program::gen_to_float(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("to_float requires destination variable (dest float)");
+        }
+        if (i.op2.op.empty()) {
+            throw mx::Exception("to_float requires source operand");
+        }
+
         Variable &dest = getVariable(i.op1.op);
-        Variable &src = getVariable(i.op2.op);
         if (dest.type != VarType::VAR_FLOAT) {
             throw mx::Exception("to_float: first argument must be a float variable");
         }
-        if (src.type != VarType::VAR_STRING) {
-            throw mx::Exception("to_float: second argument must be a string variable");
+
+        if (isVariable(i.op2.op)) {
+            Variable &src = getVariable(i.op2.op);
+            switch (src.type) {
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %xmm0\n";
+                    out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    out << "\tcvtsi2sd %rax, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    out << "\tcvtsi2sd %rax, %xmm0\n";
+                    out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                case VarType::VAR_STRING:
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rdi\n";
+                    out << "\tcall " << getPlatformSymbolName("atof") << "\n";
+                    out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    break;
+
+                default:
+                    throw mx::Exception("to_float: unsupported source variable type");
+            }
         }
-        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
-        out << "\tcall " << getPlatformSymbolName("atof") << "\n";
-        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+        else if (i.op2.type == OperandType::OP_CONSTANT) {
+            out << "\tmovq $" << i.op2.op << ", %rax\n";
+            out << "\tcvtsi2sd %rax, %xmm0\n";
+            out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+        }
+        else {
+            throw mx::Exception("to_float: unsupported source operand");
+        }
     }
-        
 
     void Program::gen_div(std::ostream &out, const Instruction &i) {
         if (i.op3.op.empty()) {
@@ -998,18 +1106,65 @@ namespace mxvm {
         return count;
     }
 
-    int Program::generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op) {
+    int Program::generateLoadVar(std::ostream &out, VarType reqType, std::string reg, const Operand &op) {
         int count = 0;
         if(isVariable(op.op)) {
             if(op.type != OperandType::OP_VARIABLE) {
-                throw mx::Exception("Operand expected variable instead I foudn: " + op.op);
+                throw mx::Exception("Operand expected variable instead I found: " + op.op);
             }
             Variable &v = getVariable(op.op);
-            if(v.type != type && type != VarType::VAR_INTEGER) {
-                std::ostringstream vartype;
-                vartype << v.type << " != " << type << "\n";
-                throw mx::Exception ("LoadVar Variable type mismatch: " + op.op + " " + vartype.str());
+            if (reqType == VarType::VAR_FLOAT) {
+                if (v.type == VarType::VAR_FLOAT) {
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    count = 1;
+                } else if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
+                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rax\n";
+                    out << "\tcvtsi2sd %rax, " << reg << "\n";
+                    count = 1;
+                } else if (v.type == VarType::VAR_BYTE) {
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rax\n";
+                    out << "\tcvtsi2sd %rax, " << reg << "\n";
+                    count = 1;
+                } else if (v.type == VarType::VAR_STRING) {
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rdi\n";
+                    out << "\tcall " << getPlatformSymbolName("atof") << "\n";
+                    out << "\tmovsd %xmm0, " << reg << "\n";
+                    count = 1;
+                } else {
+                    throw mx::Exception("LoadVar: unsupported source type for float");
+                }
+                return count;
             }
+
+            if (reqType == VarType::VAR_INTEGER || reqType == VarType::VAR_POINTER || reqType == VarType::VAR_EXTERN) {
+                if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
+                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                } else if (v.type == VarType::VAR_BYTE) {
+                    out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                } else if (v.type == VarType::VAR_FLOAT) {
+                    out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %xmm0\n";
+                    out << "\tcvttsd2si %xmm0, " << reg << "\n";
+                } else if (v.type == VarType::VAR_STRING) {
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rdi\n";
+                    out << "\tcall " << getPlatformSymbolName("atol") << "\n";
+                    out << "\tmovq %rax, " << reg << "\n";
+                } else {
+                    throw mx::Exception("LoadVar: unsupported source type for integer");
+                }
+                return count;
+            }
+
+            if (reqType == VarType::VAR_STRING) {
+                if (v.type == VarType::VAR_STRING) {
+                    out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                } else if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
+                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                } else {
+                    throw mx::Exception("LoadVar: unsupported source type for string");
+                }
+                return count;
+            }
+
             switch(v.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
@@ -1023,19 +1178,26 @@ namespace mxvm {
                 case VarType::VAR_FLOAT:
                     out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 1;
-                break;
+                    break;
                 case VarType::VAR_STRING:
-                    count = 0;
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
-                break;
+                    break;
                 default:
-                break;
+                    break;
             }
         } else {
-            if(op.type == OperandType::OP_CONSTANT && type == VarType::VAR_INTEGER) {
-                out << "\tmovq $" << op.op << ", " << reg << "\n";
-            } else if(op.type == OperandType::OP_CONSTANT && type == VarType::VAR_FLOAT) {
-                throw mx::Exception("You cannot use a constant with a floating point variable.");
+            if(op.type == OperandType::OP_CONSTANT) {
+                if (reqType == VarType::VAR_INTEGER || reqType == VarType::VAR_POINTER || reqType == VarType::VAR_EXTERN) {
+                    out << "\tmovq $" << op.op << ", " << reg << "\n";
+                } else if (reqType == VarType::VAR_FLOAT) {
+                    out << "\tmovq $" << op.op << ", %rax\n";
+                    out << "\tcvtsi2sd %rax, " << reg << "\n";
+                    count = 1;
+                } else if (reqType == VarType::VAR_STRING) {
+                    out << "\tmovq $" << op.op << ", " << reg << "\n";
+                } else {
+                    out << "\tmovq $" << op.op << ", " << reg << "\n";
+                }
             }
         }
         return count;
@@ -1063,7 +1225,7 @@ namespace mxvm {
 
         int total = 0;
         const size_t stack_args = (args.size() > 5) ? (args.size() - 5) : 0;
-        const bool needs_dummy = (stack_args % 2) != 0; // keep 16B alignment
+        const bool needs_dummy = (stack_args % 2) != 0; 
 
         if (needs_dummy) {
             out << "\tsub $8, %rsp\n";
@@ -1130,14 +1292,16 @@ namespace mxvm {
                 case JMP: mnem = "jmp"; break;
                 case JE:  mnem = "je";  break;
                 case JNE: mnem = "jne"; break;
-                case JL:  mnem = "jl";  break;
-                case JLE: mnem = "jle"; break;
-                case JG:  mnem = "jg";  break;
-                case JGE: mnem = "jge"; break;
                 case JZ:  mnem = "jz";  break;
                 case JNZ: mnem = "jnz"; break;
-                case JA:  mnem = "ja";  break;
-                case JB:  mnem = "jb";  break;
+                
+                
+                case JL:  mnem = (last_cmp_type == CMP_FLOAT) ? "jb" : "jl"; break;
+                case JLE: mnem = (last_cmp_type == CMP_FLOAT) ? "jbe" : "jle"; break;
+                case JG:  mnem = (last_cmp_type == CMP_FLOAT) ? "ja" : "jg"; break;
+                case JGE: mnem = (last_cmp_type == CMP_FLOAT) ? "jae" : "jge"; break;
+                case JA:  mnem = "ja";  break; 
+                case JB:  mnem = "jb";  break; 
                 default:
                     throw mx::Exception("Invalid jump opcode for gen_jmp");
             }
@@ -1165,16 +1329,71 @@ namespace mxvm {
             generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
             generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
             out << "\tcomisd %xmm1, %xmm0\n";
+            last_cmp_type = CMP_FLOAT; 
+            
         }  else if(type1 == VarType::VAR_POINTER && (type2 == VarType::VAR_INTEGER || type2 == VarType::VAR_BYTE)) {
             generateLoadVar(out, type1, "%rax", i.op1);
             generateLoadVar(out, type2, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
+            last_cmp_type = CMP_INTEGER; 
         }
         else {
             generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
             generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
+            last_cmp_type = CMP_INTEGER; 
         }
+    }
+
+    void Program::gen_fcmp(std::ostream &out, const Instruction &i) {
+        if (i.op2.op.empty()) {
+            throw mx::Exception("FCMP requires two operands");
+        }
+        
+        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+        out << "\tcomisd %xmm1, %xmm0\n";
+        last_cmp_type = CMP_FLOAT; 
+    }
+
+    void Program::gen_jae(std::ostream &out, const Instruction &i) {
+        out << "\tjae ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jbe(std::ostream &out, const Instruction &i) {
+        out << "\tjbe ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jc(std::ostream &out, const Instruction &i) {
+        out << "\tjc ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jnc(std::ostream &out, const Instruction &i) {
+        out << "\tjnc ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jp(std::ostream &out, const Instruction &i) {
+        out << "\tjp ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jnp(std::ostream &out, const Instruction &i) {
+        out << "\tjnp ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jo(std::ostream &out, const Instruction &i) {
+        out << "\tjo ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jno(std::ostream &out, const Instruction &i) {
+        out << "\tjno ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_js(std::ostream &out, const Instruction &i) {
+        out << "\tjs ." << i.op1.op << "\n";
+    }
+
+    void Program::gen_jns(std::ostream &out, const Instruction &i) {
+        out << "\tjns ." << i.op1.op << "\n";
     }
 
     void Program::gen_mov(std::ostream &out, const Instruction &i) {
@@ -1241,7 +1460,6 @@ namespace mxvm {
             if(isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if(v.type == VarType::VAR_INTEGER) {
-                    // Use less common registers to avoid clobbering and optimizer bugs
                     generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op2);
                     if(arth == "mul")
@@ -1264,7 +1482,6 @@ namespace mxvm {
             if(isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if(v.type == VarType::VAR_INTEGER) {
-                    // Use less common registers to avoid clobbering and optimizer bugs
                     generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op3);
                     if(arth == "mul")
@@ -1286,7 +1503,6 @@ namespace mxvm {
     }
 
     void Program::gen_exit(std::ostream &out, const Instruction &i) {
-        // Check if std module is being used
         bool uses_std_module = false;
         for(const auto &e : external) {
             if(e.mod == "std") {
@@ -1294,8 +1510,6 @@ namespace mxvm {
                 break;
             }
         }
-
-        // If using std module, clean up program args before exit
         if(uses_std_module) {
             out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
         }
