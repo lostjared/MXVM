@@ -52,67 +52,6 @@ namespace pascal {
     }
 
 
-    std::vector<std::unique_ptr<ASTNode>> PascalParser::parseDeclarations() {
-        std::vector<std::unique_ptr<ASTNode>> declarations;
-        
-        if (match("var")) {  
-            while (peekIs(types::TokenType::TT_ID)) {
-                if (isKeyword(token->getTokenValue())) {
-                    break; 
-                }
-                
-                std::vector<std::string> identifiers;
-                
-                identifiers.push_back(token->getTokenValue());
-                next();  
-                
-                while (match(",")) {  
-                    if (!peekIs(types::TokenType::TT_ID))
-                        error("Expected identifier after comma");
-                        
-                    identifiers.push_back(token->getTokenValue());
-                    next();  
-                }
-                
-                if (!match(":"))  
-                    error("Expected ':' after identifiers found: " + token->getTokenValue() + " on Line: " + std::to_string(token->getLine()));
-                    
-                if (!peekIs(types::TokenType::TT_ID))
-                    error("Expected type name");
-                    
-                std::string type = token->getTokenValue();
-                next();  
-                
-                std::unique_ptr<ASTNode> initializer = nullptr;
-                if (match(":=")) {  
-                    initializer = parseExpression();
-                }
-                
-                if (!match(";"))
-                    error("Expected ';' after variable declaration");
-
-                if (initializer) {
-                    std::vector<std::unique_ptr<ASTNode>> initializers;
-                    initializers.push_back(std::move(initializer));
-                    declarations.push_back(std::make_unique<VarDeclNode>(
-                        std::move(identifiers), type, std::move(initializers)));
-                } else {
-                    declarations.push_back(std::make_unique<VarDeclNode>(
-                        std::move(identifiers), type));
-                }
-            }
-        }
-
-        while (peekIs("procedure") || peekIs("function")) {
-            if (peekIs("procedure")) {
-                declarations.push_back(parseProcedureDeclaration());
-            } else {
-                declarations.push_back(parseFunctionDeclaration());
-            }
-        }
-
-        return declarations;
-    }
     bool PascalParser::isKeyword(const std::string& token) {
         std::string lower = token;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -719,6 +658,101 @@ namespace pascal {
         return std::make_unique<CaseStmtNode>(std::move(expression), 
                                               std::move(branches), 
                                               std::move(elseStatement));
+    }
+
+    std::unique_ptr<ASTNode> PascalParser::parseConstDeclaration() {
+        expectToken("const");
+        next();
+        
+        std::vector<std::unique_ptr<ConstDeclNode::ConstAssignment>> assignments;
+        
+        do {
+            expectToken(types::TokenType::TT_ID);
+            std::string identifier = token->getTokenValue();
+            next();
+            
+            expectToken("=");
+            next();
+            
+            auto value = parseExpression();
+            
+            assignments.push_back(
+                std::make_unique<ConstDeclNode::ConstAssignment>(identifier, std::move(value))
+            );
+            
+            expectToken(";");
+            next();
+            
+        } while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue()));
+        
+        return std::make_unique<ConstDeclNode>(std::move(assignments));
+    }
+
+    std::vector<std::unique_ptr<ASTNode>> PascalParser::parseDeclarations() {
+        std::vector<std::unique_ptr<ASTNode>> declarations;
+        
+        while (peekIs("const") || peekIs("var") || peekIs("procedure") || peekIs("function")) {
+            if (peekIs("const")) {
+                declarations.push_back(parseConstDeclaration());
+            }
+            else if (peekIs("var")) {
+                if (match("var")) {  
+                    while (peekIs(types::TokenType::TT_ID)) {
+                        if (isKeyword(token->getTokenValue())) {
+                            break; 
+                        }
+                        
+                        std::vector<std::string> identifiers;
+                        
+                        identifiers.push_back(token->getTokenValue());
+                        next();  
+                        
+                        while (match(",")) {  
+                            if (!peekIs(types::TokenType::TT_ID))
+                                error("Expected identifier after comma");
+                                
+                            identifiers.push_back(token->getTokenValue());
+                            next();  
+                        }
+                        
+                        if (!match(":"))  
+                            error("Expected ':' after identifiers found: " + token->getTokenValue() + " on Line: " + std::to_string(token->getLine()));
+                            
+                        if (!peekIs(types::TokenType::TT_ID))
+                            error("Expected type name");
+                            
+                        std::string type = token->getTokenValue();
+                        next();  
+                        
+                        std::unique_ptr<ASTNode> initializer = nullptr;
+                        if (match(":=")) {  
+                            initializer = parseExpression();
+                        }
+                        
+                        if (!match(";"))
+                            error("Expected ';' after variable declaration");
+
+                        if (initializer) {
+                            std::vector<std::unique_ptr<ASTNode>> initializers;
+                            initializers.push_back(std::move(initializer));
+                            declarations.push_back(std::make_unique<VarDeclNode>(
+                                std::move(identifiers), type, std::move(initializers)));
+                        } else {
+                            declarations.push_back(std::make_unique<VarDeclNode>(
+                                std::move(identifiers), type));
+                        }
+                    }
+                }
+            }
+            else if (peekIs("procedure")) {
+                declarations.push_back(parseProcedureDeclaration());
+            }
+            else if (peekIs("function")) {
+                declarations.push_back(parseFunctionDeclaration());
+            }
+        }
+        
+        return declarations;
     }
 
 }

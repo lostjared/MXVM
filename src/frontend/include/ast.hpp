@@ -60,6 +60,24 @@ namespace pascal {
         std::string toString() const override;
     };
 
+    class ConstDeclNode : public ASTNode {
+    public:
+        struct ConstAssignment {
+            std::string identifier;
+            std::unique_ptr<ASTNode> value;
+            
+            ConstAssignment(const std::string& id, std::unique_ptr<ASTNode> val)
+                : identifier(id), value(std::move(val)) {}
+        };
+        
+        std::vector<std::unique_ptr<ConstAssignment>> assignments;  
+        ConstDeclNode(std::vector<std::unique_ptr<ConstAssignment>> assigns)
+            : assignments(std::move(assigns)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
     class ProcDeclNode : public ASTNode {
     public:
         std::string name;
@@ -332,6 +350,7 @@ namespace pascal {
         virtual void visit(ProgramNode& node) = 0;
         virtual void visit(BlockNode& node) = 0;
         virtual void visit(VarDeclNode& node) = 0;
+        virtual void visit(ConstDeclNode& node) = 0;
         virtual void visit(ProcDeclNode& node) = 0;
         virtual void visit(FuncDeclNode& node) = 0;
         virtual void visit(ParameterNode& node) = 0;
@@ -385,6 +404,7 @@ namespace pascal {
         void visit(EmptyStmtNode& node) override;
         void visit(RepeatStmtNode& node) override;
         void visit(CaseStmtNode& node) override;
+        void visit(ConstDeclNode& node) override; 
     };
 
 } 

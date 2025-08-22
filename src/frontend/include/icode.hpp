@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <memory>
 #include <set>
+#include <map>
 
 namespace pascal {
 
@@ -133,7 +134,7 @@ namespace pascal {
             return "empty_str";
         }
         
-        
+        std::map<std::string, std::pair<std::string, std::string>> constInitialValues;
         const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
         const std::vector<std::string> ptrRegisters = {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
         const std::vector<std::string> floatRegisters = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9"};
@@ -687,28 +688,6 @@ namespace pascal {
                 out << "\t\tfloat " << constant.first << " = " << constant.second << "\n";
             }
             
-            
-            for (int i = 0; i < nextSlot; ++i) {
-                if (!isRegisterSlot(i) && !isTempVar(slotVar(i)) && !isPtrReg(slotVar(i))) {
-                    auto it = slotToType.find(i);
-                    if (it != slotToType.end()) {
-                        if (it->second == VarType::STRING) {
-                            out << "\t\tstring " << slotVar(i) << " = \"\"\n";
-                        } else if (it->second == VarType::PTR) {
-                            out << "\t\tptr " << slotVar(i) << " = null\n";
-                        } else if (it->second == VarType::CHAR) {
-                            out << "\t\tint " << slotVar(i) << " = 0\n"; 
-                        } else if (it->second == VarType::DOUBLE) {
-                            out << "\t\tfloat " << slotVar(i) << " = 0.0\n";
-                        } else {
-                            out << "\t\tint " << slotVar(i) << " = 0\n";
-                        }
-                    } else {
-                        out << "\t\tint " << slotVar(i) << " = 0\n";
-                    }
-                }
-            }
-            
             if (needsEmptyString) {
                 out << "\t\tstring empty_str = \"\"\n";
             }
@@ -735,6 +714,35 @@ namespace pascal {
                 out << "\t\tstring newline = \"\\n\"\n";
             }
             out << "\t\tstring input_buffer, 256\n";
+
+            for (int i = 0; i < nextSlot; ++i) {
+                if (!isRegisterSlot(i) && !isTempVar(slotVar(i)) && !isPtrReg(slotVar(i))) {
+                    auto it = slotToType.find(i);
+                    if (it != slotToType.end()) {
+                        std::string varName = slotVar(i);
+                        auto constIt = constInitialValues.find(varName);
+                        if (constIt != constInitialValues.end()) {
+                            std::string typeStr = constIt->second.first;
+                            std::string value = constIt->second.second;
+                            out << "\t\t" << typeStr << " " << varName << " = " << value << "\n";
+                        } else {
+                            if (it->second == VarType::STRING) {
+                                out << "\t\tstring " << slotVar(i) << " = \"\"\n";
+                            } else if (it->second == VarType::PTR) {
+                                out << "\t\tptr " << slotVar(i) << " = null\n";
+                            } else if (it->second == VarType::CHAR) {
+                                out << "\t\tint " << slotVar(i) << " = 0\n"; 
+                            } else if (it->second == VarType::DOUBLE) {
+                                out << "\t\tfloat " << slotVar(i) << " = 0.0\n";
+                            } else {
+                                out << "\t\tint " << slotVar(i) << " = 0\n";
+                            }
+                        }
+                    } else {
+                        out << "\t\tint " << slotVar(i) << " = 0\n";
+                    }
+                }
+            }
             out << "\t}\n";
             out << "\tsection code {\n";
             out << "\tstart:\n";
@@ -1440,6 +1448,60 @@ namespace pascal {
 
         void visit(EmptyStmtNode& node) override {
         }
+        void visit(ConstDeclNode& node) override {
+            for (const auto& assignment : node.assignments) {
+                std::string varType;
+                std::string literalValue;
+                
+                if (auto numNode = dynamic_cast<NumberNode*>(assignment->value.get())) {
+                    if (numNode->isReal || numNode->value.find('.') != std::string::npos) {
+                        varType = "float";
+                        literalValue = numNode->value;
+                    } else {
+                        varType = "int";
+                        literalValue = numNode->value;
+                    }
+                } else if (auto stringNode = dynamic_cast<StringNode*>(assignment->value.get())) {
+                    varType = "string";
+                    literalValue = "\"" + stringNode->value + "\"";
+                } else if (auto boolNode = dynamic_cast<BooleanNode*>(assignment->value.get())) {
+                    varType = "int";
+                    literalValue = boolNode->value ? "1" : "0";
+                } else {
+                    std::string valueReg = eval(assignment->value.get());
+                    
+                    varType = "int"; 
+                    int slot = newSlotFor(assignment->identifier);
+                    setVarType(assignment->identifier, VarType::INT);
+                    setSlotType(slot, VarType::INT);
+                    
+                    std::string varLocation = slotVar(slot);
+                    emit3("mov", varLocation, valueReg);
+                    
+                    if (isReg(valueReg)) {
+                        freeReg(valueReg);
+                    }
+                    continue;
+                }
+                
+                int slot = newSlotFor(assignment->identifier);
+                VarType vType = VarType::INT;
+                if (varType == "float") {
+                    vType = VarType::DOUBLE;
+                } else if (varType == "string") {
+                    vType = VarType::STRING;
+                }
+                
+                setVarType(assignment->identifier, vType);
+                setSlotType(slot, vType);
+                std::string varLocation = slotVar(slot);
+                updateDataSectionInitialValue(varLocation, varType, literalValue);
+            }
+        }
+
+        void updateDataSectionInitialValue(const std::string& varName, const std::string& type, const std::string& value) {
+            constInitialValues[varName] = {type, value};
+        }
 
         void visit(RepeatStmtNode& node) override {
             std::string startLabel = newLabel("REPEAT");
@@ -1511,19 +1573,6 @@ namespace pascal {
 
     private:
         std::unordered_map<std::string, std::string> realConstants;
-    
-        void generateDataSection() {
-            for (const auto& constant : realConstants) {
-                emit("real " + constant.first + " = " + constant.second);
-            }
-            
-            if (usedStrings.count("fmt_float")) {
-                emit("string fmt_float = \"%.6f \"");
-            }
-            if (usedStrings.count("fmt_double")) {
-                emit("string fmt_double = \"%.6f\"");
-            }
-        }
     };
 
     std::string mxvmOpt(const std::string &text);

@@ -232,6 +232,29 @@ namespace pascal {
         }
     }
 
+    void ConstDeclNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ConstDeclNode::toString() const {
+        return "ConstDecl";
+    }
+
+    void PrettyPrintVisitor::visit(ConstDeclNode& node) {
+        printIndent();
+        out << "const\n";
+        indentLevel++;
+        
+        for (const auto& assignment : node.assignments) {
+            printIndent();
+            out << assignment->identifier << " = ";
+            assignment->value->accept(*this);
+            out << ";\n";
+        }
+        
+        indentLevel--;
+    }
+
     void PrettyPrintVisitor::visit(ProgramNode& node) {
         printIndent();
         out << "program " << node.name << ";" << std::endl;
@@ -488,5 +511,4 @@ namespace pascal {
         printIndent();
         out << "end";
     }
-
 }

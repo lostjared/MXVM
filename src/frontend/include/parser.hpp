@@ -82,6 +82,7 @@ namespace pascal {
         std::unique_ptr<ASTNode> parseBlock();
         std::vector<std::unique_ptr<ASTNode>> parseDeclarations();
         std::unique_ptr<ASTNode> parseVarDeclaration();
+        std::unique_ptr<ASTNode> parseConstDeclaration();
         std::unique_ptr<ASTNode> parseProcedureDeclaration();
         std::unique_ptr<ASTNode> parseFunctionDeclaration();
         std::vector<std::unique_ptr<ASTNode>> parseParameterList();
