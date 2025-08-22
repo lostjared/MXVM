@@ -28,7 +28,7 @@ namespace pascal {
             "isspace", "atoi", "atof", "exit", "system", "memcpy", "memcmp",
             "memmove", "memset", "exp", "exp2", "log", "log10", "log2", "fmod",
             "atan2", "asin", "acos", "atan", "sinh", "cosh", "tanh", "hypot",
-            "round", "trunc", "float_to_int", "int_to_float"
+            "round", "trunc", "float_to_int", "int_to_float", "halt"
         };
     
 
@@ -173,7 +173,7 @@ namespace pascal {
                 if (arguments.size() != 1) throw std::runtime_error("free requires 1 argument");
                 visitor.emit_invoke("free", args);
             }
-            else if (funcName == "exit") {
+            else if (funcName == "halt") {
                 if (arguments.size() != 1) throw std::runtime_error("exit requires 1 argument");
                 visitor.emit("exit " + args[0]);
             }
