@@ -80,6 +80,8 @@ namespace pascal {
         std::unordered_set<std::string> usedRealConstants;  
         int realConstantCounter = 0;
         std::set<std::string> usedModules;
+        std::vector<std::string> globalArrays;
+        std::unordered_map<std::string, std::vector<std::string>> functionScopedArrays;
     
         std::string generateRealConstantName() {
             return "real_const_" + std::to_string(realConstantCounter++);
@@ -518,6 +520,8 @@ namespace pascal {
             deferredFuncs.clear();
             valueLocations.clear();
             varTypes.clear();  
+            globalArrays.clear(); 
+            functionScopedArrays.clear(); 
             
             for (size_t i = 0; i < regInUse.size(); i++) {
                 regInUse[i] = false;
@@ -528,10 +532,17 @@ namespace pascal {
             }
             
             root->accept(*this);
+
+            
+            for (const auto& arrayName : globalArrays) {
+                emit1("free", arrayName);
+            }
+
             emit("done");
             
             for (auto pn : deferredProcs) {
                 emitLabel(funcLabel("function PROC_", pn->name));
+                currentFunctionName = pn->name; 
                 
                 for (size_t i = 0; i < regInUse.size(); i++) {
                     regInUse[i] = false;
@@ -593,7 +604,15 @@ namespace pascal {
                 }
                 
                 if (pn->block) pn->block->accept(*this);
+
+                if (functionScopedArrays.count(pn->name)) {
+                    for (const auto& arrayName : functionScopedArrays[pn->name]) {
+                        emit1("free", arrayName);
+                    }
+                }
+
                 emit("ret");
+                currentFunctionName.clear(); 
             }
             
             for (auto fn : deferredFuncs) {
@@ -649,6 +668,12 @@ namespace pascal {
                 }
 
                 if (fn->block) fn->block->accept(*this);
+
+                if (functionScopedArrays.count(fn->name)) {
+                    for (const auto& arrayName : functionScopedArrays[fn->name]) {
+                        emit1("free", arrayName);
+                    }
+                }
 
                 if (!functionSetReturn) {
                     VarType funcReturnType = getVarType(fn->name);
@@ -1557,7 +1582,6 @@ namespace pascal {
     private:
         std::unordered_map<std::string, std::string> realConstants;
 
-        // Add array support structures
         struct ArrayInfo {
             std::string elementType;
             int lowerBound;
@@ -1581,11 +1605,8 @@ namespace pascal {
 
         void visit(ArrayDeclarationNode& node) override {
             std::string arrayName = node.name;
-    
-    
-            std::string lowerBoundStr = node.arrayType->lowerBound->toString();
-            std::string upperBoundStr = node.arrayType->upperBound->toString();
-    
+            std::string lowerBoundStr = eval(node.arrayType->lowerBound.get());
+            std::string upperBoundStr = eval(node.arrayType->upperBound.get());
             int lowerBound = 0, upperBound = 0;
             try {
                 lowerBound = std::stoi(lowerBoundStr);
@@ -1594,7 +1615,7 @@ namespace pascal {
                 throw std::runtime_error("Array bounds must be constant integers");
             }
             
-            int size = upperBound - lowerBound + 1;
+            int size = upperBound - lowerBound + 1; 
             int elementSize = getArrayElementSize(node.arrayType->elementType);
             
             ArrayInfo info;
@@ -1605,41 +1626,24 @@ namespace pascal {
             info.elementSize = elementSize;
             arrayInfo[arrayName] = info;
             
+            if (currentFunctionName.empty()) {
+                globalArrays.push_back(arrayName);
+            } else {
+                functionScopedArrays[currentFunctionName].push_back(arrayName);
+            }
+            
             setVarType(arrayName, VarType::PTR);
+            setSlotType(newSlotFor(arrayName), VarType::PTR);
             
-            std::string sizeReg = allocReg();
-            std::string countReg = allocReg();
-            std::string resultReg = allocReg();
-            
-            emit3("mov", countReg, std::to_string(size));
-            emit3("mov", sizeReg, std::to_string(elementSize));
-            emit_invoke("calloc", {countReg, sizeReg});
-            emit1("return", resultReg);  
-            emit3("mov", arrayName, resultReg);
-            
-            freeReg(sizeReg);
-            freeReg(countReg);
-            freeReg(resultReg);
+            emit3("alloc", arrayName, std::to_string(elementSize), std::to_string(size));
             
             for (size_t i = 0; i < node.initializers.size() && i < static_cast<size_t>(size); i++) {
                 std::string value = eval(node.initializers[i].get());
                 std::string offsetReg = allocReg();
-                std::string addrReg = allocReg();
-                
-                emit3("mov", offsetReg, std::to_string(i * elementSize));
-                emit3("mov", addrReg, arrayName);
-                emit3("add", addrReg, offsetReg);
-                
-                if (node.arrayType->elementType == "integer") {
-                    emit3("store", addrReg, value);
-                } else if (node.arrayType->elementType == "real") {
-                    emit3("fstore", addrReg, value);
-                } else {
-                    emit3("store", addrReg, value); 
-                }
+                emit3("mov", offsetReg, std::to_string(i * elementSize));    
+                emit3("store", value, arrayName, offsetReg);
                 
                 freeReg(offsetReg);
-                freeReg(addrReg);
                 if (isReg(value)) freeReg(value);
             }
         }
@@ -1654,33 +1658,16 @@ namespace pascal {
             std::string indexValue = eval(node.index.get());
             
             std::string adjustedIndexReg = allocReg();
-            std::string offsetReg = allocReg();
-            std::string addrReg = allocReg();
             std::string resultReg = allocReg();
             
             emit3("mov", adjustedIndexReg, indexValue);
             emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
             
-            emit3("mov", offsetReg, adjustedIndexReg);
-            emit3("mul", offsetReg, std::to_string(info.elementSize));
-            
-            emit3("mov", addrReg, node.arrayName);
-            emit3("add", addrReg, offsetReg);
-            
-            
-            if (info.elementType == "integer") {
-                emit3("load", resultReg, addrReg);
-            } else if (info.elementType == "real") {
-                emit3("fload", resultReg, addrReg);
-            } else {
-                emit3("load", resultReg, addrReg); 
-            }
+            emit4("load", resultReg, node.arrayName, adjustedIndexReg, std::to_string(info.elementSize));
             
             pushValue(resultReg);
             
             freeReg(adjustedIndexReg);
-            freeReg(offsetReg);
-            freeReg(addrReg);
             if (isReg(indexValue)) freeReg(indexValue);
         }
 
@@ -1695,30 +1682,19 @@ namespace pascal {
             std::string value = eval(node.value.get());
             
             std::string adjustedIndexReg = allocReg();
-            std::string offsetReg = allocReg();
-            std::string addrReg = allocReg();
             
             emit3("mov", adjustedIndexReg, indexValue);
             emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
             
-            emit3("mov", offsetReg, adjustedIndexReg);
-            emit3("mul", offsetReg, std::to_string(info.elementSize));
-            
-            emit3("mov", addrReg, node.arrayName);
-            emit3("add", addrReg, offsetReg);
-            if (info.elementType == "integer") {
-                emit3("store", addrReg, value);
-            } else if (info.elementType == "real") {
-                emit3("fstore", addrReg, value);
-            } else {
-                emit3("store", addrReg, value);
-            }
+            emit4("store", value, node.arrayName, adjustedIndexReg, std::to_string(info.elementSize));
             
             freeReg(adjustedIndexReg);
-            freeReg(offsetReg);
-            freeReg(addrReg);
             if (isReg(indexValue)) freeReg(indexValue);
             if (isReg(value)) freeReg(value);
+        }
+
+        void emit4(const std::string& op, const std::string& a, const std::string& b, const std::string& c, const std::string& d) {
+            emit(op + " " + a + ", " + b + ", " + c + ", " + d);
         }
     };
 

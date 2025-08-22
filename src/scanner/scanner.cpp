@@ -206,22 +206,24 @@ namespace scan {
         auto filename = string_buffer.cur_file();
         auto is_op = [](char ch) {
             return ch == '+' || ch == '-' || ch == '*' || ch == '/' ||
-                   ch == '%' || ch == '^' || ch == '|' || ch == '&' ||
-                   ch == '(' || ch == ')';
+                ch == '%' || ch == '^' || ch == '|' || ch == '&' ||
+                ch == '(' || ch == ')';
         };
         auto is_hex_digit = [](char ch) {
             return std::isdigit(ch) ||
-                   (ch >= 'a' && ch <= 'f') ||
-                   (ch >= 'A' && ch <= 'F');
+                (ch >= 'a' && ch <= 'f') ||
+                (ch >= 'A' && ch <= 'F');
         };
 
         string_buffer.backward_step(1);
         TToken token;
         std::string tok_value;
+
         auto first_opt = string_buffer.getch();
         if (!first_opt.has_value()) return std::nullopt;
         char first = *first_opt;
         tok_value += first;
+
         if (first == '0') {
             auto nx = string_buffer.peekch(0);
             if (nx.has_value() && (*nx == 'x' || *nx == 'X')) {
@@ -237,39 +239,41 @@ namespace scan {
                 return token;
             }
         }
+
         int decimal_dots = 0;
         while (true) {
             auto p = string_buffer.peekch(0);
             if (!p.has_value()) break;
             char c = *p;
             if (std::isspace(c) || is_op(c)) break;
+            if (c == '.' && string_buffer.peekch(1).has_value() && *string_buffer.peekch(1) == '.') break;
             if (!std::isdigit(c) && c != '.') break;
-            string_buffer.getch();  // consume it
+
+            string_buffer.getch();
             if (c == '.') {
                 if (++decimal_dots > 1) {
                     std::ostringstream err;
                     auto lp = string_buffer.cur_line();
-                    err << "File: " << filename
-                        << " Line: " << lp.first
-                        << " Col: "  << lp.second
-                        << " -> Too many decimal points in number.";
+                    err << "File: " << filename << " Line: " << lp.first << " Col: " << lp.second << " -> Too many decimal points in number.";
                     throw ScanExcept(err.str());
                 }
             }
             tok_value += c;
         }
+
         token.set_pos(pos);
         token.set_filename(filename);
         token.setToken(types::TokenType::TT_NUM, tok_value);
         return token;
     }
 
+
     bool Scanner::is_c_sym(const StringType  &str) {
         static const std::set<std::string> c_op = {
             "++", "--", ">>=", "<<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", 
             "==", "!=", ">=", "<=", ">>", "<<", "&&", "||", "->", ".", "&", "*", "+", 
             "-", "~", "!", "/", "%", ">", "<", "=", "^", "|", "?", ":", ";", ",", 
-            "(", ")", "[", "]", "{", "}", "->", ".","::", "$", ":=", "<>"
+            "(", ")", "[", "]", "{", "}", "->", ".","::", "$", ":=", "<>", ".."
         };
         return c_op.find(str) != c_op.end();
     }
@@ -280,14 +284,14 @@ namespace scan {
         string_buffer.backward_step(1);
         auto filename = string_buffer.cur_file();
         auto pos      = string_buffer.cur_line();
-        
+
         auto ch = string_buffer.getch();
         if (!ch.has_value()) return std::nullopt;
-        
+
         if (*ch == '-') {
             auto next = string_buffer.peekch(0);
             if (next.has_value() && *next == '-') {
-                string_buffer.getch(); 
+                string_buffer.getch();
                 std::string arg_value = "--";
                 while (true) {
                     auto peeked = string_buffer.peekch(0);
@@ -308,13 +312,20 @@ namespace scan {
                 return token;
             }
         }
-        
-        
+
+        if (*ch == '.' && string_buffer.peekch(0).has_value() && *string_buffer.peekch(0) == '.') {
+            string_buffer.getch();
+            token.set_pos(pos);
+            token.set_filename(filename);
+            token.setToken(types::TokenType::TT_SYM, "..");
+            return token;
+        }
+
         tok_value = *ch;
         std::string temp_value = tok_value;
         int look = 0;
         bool found = false;
-        
+
         while (true) {
             auto temp = string_buffer.peekch(look);
             if (temp.has_value() && token_map.lookup_int8(*temp) == types::CharType::TT_SYMBOL) {
@@ -330,16 +341,17 @@ namespace scan {
                 break;
             }
         }
-        
+
         if (found && look != 0) {
             string_buffer.forward_step(look);
         }
-        
+
         token.set_pos(pos);
         token.set_filename(filename);
         token.setToken(types::TokenType::TT_SYM, tok_value);
         return token;
     }
+
         
     std::optional<TToken> Scanner::grabString() {
             TToken token;
