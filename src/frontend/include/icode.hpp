@@ -914,16 +914,19 @@ namespace pascal {
                 args.push_back(argValue);
             }
             
-            emit_invoke(node.name, args);
+            for (size_t i = 0; i < args.size() && i < 6; i++) {
+                if (i + 1 < registers.size()) {
+                    emit3("mov", registers[i + 1], args[i]);
+                }
+            }
             
-            
+            emit1("call", "PROC_" + node.name);
             for (const auto& arg : args) {
                 if (isReg(arg)) freeReg(arg);
             }
         }
 
-        void visit(FuncCallNode& node) override {
-            
+        void visit(FuncCallNode& node) override {   
             auto handler = builtinRegistry.findHandler(node.name);
             if (handler) {
                 if (handler->generateWithResult(*this, node.name, node.arguments)) {
@@ -936,30 +939,31 @@ namespace pascal {
                 std::string argValue = eval(arg.get());
                 args.push_back(argValue);
             }
-            
-    
+            for (size_t i = 0; i < args.size() && i < 6; i++) {
+                if (i + 1 < registers.size()) {
+                    emit3("mov", registers[i + 1], args[i]);
+                }
+            }
+            emit1("call", "FUNC_" + node.name);
             auto it = funcSignatures.find(node.name);
             VarType returnType = VarType::INT; 
             if (it != funcSignatures.end()) {
                 returnType = it->second.returnType;
             }
             
-            emit_invoke(node.name, args);
-        
             std::string resultReg;
             if (returnType == VarType::DOUBLE) {
                 resultReg = allocFloatReg();
-                emit1("return", resultReg);
+                emit3("mov", resultReg, "xmm0");  
             } else if (returnType == VarType::STRING) {
                 resultReg = allocReg();
-                emit1("return", resultReg);
+                emit3("mov", resultReg, "arg0");  
             } else {
                 resultReg = allocReg();
-                emit1("return", resultReg);
+                emit3("mov", resultReg, "rax");   
             }
             
-            pushValue(resultReg);
-            
+            pushValue(resultReg);            
             for (const auto& arg : args) {
                 if (isReg(arg)) freeReg(arg);
             }
