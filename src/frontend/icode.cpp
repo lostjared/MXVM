@@ -126,7 +126,7 @@ namespace pascal {
                         std::string dst1 = trim(m1[2].str());
                         std::string src1 = trim(m1[3].str());
                         if (dst1 == src0 && src1 == dst0) {
-                            pass1.push_back("\tmov " + dst0 + ", " + src0);
+                            pass1.push_back("\t\tmov " + dst0 + ", " + src0);
                             i = k + 1;
                             continue;
                         }

@@ -9,6 +9,7 @@
 #include <utility>
 #include <algorithm>
 #include <memory>
+#include <set>
 
 namespace pascal {
 
@@ -49,17 +50,6 @@ namespace pascal {
         void generate(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) override;  
     };
 
-    
-    class MathFunctionHandler : public BuiltinFunctionHandler {
-    public:
-        bool canHandle(const std::string& funcName) const override;
-        void generate(CodeGenVisitor& visitor, const std::string& funcName, 
-                    const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
-        bool generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
-                            const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
-    };
-
-
      class StdFunctionHandler : public BuiltinFunctionHandler {
     public:
         bool canHandle(const std::string& funcName) const override;
@@ -73,12 +63,21 @@ namespace pascal {
     
     };
 
+    class SDLFunctionHandler : public BuiltinFunctionHandler {
+    public:
+        bool canHandle(const std::string& funcName) const override;
+        void generate(CodeGenVisitor& visitor, const std::string& funcName, 
+                    const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
+        bool generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
+                            const std::vector<std::unique_ptr<ASTNode>>& arguments) override;
+    };
+
 
     class CodeGenVisitor : public ASTVisitor {
     private:
         std::unordered_set<std::string> usedRealConstants;  
         int realConstantCounter = 0;
-        
+        std::set<std::string> usedModules;
     
         std::string generateRealConstantName() {
             return "real_const_" + std::to_string(realConstantCounter++);
@@ -466,7 +465,7 @@ namespace pascal {
         friend class IOFunctionHandler;
         friend class MathFunctionHandler;
         friend class StdFunctionHandler;
-
+        friend class SDLFunctionHandler;
         BuiltinFunctionRegistry builtinRegistry;
 
         CodeGenVisitor()
@@ -483,8 +482,8 @@ namespace pascal {
 
         void initializeBuiltins() {
             builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
-            builtinRegistry.registerHandler(std::make_unique<MathFunctionHandler>());
             builtinRegistry.registerHandler(std::make_unique<StdFunctionHandler>());
+            builtinRegistry.registerHandler(std::make_unique<SDLFunctionHandler>());
         }
 
         std::string name = "App";
@@ -662,25 +661,30 @@ namespace pascal {
 
         void writeTo(std::ostream& out) const {
             out << "program " << name << " {\n";
-            out << "    section module { std }\n";
-            out << "    section data {\n";
-            
-            
+            out << "\tsection module {\n ";
+            bool first = true;
+            for (const auto& mod : usedModules) {
+                if (!first) out << ", ";
+                out << "\t\t" << mod;
+                first = false;
+            }
+            out << "\n\t}\n";
+            out << "\tsection data {\n";
             for (const auto& reg : registers) {
-                out << "        int " << reg << " = 0\n";
+                out << "\t\tint " << reg << " = 0\n";
             }
             
             
             for (const auto& floatReg : floatRegisters) {
-                out << "        float " << floatReg << " = 0.0\n";
+                out << "\t\tfloat " << floatReg << " = 0.0\n";
             }
             
             for (const auto& p : ptrRegisters) {
-                 out << "        ptr " << p << " = null\n";
+                 out << "\t\tptr " << p << " = null\n";
             }
             
             for (const auto& constant : realConstants) {
-                out << "        float " << constant.first << " = " << constant.second << "\n";
+                out << "\t\tfloat " << constant.first << " = " << constant.second << "\n";
             }
             
             
@@ -689,59 +693,59 @@ namespace pascal {
                     auto it = slotToType.find(i);
                     if (it != slotToType.end()) {
                         if (it->second == VarType::STRING) {
-                            out << "        string " << slotVar(i) << " = \"\"\n";
+                            out << "\t\tstring " << slotVar(i) << " = \"\"\n";
                         } else if (it->second == VarType::PTR) {
-                            out << "        ptr " << slotVar(i) << " = null\n";
+                            out << "\t\tptr " << slotVar(i) << " = null\n";
                         } else if (it->second == VarType::CHAR) {
-                            out << "        int " << slotVar(i) << " = 0\n"; 
+                            out << "\t\tint " << slotVar(i) << " = 0\n"; 
                         } else if (it->second == VarType::DOUBLE) {
-                            out << "        float " << slotVar(i) << " = 0.0\n";
+                            out << "\t\tfloat " << slotVar(i) << " = 0.0\n";
                         } else {
-                            out << "        int " << slotVar(i) << " = 0\n";
+                            out << "\t\tint " << slotVar(i) << " = 0\n";
                         }
                     } else {
-                        out << "        int " << slotVar(i) << " = 0\n";
+                        out << "\t\tint " << slotVar(i) << " = 0\n";
                     }
                 }
             }
             
             if (needsEmptyString) {
-                out << "        string empty_str = \"\"\n";
+                out << "\t\tstring empty_str = \"\"\n";
             }
             
             for (auto &s : stringLiterals) {
                 if (s.first != "empty_str") { 
-                    out << "        string " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
+                    out << "\t\tstring " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
                 }
             }
             
             if (usedStrings.count("fmt_int")) {
-                out << "        string fmt_int = \"%lld \"\n";
+                out << "\t\tstring fmt_int = \"%lld \"\n";
             }
             if (usedStrings.count("fmt_str")) {
-                out << "        string fmt_str = \"%s \"\n";
+                out << "\t\tstring fmt_str = \"%s \"\n";
             }
             if (usedStrings.count("fmt_chr")) {
-                out << "        string fmt_chr = \"%c \"\n";
+                out << "\t\tstring fmt_chr = \"%c \"\n";
             }
             if (usedStrings.count("fmt_float")) {
-                out << "        string fmt_float = \"%.6f \"\n";
+                out << "\t\tstring fmt_float = \"%.6f \"\n";
             }
             if (usedStrings.count("newline")) {
-                out << "        string newline = \"\\n\"\n";
+                out << "\t\tstring newline = \"\\n\"\n";
             }
-            out << "        string input_buffer, 256\n";
-            out << "    }\n";
-            out << "    section code {\n";
-            out << "    start:\n";
+            out << "\t\tstring input_buffer, 256\n";
+            out << "\t}\n";
+            out << "\tsection code {\n";
+            out << "\tstart:\n";
             
-            for (auto &s : prolog) out << "        " << s << "\n";
+            for (auto &s : prolog) out << "\t\t" << s << "\n";
             for (auto &s : instructions) {
-                if (endsWithColon(s)) out << "    " << s << "\n";
-                else out << "        " << s << "\n";
+                if (endsWithColon(s)) out << "\t" << s << "\n";
+                else out << "\t\t" << s << "\n";
             }
             
-            out << "    }\n";
+            out << "\t}\n";
             out << "}\n";
         }
 
@@ -1049,6 +1053,7 @@ namespace pascal {
             std::string name = node.name;
             
             auto handler = builtinRegistry.findHandler(name);
+
             if (handler) {
                 handler->generate(*this, name, node.arguments);
                 return;

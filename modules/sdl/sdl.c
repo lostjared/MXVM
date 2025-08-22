@@ -23,7 +23,7 @@ int64_t init(void) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK) == 0) {
         return 0;
     }
-    return 0;
+    return 1;
 }
 
 void quit(void) {
