@@ -65,10 +65,13 @@ namespace pascal {
         std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs;
         std::string generateRealConstantName() { return "real_const_" + std::to_string(realConstantCounter++); }
         bool isRealNumber(const std::string& s) const { return s.find('.') != std::string::npos || s.find('e') != std::string::npos || s.find('E') != std::string::npos; }
+        
+        
         std::string mangleVariableName(const std::string& varName) const {
             if (scopeHierarchy.empty() || scopeHierarchy.size() <= 1) return varName;
             std::string m; for (size_t i = 1; i < scopeHierarchy.size(); ++i) { if (i > 1) m += "_"; m += scopeHierarchy[i]; } m += "_" + varName; return m;
         }
+        
         std::string getCurrentScopeName() const { if (scopeHierarchy.empty() || scopeHierarchy.back() == "__global__") return ""; return scopeHierarchy.back(); }
         enum class VarType { INT, DOUBLE, STRING, CHAR, RECORD, PTR, BOOL, UNKNOWN, ARRAY_INT, ARRAY_DOUBLE, ARRAY_STRING };
         struct FuncInfo { std::vector<VarType> paramTypes; VarType returnType = VarType::UNKNOWN; };
@@ -76,7 +79,22 @@ namespace pascal {
         std::unordered_map<std::string, VarType> varTypes;
         std::unordered_map<int, VarType> slotToType;
         bool needsEmptyString = false;
-        VarType getVarType(const std::string& name) const { auto it = varTypes.find(name); return it != varTypes.end() ? it->second : VarType::UNKNOWN; }
+
+        
+        VarType getVarType(const std::string& name) const {
+            std::string mangledName = findMangledName(name);
+            auto slotIt = varSlot.find(mangledName);
+            if (slotIt != varSlot.end()) {
+                auto typeIt = slotToType.find(slotIt->second);
+                if (typeIt != slotToType.end()) {
+                    return typeIt->second;
+                }
+            }
+
+            auto it = varTypes.find(name);
+            return it != varTypes.end() ? it->second : VarType::UNKNOWN;
+        }
+
         void setVarType(const std::string& name, VarType t) { varTypes[name] = t; }
         void setSlotType(int slot, VarType t) { slotToType[slot] = t; }
         bool isStringVar(const std::string& name) const { auto t = getVarType(name); return t == VarType::STRING || t == VarType::PTR; }
@@ -192,19 +210,31 @@ namespace pascal {
                 a.find("real_const_") != std::string::npos ||
                 b.find("real_const_") != std::string::npos;
 
-            std::string leftOp  = isFloatOp ? ensureFloatConstant(a) : a;
-            std::string rightOp = isFloatOp ? ensureFloatConstant(b) : b;
+            std::string leftOp = a;
+            if (!isReg(a) && !isRealNumber(a)) {
+                leftOp = isFloatOp ? allocFloatReg() : allocReg();
+                emit2("mov", leftOp, a);
+            }
+            std::string rightOp = b;
+            if (!isReg(b) && !isRealNumber(b)) {
+                rightOp = isFloatOp ? allocFloatReg() : allocReg();
+                emit2("mov", rightOp, b);
+            }
+
             bool mustCopy = isParmReg(leftOp);
             if (isReg(leftOp) && !mustCopy) {
                 emit2(op, leftOp, rightOp);
                 pushValue(leftOp);
                 if (isReg(b) && !isParmReg(b)) freeReg(b);
+                if (rightOp != b) freeReg(rightOp); 
             } else {
                 std::string result = isFloatOp ? allocFloatReg() : allocReg();
                 emit2("mov", result, leftOp);
                 emit2(op, result, rightOp);
                 pushValue(result);
                 if (isReg(b) && !isParmReg(b)) freeReg(b);
+                if (leftOp != a) freeReg(leftOp);   
+                if (rightOp != b) freeReg(rightOp); 
             }
         }
         void pushCmpResult(const std::string& a, const std::string& b, const char* jop) {
@@ -335,19 +365,45 @@ namespace pascal {
                 currentFunctionName = pn->name;
                 functionSetReturn = false;
                 currentParamLocations.clear();
-                int paramIndex = 0;
+                
+                
+                int intParamIndex = 1;
+                int ptrParamIndex = 0; 
+                int floatParamIndex = 0; 
+
                 if (!pn->parameters.empty()) {
                     for (auto& p_node : pn->parameters) {
                         if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
                             for (const auto& id : param->identifiers) {
-                                if (static_cast<size_t>(paramIndex + 1) < registers.size()) {
-                                    currentParamLocations[id] = registers[paramIndex + 1];
-                                    paramIndex++;
+                                VarType paramType = getTypeFromString(param->type);
+                                std::string incomingReg;
+                                if (paramType == VarType::STRING) {
+                                    if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) {
+                                        incomingReg = ptrRegisters[ptrParamIndex++];
+                                    }
+                                    paramType = VarType::PTR;
+                                } else if (paramType == VarType::DOUBLE) {
+                                    if (static_cast<size_t>(floatParamIndex) < floatRegisters.size()) {
+                                        incomingReg = floatRegisters[floatParamIndex++];
+                                    }
+                                } else { 
+                                    if (static_cast<size_t>(intParamIndex) < registers.size()) {
+                                        incomingReg = registers[intParamIndex++];
+                                    }
+                                }
+
+                                if (!incomingReg.empty()) {
+                                    std::string mangledId = mangleVariableName(id);
+                                    int localSlot = newSlotFor(mangledId);
+                                    varSlot[id] = localSlot;
+                                    setSlotType(localSlot, paramType);
+                                    emit2("mov", slotVar(localSlot), incomingReg);
                                 }
                             }
                         }
                     }
                 }
+
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 for(const auto& pair : currentParamLocations) {
@@ -367,19 +423,46 @@ namespace pascal {
                 currentFunctionName = fn->name;
                 functionSetReturn = false;
                 currentParamLocations.clear();
-                int paramIndex = 0;
+
+                
+                int intParamIndex = 1;
+                int ptrParamIndex = 0; 
+                int floatParamIndex = 0;
+
                 if (!fn->parameters.empty()) {
                     for (auto& p_node : fn->parameters) {
                         if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
                             for (const auto& id : param->identifiers) {
-                                if (static_cast<size_t>(paramIndex + 1) < registers.size()) {
-                                    currentParamLocations[id] = registers[paramIndex + 1];
-                                    paramIndex++;
+                                VarType paramType = getTypeFromString(param->type);
+                                std::string incomingReg;
+
+                                if (paramType == VarType::STRING) {
+                                    if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) {
+                                        incomingReg = ptrRegisters[ptrParamIndex++];
+                                    }
+                                    paramType = VarType::PTR;
+                                } else if (paramType == VarType::DOUBLE) {
+                                    if (static_cast<size_t>(floatParamIndex) < floatRegisters.size()) {
+                                        incomingReg = floatRegisters[floatParamIndex++];
+                                    }
+                                } else {
+                                    if (static_cast<size_t>(intParamIndex) < registers.size()) {
+                                        incomingReg = registers[intParamIndex++];
+                                    }
+                                }
+
+                                if (!incomingReg.empty()) {
+                                    std::string mangledId = mangleVariableName(id);
+                                    int localSlot = newSlotFor(mangledId);
+                                    varSlot[id] = localSlot;
+                                    setSlotType(localSlot, paramType);
+                                    emit2("mov", slotVar(localSlot), incomingReg);
                                 }
                             }
                         }
                     }
                 }
+
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 for(const auto& pair : currentParamLocations) {
@@ -509,28 +592,104 @@ namespace pascal {
         void visit(ProcCallNode& node) override {
             auto handler = builtinRegistry.findHandler(node.name);
             if (handler) { handler->generate(*this, node.name, node.arguments); return; }
-            std::vector<std::string> args;
-            for (auto& arg : node.arguments) args.push_back(eval(arg.get()));
-            for (size_t i = 0; i < args.size() && i < 6; i++) if (i + 1 < registers.size()) emit2("mov", registers[i + 1], args[i]);
+
+            
+            std::vector<std::string> evaluated_args;
+            int intRegIdx = 1;   
+            int ptrRegIdx = 0;   
+            int floatRegIdx = 0; 
+
+            for (auto& arg : node.arguments) {
+                std::string argVal = eval(arg.get());
+                evaluated_args.push_back(argVal);
+                VarType argType = getExpressionType(arg.get());
+                std::string targetReg;
+
+                if (argType == VarType::STRING || argType == VarType::PTR) {
+                    if (static_cast<size_t>(ptrRegIdx) < ptrRegisters.size()) {
+                        targetReg = ptrRegisters[ptrRegIdx++];
+                    }
+                } else if (argType == VarType::DOUBLE) {
+                    if (static_cast<size_t>(floatRegIdx) < floatRegisters.size()) {
+                        targetReg = floatRegisters[floatRegIdx++];
+                    }
+                } else { 
+                    if (static_cast<size_t>(intRegIdx) < registers.size()) {
+                        targetReg = registers[intRegIdx++];
+                    }
+                }
+
+                if (!targetReg.empty()) {
+                    emit2("mov", targetReg, argVal);
+                }
+            }
+            
             emit1("call", "PROC_" + node.name);
-            for (const auto& arg : args) if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
+
+            for (const auto& arg : evaluated_args) {
+                if (isReg(arg) && !isParmReg(arg)) {
+                    freeReg(arg);
+                }
+            }
         }
         void visit(FuncCallNode& node) override {
             auto handler = builtinRegistry.findHandler(node.name);
             if (handler) { if (handler->generateWithResult(*this, node.name, node.arguments)) return; }
-            std::vector<std::string> args;
-            for (auto& arg : node.arguments) args.push_back(eval(arg.get()));
-            for (size_t i = 0; i < args.size() && i < 6; i++) if (i + 1 < registers.size()) emit2("mov", registers[i + 1], args[i]);
+            std::vector<std::string> evaluated_args;
+            int intRegIdx = 1;
+            int ptrRegIdx = 0;
+            int floatRegIdx = 0; 
+
+            for (auto& arg : node.arguments) {
+                std::string argVal = eval(arg.get());
+                evaluated_args.push_back(argVal);
+                VarType argType = getExpressionType(arg.get());
+                std::string targetReg;
+
+                if (argType == VarType::STRING || argType == VarType::PTR) {
+                    if (static_cast<size_t>(ptrRegIdx) < ptrRegisters.size()) {
+                        targetReg = ptrRegisters[ptrRegIdx++];
+                    }
+                } else if (argType == VarType::DOUBLE) {
+                    if (static_cast<size_t>(floatRegIdx) < floatRegisters.size()) {
+                        targetReg = floatRegisters[floatRegIdx++];
+                    }
+                } else {
+                    if (static_cast<size_t>(intRegIdx) < registers.size()) {
+                        targetReg = registers[intRegIdx++];
+                    }
+                }
+
+                if (!targetReg.empty()) {
+                    emit2("mov", targetReg, argVal);
+                }
+            }
+            
             emit1("call", "FUNC_" + node.name);
+
             auto it = funcSignatures.find(node.name);
-            VarType returnType = VarType::INT;
-            if (it != funcSignatures.end()) returnType = it->second.returnType;
-            std::string resultReg;
-            if (returnType == VarType::DOUBLE) { resultReg = allocFloatReg(); emit2("mov", resultReg, "xmm0"); }
-            else if (returnType == VarType::STRING) { resultReg = allocReg(); emit2("mov", resultReg, "arg0"); }
-            else { resultReg = allocReg(); emit2("mov", resultReg, "rax"); }
-            pushValue(resultReg);
-            for (const auto& arg : args) if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
+            VarType returnType = (it != funcSignatures.end()) ? it->second.returnType : VarType::INT;
+            
+            std::string resultLocation;
+            if (returnType == VarType::DOUBLE) {
+                resultLocation = allocFloatReg();
+                emit2("mov", resultLocation, "xmm0");
+            } else if (returnType == VarType::STRING) { 
+                int tempSlot = newSlotFor("__t" + std::to_string(nextTemp++));
+                setSlotType(tempSlot, VarType::PTR);
+                resultLocation = slotVar(tempSlot);
+                emit2("mov", resultLocation, "arg0"); 
+            } else { 
+                resultLocation = allocReg();
+                emit2("mov", resultLocation, "rax");
+            }
+            pushValue(resultLocation);
+            
+            for (const auto& arg : evaluated_args) {
+                if (isReg(arg) && !isParmReg(arg)) {
+                    freeReg(arg);
+                }
+            }
         }
         void visit(FuncDeclNode& node) override {
             FuncInfo funcInfo; funcInfo.returnType = getTypeFromString(node.returnType);
@@ -730,11 +889,12 @@ namespace pascal {
         }
         void visit(VariableNode& node) override {
             auto it = currentParamLocations.find(node.name);
-            if (it != currentParamLocations.end()) { pushValue(it->second); return; }
-            std::string m = findMangledName(node.name);
-            std::string reg = getVarType(node.name) == VarType::DOUBLE ? allocFloatReg() : allocReg();
-            emit2("mov", reg, m);
-            pushValue(reg);
+            if (it != currentParamLocations.end()) {
+                pushValue(it->second);
+                return;
+            }
+            
+            pushValue(findMangledName(node.name));
         }
         void visit(NumberNode& node) override {
             if (node.isReal || isRealNumber(node.value)) { std::string n = generateRealConstantName(); usedRealConstants.insert(n); realConstants[n] = node.value; pushValue(n); }
@@ -898,7 +1058,9 @@ namespace pascal {
             freeReg(adjustedIndexReg);
             if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
         }
-        std::string findMangledName(const std::string& name) {
+
+        
+        std::string findMangledName(const std::string& name) const {
             if (scopeHierarchy.empty()) return name;
             for (int depth = (int)scopeHierarchy.size() - 1; depth >= 0; --depth) {
                 std::string candidate;
@@ -909,7 +1071,9 @@ namespace pascal {
             }
             return name;
         }
-        std::string findMangledArrayName(const std::string& name) {
+        
+        
+        std::string findMangledArrayName(const std::string& name) const {
             if (scopeHierarchy.empty()) return name;
             for (int depth = (int)scopeHierarchy.size() - 1; depth >= 1; --depth) {
                 std::string candidate;
