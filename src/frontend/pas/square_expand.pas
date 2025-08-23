@@ -5,10 +5,10 @@ const
   SDL_QUIT = 256;
   SDL_KEYDOWN = 768;
   SDLK_ESCAPE = 27;
-  WIDTH = 640;
-  HEIGHT = 480;
+  WIDTH = 800;
+  HEIGHT = 800;
   TILE_W = 32;
-  TILE_H = 16;
+  TILE_H = 32;
 var
   result, window_id, renderer, event_type_result: integer;
   running: boolean;
@@ -20,12 +20,8 @@ var
 
 procedure render(cols, rows: integer);
 begin
-  if cols < 1 then cols := 1;
-  if rows < 1 then rows := 1;
-  if cols > max_cols then cols := max_cols;
-  if rows > max_rows then rows := max_rows;
-  for z := 0 to rows - 1 do
-    for i := 0 to cols - 1 do
+  for z := 0 to rows do
+    for i := 0 to cols do
     begin
       color_value_r := rand() mod 255;
       color_value_g := rand() mod 255;
@@ -54,8 +50,8 @@ begin
 end;
 
 begin
-  max_cols := WIDTH div TILE_W;
-  max_rows := HEIGHT div TILE_H;
+  max_cols :=(WIDTH div TILE_W)-1;
+  max_rows := (HEIGHT div TILE_H)-1;
   init;
   running := true;
   while running do
@@ -69,18 +65,19 @@ begin
     sdl_set_draw_color(renderer, 0, 0, 0, 255);
     sdl_clear(renderer);
     render(index_w, index_h);
-    if (index_w >= max_cols) and (index_h >= max_rows) then
+    if (index_w >= max_cols) or (index_h >= max_rows) then
     begin
       index_w := 2;
       index_h := 2;
     end
     else
     begin
-      if index_w < max_cols then index_w := index_w + 1;
-      if index_h < max_rows then index_h := index_h + 1;
+      index_w := index_w + 1;
+      index_h := index_h + 1;
     end;
     sdl_present(renderer);
     sdl_delay(16);
   end;
   cleanup;
 end.
+

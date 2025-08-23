@@ -186,11 +186,26 @@ namespace pascal {
         }
         void recordLocation(const std::string& var, ValueLocation loc) { valueLocations[var] = loc; }
         void pushTri(const char* op, const std::string& a, const std::string& b) {
-            bool isFloatOp = isFloatReg(a) || isFloatReg(b) || isRealNumber(a) || isRealNumber(b) || a.find("real_const_")==0 || b.find("real_const_")==0;
-            std::string la = isFloatOp ? ensureFloatConstant(a) : a;
-            std::string lb = isFloatOp ? ensureFloatConstant(b) : b;
-            if (isReg(la)) { emit2(op, la, lb); pushValue(la); if (isReg(b) && !isParmReg(b)) freeReg(b); }
-            else { std::string r = isFloatOp ? allocFloatReg() : allocReg(); emit2("mov", r, la); emit2(op, r, lb); pushValue(r); if (isReg(b) && !isParmReg(b)) freeReg(b); }
+            bool isFloatOp =
+                isFloatReg(a) || isFloatReg(b) ||
+                isRealNumber(a) || isRealNumber(b) ||
+                a.find("real_const_") != std::string::npos ||
+                b.find("real_const_") != std::string::npos;
+
+            std::string leftOp  = isFloatOp ? ensureFloatConstant(a) : a;
+            std::string rightOp = isFloatOp ? ensureFloatConstant(b) : b;
+            bool mustCopy = isParmReg(leftOp);
+            if (isReg(leftOp) && !mustCopy) {
+                emit2(op, leftOp, rightOp);
+                pushValue(leftOp);
+                if (isReg(b) && !isParmReg(b)) freeReg(b);
+            } else {
+                std::string result = isFloatOp ? allocFloatReg() : allocReg();
+                emit2("mov", result, leftOp);
+                emit2(op, result, rightOp);
+                pushValue(result);
+                if (isReg(b) && !isParmReg(b)) freeReg(b);
+            }
         }
         void pushCmpResult(const std::string& a, const std::string& b, const char* jop) {
             std::string t = allocReg();
