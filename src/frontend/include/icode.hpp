@@ -641,6 +641,17 @@ namespace pascal {
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
+
+                // Mark parameter registers as in use to prevent overwriting
+                for(const auto& pair : currentParamLocations) {
+                    for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
+                        if (registers[reg_idx] == pair.second) {
+                            regInUse[reg_idx] = true;
+                            break;
+                        }
+                    }
+                }
+
                 if (pn->block) pn->block->accept(*this);
                 if (functionScopedArrays.count(pn->name))
                     for (auto &an : functionScopedArrays[pn->name]) emit1("free", an);
@@ -673,6 +684,16 @@ namespace pascal {
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
+
+                for(const auto& pair : currentParamLocations) {
+                    for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
+                        if (registers[reg_idx] == pair.second) {
+                            regInUse[reg_idx] = true;
+                            break;
+                        }
+                    }
+                }
+
                 if (fn->block) fn->block->accept(*this);
                 if (functionScopedArrays.count(fn->name))
                     for (auto &an : functionScopedArrays[fn->name]) emit1("free", an);
@@ -1071,10 +1092,11 @@ namespace pascal {
         void visit(IfStmtNode& node) override {
             std::string elseL = newLabel("ELSE");
             std::string endL  = newLabel("ENDIF");
-            std::string c = eval(node.condition.get());
-            emit2("cmp", c, "0");
+            std::string condResult = eval(node.condition.get());
+            
+            emit2("cmp", condResult, "0");
             emit1("je", elseL);
-            if (isReg(c)) freeReg(c);
+            if (isReg(condResult)) freeReg(condResult);
             
             if (node.thenStatement) node.thenStatement->accept(*this);
             emit1("jmp", endL);
@@ -1694,15 +1716,24 @@ namespace pascal {
     private:
         std::string findMangledName(const std::string& name) {
             if (scopeHierarchy.empty()) return name;
-            for (int depth = static_cast<int>(scopeHierarchy.size()) - 1; depth >= 1; --depth) {
+            
+            for (int depth = static_cast<int>(scopeHierarchy.size()) - 1; depth >= 0; --depth) {
                 std::string candidate;
-                for (int i = 1; i <= depth; ++i) {
-                    if (i > 1) candidate += "_";
-                    candidate += scopeHierarchy[i];
+            
+                if (depth == 0) {
+                    candidate = name;
+                } else {
+                    for (int i = 1; i <= depth; ++i) {
+                        if (i > 1) candidate += "_";
+                        candidate += scopeHierarchy[i];
+                    }
+                    candidate += "_" + name;
                 }
-                candidate += "_" + name;
+                
                 auto it = varSlot.find(candidate);
-                if (it != varSlot.end()) return candidate;
+                if (it != varSlot.end()) {
+                    return candidate;
+                }
             }
             return name;
         }
