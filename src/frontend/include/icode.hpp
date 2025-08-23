@@ -858,7 +858,7 @@ namespace pascal {
         }
         VarType getExpressionType(ASTNode* node) {
             if (dynamic_cast<NumberNode*>(node)) { auto n = static_cast<NumberNode*>(node); return n->isReal ? VarType::DOUBLE : VarType::INT; }
-            if (dynamic_cast<StringNode*>(node)) { auto s = static_cast<StringNode*>(node); return s->value.length()==1 ? VarType::CHAR : VarType::STRING; }
+            if (dynamic_cast<StringNode*>(node)) { return VarType::STRING; }
             if (dynamic_cast<BooleanNode*>(node)) return VarType::BOOL;
             if (auto varNode = dynamic_cast<VariableNode*>(node)) return getVarType(varNode->name);
             if (auto a = dynamic_cast<ArrayAccessNode*>(node)) {

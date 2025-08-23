@@ -58,17 +58,10 @@ namespace pascal {
                         }
                     }
                     else if (auto strNode = dynamic_cast<StringNode*>(a)) {
-                        if (strNode->value.length() == 1) {
-                            visitor.usedStrings.insert("fmt_chr");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_chr", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        } else {
-                            visitor.usedStrings.insert("fmt_str");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_str", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        }
+                        visitor.usedStrings.insert("fmt_str");
+                        std::string v = visitor.eval(a);
+                        visitor.emit2("print", "fmt_str", v);
+                        if (visitor.isReg(v)) visitor.freeReg(v);
                     }
                     else if (auto varNode = dynamic_cast<VariableNode*>(a)) {
                         auto varType = visitor.getVarType(varNode->name);
