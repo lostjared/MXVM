@@ -82,6 +82,14 @@ namespace pascal {
         std::vector<std::string> globalArrays;
         std::unordered_map<std::string, std::vector<std::string>> functionScopedArrays;
         std::vector<std::string> scopeHierarchy;
+        struct Scope {
+            std::string name;
+            std::vector<ProcDeclNode*> nestedProcs;
+            std::vector<FuncDeclNode*> nestedFuncs;
+        };
+        std::vector<Scope> scopeStack;
+        std::map<std::string, std::string> currentParamLocations;
+        std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs;
         
         std::string generateRealConstantName() {
             return "real_const_" + std::to_string(realConstantCounter++);
@@ -165,18 +173,8 @@ namespace pascal {
         const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"};
         const std::vector<std::string> ptrRegisters = {"arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6"};
         const std::vector<std::string> floatRegisters = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9"};
-        
         std::vector<bool> regInUse;
         std::vector<bool> floatRegInUse;  
-    
-        struct Scope {
-            std::string name;
-            std::vector<ProcDeclNode*> nestedProcs;
-            std::vector<FuncDeclNode*> nestedFuncs;
-        };
-        std::vector<Scope> scopeStack;
-
-        std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs; 
         std::vector<std::pair<FuncDeclNode*, std::vector<std::string>>> deferredFuncs; 
 
         std::string currentFunctionName;
@@ -617,6 +615,7 @@ namespace pascal {
             emit("done");
 
             
+            // In the loop for deferredProcs
             for (size_t i = 0; i < deferredProcs.size(); ++i) {
                 auto &item = deferredProcs[i];
                 auto *pn = item.first;
@@ -624,6 +623,22 @@ namespace pascal {
                 emitLabel(funcLabel("function PROC_", pn->name));
                 currentFunctionName = pn->name;
                 functionSetReturn = false;
+
+                currentParamLocations.clear();
+                int paramIndex = 0;
+                if (!pn->parameters.empty()) {
+                    for (auto& p_node : pn->parameters) {
+                        if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
+                            for (const auto& id : param->identifiers) {
+                                if (static_cast<size_t>(paramIndex + 1) < registers.size()) {
+                                    currentParamLocations[id] = registers[paramIndex + 1];
+                                    paramIndex++;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 if (pn->block) pn->block->accept(*this);
@@ -632,7 +647,7 @@ namespace pascal {
                 emit("ret");
             }
 
-            
+            // In the loop for deferredFuncs
             for (size_t i = 0; i < deferredFuncs.size(); ++i) {
                 auto &item = deferredFuncs[i];
                 auto *fn = item.first;
@@ -640,6 +655,22 @@ namespace pascal {
                 emitLabel(funcLabel("function FUNC_", fn->name));
                 currentFunctionName = fn->name;
                 functionSetReturn = false;
+
+                currentParamLocations.clear();
+                int paramIndex = 0;
+                if (!fn->parameters.empty()) {
+                    for (auto& p_node : fn->parameters) {
+                        if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
+                            for (const auto& id : param->identifiers) {
+                                if (static_cast<size_t>(paramIndex + 1) < registers.size()) {
+                                    currentParamLocations[id] = registers[paramIndex + 1];
+                                    paramIndex++;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 if (fn->block) fn->block->accept(*this);
@@ -658,6 +689,7 @@ namespace pascal {
                 emit("ret");
             }
             currentFunctionName.clear();
+            currentParamLocations.clear();
         }
 
         void emit_invoke(const std::string& funcName, const std::vector<std::string>& params) {
@@ -1013,8 +1045,15 @@ namespace pascal {
     auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
     if (!varPtr) return;
     std::string varName = varPtr->name;
-    std::string mangled = findMangledName(varName);
     std::string rhs = eval(node.expression.get());
+
+    auto it = currentParamLocations.find(varName);
+    if (it != currentParamLocations.end()) {
+        emit2("mov", it->second, rhs);
+        if (isReg(rhs)) freeReg(rhs);
+        return;
+    }
+
     if (!currentFunctionName.empty() && varName == currentFunctionName) {
         VarType rt = getVarType(currentFunctionName);
         if (rt == VarType::STRING) emit2("mov","arg0",rhs);
@@ -1022,6 +1061,7 @@ namespace pascal {
         else emit2("mov","rax",rhs);
         functionSetReturn = true;
     } else {
+        std::string mangled = findMangledName(varName);
         emit2("mov", mangled, rhs);
         recordLocation(varName, {ValueLocation::MEMORY, mangled});
     }
@@ -1363,6 +1403,11 @@ namespace pascal {
         }
 
         void visit(VariableNode& node) override {
+            auto it = currentParamLocations.find(node.name);
+            if (it != currentParamLocations.end()) {
+                pushValue(it->second);
+                return;
+            }
 
             std::string m = findMangledName(node.name);
 
