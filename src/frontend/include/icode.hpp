@@ -53,6 +53,7 @@ namespace pascal {
 
     class CodeGenVisitor : public ASTVisitor {
     private:
+        std::unordered_map<std::string, std::string> compileTimeConstants;
         std::unordered_set<std::string> usedRealConstants;
         int realConstantCounter = 0;
         std::set<std::string> usedModules;
@@ -345,6 +346,7 @@ namespace pascal {
             valueLocations.clear();
             varTypes.clear();
             globalArrays.clear();
+            compileTimeConstants.clear();
             functionScopedArrays.clear();
             scopeStack.clear();
             scopeHierarchy.clear();
@@ -541,43 +543,54 @@ namespace pascal {
                 int slot = newSlotFor(mangledId);
                 varSlot[id] = slot;
                 varSlot[mangledId] = slot;
-                if (!node.type.empty()) {
-                    if (node.type == "string") {
-                        setVarType(id, VarType::PTR);
-                        setSlotType(slot, VarType::PTR);
-                        if (i < node.initializers.size() && node.initializers[i]) { std::string init = eval(node.initializers[i].get()); emit2("mov", slotVar(slot), init); if (isReg(init) && !isParmReg(init)) freeReg(init); } else emit2("mov", slotVar(slot), emptyString());
-                    } else if (node.type == "char") {
-                        setVarType(id, VarType::CHAR);
-                        setSlotType(slot, VarType::CHAR);
-                        if (i < node.initializers.size() && node.initializers[i]) { std::string init = eval(node.initializers[i].get()); emit2("mov", slotVar(slot), init); if (isReg(init) && !isParmReg(init)) freeReg(init); } else emit2("mov", slotVar(slot), "0");
-                    } else if (node.type == "integer" || node.type == "boolean") {
-                        setVarType(id, VarType::INT);
-                        setSlotType(slot, VarType::INT);
-                        if (i < node.initializers.size() && node.initializers[i]) { std::string init = eval(node.initializers[i].get()); emit2("mov", slotVar(slot), init); if (isReg(init) && !isParmReg(init)) freeReg(init); }
-                    } else if (node.type == "real") {
-                        setVarType(id, VarType::DOUBLE);
-                        setSlotType(slot, VarType::DOUBLE);
-                        if (i < node.initializers.size() && node.initializers[i]) {
-                            auto init = node.initializers[i].get();
-                            if (auto numNode = dynamic_cast<NumberNode*>(init)) {
-                                std::string constName = generateRealConstantName();
-                                realConstants[constName] = (numNode->isReal || isRealNumber(numNode->value)) ? numNode->value : numNode->value + ".0";
-                                usedRealConstants.insert(constName);
-                                emit2("mov", slotVar(slot), constName);
-                            } else {
-                                std::string init = eval(node.initializers[i].get());
-                                emit2("mov", slotVar(slot), init);
-                                if (isReg(init) && !isParmReg(init)) freeReg(init);
-                            }
+                VarType vType = getTypeFromString(node.type);
+                setVarType(id, vType);
+                setSlotType(slot, vType);
+
+                if (i < node.initializers.size() && node.initializers[i]) {
+                    auto initNode = node.initializers[i].get();
+                    std::string initValue;
+                    bool isLiteral = false;
+
+                    if (auto numNode = dynamic_cast<NumberNode*>(initNode)) {
+                        initValue = numNode->value;
+                        isLiteral = true;
+                    } else if (auto stringNode = dynamic_cast<StringNode*>(initNode)) {
+                        initValue = "\"" + stringNode->value + "\"";
+                        isLiteral = true;
+                    } else if (auto boolNode = dynamic_cast<BooleanNode*>(initNode)) {
+                        initValue = boolNode->value ? "1" : "0";
+                        isLiteral = true;
+                    } else if (auto varNode = dynamic_cast<VariableNode*>(initNode)) {
+                        
+                        std::string refName = findMangledName(varNode->name);
+                        auto constIt = compileTimeConstants.find(refName);
+                        if (constIt != compileTimeConstants.end()) {
+                            initValue = constIt->second;
+                            isLiteral = true;
                         } else {
-                            std::string zeroConstName = generateRealConstantName();
-                            realConstants[zeroConstName] = "0.0";
-                            usedRealConstants.insert(zeroConstName);
-                            emit2("mov", slotVar(slot), zeroConstName);
+                            constIt = compileTimeConstants.find(varNode->name);
+                            if (constIt != compileTimeConstants.end()) {
+                                initValue = constIt->second;
+                                isLiteral = true;
+                            }
                         }
-                    } else if (node.type == "record") {
-                        setVarType(id, VarType::RECORD);
-                        setSlotType(slot, VarType::RECORD);
+                    }
+
+                    if (isLiteral) {
+                        std::string varTypeStr;
+                        if (vType == VarType::DOUBLE) varTypeStr = "float";
+                        else if (vType == VarType::STRING) varTypeStr = "string";
+                        else varTypeStr = "int";
+                        updateDataSectionInitialValue(slotVar(slot), varTypeStr, initValue);
+                    } else {
+                        std::string init = eval(initNode);
+                        emit2("mov", slotVar(slot), init);
+                        if (isReg(init) && !isParmReg(init)) freeReg(init);
+                    }
+                } else {
+                    if (vType == VarType::PTR) { 
+                        emit2("mov", slotVar(slot), emptyString());
                     }
                 }
             }
@@ -894,6 +907,17 @@ namespace pascal {
                 return;
             }
             
+            std::string mangledName = findMangledName(node.name);
+            auto constIt = compileTimeConstants.find(mangledName);
+            if (constIt != compileTimeConstants.end()) {
+                pushValue(constIt->second);
+                return;
+            }
+            constIt = compileTimeConstants.find(node.name);
+            if (constIt != compileTimeConstants.end()) {
+                pushValue(constIt->second);
+                return;
+            }
             pushValue(findMangledName(node.name));
         }
         void visit(NumberNode& node) override {
@@ -908,14 +932,50 @@ namespace pascal {
         void visit(EmptyStmtNode& node) override {}
         void visit(ConstDeclNode& node) override {
             for (const auto& assignment : node.assignments) {
-                std::string varType; std::string literalValue;
+                std::string varType; 
+                std::string literalValue;
+                bool isLiteral = false;
+
                 if (auto numNode = dynamic_cast<NumberNode*>(assignment->value.get())) {
-                    if (numNode->isReal || numNode->value.find('.') != std::string::npos) { varType = "float"; literalValue = numNode->value; }
-                    else { varType = "int"; literalValue = numNode->value; }
+                    if (numNode->isReal || numNode->value.find('.') != std::string::npos) { 
+                        varType = "float"; 
+                        literalValue = numNode->value; 
+                    } else { 
+                        varType = "int"; 
+                        literalValue = numNode->value; 
+                    }
+                    isLiteral = true;
                 } else if (auto stringNode = dynamic_cast<StringNode*>(assignment->value.get())) {
-                    varType = "string"; literalValue = "\"" + stringNode->value + "\"";
+                    varType = "string"; 
+                    literalValue = "\"" + stringNode->value + "\"";
+                    isLiteral = true;
                 } else if (auto boolNode = dynamic_cast<BooleanNode*>(assignment->value.get())) {
-                    varType = "int"; literalValue = boolNode->value ? "1" : "0";
+                    varType = "int"; 
+                    literalValue = boolNode->value ? "1" : "0";
+                    isLiteral = true;
+                } else if (auto varNode = dynamic_cast<VariableNode*>(assignment->value.get())) {
+                    std::string refName = findMangledName(varNode->name);
+                    auto it = compileTimeConstants.find(refName);
+                    if (it != compileTimeConstants.end()) {
+                        literalValue = it->second;
+                        varType = "int"; 
+                        isLiteral = true;
+                    }
+                }
+
+                if (isLiteral) {
+                    std::string mangledName = mangleVariableName(assignment->identifier);
+                    compileTimeConstants[mangledName] = literalValue;
+                    compileTimeConstants[assignment->identifier] = literalValue; 
+
+                    int slot = newSlotFor(mangledName);
+                    VarType vType = VarType::INT;
+                    if (varType == "float") vType = VarType::DOUBLE;
+                    else if (varType == "string") vType = VarType::STRING;
+                    setVarType(assignment->identifier, vType);
+                    setSlotType(slot, vType);
+                    std::string varLocation = slotVar(slot);
+                    updateDataSectionInitialValue(varLocation, varType, literalValue);
                 } else {
                     std::string valueReg = eval(assignment->value.get());
                     varType = "int";
@@ -925,16 +985,7 @@ namespace pascal {
                     std::string varLocation = slotVar(slot);
                     emit2("mov", varLocation, valueReg);
                     if (isReg(valueReg) && !isParmReg(valueReg)) freeReg(valueReg);
-                    continue;
                 }
-                int slot = newSlotFor(assignment->identifier);
-                VarType vType = VarType::INT;
-                if (varType == "float") vType = VarType::DOUBLE;
-                else if (varType == "string") vType = VarType::STRING;
-                setVarType(assignment->identifier, vType);
-                setSlotType(slot, vType);
-                std::string varLocation = slotVar(slot);
-                updateDataSectionInitialValue(varLocation, varType, literalValue);
             }
         }
         void updateDataSectionInitialValue(const std::string& varName, const std::string& type, const std::string& value) { constInitialValues[varName] = {type, value}; }
