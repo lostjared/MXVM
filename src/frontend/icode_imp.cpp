@@ -57,7 +57,7 @@ namespace pascal {
                             if (visitor.isReg(v)) visitor.freeReg(v);
                         }
                     }
-                    else if (auto strNode = dynamic_cast<StringNode*>(a)) {
+                    else if (dynamic_cast<StringNode*>(a)) {
                         visitor.usedStrings.insert("fmt_str");
                         std::string v = visitor.eval(a);
                         visitor.emit2("print", "fmt_str", v);

@@ -11,6 +11,8 @@
 #include <memory>
 #include <set>
 #include <map>
+#include <cctype>   
+#include <cstdlib>  
 
 namespace pascal {
 
@@ -65,8 +67,15 @@ namespace pascal {
         std::map<std::string, std::string> currentParamLocations;
         std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs;
         std::string generateRealConstantName() { return "real_const_" + std::to_string(realConstantCounter++); }
-        bool isRealNumber(const std::string& s) const { return s.find('.') != std::string::npos || s.find('e') != std::string::npos || s.find('E') != std::string::npos; }
-        
+        bool isRealNumber(const std::string& s) const {
+            if (s.empty()) return false;
+            bool hasDot = false, hasExp = false;
+            for (char c : s) { if (c == '.') hasDot = true; if (c == 'e' || c == 'E') hasExp = true; }
+            if (!hasDot && !hasExp) return false;
+            char* end = nullptr;
+            std::strtod(s.c_str(), &end);
+            return end && *end == '\0';
+        }
         
         std::string mangleVariableName(const std::string& varName) const {
             if (scopeHierarchy.empty() || scopeHierarchy.size() <= 1) return varName;
@@ -95,6 +104,26 @@ namespace pascal {
             auto it = varTypes.find(name);
             return it != varTypes.end() ? it->second : VarType::UNKNOWN;
         }
+
+        bool isRealConstSymbol(const std::string& s) const {
+            return s.rfind("real_const_", 0) == 0;
+        }
+
+        std::string coerceToIntImmediate(const std::string& v) {
+            if (isFloatLiteral(v)) {
+                long long x = static_cast<long long>(std::stod(v));
+                return std::to_string(x);
+            }
+            if (isRealConstSymbol(v)) {
+                auto it = realConstants.find(v);
+                if (it != realConstants.end()) {
+                    long long x = static_cast<long long>(std::stod(it->second));
+                    return std::to_string(x);
+                }
+            }
+            return v;
+        }
+
 
         void setVarType(const std::string& name, VarType t) { varTypes[name] = t; }
         void setSlotType(int slot, VarType t) { slotToType[slot] = t; }
@@ -170,8 +199,10 @@ namespace pascal {
         void emitLabel(const std::string& label) { instructions.push_back(label + ":"); }
         void emit1(const std::string& op, const std::string& a) { emit(op + " " + a); }
         void emit2(const std::string& op, const std::string& a, const std::string& b) {
-            std::string A = a, B = b;
-            if (op == "mov" && A.rfind("xmm",0)==0 && isRealNumber(B)) B = ensureFloatConstant(B);
+            std::string A = a;
+            std::string B = b;
+            if (isRealNumber(B) && B.rfind("real_const_",0)!=0)
+                B = ensureFloatConstSymbol(B);
             emit(op + " " + A + ", " + B);
         }
         void emit3(const std::string& op, const std::string& a, const std::string& b, const std::string& c) { emit(op + " " + a + ", " + b + ", " + c); }
@@ -179,9 +210,14 @@ namespace pascal {
         std::string escapeStringForMxvm(const std::string& raw) const {
             std::ostringstream o; o << "\""; for (char c : raw) { if (c=='\\') o<<"\\\\"; else if (c=='\"') o<<"\\\""; else if (c=='\n') o<<"\\n"; else if (c=='\t') o<<"\\t"; else o<<c; } o << "\""; return o.str();
         }
-        std::string ensureFloatConstant(const std::string& value) {
-            if (isRealNumber(value) && value.find("real_const_") != 0) { std::string n = generateRealConstantName(); realConstants[n] = value; usedRealConstants.insert(n); return n; }
-            return value;
+        std::string ensureFloatConstSymbol(const std::string& value) {
+            if (!isRealNumber(value)) return value;
+            if (value.rfind("real_const_", 0) == 0) return value;
+            for (const auto &p : realConstants) if (p.second == value) return p.first;
+            std::string n = generateRealConstantName();
+            realConstants[n] = value;
+            usedRealConstants.insert(n);
+            return n;
         }
         std::string internString(const std::string& val) {
             for (const auto& p : stringLiterals) if (p.first == val) return p.second;
@@ -500,7 +536,8 @@ namespace pascal {
             for (const auto& reg : registers) out << "\t\tint " << reg << " = 0\n";
             for (const auto& floatReg : floatRegisters) out << "\t\tfloat " << floatReg << " = 0.0\n";
             for (const auto& p : ptrRegisters) out << "\t\tptr " << p << " = null\n";
-            for (const auto& constant : realConstants) out << "\t\tfloat " << constant.first << " = " << constant.second << "\n";
+            for (const auto& constant : realConstants)
+                out << "\t\tfloat " << constant.first << " = " << constant.second << "\n";
             if (needsEmptyString) out << "\t\tstring empty_str = \"\"\n";
             for (const auto& pair : stringLiterals) out << "\t\tstring " << pair.second << " = " << escapeStringForMxvm(pair.first) << "\n";
             if (usedStrings.count("fmt_int")) out << "\t\tstring fmt_int = \"%lld \"\n";
@@ -794,66 +831,123 @@ namespace pascal {
             emit1("jmp", start);
             emitLabel(end);
         }
+        
         void visit(ForStmtNode& node) override {
             std::string startVal = eval(node.startValue.get());
-            std::string endVal = eval(node.endValue.get());
+            std::string endVal   = eval(node.endValue.get());
+
+            startVal = coerceToIntImmediate(startVal);
+            endVal   = coerceToIntImmediate(endVal);
+
             std::string mangledLoopVar = mangleVariableName(node.variable);
             int slot = newSlotFor(mangledLoopVar);
             emit2("mov", slotVar(slot), startVal);
             if (isReg(startVal) && !isParmReg(startVal)) freeReg(startVal);
+
             std::string loopStartLabel = newLabel("FOR");
-            std::string loopEndLabel = newLabel("ENDFOR");
+            std::string loopEndLabel   = newLabel("ENDFOR");
             emitLabel(loopStartLabel);
+
             std::string endReg = allocReg();
             emit2("mov", endReg, endVal);
             emit2("cmp", slotVar(slot), endReg);
             if (node.isDownto) emit1("jl", loopEndLabel); else emit1("jg", loopEndLabel);
+
             if (node.statement) node.statement->accept(*this);
             if (node.isDownto) emit2("sub", slotVar(slot), "1"); else emit2("add", slotVar(slot), "1");
             emit1("jmp", loopStartLabel);
             emitLabel(loopEndLabel);
+
             if (isReg(endReg) && !isParmReg(endReg)) freeReg(endReg);
             if (isReg(endVal) && !isParmReg(endVal)) freeReg(endVal);
         }
         void visit(BinaryOpNode& node) override {
-            std::string left = eval(node.left.get());
-            std::string right = eval(node.right.get());
-            VarType leftType = getExpressionType(node.left.get());
-            VarType rightType = getExpressionType(node.right.get());
-            VarType resultType = VarType::INT;
-            bool needsFloatOp = (leftType == VarType::DOUBLE || rightType == VarType::DOUBLE);
-            if (node.operator_ == BinaryOpNode::DIVIDE) { needsFloatOp = true; resultType = VarType::DOUBLE; }
-            if (node.operator_ == BinaryOpNode::DIV) {
-                needsFloatOp = false; resultType = VarType::INT;
-                if (leftType == VarType::DOUBLE) { std::string nl = allocReg(); emit2("to_int", nl, left); if (isReg(left) && !isParmReg(left)) freeReg(left); left = nl; }
-                if (rightType == VarType::DOUBLE) { std::string nr = allocReg(); emit2("to_int", nr, right); if (isReg(right) && !isParmReg(right)) freeReg(right); right = nr; }
+            try {
+                std::string folded = foldNumeric(&node);
+                if (!folded.empty()) {
+                    if (node.operator_ == BinaryOpNode::DIVIDE && isIntegerLiteral(folded))
+                        folded += ".0";
+                    if (isFloatLiteral(folded)) {
+                        pushValue(ensureFloatConstSymbol(folded));
+                    } else {
+                        pushValue(folded);
+                    }
+                    return;
+                }
+            } catch (...) {  }
+
+            
+            auto evalOperand = [&](ASTNode* n)->std::string {
+                if (auto var = dynamic_cast<VariableNode*>(n)) {
+                    std::string v;
+                    if (tryGetConstNumeric(var->name, v)) return v;
+                }
+                return eval(n);
+            };
+
+            std::string left  = evalOperand(node.left.get());
+            std::string right = evalOperand(node.right.get());
+
+            VarType lt = getExpressionType(node.left.get());
+            VarType rt = getExpressionType(node.right.get());
+
+            bool isRealDivide = (node.operator_ == BinaryOpNode::DIVIDE);
+
+            if (isRealDivide) {
+                bool leftIsNum  = isIntegerLiteral(left)  || isFloatLiteral(left);
+                bool rightIsNum = isIntegerLiteral(right) || isFloatLiteral(right);
+
+                if (leftIsNum && rightIsNum) {
+                    
+                    if (isIntegerLiteral(left) && isIntegerLiteral(right)) {
+                        left += ".0";
+                    }
+                } else {
+                    if (lt != VarType::DOUBLE && rt != VarType::DOUBLE) {
+                        if (isIntegerLiteral(left) && !isFloatLiteral(left))
+                            left += ".0";
+                        else if (isIntegerLiteral(right) && !isFloatLiteral(right))
+                            right += ".0";
+                    }
+                }
             }
+
+        
+            if (node.operator_ == BinaryOpNode::DIV && (isFloatLiteral(left) || isFloatLiteral(right))) {
+                if (isFloatLiteral(left))  left  = std::to_string((long long)std::stod(left));
+                if (isFloatLiteral(right)) right = std::to_string((long long)std::stod(right));
+            }
+
+            auto emitBinary = [&](const char* op) {
+                std::string dst;
+                bool leftIsUsableReg = isReg(left) && !isParmReg(left);
+                if (leftIsUsableReg) {
+                    dst = left;
+                } else {
+                    dst = allocReg();
+                    emit2("mov", dst, left);  
+                }
+                emit2(op, dst, right);
+                if (isReg(right) && !isParmReg(right)) freeReg(right);
+                pushValue(dst);
+            };
+
             switch (node.operator_) {
-                case BinaryOpNode::PLUS: pushTri("add", left, right); break;
-                case BinaryOpNode::MINUS: pushTri("sub", left, right); break;
-                case BinaryOpNode::MULTIPLY: pushTri("mul", left, right); break;
-                case BinaryOpNode::DIVIDE: pushTri("div", left, right); break;
-                case BinaryOpNode::DIV: pushTri("div", left, right); break;
-                case BinaryOpNode::MOD:
-                    if (resultType == VarType::DOUBLE) {
-                        std::string result = allocFloatReg();
-                        emit_invoke("fmod", {left, right});
-                        emit1("return", result);
-                        pushValue(result);
-                        if (isReg(left) && !isParmReg(left)) freeReg(left);
-                        if (isReg(right) && !isParmReg(right)) freeReg(right);
-                        return;
-                    } else pushTri("mod", left, right);
-                    break;
-                case BinaryOpNode::EQUAL: if (needsFloatOp) pushFloatCmpResult(left, right, "je"); else pushCmpResult(left, right, "je"); break;
-                case BinaryOpNode::NOT_EQUAL: if (needsFloatOp) pushFloatCmpResult(left, right, "jne"); else pushCmpResult(left, right, "jne"); break;
-                case BinaryOpNode::LESS: if (needsFloatOp) pushFloatCmpResult(left, right, "jb"); else pushCmpResult(left, right, "jl"); break;
-                case BinaryOpNode::LESS_EQUAL: if (needsFloatOp) pushFloatCmpResult(left, right, "jbe"); else pushCmpResult(left, right, "jle"); break;
-                case BinaryOpNode::GREATER: if (needsFloatOp) pushFloatCmpResult(left, right, "ja"); else pushCmpResult(left, right, "jg"); break;
-                case BinaryOpNode::GREATER_EQUAL: if (needsFloatOp) pushFloatCmpResult(left, right, "jae"); else pushCmpResult(left, right, "jge"); break;
-                case BinaryOpNode::AND: pushLogicalAnd(left, right); break;
-                case BinaryOpNode::OR: pushLogicalOr(left, right); break;
-                default: throw std::runtime_error("Unknown binary operator");
+                case BinaryOpNode::PLUS:      emitBinary("add"); break;
+                case BinaryOpNode::MINUS:     emitBinary("sub"); break;
+                case BinaryOpNode::MULTIPLY:  emitBinary("mul"); break;
+                case BinaryOpNode::DIVIDE:    emitBinary("div"); break;      
+                case BinaryOpNode::DIV:       emitBinary("div"); break;      
+                case BinaryOpNode::MOD:       emitBinary("mod"); break;
+                case BinaryOpNode::AND:       pushLogicalAnd(left, right); break;
+                case BinaryOpNode::OR:        pushLogicalOr(left, right); break;
+                case BinaryOpNode::EQUAL:         pushCmpResult(left, right, "je");  break;
+                case BinaryOpNode::NOT_EQUAL:     pushCmpResult(left, right, "jne"); break;
+                case BinaryOpNode::LESS:          pushCmpResult(left, right, "jl");  break;
+                case BinaryOpNode::LESS_EQUAL:    pushCmpResult(left, right, "jle"); break;
+                case BinaryOpNode::GREATER:       pushCmpResult(left, right, "jg");  break;
+                case BinaryOpNode::GREATER_EQUAL: pushCmpResult(left, right, "jge"); break;
+                default: throw std::runtime_error("Unsupported binary operator");
             }
         }
         VarType getExpressionType(ASTNode* node) {
@@ -923,8 +1017,11 @@ namespace pascal {
             pushValue(findMangledName(node.name));
         }
         void visit(NumberNode& node) override {
-            if (node.isReal || isRealNumber(node.value)) { std::string n = generateRealConstantName(); usedRealConstants.insert(n); realConstants[n] = node.value; pushValue(n); }
-            else pushValue(node.value);
+            if (node.isReal || isRealNumber(node.value)) {
+                pushValue(ensureFloatConstSymbol(node.value));
+            } else {
+                pushValue(node.value);
+            }
         }
         void visit(StringNode& node) override {
             std::string sym = internString(node.value);
@@ -932,64 +1029,85 @@ namespace pascal {
         }
         void visit(BooleanNode& node) override { std::string reg = allocReg(); emit2("mov", reg, node.value ? "1" : "0"); pushValue(reg); }
         void visit(EmptyStmtNode& node) override {}
-        void visit(ConstDeclNode& node) override {
-            for (const auto& assignment : node.assignments) {
-                std::string varType; 
-                std::string literalValue;
-                bool isLiteral = false;
 
-                if (auto numNode = dynamic_cast<NumberNode*>(assignment->value.get())) {
-                    if (numNode->isReal || numNode->value.find('.') != std::string::npos) { 
-                        varType = "float"; 
-                        literalValue = numNode->value; 
-                    } else { 
-                        varType = "int"; 
-                        literalValue = numNode->value; 
-                    }
-                    isLiteral = true;
-                } else if (auto stringNode = dynamic_cast<StringNode*>(assignment->value.get())) {
-                    varType = "string"; 
-                    literalValue = internString(stringNode->value);
-                    isLiteral = true;
-                } else if (auto boolNode = dynamic_cast<BooleanNode*>(assignment->value.get())) {
-                    varType = "int"; 
-                    literalValue = boolNode->value ? "1" : "0";
-                    isLiteral = true;
-                } else if (auto varNode = dynamic_cast<VariableNode*>(assignment->value.get())) {
-                    std::string refName = findMangledName(varNode->name);
-                    auto it = compileTimeConstants.find(refName);
-                    if (it != compileTimeConstants.end()) {
-                        literalValue = it->second;
-                        varType = "int"; 
-                        isLiteral = true;
-                    }
+    private:
+        
+        std::string evaluateConstantExpression(ASTNode* node) {
+            if (auto numNode = dynamic_cast<NumberNode*>(node)) {
+                return numNode->value;
+            }
+            if (auto varNode = dynamic_cast<VariableNode*>(node)) {
+                auto it = compileTimeConstants.find(findMangledName(varNode->name));
+                if (it != compileTimeConstants.end()) {
+                    return it->second;
                 }
-
-                if (isLiteral) {
-                    std::string mangledName = mangleVariableName(assignment->identifier);
-                    compileTimeConstants[mangledName] = literalValue;
-                    compileTimeConstants[assignment->identifier] = literalValue; 
-
-                    int slot = newSlotFor(mangledName);
-                    VarType vType = VarType::INT;
-                    if (varType == "float") vType = VarType::DOUBLE;
-                    else if (varType == "string") vType = VarType::PTR;
-                    setVarType(assignment->identifier, vType);
-                    setSlotType(slot, vType);
-                    std::string varLocation = slotVar(slot);
-                    updateDataSectionInitialValue(varLocation, (vType == VarType::PTR ? "ptr" : varType), literalValue);
-                } else {
-                    std::string valueReg = eval(assignment->value.get());
-                    varType = "int";
-                    int slot = newSlotFor(assignment->identifier);
-                    setVarType(assignment->identifier, VarType::INT);
-                    setSlotType(slot, VarType::INT);
-                    std::string varLocation = slotVar(slot);
-                    emit2("mov", varLocation, valueReg);
-                    if (isReg(valueReg) && !isParmReg(valueReg)) freeReg(valueReg);
+                throw std::runtime_error("Cannot use non-constant variable '" + varNode->name + "' in a constant expression.");
+            }
+            if (auto binOp = dynamic_cast<BinaryOpNode*>(node)) {
+                double left = std::stod(evaluateConstantExpression(binOp->left.get()));
+                double right = std::stod(evaluateConstantExpression(binOp->right.get()));
+                double result;
+                switch (binOp->operator_) {
+                    case BinaryOpNode::PLUS:     result = left + right; break;
+                    case BinaryOpNode::MINUS:    result = left - right; break;
+                    case BinaryOpNode::MULTIPLY: result = left * right; break;
+                    case BinaryOpNode::DIVIDE:   result = left / right; break;
+                    case BinaryOpNode::DIV:      result = static_cast<long long>(left) / static_cast<long long>(right); break;
+                    default: throw std::runtime_error("Unsupported operator in constant expression.");
                 }
+                return std::to_string(result);
+            }
+            throw std::runtime_error("Unsupported node type in constant expression.");
+        }
+
+    public:
+     void visit(ConstDeclNode& node) override {
+        for (const auto& assignment : node.assignments) {
+            if (auto strNode = dynamic_cast<StringNode*>(assignment->value.get())) {
+                std::string sym = internString(strNode->value); 
+
+                std::string mangledName = mangleVariableName(assignment->identifier);
+                compileTimeConstants[mangledName] = mangledName; 
+                compileTimeConstants[assignment->identifier] = mangledName;
+
+                int slot = newSlotFor(mangledName);
+                setVarType(assignment->identifier, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                prolog.push_back("mov " + slotVar(slot) + ", " + sym);
+                continue;
+            }
+
+            try {
+                std::string literalValue = evaluateConstantExpression(assignment->value.get());
+                bool isFloat = isRealNumber(literalValue);
+                if (isFloat) literalValue = ensureFloatConstSymbol(literalValue);
+
+                std::string varType = isFloat ? "float" : "int";
+                std::string mangledName = mangleVariableName(assignment->identifier);
+
+                compileTimeConstants[mangledName] = (isFloat ? realConstants[literalValue] : literalValue);
+                compileTimeConstants[assignment->identifier] = (isFloat ? realConstants[literalValue] : literalValue);
+
+                int slot = newSlotFor(mangledName);
+                VarType vType = isFloat ? VarType::DOUBLE : VarType::INT;
+                setVarType(assignment->identifier, vType);
+                setSlotType(slot, vType);
+
+                updateDataSectionInitialValue(slotVar(slot), varType,
+                    isFloat ? realConstants[literalValue] : literalValue);
+            } catch (const std::runtime_error&) {
+                std::string valueReg = eval(assignment->value.get());
+                int slot = newSlotFor(assignment->identifier);
+                VarType exprType = getExpressionType(assignment->value.get());
+                setVarType(assignment->identifier, exprType);
+                setSlotType(slot, exprType);
+                std::string varLocation = slotVar(slot);
+                emit2("mov", varLocation, valueReg);
+                if (isReg(valueReg) && !isParmReg(valueReg)) freeReg(valueReg);
             }
         }
+    }
         void updateDataSectionInitialValue(const std::string& varName, const std::string& type, const std::string& value) { constInitialValues[varName] = {type, value}; }
         void visit(RepeatStmtNode& node) override {
             std::string startLabel = newLabel("REPEAT");
@@ -1042,23 +1160,31 @@ namespace pascal {
         void visit(ArrayDeclarationNode& node) override {
             std::string arrayName = node.name;
             std::string mangledArrayName = mangleVariableName(arrayName);
+
             std::string lowerBoundStr = eval(node.arrayType->lowerBound.get());
             std::string upperBoundStr = eval(node.arrayType->upperBound.get());
+            lowerBoundStr = coerceToIntImmediate(lowerBoundStr);
+            upperBoundStr = coerceToIntImmediate(upperBoundStr);
+
             int lowerBound = std::stoi(lowerBoundStr);
             int upperBound = std::stoi(upperBoundStr);
             int size = upperBound - lowerBound + 1;
             int elementSize = getArrayElementSize(node.arrayType->elementType);
             ArrayInfo info{node.arrayType->elementType, lowerBound, upperBound, size, elementSize};
             arrayInfo[arrayName] = info;
+
             std::string currentScope = getCurrentScopeName();
             if (currentScope.empty()) globalArrays.push_back(mangledArrayName);
             else functionScopedArrays[currentScope].push_back(mangledArrayName);
+
             setVarType(arrayName, VarType::PTR);
             int slot = newSlotFor(mangledArrayName);
             setSlotType(slot, VarType::PTR);
             varSlot[arrayName] = slot;
             varSlot[mangledArrayName] = slot;
+
             emit3("alloc", mangledArrayName, std::to_string(elementSize), std::to_string(size));
+
             for (size_t i = 0; i < node.initializers.size() && i < (size_t)size; ++i) {
                 std::string value = eval(node.initializers[i].get());
                 std::string off = allocReg();
@@ -1068,6 +1194,7 @@ namespace pascal {
                 freeReg(off);
             }
         }
+
         void visit(ArrayAccessNode& node) override {
             std::string mangledArrayName = findMangledArrayName(node.arrayName);
             auto it = arrayInfo.find(node.arrayName);
@@ -1135,6 +1262,83 @@ namespace pascal {
                 if (varSlot.count(candidate)) return candidate;
             }
             return name;
+        }
+
+        bool isIntegerLiteral(const std::string& s) const {
+            if (s.empty()) return false;
+            size_t i = (s[0]=='+'||s[0]=='-') ? 1 : 0;
+            if (i >= s.size()) return false;
+            for (; i < s.size(); ++i)
+                if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
+            return true;
+        }
+        bool isFloatLiteral(const std::string& s) const {
+            if (s.find_first_of(".eE") == std::string::npos) return false;
+            char *end = nullptr;
+            std::strtod(s.c_str(), &end);
+            return end && *end == '\0';
+        }
+        bool tryGetConstNumeric(const std::string& name, std::string& out) {
+            auto itM = compileTimeConstants.find(findMangledName(name));
+            if (itM != compileTimeConstants.end() &&
+                (isIntegerLiteral(itM->second) || isFloatLiteral(itM->second))) {
+                out = itM->second;
+                return true;
+            }
+            auto it = compileTimeConstants.find(name);
+            if (it != compileTimeConstants.end() &&
+                (isIntegerLiteral(it->second) || isFloatLiteral(it->second))) {
+                out = it->second;
+                return true;
+            }
+            return false;
+        }
+        std::string foldNumeric(ASTNode* n) {
+            if (!n) return "";
+            if (auto num = dynamic_cast<NumberNode*>(n)) return num->value;
+            if (auto var = dynamic_cast<VariableNode*>(n)) {
+                std::string v;
+                if (tryGetConstNumeric(var->name, v)) return v;
+                return "";
+            }
+            if (auto bin = dynamic_cast<BinaryOpNode*>(n)) {
+                std::string L = foldNumeric(bin->left.get());
+                std::string R = foldNumeric(bin->right.get());
+                if (L.empty() || R.empty()) return "";
+                auto toD = [&](const std::string& s)->double { return std::stod(s); };
+                auto toI = [&](const std::string& s)->long long {
+                    return isFloatLiteral(s) ? static_cast<long long>(std::stod(s))
+                                             : std::stoll(s);
+                };
+                switch (bin->operator_) {
+                    case BinaryOpNode::PLUS:
+                        return (isFloatLiteral(L)||isFloatLiteral(R))
+                               ? std::to_string(toD(L)+toD(R))
+                               : std::to_string(toI(L)+toI(R));
+                    case BinaryOpNode::MINUS:
+                        return (isFloatLiteral(L)||isFloatLiteral(R))
+                               ? std::to_string(toD(L)-toD(R))
+                               : std::to_string(toI(L)-toI(R));
+                    case BinaryOpNode::MULTIPLY:
+                        return (isFloatLiteral(L)||isFloatLiteral(R))
+                               ? std::to_string(toD(L)*toD(R))
+                               : std::to_string(toI(L)*toI(R));
+                    case BinaryOpNode::DIVIDE: {
+                        double rv = toD(R); if (rv==0.0) throw std::runtime_error("division by zero");
+                        return std::to_string(toD(L)/rv);
+                    }
+                    case BinaryOpNode::DIV: {
+                        long long ri = toI(R); if (ri==0) throw std::runtime_error("division by zero");
+                        return std::to_string(toI(L)/ri);
+                    }
+                    case BinaryOpNode::MOD: {
+                        long long ri = toI(R); if (ri==0) throw std::runtime_error("mod by zero");
+                        return std::to_string(toI(L)%ri);
+                    }
+                    default: return "";
+                }
+            }
+            return "";
         }
     };
 
