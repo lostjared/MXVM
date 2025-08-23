@@ -1535,9 +1535,16 @@ namespace mxvm {
                             v.var_value.float_value = 0.0;
                             v.var_value.type = VarType::VAR_FLOAT;
                         }
-                    } else if(s.type == VarType::VAR_INTEGER || s.type == VarType::VAR_BYTE || s.type == VarType::VAR_POINTER || s.type == VarType::VAR_EXTERN) {
-                        v.var_value.float_value = static_cast<int64_t>(s.var_value.int_value);
-                    } 
+                    } else if (s.type == VarType::VAR_INTEGER || s.type == VarType::VAR_BYTE) {
+                        v.var_value.float_value = static_cast<double>(s.var_value.int_value);
+                        v.var_value.type = VarType::VAR_FLOAT;
+                    } else if (s.type == VarType::VAR_FLOAT) {
+                        v.var_value.float_value = s.var_value.float_value;
+                        v.var_value.type = VarType::VAR_FLOAT;
+                    } else if (s.type == VarType::VAR_POINTER || s.type == VarType::VAR_EXTERN) {
+                        v.var_value.float_value = static_cast<double>(reinterpret_cast<uintptr_t>(s.var_value.ptr_value));
+                        v.var_value.type = VarType::VAR_FLOAT;
+                    }
                 } else {
                     throw mx::Exception("to_float second argument must be a variable");
                 }
@@ -1723,13 +1730,12 @@ namespace mxvm {
             var2 = &temp2;
         }
         
-        // Reset all flags
+        
         zero_flag = false;
         less_flag = false;
         greater_flag = false;
-        carry_flag = false;
         
-        // Convert to double for comparison
+        
         double val1, val2;
         if (var1->type == VarType::VAR_FLOAT) {
             val1 = var1->var_value.float_value;
@@ -1747,12 +1753,11 @@ namespace mxvm {
             throw mx::Exception("FCMP: unsupported operand type for var2");
         }
         
-        // Set flags based on comparison
+        
         if (val1 == val2) {
             zero_flag = true;
         } else if (val1 < val2) {
             less_flag = true;
-            carry_flag = true;  // For unsigned comparisons
         } else {
             greater_flag = true;
         }

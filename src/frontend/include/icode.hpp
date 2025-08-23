@@ -318,7 +318,14 @@ namespace pascal {
             emit(op + " " + a);
         }
         void emit2(const std::string& op, const std::string& a, const std::string& b) {
-            emit(op + " " + a + ", " + b);
+            std::string operandA = a;
+            std::string operandB = b;
+            
+            if (op == "mov" && operandA.substr(0, 3) == "xmm" && isRealNumber(operandB)) {
+                operandB = ensureFloatConstant(operandB);
+            }
+            
+            emit(op + " " + operandA + ", " + operandB);
         }
         void emit3(const std::string& op, const std::string& a, const std::string& b, const std::string& c) {
             emit(op + " " + a + ", " + b + ", " + c);
@@ -341,6 +348,15 @@ namespace pascal {
             return o.str();
         }
 
+        std::string ensureFloatConstant(const std::string& value) {
+            if (isRealNumber(value) && value.find("real_const_") != 0) {
+                std::string constName = generateRealConstantName();
+                realConstants[constName] = value;
+                usedRealConstants.insert(constName);
+                return constName;
+            }
+            return value;
+        }
         
         std::string internString(const std::string& val) {
             for (const auto& pair : stringLiterals) {
@@ -403,7 +419,8 @@ namespace pascal {
             if (!n) return "0";
             
             if (auto num = dynamic_cast<NumberNode*>(n)) {
-                if (num->value.length() < 10) {
+                
+                if (!num->isReal && !isRealNumber(num->value)) {
                     return num->value;
                 }
             }
@@ -425,8 +442,8 @@ namespace pascal {
                              a.find("real_const_") != std::string::npos ||
                              b.find("real_const_") != std::string::npos;
             
-            std::string leftOp = a;
-            std::string rightOp = b;
+            std::string leftOp = isFloatOp ? ensureFloatConstant(a) : a;
+            std::string rightOp = isFloatOp ? ensureFloatConstant(b) : b;
             
             if (isReg(leftOp)) {
                 emit2(op, leftOp, rightOp);
@@ -458,7 +475,26 @@ namespace pascal {
             if (isReg(b)) freeReg(b);
         }
 
-        void pushFloatCmpResult(const std::string& a, const std::string& b, const char* jop) {
+        void pushFloatCmpResult(const std::string& aIn, const std::string& bIn, const char* jop) {
+            // Ensure both inputs are properly declared variables or constants
+            std::string a = aIn;
+            std::string b = bIn;
+            
+            // Check if either is a floating point literal that needs to be declared
+            if (isRealNumber(a) && a.find("real_const_") != 0) {
+                std::string constName = generateRealConstantName();
+                realConstants[constName] = a;
+                usedRealConstants.insert(constName);
+                a = constName;
+            }
+            
+            if (isRealNumber(b) && b.find("real_const_") != 0) {
+                std::string constName = generateRealConstantName();
+                realConstants[constName] = b;
+                usedRealConstants.insert(constName);
+                b = constName;
+            }
+            
             std::string t = allocReg();
             std::string L1 = newLabel("CMP_TRUE");
             std::string L2 = newLabel("CMP_END");
@@ -471,8 +507,8 @@ namespace pascal {
             emitLabel(L2);
             pushValue(t);
             
-            if (isReg(a)) freeReg(a);
-            if (isReg(b)) freeReg(b);
+            if (isReg(a) && a != aIn) freeReg(a);
+            if (isReg(b) && b != bIn) freeReg(b);
         }
 
         void pushLogicalAnd(const std::string& a, const std::string& b) {
@@ -1078,7 +1114,7 @@ namespace pascal {
                 emit2("to_float", vrFloat, vr);
                 
             
-                emit2("fcmp", vrFloat, endV);
+                emit2("cmp", vrFloat, endV);
                 if (node.isDownto) {
                     emit1("jb", end);  
                 } else {

@@ -64,9 +64,9 @@ begin
         end;
         sdl_set_draw_color(renderer, 0, 0, 0, 255);
         sdl_clear(renderer);
-        for z := 0 to 480.0/SQUARE_H do
+        for z := 0 to (480 div SQUARE_H)-1 do
         begin
-            for i := 0 to 640.0/SQUARE_W do
+            for i := 0 to (640 div SQUARE_W)-1 do
             begin
                 color_value_r := rand() mod 255;
                 color_value_g := rand() mod 255;
@@ -82,3 +82,4 @@ begin
     sdl_destroy_window(window_id);
     sdl_quit();
 end.
+

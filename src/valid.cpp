@@ -82,6 +82,7 @@ namespace mxvm {
         {"neg",   {"neg",   {OpKind::Id}}},
         {"mod",   {"mod",   {OpKind::Id, OpKind::Any}, VArity::AnyTail, 2, 3}},
         {"cmp",   {"cmp",   {OpKind::Any, OpKind::Any}}},
+        {"fcmp",   {"fcmp",   {OpKind::Any, OpKind::Any}}},
         {"jmp",   {"jmp",   {OpKind::Label}}},
         {"je",    {"je",    {OpKind::Label}}},
         {"jne",   {"jne",   {OpKind::Label}}},
