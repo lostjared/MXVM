@@ -556,7 +556,7 @@ namespace pascal {
                         initValue = numNode->value;
                         isLiteral = true;
                     } else if (auto stringNode = dynamic_cast<StringNode*>(initNode)) {
-                        initValue = "\"" + stringNode->value + "\"";
+                        initValue = internString(stringNode->value);
                         isLiteral = true;
                     } else if (auto boolNode = dynamic_cast<BooleanNode*>(initNode)) {
                         initValue = boolNode->value ? "1" : "0";
@@ -580,7 +580,9 @@ namespace pascal {
                     if (isLiteral) {
                         std::string varTypeStr;
                         if (vType == VarType::DOUBLE) varTypeStr = "float";
-                        else if (vType == VarType::STRING) varTypeStr = "string";
+                        else if (vType == VarType::STRING) {
+                             varTypeStr = "ptr"; 
+                        }
                         else varTypeStr = "int";
                         updateDataSectionInitialValue(slotVar(slot), varTypeStr, initValue);
                     } else {
@@ -925,8 +927,8 @@ namespace pascal {
             else pushValue(node.value);
         }
         void visit(StringNode& node) override {
-            if (node.value.length() == 1) { int asciiValue = (int)node.value[0]; pushValue(std::to_string(asciiValue)); }
-            else { std::string sym = internString(node.value); pushValue(sym); }
+            std::string sym = internString(node.value);
+            pushValue(sym);
         }
         void visit(BooleanNode& node) override { std::string reg = allocReg(); emit2("mov", reg, node.value ? "1" : "0"); pushValue(reg); }
         void visit(EmptyStmtNode& node) override {}
@@ -947,7 +949,7 @@ namespace pascal {
                     isLiteral = true;
                 } else if (auto stringNode = dynamic_cast<StringNode*>(assignment->value.get())) {
                     varType = "string"; 
-                    literalValue = "\"" + stringNode->value + "\"";
+                    literalValue = internString(stringNode->value);
                     isLiteral = true;
                 } else if (auto boolNode = dynamic_cast<BooleanNode*>(assignment->value.get())) {
                     varType = "int"; 
@@ -971,11 +973,11 @@ namespace pascal {
                     int slot = newSlotFor(mangledName);
                     VarType vType = VarType::INT;
                     if (varType == "float") vType = VarType::DOUBLE;
-                    else if (varType == "string") vType = VarType::STRING;
+                    else if (varType == "string") vType = VarType::PTR;
                     setVarType(assignment->identifier, vType);
                     setSlotType(slot, vType);
                     std::string varLocation = slotVar(slot);
-                    updateDataSectionInitialValue(varLocation, varType, literalValue);
+                    updateDataSectionInitialValue(varLocation, (vType == VarType::PTR ? "ptr" : varType), literalValue);
                 } else {
                     std::string valueReg = eval(assignment->value.get());
                     varType = "int";
