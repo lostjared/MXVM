@@ -198,7 +198,7 @@ namespace pascal {
         }
 
         bool StdFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName,
-                                                    const std::vector<std::unique_ptr<ASTNode>>& arguments)  {
+                                  const std::vector<std::unique_ptr<ASTNode>>& arguments)  {
             visitor.usedModules.insert("std");
             
             int lineNum = arguments.empty() ? 1 : arguments[0]->getLineNumber();
@@ -219,54 +219,29 @@ namespace pascal {
                 args.reserve(arguments.size());
 
                 for (const auto& argNode : arguments) {
-                    std::string argLocation;
-                    bool isLiteral = false;
+                    std::string argLocation = visitor.eval(argNode.get());
+                    auto argType = visitor.getExpressionType(argNode.get());
 
-                    if (auto numNode = dynamic_cast<NumberNode*>(argNode.get())) {
-                        isLiteral = true;
-                        std::string constName = visitor.generateRealConstantName();
-                        if (numNode->value.find('.') == std::string::npos) {
-                            visitor.realConstants[constName] = numNode->value + ".0";
+                    if (argType != CodeGenVisitor::VarType::DOUBLE) {
+                        std::string floatReg = visitor.allocFloatReg();
+                        visitor.emit2("to_float", floatReg, argLocation);
+                        if (visitor.isReg(argLocation)) visitor.freeReg(argLocation);
+                        args.push_back(floatReg);
+                    } else {
+                        if (!visitor.isFloatReg(argLocation)) {
+                            std::string floatReg = visitor.allocFloatReg();
+                            visitor.emit2("mov", floatReg, argLocation);
+                            args.push_back(floatReg);
                         } else {
-                            visitor.realConstants[constName] = numNode->value;
+                            args.push_back(argLocation);
                         }
-                        visitor.usedRealConstants.insert(constName);
-                        argLocation = constName;
-                    } 
-                    else if (auto unaryNode = dynamic_cast<UnaryOpNode*>(argNode.get())) {
-                        if (unaryNode->operator_ == UnaryOpNode::MINUS) {
-                            if (auto numNode = dynamic_cast<NumberNode*>(unaryNode->operand.get())) {
-                                isLiteral = true;
-                                std::string constName = visitor.generateRealConstantName();
-                                std::string val = "-" + numNode->value;
-                                if (val.find('.') == std::string::npos) {
-                                    visitor.realConstants[constName] = val + ".0";
-                                } else {
-                                    visitor.realConstants[constName] = val;
-                                }
-                                visitor.usedRealConstants.insert(constName);
-                                argLocation = constName;
-                            }
-                        }
-                    }
-                    
-                    if (!isLiteral) {
-                        argLocation = visitor.eval(argNode.get());
-                    }
-
-                    std::string floatReg = visitor.allocFloatReg();
-                    visitor.emit3("mov", floatReg, argLocation);
-                    args.push_back(floatReg);
-                    if (!isLiteral && visitor.isReg(argLocation)) {
-                        visitor.freeReg(argLocation);
                     }
                 }
 
-                std::string resultReg = visitor.allocFloatReg();
                 visitor.emit_invoke(funcName, args);
-                visitor.emit("return " + resultReg); 
+                std::string resultReg = visitor.allocFloatReg();
+                visitor.emit("return " + resultReg);                
                 visitor.pushValue(resultReg);
-
                 for (const std::string& fr : args) {
                     if (visitor.isFloatReg(fr)) {
                         visitor.freeFloatReg(fr);
@@ -294,6 +269,24 @@ namespace pascal {
                 std::string resultReg = visitor.allocReg();
                 visitor.emit("return " + resultReg); 
                 visitor.pushValue(resultReg);
+                return true;
+            }
+            else if (funcName == "float" || funcName == "real") {
+                if (arguments.size() != 1) {
+                    throw std::runtime_error("float/real expects one argument");
+                }
+                std::string argLocation = visitor.eval(arguments[0].get());
+
+                auto argType = visitor.getExpressionType(arguments[0].get());
+                if (argType == CodeGenVisitor::VarType::DOUBLE) {
+                    visitor.pushValue(argLocation);
+                    return true;
+                }
+
+                std::string floatReg = visitor.allocFloatReg();
+                visitor.emit2("to_float", floatReg, argLocation);
+                visitor.pushValue(floatReg);
+                if (visitor.isReg(argLocation)) visitor.freeReg(argLocation);
                 return true;
             }
 

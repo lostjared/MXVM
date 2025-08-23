@@ -76,7 +76,6 @@ namespace pascal {
 
     class CodeGenVisitor : public ASTVisitor {
     private:
-      
         std::unordered_set<std::string> usedRealConstants;  
         int realConstantCounter = 0;
         std::set<std::string> usedModules;
@@ -147,9 +146,15 @@ namespace pascal {
         
         std::vector<bool> regInUse;
         std::vector<bool> floatRegInUse;  
-        
-        std::vector<ProcDeclNode*> deferredProcs;
-        std::vector<FuncDeclNode*> deferredFuncs;
+    
+        struct Scope {
+            std::string name;
+            std::vector<ProcDeclNode*> nestedProcs;
+            std::vector<FuncDeclNode*> nestedFuncs;
+        };
+        std::vector<Scope> scopeStack;
+        std::vector<ProcDeclNode*> deferredProcs; 
+        std::vector<FuncDeclNode*> deferredFuncs; 
         std::string currentFunctionName;
         bool functionSetReturn;
         
@@ -162,8 +167,7 @@ namespace pascal {
         std::vector<std::string> instructions;
 
         std::vector<std::string> evalStack;
-
-        std::unordered_map<std::string,std::string> stringLiterals; 
+        std::vector<std::pair<std::string, std::string>> stringLiterals;
         std::unordered_set<std::string> usedStrings;
 
         std::unordered_map<int, std::string> slotToName;
@@ -292,11 +296,11 @@ namespace pascal {
         void emit2(const std::string& op, const std::string& a, const std::string& b) {
             emit(op + " " + a + ", " + b);
         }
-        void emit3(const std::string& op, const std::string& a, const std::string& b) {
-            emit(op + " " + a + ", " + b);
+        void emit3(const std::string& op, const std::string& a, const std::string& b, const std::string& c) {
+            emit(op + " " + a + ", " + b + ", " + c);
         }
-        void emit3(const std::string& op, const std::string& dst, const std::string& a, const std::string& b) {
-            emit(op + " " + dst + ", " + a + ", " + b);
+        void emit4(const std::string& op, const std::string& a, const std::string& b, const std::string& c, const std::string& d) {
+            emit(op + " " + a + ", " + b + ", " + c + ", " + d);
         }
 
         std::string escapeStringForMxvm(const std::string& raw) const {
@@ -313,9 +317,18 @@ namespace pascal {
             return o.str();
         }
 
+        
         std::string internString(const std::string& val) {
-            std::string key = "str_" + std::to_string((int)stringLiterals.size());
-            stringLiterals.emplace(key, val);
+            // Check if this string has already been interned
+            for (const auto& pair : stringLiterals) {
+                if (pair.first == val) {
+                    return pair.second; // Return existing symbol
+                }
+            }
+            
+            // Create a new symbol
+            std::string key = "str_" + std::to_string(stringLiterals.size());
+            stringLiterals.push_back({val, key});
             return key;
         }
 
@@ -394,13 +407,13 @@ namespace pascal {
             std::string rightOp = b;
             
             if (isReg(leftOp)) {
-                emit3(op, leftOp, rightOp);
+                emit2(op, leftOp, rightOp);
                 pushValue(leftOp); 
                 if (isReg(b)) freeReg(b); 
             } else {
                 std::string result = isFloatOp ? allocFloatReg() : allocReg();
-                emit3("mov", result, leftOp);
-                emit3(op, result, rightOp);
+                emit2("mov", result, leftOp);
+                emit2(op, result, rightOp);
                 pushValue(result);
                 if (isReg(b)) freeReg(b);
             }
@@ -412,10 +425,10 @@ namespace pascal {
             std::string L2 = newLabel("CMP_END");
             emit2("cmp", a, b);
             emit1(jop, L1);
-            emit3("mov", t, "0");
+            emit2("mov", t, "0");
             emit1("jmp", L2);
             emitLabel(L1);
-            emit3("mov", t, "1");
+            emit2("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
             
@@ -429,10 +442,10 @@ namespace pascal {
             std::string L2 = newLabel("CMP_END");
             emit2("fcmp", a, b);  
             emit1(jop, L1);
-            emit3("mov", t, "0");
+            emit2("mov", t, "0");
             emit1("jmp", L2);
             emitLabel(L1);
-            emit3("mov", t, "1");
+            emit2("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
             
@@ -448,10 +461,10 @@ namespace pascal {
             emit1("je", L0);
             emit2("cmp", b, "0");
             emit1("je", L0);
-            emit3("mov", t, "1");
+            emit2("mov", t, "1");
             emit1("jmp", L1);
             emitLabel(L0);
-            emit3("mov", t, "0");
+            emit2("mov", t, "0");
             emitLabel(L1);
             pushValue(t);
             
@@ -467,10 +480,10 @@ namespace pascal {
             emit1("jne", L1);
             emit2("cmp", b, "0");
             emit1("jne", L1);
-            emit3("mov", t, "0");
+            emit2("mov", t, "0");
             emit1("jmp", L2);
             emitLabel(L1);
-            emit3("mov", t, "1");
+            emit2("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
             
@@ -523,7 +536,9 @@ namespace pascal {
             varTypes.clear();  
             globalArrays.clear(); 
             functionScopedArrays.clear(); 
-            
+            scopeStack.clear();
+            scopeStack.push_back({"__global__"});
+
             for (size_t i = 0; i < regInUse.size(); i++) {
                 regInUse[i] = false;
             }
@@ -533,97 +548,33 @@ namespace pascal {
             }
             
             root->accept(*this);
-
-            
             for (const auto& arrayName : globalArrays) {
                 emit1("free", arrayName);
             }
-
             emit("done");
-            
-            for (auto pn : deferredProcs) {
+            size_t processedIndex = 0;
+            while (processedIndex < deferredProcs.size()) {
+                auto pn = deferredProcs[processedIndex++];
                 emitLabel(funcLabel("function PROC_", pn->name));
-                currentFunctionName = pn->name; 
+                currentFunctionName = pn->name;
+                for (size_t i = 0; i < regInUse.size(); i++) regInUse[i] = false;
+                for (size_t i = 0; i < floatRegInUse.size(); i++) floatRegInUse[i] = false;
                 
-                for (size_t i = 0; i < regInUse.size(); i++) {
-                    regInUse[i] = false;
-                }
-                for (size_t i = 0; i < floatRegInUse.size(); i++) {
-                    floatRegInUse[i] = false;
-                }
-                
-                int paramIndex = 0;
-                for (auto &p : pn->parameters) {
-                    if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                        for (auto &id : param->identifiers) {
-                            if (paramIndex < 6) {
-                                if (!param->type.empty() && param->type == "string") {
-                                    int slot = newSlotFor(id);
-                                    emit3("mov", slotVar(slot), ptrRegisters[paramIndex]);
-                                    setVarType(id, VarType::STRING);
-                                } 
-                                else if (!param->type.empty() && param->type == "real") {
-                                    int slot = newSlotFor(id);
-                                    emit3("mov", slotVar(slot), floatRegisters[paramIndex]);
-                                    setVarType(id, VarType::DOUBLE);
-                                } 
-                                else {
-                                    
-                                    int slot = newSlotFor(id); 
-                                    varSlot[id] = slot;        
-                                    
-                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]); 
-                                    regInUse[paramIndex + 1] = true;
-                                    
-                                    if (!param->type.empty()) {
-                                        if (param->type == "integer" || param->type == "boolean") {
-                                            setVarType(id, VarType::INT);
-                                            setSlotType(slot, VarType::INT); 
-                                        }
-                                    }
-                                }
-                                paramIndex++;
-                            } else {
-                                int slot = newSlotFor(id);
-                                emit3("mov", slotVar(slot), "param" + std::to_string(paramIndex));
-                                if (!param->type.empty()) {
-                                    if (param->type == "string") {
-                                        setVarType(id, VarType::STRING);
-                                        setSlotType(slot, VarType::STRING);
-                                    } else if (param->type == "integer" || param->type == "boolean") {
-                                        setVarType(id, VarType::INT);
-                                        setSlotType(slot, VarType::INT);
-                                    } else if (param->type == "real") {
-                                        setVarType(id, VarType::DOUBLE);
-                                        setSlotType(slot, VarType::DOUBLE);
-                                    }
-                                }
-                                paramIndex++;
-                            }
-                        }
-                    }
+                if (pn->block) {
+                    pn->block->accept(*this);
                 }
                 
-                if (pn->block) pn->block->accept(*this);
-
                 if (functionScopedArrays.count(pn->name)) {
                     for (const auto& arrayName : functionScopedArrays[pn->name]) {
                         emit1("free", arrayName);
                     }
                 }
-
                 emit("ret");
-                currentFunctionName.clear(); 
             }
             
             for (auto fn : deferredFuncs) {
                 emitLabel(funcLabel("function FUNC_", fn->name));
-                for (size_t i = 0; i < regInUse.size(); i++) {
-                    regInUse[i] = false;
-                }
-                for (size_t i = 0; i < floatRegInUse.size(); i++) {
-                    floatRegInUse[i] = false;
-                }
+                scopeStack.push_back({fn->name});
                 currentFunctionName = fn->name;
                 functionSetReturn = false;
 
@@ -652,7 +603,7 @@ namespace pascal {
                                     int slot = newSlotFor(id); 
                                     varSlot[id] = slot;        
                                     
-                                    emit3("mov", slotVar(slot), registers[paramIndex + 1]);
+                                    emit2("mov", slotVar(slot), registers[paramIndex + 1]);
                                     regInUse[paramIndex + 1] = true;
                                     
                                     if (!param->type.empty()) {
@@ -675,27 +626,27 @@ namespace pascal {
                         emit1("free", arrayName);
                     }
                 }
-
+                
                 if (!functionSetReturn) {
                     VarType funcReturnType = getVarType(fn->name);
                     if (funcReturnType == VarType::STRING) {
-                        emit3("mov", "arg0", emptyString());  
+                        emit2("mov", "arg0", emptyString());  
                     } else if (funcReturnType == VarType::DOUBLE) {
                         
                         std::string zeroConstName = generateRealConstantName();
                         realConstants[zeroConstName] = "0.0";
                         usedRealConstants.insert(zeroConstName);
-                        emit3("mov", "xmm0", zeroConstName);
+                        emit2("mov", "xmm0", zeroConstName);
                     } else {
-                        emit3("mov", "rax", "0");  
+                        emit2("mov", "rax", "0");  
                     }
                 }
-
                 emit("ret");
-                currentFunctionName.clear();
-                functionSetReturn = false;
+
+                scopeStack.pop_back();
             }
            
+            currentFunctionName.clear();
         }
 
         void emit_invoke(const std::string& funcName, const std::vector<std::string>& params) {
@@ -738,10 +689,8 @@ namespace pascal {
                 out << "\t\tstring empty_str = \"\"\n";
             }
             
-            for (auto &s : stringLiterals) {
-                if (s.first != "empty_str") { 
-                    out << "\t\tstring " << s.first << " = " << escapeStringForMxvm(s.second) << "\n";
-                }
+            for (const auto& pair : stringLiterals) {
+                out << "\t\tstring " << pair.second << " = " << escapeStringForMxvm(pair.first) << "\n";
             }
             
             if (usedStrings.count("fmt_int")) {
@@ -809,8 +758,10 @@ namespace pascal {
         }
 
         void visit(BlockNode& node) override {
-            for (auto &d : node.declarations) if (d) d->accept(*this);
-            if (node.compoundStatement) node.compoundStatement->accept(*this);
+            for (auto& decl : node.declarations) {
+                decl->accept(*this);
+            }
+            node.compoundStatement->accept(*this);
         }
 
         void visit(VarDeclNode& node) override {
@@ -821,28 +772,24 @@ namespace pascal {
                 if (!node.type.empty()) {
                     if (node.type == "string") {
                         setVarType(id, VarType::PTR);
-                        setSlotType(slot, VarType::PTR);
-                        
-                
+                        setSlotType(slot, VarType::PTR);        
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
+                            emit2("mov", slotVar(slot), init);
                             if (isReg(init)) freeReg(init);
                         } else {
-                            emit3("mov", slotVar(slot), emptyString());
+                            emit2("mov", slotVar(slot), emptyString());
                         }
                     }
                     else if (node.type == "char") {
                         setVarType(id, VarType::CHAR);
                         setSlotType(slot, VarType::CHAR);
-                        
-                
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
+                            emit2("mov", slotVar(slot), init);
                             if (isReg(init)) freeReg(init);
                         } else {
-                            emit3("mov", slotVar(slot), "0");  
+                            emit2("mov", slotVar(slot), "0");  
                         }
                     }
                     else if (node.type == "integer" || node.type == "boolean") {
@@ -851,7 +798,7 @@ namespace pascal {
                         
                         if (i < node.initializers.size() && node.initializers[i]) {
                             std::string init = eval(node.initializers[i].get());
-                            emit3("mov", slotVar(slot), init);
+                            emit2("mov", slotVar(slot), init);
                             if (isReg(init)) freeReg(init);
                         }
                     }
@@ -866,23 +813,23 @@ namespace pascal {
                                     std::string constName = generateRealConstantName();
                                     realConstants[constName] = numNode->value;
                                     usedRealConstants.insert(constName);
-                                    emit3("mov", slotVar(slot), constName);
+                                    emit2("mov", slotVar(slot), constName);
                                 } else {
                                     std::string constName = generateRealConstantName();
                                     realConstants[constName] = numNode->value + ".0";
                                     usedRealConstants.insert(constName);
-                                    emit3("mov", slotVar(slot), constName);
+                                    emit2("mov", slotVar(slot), constName);
                                 }
                             } else {
                                 std::string init = eval(node.initializers[i].get());
-                                emit3("mov", slotVar(slot), init);
+                                emit2("mov", slotVar(slot), init);
                                 if (isReg(init)) freeReg(init);
                             }
                         } else {
                             std::string zeroConstName = generateRealConstantName();
                             realConstants[zeroConstName] = "0.0";
                             usedRealConstants.insert(zeroConstName);
-                            emit3("mov", slotVar(slot), zeroConstName);
+                            emit2("mov", slotVar(slot), zeroConstName);
                         }
                     }
                     else if (node.type == "record") {
@@ -896,22 +843,6 @@ namespace pascal {
 
         void visit(ProcDeclNode& node) override {
             deferredProcs.push_back(&node);
-            
-            FuncInfo info;
-            for (auto &p : node.parameters) {
-                if (auto param = dynamic_cast<ParameterNode*>(p.get())) {
-                    VarType t = VarType::INT; 
-                    if (!param->type.empty()) {
-                        if (param->type == "string") t = VarType::STRING;
-                        else if (param->type == "char") t = VarType::CHAR;
-                        else if (param->type == "real") t = VarType::DOUBLE;
-                    }
-                    for (size_t i = 0; i < param->identifiers.size(); ++i) {
-                        info.paramTypes.push_back(t);
-                    }
-                }
-            }
-            funcSignatures[node.name] = info;
         }
 
         VarType getTypeFromString(const std::string& typeStr) {
@@ -945,7 +876,7 @@ namespace pascal {
             
             for (size_t i = 0; i < args.size() && i < 6; i++) {
                 if (i + 1 < registers.size()) {
-                    emit3("mov", registers[i + 1], args[i]);
+                    emit2("mov", registers[i + 1], args[i]);
                 }
             }
             
@@ -970,7 +901,7 @@ namespace pascal {
             }
             for (size_t i = 0; i < args.size() && i < 6; i++) {
                 if (i + 1 < registers.size()) {
-                    emit3("mov", registers[i + 1], args[i]);
+                    emit2("mov", registers[i + 1], args[i]);
                 }
             }
             emit1("call", "FUNC_" + node.name);
@@ -983,13 +914,13 @@ namespace pascal {
             std::string resultReg;
             if (returnType == VarType::DOUBLE) {
                 resultReg = allocFloatReg();
-                emit3("mov", resultReg, "xmm0");  
+                emit2("mov", resultReg, "xmm0");  
             } else if (returnType == VarType::STRING) {
                 resultReg = allocReg();
-                emit3("mov", resultReg, "arg0");  
+                emit2("mov", resultReg, "arg0");  
             } else {
                 resultReg = allocReg();
-                emit3("mov", resultReg, "rax");   
+                emit2("mov", resultReg, "rax");   
             }
             
             pushValue(resultReg);            
@@ -1063,11 +994,11 @@ namespace pascal {
             if (!currentFunctionName.empty() && varName == currentFunctionName) {
                 VarType funcReturnType = getVarType(currentFunctionName);
                 if (funcReturnType == VarType::STRING) {
-                    emit3("mov", "arg0", rhs);  
+                    emit2("mov", "arg0", rhs);  
                 } else if (funcReturnType == VarType::DOUBLE) {
-                    emit3("mov", "xmm0", rhs);  
+                    emit2("mov", "xmm0", rhs);  
                 } else {
-                    emit3("mov", "rax", rhs);   
+                    emit2("mov", "rax", rhs);   
                 }
                 functionSetReturn = true;
             } else {
@@ -1090,7 +1021,7 @@ namespace pascal {
                     freeReg(it->second.location);
                 }
                 
-                emit3("mov", memLoc, rhs);
+                emit2("mov", memLoc, rhs);
                 recordLocation(varName, {ValueLocation::MEMORY, memLoc});
             }
             
@@ -1135,11 +1066,8 @@ namespace pascal {
             bool isFloatLoop = (startType == VarType::DOUBLE || endType == VarType::DOUBLE);
             
             if (isFloatLoop) {
-            
                 setVarType(node.variable, VarType::DOUBLE);
                 setSlotType(slot, VarType::DOUBLE);
-                
-            
                 if (startType == VarType::INT) {
                     if (std::all_of(startV.begin(), startV.end(), [](char c) { return std::isdigit(c) || c == '-'; })) {
                         std::string constName = generateRealConstantName();
@@ -1155,7 +1083,7 @@ namespace pascal {
                 }
             }
             
-            emit3("mov", slotVar(slot), startV);
+            emit2("mov", slotVar(slot), startV);
             if (isReg(startV)) freeReg(startV);
 
             std::string loop = newLabel("FOR");
@@ -1216,22 +1144,22 @@ namespace pascal {
                 usedRealConstants.insert(oneConstName);
                 
                 std::string vrFloat = allocFloatReg();
-                emit3("mov", vrFloat, vr);
+                emit2("mov", vrFloat, vr);
                 
                 if (node.isDownto) {
-                    emit3("sub", vrFloat, oneConstName);
+                    emit2("sub", vrFloat, oneConstName);
                 } else {
-                    emit3("add", vrFloat, oneConstName);
+                    emit2("add", vrFloat, oneConstName);
                 }
                 
-                emit3("mov", vr, vrFloat);
+                emit2("mov", vr, vrFloat);
                 freeFloatReg(vrFloat);
             } else {
             
                 if (node.isDownto) {
-                    emit3("sub", vr, "1");
+                    emit2("sub", vr, "1");
                 } else {
-                    emit3("add", vr, "1");
+                    emit2("add", vr, "1");
                 }
             }
 
@@ -1410,8 +1338,8 @@ namespace pascal {
             switch (node.operator_) {
                 case UnaryOpNode::MINUS: {
                     std::string t = allocReg();
-                    emit3("mov", t, "0");
-                    emit3("sub", t, v);
+                    emit2("mov", t, "0");
+                    emit2("sub", t, v);
                     pushValue(t);
                     break;
                 }
@@ -1425,10 +1353,10 @@ namespace pascal {
                     std::string L2 = newLabel("NOT_END");
                     emit2("cmp", v, "0");
                     emit1("je", L1);
-                    emit3("mov", t, "0");
+                    emit2("mov", t, "0");
                     emit1("jmp", L2);
                     emitLabel(L1);
-                    emit3("mov", t, "1");
+                    emit2("mov", t, "1");
                     emitLabel(L2);
                     pushValue(t);
                     if (isReg(v)) freeReg(v);
@@ -1451,7 +1379,7 @@ namespace pascal {
             } else {
                 reg = allocReg();
             }
-            emit3("mov", reg, memVar);
+            emit2("mov", reg, memVar);
             pushValue(reg);
         }
 
@@ -1478,7 +1406,7 @@ namespace pascal {
 
         void visit(BooleanNode& node) override {
             std::string reg = allocReg();
-            emit3("mov", reg, node.value ? "1" : "0");
+            emit2("mov", reg, node.value ? "1" : "0");
             pushValue(reg);
         }
 
@@ -1512,7 +1440,7 @@ namespace pascal {
                     setSlotType(slot, VarType::INT);
                     
                     std::string varLocation = slotVar(slot);
-                    emit3("mov", varLocation, valueReg);
+                    emit2("mov", varLocation, valueReg);
                     
                     if (isReg(valueReg)) {
                         freeReg(valueReg);
@@ -1654,10 +1582,11 @@ namespace pascal {
             info.elementSize = elementSize;
             arrayInfo[arrayName] = info;
             
-            if (currentFunctionName.empty()) {
-                globalArrays.push_back(arrayName);
+            std::string ownerFunction = scopeStack.empty() ? "" : scopeStack.back().name;
+            if (ownerFunction == "__global__" || ownerFunction.empty()) {
+                 globalArrays.push_back(node.name);
             } else {
-                functionScopedArrays[currentFunctionName].push_back(arrayName);
+                 functionScopedArrays[ownerFunction].push_back(node.name);
             }
             
             setVarType(arrayName, VarType::PTR);
@@ -1668,7 +1597,7 @@ namespace pascal {
             for (size_t i = 0; i < node.initializers.size() && i < static_cast<size_t>(size); i++) {
                 std::string value = eval(node.initializers[i].get());
                 std::string offsetReg = allocReg();
-                emit3("mov", offsetReg, std::to_string(i * elementSize));    
+                emit2("mov", offsetReg, std::to_string(i * elementSize));    
                 emit3("store", value, arrayName, offsetReg);
                 
                 freeReg(offsetReg);
@@ -1688,8 +1617,8 @@ namespace pascal {
             std::string adjustedIndexReg = allocReg();
             std::string resultReg = allocReg();
             
-            emit3("mov", adjustedIndexReg, indexValue);
-            emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
+            emit2("mov", adjustedIndexReg, indexValue);
+            emit2("sub", adjustedIndexReg, std::to_string(info.lowerBound));
             
             emit4("load", resultReg, node.arrayName, adjustedIndexReg, std::to_string(info.elementSize));
             
@@ -1711,18 +1640,15 @@ namespace pascal {
             
             std::string adjustedIndexReg = allocReg();
             
-            emit3("mov", adjustedIndexReg, indexValue);
-            emit3("sub", adjustedIndexReg, std::to_string(info.lowerBound));
+            emit2("mov", adjustedIndexReg, indexValue);
+            emit2("sub", adjustedIndexReg, std::to_string(info.lowerBound));
+            
             
             emit4("store", value, node.arrayName, adjustedIndexReg, std::to_string(info.elementSize));
             
             freeReg(adjustedIndexReg);
             if (isReg(indexValue)) freeReg(indexValue);
             if (isReg(value)) freeReg(value);
-        }
-
-        void emit4(const std::string& op, const std::string& a, const std::string& b, const std::string& c, const std::string& d) {
-            emit(op + " " + a + ", " + b + ", " + c + ", " + d);
         }
     };
 
