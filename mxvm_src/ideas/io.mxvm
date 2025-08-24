@@ -1,5 +1,0 @@
-module io {
-    extern fopen
-    extern fclose
-    extern fprintf
-}
