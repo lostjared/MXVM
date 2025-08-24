@@ -10,13 +10,14 @@ my @files = qw(
 );
 
 my ($test_passed, $test_failed) = (0, 0);
+my $current_path = $ARGV[0] // "/usr/local/lib";
 
 foreach my $f (@files) {
   print ">>> Testing $f\n";
 
   unlink "output.mxvm";
 
-  my $rc = system("mxvm-test", $f, "echo");
+  my $rc = system("mxx", $f, "output.mxvm");
   if ($rc == -1) {
     warn "Failed to exec mxvm-test for $f: $!\n";
     $test_failed++; next;
@@ -36,7 +37,7 @@ foreach my $f (@files) {
     $test_failed++; next;
   }
 
-  my $rc2 = system("mxvm-test", "output.mxvm", "echo");
+  my $rc2 = system("mxvmc", "--path", $current_path, "--dry-run", "output.mxvm");
   if ($rc2 == -1) {
     warn "Failed to exec mxvm-test (run) for $f: $!\n";
     $test_failed++;
