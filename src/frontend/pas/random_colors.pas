@@ -44,7 +44,6 @@ begin
         writeln('renderer created');
 
     running := true;
-    color_value := 0;
     while running do
     begin
         while sdl_poll_event() <> 0 do
