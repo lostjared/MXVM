@@ -134,6 +134,7 @@ add_compile_definitions()
 add_subdirectory(src/vm)
 add_subdirectory(src/html_gen)
 add_subdirectory(src/frontend)
+add_subdirectory(tests)
 include(GNUInstallDirs)
 install(TARGETS mxvm
     EXPORT mxvmTargets
@@ -145,6 +146,7 @@ install(TARGETS mxvm
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
 message(STATUS "CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "Mode: ${DEBUG_MODE}")
 message(STATUS "Set CMAKE_BUILD_TYPE to Debug/Release")
