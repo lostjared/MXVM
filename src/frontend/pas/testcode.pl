@@ -2,12 +2,7 @@
 use strict;
 use warnings;
 
-my @files = qw(
-  array.pas caseof.pas fib.pas for.pas if.pas negative.pas procedure.pas
-  random_pixels.pas random_squares.pas real.pas skeleton.pas while.pas
-  case.pas fibonacci.pas hello_sdl.pas not.pas random_colors.pas
-  random_rect.pas read.pas repeat.pas square_expand.pas
-);
+my @files = sort glob("*.pas");
 
 my ($test_passed, $test_failed) = (0, 0);
 my $current_path = $ARGV[0] // "/usr/local/lib";
