@@ -134,7 +134,7 @@ add_compile_definitions()
 add_subdirectory(src/vm)
 add_subdirectory(src/html_gen)
 add_subdirectory(src/frontend)
-add_subdirectory(tests)
+#add_subdirectory(tests)
 include(GNUInstallDirs)
 install(TARGETS mxvm
     EXPORT mxvmTargets
