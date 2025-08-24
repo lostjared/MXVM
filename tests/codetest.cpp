@@ -56,13 +56,7 @@ int TestSource::run(bool echo) {
         if(fgets(buffer, 256, fptr) && echo)
             std::cout << buffer;
     }
-    int value = pclose(fptr);
-    if(value != 0) {
-        std::cerr << "mxvm-test: " << filename << " test failed!\n";
-    } else if(value == 0) {
-        std::cerr << "mxvm-test: " << filename << " test passed!\n";
-    }
-    return value;
+    return pclose(fptr);
 }
 
 

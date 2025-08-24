@@ -81,6 +81,12 @@ int main(int argc, char **argv) {
         }
         std::ostringstream buffer;
         buffer << file.rdbuf();
+
+        if(buffer.str().empty()) {
+            std::cerr << "mxx: file is empty\n";
+            return EXIT_FAILURE;
+        }
+
         source = buffer.str();       
         pascal::PascalParser parser(removeComments(source));
         auto ast = parser.parseProgram();

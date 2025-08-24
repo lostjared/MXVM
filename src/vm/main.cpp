@@ -69,6 +69,7 @@ struct Args {
     int platform_argc = 0;
     char ** platform_argv = nullptr;
     bool Makefile = false;
+    bool only_test = false;
 };
 
 template<typename T>
@@ -81,7 +82,7 @@ void print_help(T &type) {
 
 int process_arguments(Args *args);
 int action_translate(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args);
-int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
+int action_interpret(bool only_test, std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path);
 int translate_x64(const mxvm::Platform &platform, std::unique_ptr<mxvm::Program> &program, Args *args);
 void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program>& program);
 void createMakefile(Args *args);
@@ -148,6 +149,7 @@ Args proc_args(int argc, char **argv) {
     .addOptionDoubleValue(137, "include", "include path")
     .addOptionSingle('m', "gemerate Makefile")
     .addOptionDouble(140, "makefile", "generate Makefile")
+    .addOptionDouble(141, "dry-run", "check for correctness do not execute")
     ;
 
     if(argc == 1) {
@@ -158,6 +160,9 @@ Args proc_args(int argc, char **argv) {
     try {
         while((value = argz.proc(arg)) != -1) {
             switch(value) {
+                case 141:
+                    args.only_test = true;
+                break;
                 case 'm':
                 case 140:
                     args.Makefile = true;
@@ -232,6 +237,7 @@ Args proc_args(int argc, char **argv) {
         exit(EXIT_FAILURE);
     } catch(const mx::Exception &e) {
         std::cerr << Col("MXVM: ", mx::Color::RED) << " Exception: " << e.what() << "\n";
+        
     }
 
     if(args.source_file.empty()) {
@@ -418,9 +424,9 @@ int process_arguments(Args *args) {
     } else if(args->action == vm_action::translate) {
         exitCode = action_translate(args->platform, program, args);
     } else if(args->action == vm_action::interpret && !args->source_file.empty()) {
-        exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
+        exitCode = action_interpret(args->only_test, args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else if(args->action == vm_action::null_action && !args->source_file.empty()) {
-        exitCode = action_interpret(args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
+        exitCode = action_interpret(args->only_test, args->include_path, args->object_path, args->argv, args->source_file, args->module_path);
     } else {
         std::cerr << Col("MXVM: Error ", mx::Color::RED) <<"invalid action/command\n";
         return EXIT_FAILURE;
@@ -558,7 +564,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
 }
 #endif
     
- int action_interpret(std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path) {
+ int action_interpret(bool only_test, std::string_view include_path, std::string_view object_path, const std::vector<std::string> &argv, std::string_view input, std::string_view mod_path) {
     int exitCode = 0;
     std::unique_ptr<mxvm::Program> program(new mxvm::Program());
     program->setArgs(argv);
@@ -653,7 +659,8 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                 }
             }
             program->flatten(program.get());
-            exitCode = program->exec();
+            if(only_test == false)
+                exitCode = program->exec();
             
             if(mxvm::debug_mode) {
                 if(debug_output.is_open()) {
@@ -681,6 +688,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                 program->memoryDump(debug_output);
             }
         }
+        return EXIT_FAILURE;
     } catch(const std::runtime_error &e) {
         std::cerr << Col("MXVM: Runtime Error: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
@@ -689,6 +697,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                 program->memoryDump(debug_output);
             }
         }
+        return EXIT_FAILURE;
     } catch(const std::exception &e) {
         std::cerr << Col("MXVM: Exception: ", mx::Color::RED) << e.what() << "\n";
         if(mxvm::debug_mode) {
@@ -697,6 +706,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                 program->memoryDump(debug_output);
             }
         }
+        return EXIT_FAILURE;
     }  
     catch(...) {
         std::cerr << Col("MXVM: ", mx::Color::RED)<< "Unknown Exception.\n";
@@ -706,6 +716,7 @@ BOOL WINAPI CtrlHandler(DWORD ctrlType) {
                 program->memoryDump(debug_output);
             }
         }
+        return EXIT_FAILURE;
     }
 
     if(mxvm::debug_mode) {
