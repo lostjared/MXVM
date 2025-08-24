@@ -55,7 +55,7 @@ begin
       halt(EXIT_FAILURE);
   end;  
       
-  target_id := sdl_create_render_target(renderer, SCALE_W, SCLAE_H);
+  target_id := sdl_create_render_target(renderer, SCALE_W, SCALE_H);
   if target_id = -1 then 
   begin 
     writeln('could not create render target');
