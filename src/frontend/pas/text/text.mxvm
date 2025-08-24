@@ -219,7 +219,7 @@ program AppSkeleton {
 		jmp ENDIF_29
 	ELSE_28:
 	ENDIF_29:
-		invoke create_render_target, renderer, 640, 480
+		invoke create_render_target, renderer, 640, 360
 		return r9
 		mov target_id, r9
 		mov r9, 0

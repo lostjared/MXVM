@@ -15,7 +15,7 @@ const
   filename = 'font.ttf';
   EXIT_FAILURE = 1;
   SCALE_W = 640;
-  SCALE_H = 480;
+  SCALE_H = 360;
 var
 running : boolean;
 event_type_result: integer;
