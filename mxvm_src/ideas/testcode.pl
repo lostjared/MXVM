@@ -32,9 +32,11 @@ foreach my $f (@files) {
 }
 print "Test passed: $test_passed  Test failed: $test_failed\n";
 if($test_failed > 0) {
+    print "Files {\n ";
     foreach my $i  (@failed_files) {
         print "$i ";
     }
-    print "\n";
+    print "\n}\n Failed.";
 }
+
 exit($test_failed ? 1 : 0);
