@@ -205,7 +205,7 @@ namespace mxvm {
             handle = handles[mod];
         }
         if(handle == nullptr) {
-            throw mx::Exception("Error could not open module: " + mod);
+            throw mx::Exception("Error could not open module: " + mod + " try using --path to point to module path");
         }
         func = (void*)dlsym(handle, name.c_str());
         if(func == nullptr) {

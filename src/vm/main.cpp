@@ -59,7 +59,7 @@ std::ostream &operator<<(std::ostream &out, const vm_target &t) {
 struct Args {
     std::string source_file;
     std::string output_file;
-    std::string module_path;
+    std::string module_path = "/usr/local/lib";
     std::string object_path = ".";
     std::string include_path = "/usr/local/include/mxvm/modules";
     vm_action action = vm_action::null_action;
