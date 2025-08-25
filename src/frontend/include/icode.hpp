@@ -67,7 +67,7 @@ namespace pascal {
         std::unordered_map<std::string, std::string> compileTimeConstants;
         std::unordered_set<std::string> usedRealConstants;
         int realConstantCounter = 0;
-
+        std::unordered_map<std::string, std::string> currentParamTypes; 
         std::set<std::string> usedModules;
 
         std::vector<std::string> globalArrays;
@@ -370,8 +370,12 @@ namespace pascal {
             pushValue(t);
             if (isReg(a) && opA != a) freeReg(opA);
             if (isReg(b) && opB != b) freeReg(opB);
-            if (isReg(a) && !isParmReg(a)) freeReg(a);
-            if (isReg(b) && !isParmReg(b)) freeReg(b);
+            if (a == b) {
+                if (isReg(a) && !isParmReg(a)) freeReg(a);
+            } else {
+                if (isReg(a) && !isParmReg(a)) freeReg(a);
+                if (isReg(b) && !isParmReg(b)) freeReg(b);
+            }
         }
 
         void pushFloatCmpResult(const std::string& aIn, const std::string& bIn, const char* jop) {
@@ -495,17 +499,18 @@ namespace pascal {
 
             
             for (size_t i = 0; i < deferredProcs.size(); ++i) {
-                auto &item = deferredProcs[i];
-                auto *pn = item.first;
-                scopeHierarchy = item.second;
-                emitLabel(funcLabel("function PROC_", pn->name));
+                auto pn = deferredProcs[i].first;
+                auto oldHierarchy = scopeHierarchy;  
+                scopeHierarchy = deferredProcs[i].second;
+                
+                emitLabel(funcLabel("function PROC_", pn->name)); 
                 currentFunctionName = pn->name;
-                functionSetReturn = false;
                 currentParamLocations.clear();
+                currentParamTypes.clear(); 
 
                 int intParamIndex = 1;
                 int ptrParamIndex = 0;
-                int floatParamIndex = 0;
+                //int floatParamIndex = 0;
 
                 if (!pn->parameters.empty()) {
                     for (auto& p_node : pn->parameters) {
@@ -513,11 +518,14 @@ namespace pascal {
                             for (const auto& id : param->identifiers) {
                                 VarType paramType = getTypeFromString(param->type);
                                 std::string incomingReg;
-                                if (paramType == VarType::STRING) {
+                                if (paramType == VarType::STRING || paramType == VarType::RECORD) {
                                     if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) incomingReg = ptrRegisters[ptrParamIndex++];
                                     paramType = VarType::PTR;
-                                } else if (paramType == VarType::DOUBLE) {
-                                    if (static_cast<size_t>(floatParamIndex) < floatRegisters.size()) incomingReg = floatRegisters[floatParamIndex++];
+                                    std::string mangledId = mangleVariableName(id);
+                                    int localSlot = newSlotFor(mangledId);
+                                    setSlotType(localSlot, paramType);
+                                    emit2("mov", slotVar(localSlot), incomingReg);
+                                    currentParamTypes[id] = param->type;
                                 } else {
                                     if (static_cast<size_t>(intParamIndex) < registers.size()) incomingReg = registers[intParamIndex++];
                                 }
@@ -525,10 +533,11 @@ namespace pascal {
                                 if (!incomingReg.empty()) {
                                     std::string mangledId = mangleVariableName(id);
                                     int localSlot = newSlotFor(mangledId);
-                                    varSlot[id] = localSlot;
+                                    //varSlot[id] = localSlot;
                                     setSlotType(localSlot, paramType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
                                 }
+                                currentParamTypes[id] = param->type; 
                             }
                         }
                     }
@@ -544,27 +553,21 @@ namespace pascal {
                 }
 
                 if (pn->block) pn->block->accept(*this);
-                if (functionScopedArrays.count(pn->name))
-                    for (auto &an : functionScopedArrays[pn->name]) emit1("free", an);
-                
-                
-                if (recordsToFreeInScope.count(pn->name)) {
-                    for (const auto& recordVar : recordsToFreeInScope[pn->name]) {
-                        emit1("free", recordVar);
-                    }
-                }
+                                
                 emit("ret");
+                scopeHierarchy = oldHierarchy;  
             }
 
             
             for (size_t i = 0; i < deferredFuncs.size(); ++i) {
-                auto &item = deferredFuncs[i];
-                auto *fn = item.first;
-                scopeHierarchy = item.second;
-                emitLabel(funcLabel("function FUNC_", fn->name));
+                auto fn = deferredFuncs[i].first;
+                auto oldHierarchy = scopeHierarchy; 
+                scopeHierarchy = deferredFuncs[i].second;
+                
+                emitLabel(funcLabel("function FUNC_", fn->name)); 
                 currentFunctionName = fn->name;
-                functionSetReturn = false;
                 currentParamLocations.clear();
+                currentParamTypes.clear(); 
 
                 int intParamIndex = 1;
                 int ptrParamIndex = 0;
@@ -576,7 +579,7 @@ namespace pascal {
                             for (const auto& id : param->identifiers) {
                                 VarType paramType = getTypeFromString(param->type);
                                 std::string incomingReg;
-                                if (paramType == VarType::STRING) {
+                                if (paramType == VarType::STRING || paramType == VarType::RECORD) {
                                     if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) incomingReg = ptrRegisters[ptrParamIndex++];
                                     paramType = VarType::PTR;
                                 } else if (paramType == VarType::DOUBLE) {
@@ -588,10 +591,11 @@ namespace pascal {
                                 if (!incomingReg.empty()) {
                                     std::string mangledId = mangleVariableName(id);
                                     int localSlot = newSlotFor(mangledId);
-                                    varSlot[id] = localSlot;
+                                    //varSlot[id] = localSlot;
                                     setSlotType(localSlot, paramType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
                                 }
+                                currentParamTypes[id] = param->type; 
                             }
                         }
                     }
@@ -623,6 +627,7 @@ namespace pascal {
                     else emit2("mov","rax","0");
                 }
                 emit("ret");
+                scopeHierarchy = oldHierarchy;  
             }
 
             currentFunctionName.clear();
@@ -777,7 +782,7 @@ namespace pascal {
                 VarType argType = getExpressionType(arg.get());
                 std::string targetReg;
 
-                if (argType == VarType::STRING || argType == VarType::PTR) {
+                if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
                     if (static_cast<size_t>(ptrRegIdx) < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
                 } else if (argType == VarType::DOUBLE) {
                     if (static_cast<size_t>(floatRegIdx) < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
@@ -808,7 +813,7 @@ namespace pascal {
                 VarType argType = getExpressionType(arg.get());
                 std::string targetReg;
 
-                if (argType == VarType::STRING || argType == VarType::PTR) {
+                if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
                     if (static_cast<size_t>(ptrRegIdx) < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
                 } else if (argType == VarType::DOUBLE) {
                     if (static_cast<size_t>(floatRegIdx) < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
@@ -1443,7 +1448,7 @@ namespace pascal {
                 auto toD = [&](const std::string& s)->double { return std::stod(s); };
                 auto toI = [&](const std::string& s)->long long {
                     return isFloatLiteral(s) ? static_cast<long long>(std::stod(s)) : std::stoll(s);
-                };
+                               };
                 switch (bin->operator_) {
                     case BinaryOpNode::PLUS:
                         return (isFloatLiteral(L)||isFloatLiteral(R)) ? std::to_string(toD(L)+toD(R)) : std::to_string(toI(L)+toI(R));
@@ -1495,12 +1500,21 @@ namespace pascal {
             return {f.offset, f.size};
         }
 
-        std::string getVarRecordTypeName(const std::string& name) {
-            auto it = varRecordType.find(findMangledName(name));
-            if (it != varRecordType.end()) return it->second;
-            auto jt = varRecordType.find(name);
-            if (jt != varRecordType.end()) return jt->second;
-            return "";
+        std::string getVarRecordTypeName(const std::string& varName) {
+            auto param_it = currentParamTypes.find(varName);
+            if (param_it != currentParamTypes.end()) {
+                return param_it->second;
+            }
+            auto it = varRecordType.find(findMangledName(varName));
+            if (it != varRecordType.end()) {
+                return it->second;
+            }
+        
+            it = varRecordType.find(varName);
+            if (it != varRecordType.end()) {
+                return it->second;
+            }
+            return ""; 
         }
 
         void visit(RecordTypeNode& /*node*/) override {}

@@ -38,78 +38,26 @@ namespace pascal {
         void IOFunctionHandler::generate(CodeGenVisitor& visitor, const std::string& funcName, 
                         const std::vector<std::unique_ptr<ASTNode>>& arguments) {
             if (funcName == "writeln" || funcName == "write") {
-                for(auto &arg : arguments) {
-                    ASTNode *a = arg.get();
-                    
-                    if (auto numNode = dynamic_cast<NumberNode*>(a)) {
-                        if (numNode->isReal || visitor.isRealNumber(numNode->value)) {
-                            visitor.usedStrings.insert("fmt_float");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_float", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        } else {
-                            visitor.usedStrings.insert("fmt_int");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_int", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        }
-                    }
-                    else if (dynamic_cast<StringNode*>(a)) {
+                for(const auto& arg : arguments) {
+                    std::string val = visitor.eval(arg.get());
+                    CodeGenVisitor::VarType type = visitor.getExpressionType(arg.get());
+                    if (type == CodeGenVisitor::VarType::STRING || type == CodeGenVisitor::VarType::PTR) {
                         visitor.usedStrings.insert("fmt_str");
-                        std::string v = visitor.eval(a);
-                        visitor.emit2("print", "fmt_str", v);
-                        if (visitor.isReg(v)) visitor.freeReg(v);
-                    }
-                    else if (auto varNode = dynamic_cast<VariableNode*>(a)) {
-                        auto varType = visitor.getVarType(varNode->name);
-                        if (varType == CodeGenVisitor::VarType::CHAR) {
-                            visitor.usedStrings.insert("fmt_chr");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_chr", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        } 
-                        else if (varType == CodeGenVisitor::VarType::STRING || visitor.isStringVar(varNode->name)) {
-                            visitor.usedStrings.insert("fmt_str");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_str", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        }
-                        else if (varType == CodeGenVisitor::VarType::DOUBLE) {
-                            visitor.usedStrings.insert("fmt_float");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_float", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        }
-                        else {
-                            visitor.usedStrings.insert("fmt_int");
-                            std::string v = visitor.eval(a);
-                            visitor.emit2("print", "fmt_int", v);
-                            if (visitor.isReg(v)) visitor.freeReg(v);
-                        }
-                    }
-                    else {
-                        std::string v = visitor.eval(a);
-                        if (visitor.isFloatReg(v) || v.find("real_const_") != std::string::npos) {
-                            visitor.usedStrings.insert("fmt_float");
-                            visitor.emit2("print", "fmt_float", v);
-                        } else {
-                            CodeGenVisitor::VarType exprType = visitor.getExpressionType(a);
-                            if (exprType == CodeGenVisitor::VarType::DOUBLE) {
-                                visitor.usedStrings.insert("fmt_float");
-                                visitor.emit2("print", "fmt_float", v);
-                            } else if (exprType == CodeGenVisitor::VarType::CHAR) {
-                                visitor.usedStrings.insert("fmt_chr");
-                                visitor.emit2("print", "fmt_chr", v);
-                            } else {
-                                visitor.usedStrings.insert("fmt_int");
-                                visitor.emit2("print", "fmt_int", v);
-                            }
-                        }
-                        
-                        if (visitor.isReg(v)) visitor.freeReg(v);
+                        visitor.emit2("print", "fmt_str", val);
+                    } else if (type == CodeGenVisitor::VarType::DOUBLE) {
+                        visitor.usedStrings.insert("fmt_float");
+                        visitor.emit2("print", "fmt_float", val);
+                    } else if (type == CodeGenVisitor::VarType::CHAR) {
+                        visitor.usedStrings.insert("fmt_chr");
+                        visitor.emit2("print", "fmt_chr", val);
+                    } else { 
+                        visitor.usedStrings.insert("fmt_int");
+                        visitor.emit2("print", "fmt_int", val);
+                    }   
+                    if (visitor.isReg(val) && !visitor.isParmReg(val)) {
+                        visitor.freeReg(val);
                     }
                 }
-
                 if (funcName == "writeln") {
                     visitor.usedStrings.insert("newline");
                     visitor.emit1("print", "newline");
