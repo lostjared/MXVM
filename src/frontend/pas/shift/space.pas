@@ -14,8 +14,7 @@ const
   SCALE_H = 360;
   BLOCK_W = 22;
   BLOCK_H = 24;
-  BLOCK_TOTAL = BLOCK_W * BLOCK_H;
-  
+  BLOCK_TOTAL = BLOCK_W * BLOCK_H;  
 var
 running : boolean;
 event_type_result: integer;
@@ -71,7 +70,7 @@ procedure init_array();
 var
     index: integer;
 begin
-    for index := 0 to (22*24)-1 do
+    for index := 0 to (BLOCK_TOTAL)-1 do
     begin
         blocks[index] := rand() mod 4;
     end;

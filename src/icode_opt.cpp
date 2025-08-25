@@ -30,35 +30,27 @@ namespace mxvm {
         return std::regex_search(line, re_label);
     }
 
-    
-
     static std::vector<std::string> opt_core_lines(const std::vector<std::string>& lines) {
         std::regex re_mov_reg(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_mem_to_reg(R"(^\s*mov[a-z]*\s+([A-Za-z0-9_]+(?:\(%rip\))?)\s*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_reg_to_mem(R"(^\s*mov[a-z]*\s+(%[a-z0-9]+)\s*,\s*([A-Za-z0-9_]+(?:\(%rip\))?)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_call_or_jmp(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
-
         std::regex re_xor_eax(R"(^\s*xorq?\s+%eax\s*,\s*%eax\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_call_func(R"(^\s*call\s+([_A-Za-z][_A-Za-z0-9]*)\s*(?:[#;].*)?$)", std::regex::icase);
         static const std::unordered_set<std::string> variadic_funcs = {
             "printf", "fprintf", "sprintf", "snprintf", "scanf", "fscanf", "sscanf",
             "vprintf", "vfprintf", "vsprintf", "vsnprintf", "vscanf", "vfscanf", "vsscanf"
         };
-
-
         std::vector<std::string> out;
         out.reserve(lines.size());
-
         struct ValueInfo { std::string location; bool valid = true; };
         std::unordered_map<std::string, ValueInfo> reg_contents;
         std::unordered_map<std::string, ValueInfo> mem_contents;
-
         auto invalidate_tracking = [&]() {
             reg_contents.clear();
             mem_contents.clear();
         };
-
         auto clobber_reg = [&](const std::string& reg){
             reg_contents.erase(reg);
             for (auto it = mem_contents.begin(); it != mem_contents.end(); ) {
@@ -66,7 +58,6 @@ namespace mxvm {
                 else ++it;
             }
         };
-
         for (size_t i = 0; i < lines.size(); ++i) {
             const std::string& line = lines[i];
 
@@ -79,7 +70,6 @@ namespace mxvm {
                     }
                 }
             }
-        
             if (is_label(line) || std::regex_search(line, re_call_or_jmp)) {
                 out.push_back(line);
                 invalidate_tracking();
@@ -168,8 +158,6 @@ namespace mxvm {
             "printf", "fprintf", "sprintf", "snprintf", "scanf", "fscanf", "sscanf",
             "vprintf", "vfprintf", "vsprintf", "vsnprintf", "vscanf", "vfscanf", "vsscanf"
         };
-        
-
         auto local_is_label = [](const std::string& s){
             static const std::regex re(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)"); 
             return std::regex_search(s, re);
@@ -228,7 +216,6 @@ namespace mxvm {
                 invalidate_tracking();
                 continue;
             }
-
             {
                 std::smatch m;
                 if (std::regex_match(line, m, re_sub_rsp)) {
@@ -237,7 +224,6 @@ namespace mxvm {
                     continue;
                 }
             }
-
             if (!frame_bytes.empty()) {
                 out.push_back(line);
                 std::smatch m;
@@ -247,7 +233,6 @@ namespace mxvm {
                 }
                 continue;
             }
-
             if (has_call_or_ret(line) || touches_rsp(line) || std::regex_search(line, re_call_or_jmp)) {
                 out.push_back(line);
                 invalidate_tracking();
