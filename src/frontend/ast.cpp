@@ -3,6 +3,12 @@
 
 namespace pascal {
 
+    BlockNode::BlockNode(std::vector<std::unique_ptr<ASTNode>> decls, std::unique_ptr<CompoundStmtNode> stmt)
+    : declarations(std::move(decls)), compoundStatement(std::move(stmt)) {}
+
+    ProgramNode::ProgramNode(const std::string& p_name, std::unique_ptr<BlockNode> blk)
+    : name(p_name), block(std::move(blk)) {}
+
     void ASTNode::print(std::ostream& out, int indent) const {
         for (int i = 0; i < indent; ++i) out << "  ";
         out << toString() << std::endl;
@@ -35,7 +41,16 @@ namespace pascal {
             if (i > 0) oss << ", ";
             oss << identifiers[i];
         }
-        oss << " : " << type;
+        oss << " : ";
+        std::visit([&oss](const auto& t) {
+            using T = std::decay_t<decltype(t)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << t;
+            } else if constexpr (std::is_same_v<T, std::unique_ptr<ASTNode>>) {
+                if (t) oss << t->toString();
+                else oss << "<null>";
+            }
+        }, type);
         return oss.str();
     }
 
@@ -226,12 +241,6 @@ namespace pascal {
         return "EmptyStmt";
     }
 
-    void PrettyPrintVisitor::printIndent() {
-        for (int i = 0; i < indentLevel; ++i) {
-            out << "  ";
-        }
-    }
-
     void ConstDeclNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }
@@ -240,276 +249,12 @@ namespace pascal {
         return "ConstDecl";
     }
 
-    void PrettyPrintVisitor::visit(ConstDeclNode& node) {
-        printIndent();
-        out << "const\n";
-        indentLevel++;
-        
-        for (const auto& assignment : node.assignments) {
-            printIndent();
-            out << assignment->identifier << " = ";
-            assignment->value->accept(*this);
-            out << ";\n";
-        }
-        
-        indentLevel--;
-    }
-
-    void PrettyPrintVisitor::visit(ProgramNode& node) {
-        printIndent();
-        out << "program " << node.name << ";" << std::endl;
-        indentLevel++;
-        node.block->accept(*this);
-        indentLevel--;
-        printIndent();
-        out << "." << std::endl;
-    }
-
-    void PrettyPrintVisitor::visit(BlockNode& node) {
-        for (auto& decl : node.declarations) {
-            decl->accept(*this);
-        }
-        node.compoundStatement->accept(*this);
-    }
-
-    void PrettyPrintVisitor::visit(VarDeclNode& node) {
-        printIndent();
-        out << "var ";
-        for (size_t i = 0; i < node.identifiers.size(); ++i) {
-            if (i > 0) out << ", ";
-            out << node.identifiers[i];
-        }
-        out << " : " << node.type << ";" << std::endl;
-    }
-
-    void PrettyPrintVisitor::visit(ProcDeclNode& node) {
-        printIndent();
-        out << "procedure " << node.name;
-        if (!node.parameters.empty()) {
-            out << "(";
-            for (size_t i = 0; i < node.parameters.size(); ++i) {
-                if (i > 0) out << "; ";
-                node.parameters[i]->accept(*this);
-            }
-            out << ")";
-        }
-        out << ";" << std::endl;
-        indentLevel++;
-        node.block->accept(*this);
-        indentLevel--;
-        printIndent();
-        out << ";" << std::endl;
-    }
-
-    void PrettyPrintVisitor::visit(FuncDeclNode& node) {
-        printIndent();
-        out << "function " << node.name;
-        if (!node.parameters.empty()) {
-            out << "(";
-            for (size_t i = 0; i < node.parameters.size(); ++i) {
-                if (i > 0) out << "; ";
-                node.parameters[i]->accept(*this);
-            }
-            out << ")";
-        }
-        out << " : " << node.returnType << ";" << std::endl;
-        indentLevel++;
-        node.block->accept(*this);
-        indentLevel--;
-        printIndent();
-        out << ";" << std::endl;
-    }
-
-    void PrettyPrintVisitor::visit(ParameterNode& node) {
-        if (node.isVar) out << "var ";
-        for (size_t i = 0; i < node.identifiers.size(); ++i) {
-            if (i > 0) out << ", ";
-            out << node.identifiers[i];
-        }
-        out << " : " << node.type;
-    }
-
-    void PrettyPrintVisitor::visit(CompoundStmtNode& node) {
-        printIndent();
-        out << "begin" << std::endl;
-        indentLevel++;
-        for (size_t i = 0; i < node.statements.size(); ++i) {
-            node.statements[i]->accept(*this);
-            if (i < node.statements.size() - 1) {
-                out << ";";
-            }
-            out << std::endl;
-        }
-        indentLevel--;
-        printIndent();
-        out << "end";
-    }
-
-    void PrettyPrintVisitor::visit(AssignmentNode& node) {
-        printIndent();
-        node.variable->accept(*this);
-        out << " := ";
-        node.expression->accept(*this);
-    }
-
-    void PrettyPrintVisitor::visit(IfStmtNode& node) {
-        printIndent();
-        out << "if ";
-        node.condition->accept(*this);
-        out << " then" << std::endl;
-        indentLevel++;
-        node.thenStatement->accept(*this);
-        indentLevel--;
-        if (node.elseStatement) {
-            out << std::endl;
-            printIndent();
-            out << "else" << std::endl;
-            indentLevel++;
-            node.elseStatement->accept(*this);
-            indentLevel--;
-        }
-    }
-
-    void PrettyPrintVisitor::visit(WhileStmtNode& node) {
-        printIndent();
-        out << "while ";
-        node.condition->accept(*this);
-        out << " do" << std::endl;
-        indentLevel++;
-        node.statement->accept(*this);
-        indentLevel--;
-    }
-
-    void PrettyPrintVisitor::visit(ForStmtNode& node) {
-        printIndent();
-        out << "for " << node.variable << " := ";
-        node.startValue->accept(*this);
-        out << (node.isDownto ? " downto " : " to ");
-        node.endValue->accept(*this);
-        out << " do" << std::endl;
-        indentLevel++;
-        node.statement->accept(*this);
-        indentLevel--;
-    }
-
-    void PrettyPrintVisitor::visit(ProcCallNode& node) {
-        printIndent();
-        out << node.name;
-        if (!node.arguments.empty()) {
-            out << "(";
-            for (size_t i = 0; i < node.arguments.size(); ++i) {
-                if (i > 0) out << ", ";
-                node.arguments[i]->accept(*this);
-            }
-            out << ")";
-        }
-    }
-
-    void PrettyPrintVisitor::visit(BinaryOpNode& node) {
-        out << "(";
-        node.left->accept(*this);
-        out << " " << BinaryOpNode::opToString(node.operator_) << " ";
-        node.right->accept(*this);
-        out << ")";
-    }
-
-    void PrettyPrintVisitor::visit(UnaryOpNode& node) {
-        switch (node.operator_) {
-            case UnaryOpNode::PLUS: out << "+"; break;
-            case UnaryOpNode::MINUS: out << "-"; break;
-            case UnaryOpNode::NOT: out << "not "; break;
-        }
-        node.operand->accept(*this);
-    }
-
-    void PrettyPrintVisitor::visit(FuncCallNode& node) {
-        out << node.name << "(";
-        for (size_t i = 0; i < node.arguments.size(); ++i) {
-            if (i > 0) out << ", ";
-            node.arguments[i]->accept(*this);
-        }
-        out << ")";
-    }
-
-    void PrettyPrintVisitor::visit(VariableNode& node) {
-        out << node.name;
-    }
-
-    void PrettyPrintVisitor::visit(NumberNode& node) {
-        out << node.value;
-    }
-
-    void PrettyPrintVisitor::visit(StringNode& node) {
-        out << "'" << node.value << "'";
-    }
-
-    void PrettyPrintVisitor::visit(BooleanNode& node) {
-        out << (node.value ? "true" : "false");
-    }
-
-    void PrettyPrintVisitor::visit(EmptyStmtNode& node) {
-    }
-
-    void PrettyPrintVisitor::visit(RepeatStmtNode& node) {
-        printIndent();
-        out << "repeat" << std::endl;
-        indentLevel++;
-        for (size_t i = 0; i < node.statements.size(); ++i) {
-            node.statements[i]->accept(*this);
-            if (i < node.statements.size() - 1) {
-                out << ";";
-            }
-            out << std::endl;
-        }
-        indentLevel--;
-        printIndent();
-        out << "until ";
-        node.condition->accept(*this);
-    }
-
     void CaseStmtNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }
 
     std::string CaseStmtNode::toString() const {
         return "CaseStmt: " + std::to_string(branches.size()) + " branches";
-    }
-
-    void PrettyPrintVisitor::visit(CaseStmtNode& node) {
-        printIndent();
-        out << "case ";
-        node.expression->accept(*this);
-        out << " of" << std::endl;
-        
-        indentLevel++;
-        for (auto& branch : node.branches) {
-            printIndent();
-            for (size_t i = 0; i < branch->values.size(); i++) {
-                if (i > 0) out << ", ";
-                branch->values[i]->accept(*this);
-            }
-            out << ":" << std::endl;
-            
-            indentLevel++;
-            if (branch->statement) {
-                branch->statement->accept(*this);
-            }
-            indentLevel--;
-            out << ";" << std::endl;
-        }
-        
-        if (node.elseStatement) {
-            printIndent();
-            out << "else" << std::endl;
-            indentLevel++;
-            node.elseStatement->accept(*this);
-            indentLevel--;
-            out << std::endl;
-        }
-        
-        indentLevel--;
-        printIndent();
-        out << "end";
     }
 
     void ArrayTypeNode::accept(ASTVisitor& visitor) {
@@ -544,4 +289,49 @@ namespace pascal {
     std::string ArrayAssignmentNode::toString() const {
         return "ArrayAssignment: " + arrayName + "[" + index->toString() + "] := " + value->toString();
     }
+
+    RecordTypeNode::RecordTypeNode(std::vector<std::unique_ptr<ASTNode>> fields)
+    : fields(std::move(fields)) {}
+
+    void RecordTypeNode::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+    std::string RecordTypeNode::toString() const { return "RecordType"; }
+
+    RecordDeclarationNode::RecordDeclarationNode(const std::string& name, std::unique_ptr<RecordTypeNode> recordType)
+        : name(name), recordType(std::move(recordType)) {}
+
+    void RecordDeclarationNode::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+    std::string RecordDeclarationNode::toString() const { return "RecordDeclaration: " + name; }
+
+    FieldAccessNode::FieldAccessNode(std::unique_ptr<ASTNode> recordExpr, const std::string& fieldName)
+        : recordExpr(std::move(recordExpr)), fieldName(fieldName) {}
+
+    void FieldAccessNode::accept(ASTVisitor& visitor) { visitor.visit(*this); }
+
+    std::string FieldAccessNode::toString() const { return "FieldAccess: " + fieldName; }
+    
+    void TypeDeclNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+
+    void TypeAliasNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string TypeDeclNode::toString() const {
+        std::string result = "TypeDeclNode(";
+        for (const auto& decl : typeDeclarations) {
+            result += decl->toString() + ", ";
+        }
+        if (!typeDeclarations.empty()) result.pop_back(), result.pop_back();
+        result += ")";
+        return result;
+    }
+
+    std::string TypeAliasNode::toString() const {
+        return "TypeAliasNode(" + typeName + " = " + baseType + ")";
+    }
+
 }

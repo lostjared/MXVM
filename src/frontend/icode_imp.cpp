@@ -31,9 +31,6 @@ namespace pascal {
             "round", "trunc", "float_to_int", "int_to_float", "halt"
         };
     
-
-        bool BuiltinFunctionHandler::generateWithResult(CodeGenVisitor& visitor, const std::string& funcName, const std::vector<std::unique_ptr<ASTNode>>& arguments) { return false; }
-
         bool IOFunctionHandler::canHandle(const std::string& funcName) const {
             return funcName == "writeln" || funcName == "write" || funcName == "readln";
         }

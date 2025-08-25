@@ -72,7 +72,7 @@ namespace pascal {
         PascalParser() = delete;
         explicit PascalParser(const std::string& source) : mxx::XParser(source), validator(source) {}
 
-        std::unique_ptr<ASTNode> parseProgram();
+        std::unique_ptr<ProgramNode> parseProgram();
         mxx::TPValidator validator;
     private:
         
@@ -81,16 +81,19 @@ namespace pascal {
         void expectToken(types::TokenType expected);
         bool match(const std::string& s);
         bool match(types::TokenType t);
-        std::unique_ptr<ASTNode> parseBlock();
+         std::unique_ptr<ASTNode> parseLValue();
+        std::unique_ptr<BlockNode> parseBlock();
+        std::unique_ptr<CompoundStmtNode> parseCompoundStatement();
         std::vector<std::unique_ptr<ASTNode>> parseDeclarations();
         std::unique_ptr<ASTNode> parseVarDeclaration();
         std::unique_ptr<ASTNode> parseConstDeclaration();
         std::unique_ptr<ASTNode> parseProcedureDeclaration();
         std::unique_ptr<ASTNode> parseFunctionDeclaration();
         std::vector<std::unique_ptr<ASTNode>> parseParameterList();
+        std::vector<std::unique_ptr<ASTNode>> parseStatementList();
         std::unique_ptr<ASTNode> parseParameter();
-
-        std::unique_ptr<ASTNode> parseCompoundStatement();
+        std::unique_ptr<ASTNode> parseRecordType();
+        std::unique_ptr<ASTNode> parseTypeDeclaration();
         std::unique_ptr<ASTNode> parseStatement();
         std::unique_ptr<ASTNode> parseAssignmentOrProcCall();
         std::unique_ptr<ASTNode> parseIfStatement();

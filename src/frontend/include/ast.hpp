@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <variant>
 
 namespace pascal {
 
@@ -21,26 +22,26 @@ namespace pascal {
         int getLineNumber() const { return line_number; }
     };
 
-    class ProgramNode : public ASTNode {
-    public:
-        std::string name;
-        std::unique_ptr<ASTNode> block;
-        
-        ProgramNode(const std::string& programName, std::unique_ptr<ASTNode> programBlock)
-            : name(programName), block(std::move(programBlock)) {}
-        
-        void accept(ASTVisitor& visitor) override;
-        std::string toString() const override;
-    };
+    class CompoundStmtNode; // Forward declaration
 
     class BlockNode : public ASTNode {
     public:
         std::vector<std::unique_ptr<ASTNode>> declarations;
-        std::unique_ptr<ASTNode> compoundStatement;
-        
-        BlockNode(std::vector<std::unique_ptr<ASTNode>> decls, std::unique_ptr<ASTNode> compound)
-            : declarations(std::move(decls)), compoundStatement(std::move(compound)) {}
-        
+        std::unique_ptr<CompoundStmtNode> compoundStatement;
+
+        BlockNode(std::vector<std::unique_ptr<ASTNode>> decls, std::unique_ptr<CompoundStmtNode> stmt);
+
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ProgramNode : public ASTNode {
+    public:
+        std::string name;
+        std::unique_ptr<BlockNode> block;
+
+        ProgramNode(const std::string& name, std::unique_ptr<BlockNode> blk);
+
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
     };
@@ -48,18 +49,42 @@ namespace pascal {
     class VarDeclNode : public ASTNode {
     public:
         std::vector<std::string> identifiers;
-        std::string type;
-        std::vector<std::unique_ptr<ASTNode>> initializers; 
-        
-        VarDeclNode(std::vector<std::string> ids, std::string t)
-            : identifiers(std::move(ids)), type(std::move(t)) {}
-        
-        VarDeclNode(std::vector<std::string> ids, std::string t, 
-                    std::vector<std::unique_ptr<ASTNode>> inits)
-            : identifiers(std::move(ids)), type(std::move(t)), 
-              initializers(std::move(inits)) {}
-        
+        std::variant<std::string, std::unique_ptr<ASTNode>> type; // <-- updated
+        std::vector<std::unique_ptr<ASTNode>> initializers;
+
+        VarDeclNode(std::vector<std::string> ids, std::string t,
+                    std::vector<std::unique_ptr<ASTNode>> inits = {})
+            : identifiers(std::move(ids)), type(std::move(t)), initializers(std::move(inits)) {}
+
+        VarDeclNode(std::vector<std::string> ids, std::unique_ptr<ASTNode> t,
+                    std::vector<std::unique_ptr<ASTNode>> inits = {})
+            : identifiers(std::move(ids)), type(std::move(t)), initializers(std::move(inits)) {}
+
         void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+
+    class TypeDeclNode : public ASTNode {
+    public:
+        std::vector<std::unique_ptr<ASTNode>> typeDeclarations;
+        
+        TypeDeclNode(std::vector<std::unique_ptr<ASTNode>> declarations) 
+            : typeDeclarations(std::move(declarations)) {}
+        
+       void accept(ASTVisitor& visitor) override;
+       std::string toString() const override;
+    };
+
+    class TypeAliasNode : public ASTNode {
+    public:
+        std::string typeName;
+        std::string baseType;
+        
+        TypeAliasNode(const std::string& name, const std::string& base)
+            : typeName(name), baseType(base) {}
+       
+       void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
     };
 
@@ -406,6 +431,32 @@ namespace pascal {
         }
     };
 
+    class RecordTypeNode : public ASTNode {
+    public:
+        std::vector<std::unique_ptr<ASTNode>> fields; 
+        RecordTypeNode(std::vector<std::unique_ptr<ASTNode>> fields);
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class RecordDeclarationNode : public ASTNode {
+    public:
+        std::string name;
+        std::unique_ptr<RecordTypeNode> recordType;
+        RecordDeclarationNode(const std::string& name, std::unique_ptr<RecordTypeNode> recordType);
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class FieldAccessNode : public ASTNode {
+    public:
+        std::unique_ptr<ASTNode> recordExpr;
+        std::string fieldName;
+        FieldAccessNode(std::unique_ptr<ASTNode> recordExpr, const std::string& fieldName);
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
     class ASTVisitor {
     public:
         virtual ~ASTVisitor() = default;
@@ -436,43 +487,12 @@ namespace pascal {
         virtual void visit(ArrayDeclarationNode& node) = 0;
         virtual void visit(ArrayAccessNode& node) = 0;
         virtual void visit(ArrayAssignmentNode& node) = 0;
+        virtual void visit(RecordTypeNode& node) = 0;
+        virtual void visit(RecordDeclarationNode& node) = 0;
+        virtual void visit(FieldAccessNode& node) = 0;
+        virtual void visit(TypeDeclNode& node) = 0;
+        virtual void visit(TypeAliasNode& node) = 0;
     };
-
-    class PrettyPrintVisitor : public ASTVisitor {
-    private:
-        std::ostream& out;
-        int indentLevel;
-        
-        void printIndent();
-        
-    public:
-        PrettyPrintVisitor(std::ostream& output) : out(output), indentLevel(0) {}
-    
-        void visit(ProgramNode& node) override;
-        void visit(BlockNode& node) override;
-        void visit(VarDeclNode& node) override;
-        void visit(ProcDeclNode& node) override;
-        void visit(FuncDeclNode& node) override;
-        void visit(ParameterNode& node) override;
-        void visit(CompoundStmtNode& node) override;
-        void visit(AssignmentNode& node) override;
-        void visit(IfStmtNode& node) override;
-        void visit(WhileStmtNode& node) override;
-        void visit(ForStmtNode& node) override;
-        void visit(ProcCallNode& node) override;
-        void visit(BinaryOpNode& node) override;
-        void visit(UnaryOpNode& node) override;
-        void visit(FuncCallNode& node) override;
-        void visit(VariableNode& node) override;
-        void visit(NumberNode& node) override;
-        void visit(StringNode& node) override;
-        void visit(BooleanNode& node) override;
-        void visit(EmptyStmtNode& node) override;
-        void visit(RepeatStmtNode& node) override;
-        void visit(CaseStmtNode& node) override;
-        void visit(ConstDeclNode& node) override; 
-    };
-
 } 
 
 #endif

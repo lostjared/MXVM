@@ -18,7 +18,6 @@ procedure render();
 var
 i, z: integer;
 begin
-{ render  here }
 end;
 procedure init(title: string; x,y,w,h: integer);
 var
