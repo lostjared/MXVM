@@ -1201,6 +1201,14 @@ namespace pascal {
             if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
             ArrayInfo &info = it->second;
             std::string indexValue = eval(node.index.get());
+            VarType indexType = getExpressionType(node.index.get());
+            if (indexType == VarType::DOUBLE) {
+                std::string intIndex = allocReg();
+                emit2("to_int", intIndex, indexValue);
+                if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
+                indexValue = intIndex;
+            }
+            
             std::string adj = allocReg();
             std::string res = allocReg();
             emit2("mov", adj, indexValue);
@@ -1216,6 +1224,13 @@ namespace pascal {
             ArrayInfo &info = it->second;
             std::string value = eval(node.value.get());
             std::string index = eval(node.index.get());
+            VarType indexType = getExpressionType(node.index.get());
+            if (indexType == VarType::DOUBLE) {
+                std::string intIndex = allocReg();
+                emit2("to_int", intIndex, index);
+                if (isReg(index) && !isParmReg(index)) freeReg(index);
+                index = intIndex;
+            }
             std::string mangled = findMangledArrayName(node.arrayName);
             std::string idxReg = allocReg();
             emit2("mov", idxReg, index);
@@ -1231,6 +1246,13 @@ namespace pascal {
             if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
             ArrayInfo& info = it->second;
             std::string indexValue = eval(node.index.get());
+            VarType indexType = getExpressionType(node.index.get());
+            if (indexType == VarType::DOUBLE) {
+                std::string intIndex = allocReg();
+                emit2("to_int", intIndex, indexValue);
+                if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
+                indexValue = intIndex;
+            }
             std::string adjustedIndexReg = allocReg();
             emit2("mov", adjustedIndexReg, indexValue);
             emit2("sub", adjustedIndexReg, std::to_string(info.lowerBound));
