@@ -39,6 +39,14 @@ namespace mxvm {
         std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_call_or_jmp(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
 
+        std::regex re_xor_eax(R"(^\s*xorq?\s+%eax\s*,\s*%eax\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_call_func(R"(^\s*call\s+([_A-Za-z][_A-Za-z0-9]*)\s*(?:[#;].*)?$)", std::regex::icase);
+        static const std::unordered_set<std::string> variadic_funcs = {
+            "printf", "fprintf", "sprintf", "snprintf", "scanf", "fscanf", "sscanf",
+            "vprintf", "vfprintf", "vsprintf", "vsnprintf", "vscanf", "vfscanf", "vsscanf"
+        };
+
+
         std::vector<std::string> out;
         out.reserve(lines.size());
 
@@ -62,6 +70,16 @@ namespace mxvm {
         for (size_t i = 0; i < lines.size(); ++i) {
             const std::string& line = lines[i];
 
+            if (std::regex_match(line, re_xor_eax) && (i + 1 < lines.size())) {
+                std::smatch m;
+                if (std::regex_match(lines[i + 1], m, re_call_func)) {
+                    std::string func_name = m[1].str();
+                    if (variadic_funcs.find(func_name) == variadic_funcs.end()) {
+                        continue; 
+                    }
+                }
+            }
+        
             if (is_label(line) || std::regex_search(line, re_call_or_jmp)) {
                 out.push_back(line);
                 invalidate_tracking();
@@ -143,6 +161,15 @@ namespace mxvm {
         std::regex re_modifies_reg(R"(^\s*(?:add|sub|mul|imul|div|idiv|and|or|xor|shl|shr|sal|sar|not|neg)[a-z]*\s+.*,\s*(%[a-z0-9]+)\s*(?:[#;].*)?$)", std::regex::icase);
         std::regex re_call_or_jmp(R"(^\s*(?:call|jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe)[a-z]*\s+)", std::regex::icase);
 
+        
+        std::regex re_xor_eax(R"(^\s*xorq?\s+%eax\s*,\s*%eax\s*(?:[#;].*)?$)", std::regex::icase);
+        std::regex re_call_func(R"(^\s*call\s+([_A-Za-z][_A-ZaZ0-9]*)\s*(?:[#;].*)?$)", std::regex::icase);
+        static const std::unordered_set<std::string> variadic_funcs = {
+            "printf", "fprintf", "sprintf", "snprintf", "scanf", "fscanf", "sscanf",
+            "vprintf", "vfprintf", "vsprintf", "vsnprintf", "vscanf", "vfscanf", "vsscanf"
+        };
+        
+
         auto local_is_label = [](const std::string& s){
             static const std::regex re(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)"); 
             return std::regex_search(s, re);
@@ -184,6 +211,18 @@ namespace mxvm {
         for (size_t i = 0; i < lines.size(); ++i) {
             const std::string& line = lines[i];
 
+            if (std::regex_match(line, re_xor_eax) && (i + 1 < lines.size())) {
+                std::smatch m;
+                if (std::regex_match(lines[i + 1], m, re_call_func)) {
+                    std::string func_name = m[1].str();
+                    if (!func_name.empty() && func_name[0] == '_') {
+                        func_name = func_name.substr(1);
+                    }
+                    if (variadic_funcs.find(func_name) == variadic_funcs.end()) {
+                        continue; 
+                    }
+                }
+            }
             if (local_is_label(line)) {
                 out.push_back(line);
                 invalidate_tracking();
