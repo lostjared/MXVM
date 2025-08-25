@@ -1,7 +1,8 @@
 program CaseEx;
 var
-x: integer := 50;
+x: integer;
 begin
+    x := 0;
     writeln('enter number: ');
     readln(x);
     case x of

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
+#include <cstdlib>
 
 std::string removeComments(const std::string &text) {
     std::ostringstream stream;
@@ -89,6 +89,10 @@ int main(int argc, char **argv) {
 
         source = buffer.str();       
         pascal::PascalParser parser(removeComments(source));
+        if(!parser.validator.validate(argv[1])) {
+            std::cerr << "mxx: validation failed.\n";
+            return EXIT_FAILURE;
+        }
         auto ast = parser.parseProgram();
         if (ast) {      
             pascal::CodeGenVisitor emiter;
@@ -106,12 +110,13 @@ int main(int argc, char **argv) {
         }
     } catch (const pascal::ParseException& e) {
         std::cerr << "Parse Error: " << e.what() << std::endl;
-        return 1;
+        return EXIT_FAILURE;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
+        return EXIT_FAILURE;
     } catch(const scan::ScanExcept &e) {
         std::cerr << "Syntax Error: " << e.why() << std::endl;
+        return EXIT_FAILURE;
     }
     return 0;
 }

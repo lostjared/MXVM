@@ -1,4 +1,4 @@
-program AppSkeleton;
+program AppSkeleton ;
 const
   SDL_WINDOW_SHOWN = 4;
   SDL_RENDERER_ACCELLERATED = 2;
@@ -16,7 +16,7 @@ const
   BLOCK_H = 24;
   BLOCK_TOTAL = BLOCK_W * BLOCK_H;  
 var
-running : boolean;
+running: boolean;
 event_type_result: integer;
 color_value_r,  color_value_g, color_value_b: integer;
 window_id, renderer, target_id:  integer;

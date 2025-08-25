@@ -15,8 +15,8 @@ var
   color_value_r, color_value_g, color_value_b: integer;
   i, z: integer;
   max_cols, max_rows: integer;
-  index_w: integer := 2;
-  index_h: integer := 2;
+  index_w: integer;
+  index_h: integer;
 
 procedure render(cols, rows: integer);
 begin
@@ -50,6 +50,8 @@ begin
 end;
 
 begin
+  index_w := 2;
+  index_h := 2;
   max_cols :=(WIDTH div TILE_W)-1;
   max_rows := (HEIGHT div TILE_H)-1;
   init;

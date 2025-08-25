@@ -8,7 +8,8 @@ add_executable(mxx
     ast.cpp
     icode.cpp
     icode_imp.cpp                 
-    main.cpp)
+    main.cpp
+    validator.cpp)
 target_include_directories(mxx
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

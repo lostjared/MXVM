@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "validator.hpp"
 
 namespace pascal {
     class ParseException : public std::runtime_error {
@@ -69,11 +70,12 @@ namespace pascal {
     class PascalParser : public mxx::XParser {
     public:
         PascalParser() = delete;
-        explicit PascalParser(const std::string& source) : mxx::XParser(source) {}
+        explicit PascalParser(const std::string& source) : mxx::XParser(source), validator(source) {}
 
         std::unique_ptr<ASTNode> parseProgram();
-
+        mxx::TPValidator validator;
     private:
+        
         void error(const std::string& message);
         void expectToken(const std::string& expected);
         void expectToken(types::TokenType expected);
