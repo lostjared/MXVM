@@ -720,7 +720,7 @@ namespace mxvm {
             if (v2 != 0) {
                 dest.var_value.int_value = v1 / v2;
             } else {
-                // Safe behavior: set 0 on div-by-zero and continue
+                
                 dest.var_value.int_value = 0;
             }
             dest.var_value.type = VarType::VAR_INTEGER;
@@ -855,105 +855,92 @@ namespace mxvm {
         }
     }
 
+    
     void Program::exec_store(const Instruction& instr) {
-       
-        int64_t value = 0;
-        VarType type;
-        Variable src;
-
-        if(instr.op1.type == OperandType::OP_CONSTANT) {
-            value = std::stoll(instr.op1.op, nullptr, 0);
-            type = VarType::VAR_INTEGER;
-        }
-        else {
-            src = getVariable(instr.op1.op);
-            value = src.var_value.int_value;
-            type = src.type;
-        }
-        void* ptr = nullptr;
-        size_t index = 0;
-        size_t size = 8;
-        if (isVariable(instr.op2.op)) {
-            Variable& ptrVar = getVariable(instr.op2.op);
-            if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
-                throw mx::Exception("STORE destination must be a valid pointer:  " + ptrVar.var_name);
-            }
-            ptr = ptrVar.var_value.ptr_value;
-        } else {
+        if (!isVariable(instr.op2.op)) {
             throw mx::Exception("STORE destination must be a pointer variable");
         }
+        Variable& ptrVar = getVariable(instr.op2.op);
+        if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
+            throw mx::Exception("STORE destination must be a valid pointer: " + ptrVar.var_name);
+        }
+        void* ptr = ptrVar.var_value.ptr_value;
 
+        size_t index = 0;
         if (!instr.op3.op.empty()) {
             if (isVariable(instr.op3.op)) {
                 index = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
             } else {
                 index = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
             }
-        } else {
-            throw mx::Exception("STORE: operand 3 is empty\n");
         }
 
-        if (!instr.vop.empty()) {
+        size_t size = 8;
+        if (!instr.vop.empty() && !instr.vop[0].op.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
                 size = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
-            } else if (!sizeOp.op.empty()) {
+            } else {
                 size = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             }
         }
 
-        Variable& ptrVar = getVariable(instr.op2.op);
         if (index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name + ", " + std::to_string(index) + " >= " + std::to_string(ptrVar.var_value.ptr_count));
+            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name);
         }
         if (size > ptrVar.var_value.ptr_size) {
-            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name + ", " + std::to_string(size) + " > " + std::to_string(ptrVar.var_value.ptr_size));
+            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name);
         }
-
         char* base = static_cast<char*>(ptr) + index * size;
-        switch (type) {
-            case VarType::VAR_INTEGER:
-                if (size == sizeof(int64_t)) {
-                    *reinterpret_cast<int64_t*>(base) = value;
-                } else if (size == sizeof(unsigned char)) {
-                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(value);
-                } else {
-                    throw mx::Exception("STORE: size mismatch for integer");
-                }
-                break;
-            case VarType::VAR_BYTE:
-                if (size == sizeof(unsigned char)) {
-                    *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(value);
-                } else {
-                    throw mx::Exception("STORE: size mismatch for byte");
-                }
-                break;
-            case VarType::VAR_FLOAT:
-                if (size == sizeof(double)) {
-                    double float_value = getVariable(instr.op1.op).var_value.float_value;
-                    *reinterpret_cast<double*>(base) = float_value;
-                } else {
-                    throw mx::Exception("STORE: size mismatch for float");
-                }
-                break;
-            case VarType::VAR_POINTER:
-                if (size == sizeof(void*)) {
-                    *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
-                } else {
-                    throw mx::Exception("STORE: size mismatch for pointer type");
-                }
-                break;
-            case VarType::VAR_STRING:
-            if (size == sizeof(void*)) {
-                *reinterpret_cast<void**>(base) = src.var_value.str_value.empty() ? nullptr : (void*)src.var_value.str_value.c_str();
+        if (instr.op1.type == OperandType::OP_CONSTANT) {
+        
+            if (size == sizeof(int64_t)) {
+                *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
             } else {
-                throw mx::Exception("STORE: size mismatch for string type");
+                throw mx::Exception("STORE: size mismatch for integer constant");
             }
-            break;
-            default:
-                throw mx::Exception("STORE: unsupported source type");
+        } else {
+
+            Variable& src = getVariable(instr.op1.op);
+            switch (src.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_BYTE:
+                    if (size == sizeof(int64_t)) {
+                        *reinterpret_cast<int64_t*>(base) = src.var_value.int_value;
+                    } else if (size == sizeof(unsigned char)) {
+                        *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(src.var_value.int_value);
+                    } else {
+                        throw mx::Exception("STORE: size mismatch for integer/byte type");
+                    }
+                    break;
+                case VarType::VAR_FLOAT:
+                    if (size == sizeof(double)) {
+                        *reinterpret_cast<double*>(base) = src.var_value.float_value;
+                    } else {
+                        throw mx::Exception("STORE: size mismatch for float type");
+                    }
+                    break;
+                case VarType::VAR_POINTER:
+                    if (size == sizeof(void*)) {
+                        *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
+                    } else {
+                        throw mx::Exception("STORE: size mismatch for pointer type");
+                    }
+                    break;
+                case VarType::VAR_STRING:
+                    if (size == sizeof(void*)) {
+                        *reinterpret_cast<void**>(base) = src.var_value.str_value.empty() ? 
+                            nullptr : (void*)src.var_value.str_value.c_str();
+                    } else {
+                        throw mx::Exception("STORE: size mismatch for string type");
+                    }
+                    break;
+                default:
+                    throw mx::Exception("STORE: unsupported source type");
+            }
         }
     }
+    
     void Program::exec_and(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("AND destination must be a variable");
@@ -1104,7 +1091,7 @@ namespace mxvm {
             int64_t v1 = (src1->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1->var_value.float_value) : src1->var_value.int_value;
             int64_t v2 = (src2->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2->var_value.float_value) : src2->var_value.int_value;
             if (v2 == 0) {
-                dest.var_value.int_value = 0; // safe modulo by zero => 0
+                dest.var_value.int_value = 0; 
             } else {
                 dest.var_value.int_value = v1 % v2;
             }
@@ -1250,7 +1237,11 @@ namespace mxvm {
                     if (arg->type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
                     } else if (arg->type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
-                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                        if (spec.find("%s") != std::string::npos) {
+                            std::snprintf(buffer, sizeof(buffer), spec.c_str(), static_cast<char*>(arg->var_value.ptr_value));
+                        } else {
+                            std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                        }
                     } else if (arg->type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
                     } else if (arg->type == VarType::VAR_STRING) {
@@ -1306,7 +1297,11 @@ namespace mxvm {
                     if (arg->type == VarType::VAR_INTEGER) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.int_value);
                     } else if (arg->type == VarType::VAR_POINTER || arg->var_value.type == VarType::VAR_EXTERN) {
-                        std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                        if (spec.find("%s") != std::string::npos) {
+                            std::snprintf(buffer, sizeof(buffer), spec.c_str(), static_cast<char*>(arg->var_value.ptr_value));
+                        } else {
+                            std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.ptr_value);
+                        }
                     } else if (arg->type == VarType::VAR_FLOAT) {
                         std::snprintf(buffer, sizeof(buffer), spec.c_str(), arg->var_value.float_value);
                     } else if (arg->type == VarType::VAR_STRING) {

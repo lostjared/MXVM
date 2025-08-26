@@ -165,6 +165,7 @@ namespace pascal {
         const std::vector<std::string> floatRegisters = {"xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7","xmm8","xmm9"};
 
         std::vector<bool> regInUse;
+        std::vector<bool> ptrRegInUse; 
         std::vector<bool> floatRegInUse;
 
         std::vector<std::pair<FuncDeclNode*, std::vector<std::string>>> deferredFuncs;
@@ -213,9 +214,24 @@ namespace pascal {
             regInUse[idx] = true;
             return registers[idx];
         }
+        
+        std::string allocPtrReg() {
+            for (size_t i = 1; i < ptrRegInUse.size(); ++i) 
+                if (!ptrRegInUse[i]) { ptrRegInUse[i] = true; return ptrRegisters[i]; }
+            size_t i = ptrRegisters.size() - 1;
+            ptrRegInUse[i] = true;
+            return ptrRegisters[i];
+        }
+        
+        void freePtrReg(const std::string& reg) {
+            for (size_t i = 0; i < ptrRegisters.size(); ++i)
+                if (ptrRegisters[i] == reg) { ptrRegInUse[i] = false; return; }
+        }
+        
         void freeReg(const std::string& reg) {
             for (size_t i = 0; i < registers.size(); ++i)
                 if (registers[i] == reg) { regInUse[i] = false; return; }
+            freePtrReg(reg);
         }
         std::string allocFloatReg() {
             for (size_t i = 0; i < floatRegInUse.size(); ++i)
@@ -232,7 +248,8 @@ namespace pascal {
         bool isPtrReg(const std::string& name) const { return std::find(ptrRegisters.begin(), ptrRegisters.end(), name) != ptrRegisters.end(); }
         bool isReg(const std::string& name) const {
             return std::find(registers.begin(), registers.end(), name) != registers.end()
-                || std::find(floatRegisters.begin(), floatRegisters.end(), name) != floatRegisters.end();
+                || std::find(floatRegisters.begin(), floatRegisters.end(), name) != floatRegisters.end()
+                || isPtrReg(name); 
         }
 
         int newSlotFor(const std::string& name) {
@@ -436,6 +453,7 @@ namespace pascal {
 
         bool isParmReg(const std::string& name) const {
             for (size_t i = 1; i <= 6 && i < registers.size(); ++i) if (registers[i] == name) return true;
+            for (size_t i = 0; i < ptrRegisters.size(); ++i) if (ptrRegisters[i] == name) return true;
             return false;
         }
 
@@ -449,6 +467,7 @@ namespace pascal {
 
         CodeGenVisitor()
             : regInUse(registers.size(), false),
+              ptrRegInUse(ptrRegisters.size(), false), 
               floatRegInUse(floatRegisters.size(), false) {
             initializeBuiltins();
         }
@@ -481,6 +500,7 @@ namespace pascal {
             scopeHierarchy.push_back("__global__");
 
             for (size_t i = 0; i < regInUse.size(); ++i) regInUse[i] = false;
+            for (size_t i = 0; i < ptrRegInUse.size(); ++i) ptrRegInUse[i] = false; 
             for (size_t i = 0; i < floatRegInUse.size(); ++i) floatRegInUse[i] = false;
             scratchPtr = 0;
 
@@ -541,6 +561,7 @@ namespace pascal {
                 }
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
+                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false; 
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
 
                 for(const auto& pair : currentParamLocations) {
@@ -598,6 +619,7 @@ namespace pascal {
                 }
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
+                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false; 
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 for(const auto& pair : currentParamLocations) {
                     for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
@@ -1568,6 +1590,8 @@ namespace pascal {
 
             if (fieldType == VarType::DOUBLE) {
                 dst = allocFloatReg();
+            } else if(fieldType == VarType::PTR || fieldType == VarType::STRING) {
+                dst = allocPtrReg();
             } else {
                 dst = allocReg();
             }
