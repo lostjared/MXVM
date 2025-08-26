@@ -197,6 +197,7 @@ namespace mxvm {
         bool object_external = false;
         enum LastCmpType { CMP_NONE, CMP_INTEGER, CMP_FLOAT };
         LastCmpType last_cmp_type = CMP_NONE;
+        bool last_call_returns_owned_ptr = false;
     public:    
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
@@ -370,6 +371,8 @@ namespace mxvm {
         size_t x64_reserve_call_area(std::ostream &out, size_t spill_bytes);
         void x64_release_call_area(std::ostream &out, size_t frame);
         void x64_direct_stack_adjust(std::ostream &out, int64_t bytes);
+        bool last_call_returns_owned = false;
+        VarType last_call_ret_type = VarType::VAR_INTEGER;
     };
 
     void except_assert(std::string reason, bool value);

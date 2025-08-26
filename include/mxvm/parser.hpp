@@ -118,6 +118,9 @@ namespace mxvm {
         bool operator==(const ExternalFunction &f) {
             return (name == f.name && mod == f.mod);
         }
+        
+        VarType ret_type = VarType::VAR_INTEGER;
+        bool ret_owned = false; 
     };
 
     class ModuleParser {
