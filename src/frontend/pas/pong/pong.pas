@@ -1,4 +1,4 @@
-program AppSkeleton;
+program Pong;
 const
   SDL_WINDOW_SHOWN = 4;
   SDL_RENDERER_ACCELLERATED = 2;
