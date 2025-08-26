@@ -815,7 +815,9 @@ namespace mxvm {
                 Variable &v = getVariable(i.op1.op);
                 if (v.type != VarType::VAR_INTEGER) throw mx::Exception("NOT int only");
                 x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
-                out << "\tnotq %rax\n";
+                out << "\ttestq %rax, %rax\n";
+                out << "\tsete %al\n";
+                out << "\tmovzbq %al, %rax\n";
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else throw mx::Exception("NOT requires variable");
         } else throw mx::Exception("NOT requires operand");
