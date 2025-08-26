@@ -128,6 +128,14 @@ namespace mxvm {
         return count;
     }
 
+    
+    static bool isFunctionReturningOwnedPtr(const std::string& funcName) {
+        static const std::unordered_set<std::string> funcs = {
+            "inttostr",
+            "floattostr",
+        };
+        return funcs.count(funcName) > 0;
+    }
 
     void Program::x64_generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &args) {
         xmm_offset = 0;
@@ -175,6 +183,13 @@ namespace mxvm {
         std::string n = op[0].op;
         std::vector<Operand> a;
         for (size_t i = 1; i < op.size(); ++i) if (!op[i].op.empty()) a.push_back(op[i]);
+
+        if (isFunctionReturningOwnedPtr(n)) {
+            this->last_call_returns_owned_ptr = true;
+        } else {
+            this->last_call_returns_owned_ptr = false;
+        }
+
         x64_generateFunctionCall(out, n, a);
     }
 
@@ -336,11 +351,17 @@ namespace mxvm {
         out << "\tleave\n";
         out << "\tret\n";
     }
-
     void Program::x64_gen_return(std::ostream &out, const Instruction &i) {
-        if (isVariable(i.op1.op)) out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-        else throw mx::Exception("return requires variable");
-    }
+            if (isVariable(i.op1.op)) {
+                if (this->last_call_returns_owned_ptr) {
+                    Variable &v = getVariable(i.op1.op);
+                    v.var_value.owns = true;
+                    this->last_call_returns_owned_ptr = false; 
+                }
+                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+            }
+            else throw mx::Exception("return requires variable");
+        }
 
     void Program::x64_gen_neg(std::ostream &out, const Instruction &i) {
         if (isVariable(i.op1.op)) {
