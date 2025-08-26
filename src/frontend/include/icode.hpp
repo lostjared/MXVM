@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <optional>
 #include <stdexcept>
+#define MXVM_BOUNDS_CHECK
 
 namespace pascal {
 
@@ -77,20 +78,16 @@ namespace pascal {
         int realConstantCounter = 0;
         std::unordered_map<std::string, std::string> currentParamTypes; 
         std::set<std::string> usedModules;
-
         std::vector<std::string> globalArrays;
         std::unordered_map<std::string, std::vector<std::string>> functionScopedArrays;
-
         std::vector<std::string> scopeHierarchy;
         struct Scope { std::string name; std::vector<ProcDeclNode*> nestedProcs; std::vector<FuncDeclNode*> nestedFuncs; };
         std::vector<Scope> scopeStack;
         std::unordered_map<std::string, std::string> typeAliases;
-
         std::map<std::string, std::pair<std::string, std::string>> constInitialValues;
-
         std::map<std::string, std::string> currentParamLocations;
-
         std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs;
+        std::vector<std::string> allTempPtrs;
 
         std::string generateRealConstantName() { return "real_const_" + std::to_string(realConstantCounter++); }
 
@@ -123,7 +120,16 @@ namespace pascal {
 
         std::string getCurrentScopeName() const {
             if (scopeHierarchy.empty() || scopeHierarchy.back() == "__global__") return "";
-            return scopeHierarchy.back();
+            
+            std::string currentScope = scopeHierarchy.back();
+            auto& funcs = generatingDeferredCode ? deferredFuncs : std::vector<std::pair<FuncDeclNode*, std::vector<std::string>>>();
+            bool isFunc = false;
+            for(const auto& df : deferredFuncs) {
+                if(df.first->name == currentScope) { isFunc = true; break; }
+            }
+
+            std::vector<std::string> parentScope(scopeHierarchy.begin(), scopeHierarchy.end() - 1);
+            return (isFunc ? "FUNC_" : "PROC_") + mangleWithScope(currentScope, parentScope);
         }
 
         struct FuncInfo { std::vector<VarType> paramTypes; VarType returnType = VarType::UNKNOWN; };
@@ -133,7 +139,8 @@ namespace pascal {
         std::unordered_map<int, VarType> slotToType;
 
         bool needsEmptyString = false;
-
+        std::string funcLabel(const char* prefix, const std::string& name) { return std::string(prefix) + name; }
+        
         VarType getVarType(const std::string& name) const {
             std::string mangledName = findMangledName(name);
             auto slotIt = varSlot.find(mangledName);
@@ -169,11 +176,9 @@ namespace pascal {
             return t == VarType::STRING || t == VarType::PTR;
         }
         std::string emptyString() { needsEmptyString = true; return "empty_str"; }
-
-        const std::vector<std::string> registers = {"rax","rbx","rcx","rdx","rsi","rdi","r8","r9","r10","r11","r12","r13","r14","r15"};
         const std::vector<size_t> scratchOrder = {8,9,10,11,12,13};
         size_t scratchPtr = 0;
-    
+        const std::vector<std::string> registers = {"rax","rbx","rcx","rdx","rsi","rdi","r8","r9","r10","r11","r12","r13","r14","r15"};
         const std::vector<std::string> ptrRegisters = {
             "arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"
         };
@@ -285,10 +290,21 @@ namespace pascal {
         }
 
         std::string newTemp() { return slotVar(newSlotFor("__t" + std::to_string(nextTemp++))); }
-        std::string newLabel(const std::string& prefix) { std::ostringstream ss; ss << prefix << "_" << (labelCounter++); return ss.str(); }
-        std::string funcLabel(const char* prefix, const std::string& name) { return std::string(prefix) + name; }
+        std::string newLabel(const std::string& prefix = "L") {
+            return prefix + "_" + std::to_string(labelCounter++);
+        }
+        
+        std::string allocTempPtr(const std::string& forScope = "") {
+            std::string tempName = "_tmpptr" + std::to_string(nextTemp++);
+            std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
+            tempPtrByScope[scope].push_back(tempName);
+            allTempPtrs.push_back(tempName);
+            return tempName;
+        }
 
-        void emit(const std::string& line) { instructions.push_back(line); }
+        void emit(const std::string& s) {
+            instructions.push_back(s);
+        }
         void emitLabel(const std::string& label) { instructions.push_back(label + ":"); }
         void emit1(const std::string& op, const std::string& a) { emit(op + " " + a); }
         void emit2(const std::string& op, const std::string& a, const std::string& b) {
@@ -524,6 +540,7 @@ namespace pascal {
             scopeStack.push_back({"__global__"});
             scopeHierarchy.push_back("__global__");
             generatingDeferredCode = false; 
+            functionSetReturn = false;
 
             for (size_t i = 0; i < regInUse.size(); ++i) regInUse[i] = false;
             for (size_t i = 0; i < ptrRegInUse.size(); ++i) ptrRegInUse[i] = false; 
@@ -543,7 +560,7 @@ namespace pascal {
             }
             if (tempPtrByScope.count("")) {
                 for (auto &tp : tempPtrByScope[""]) emit1("free", tp);
-                tempPtrByScope[""].clear();
+                //tempPtrByScope[""].clear();
             }
             emit("done");
 
@@ -622,9 +639,10 @@ namespace pascal {
                     }
                 }
 
-                if (tempPtrByScope.count(pn->name)) {
-                    for (auto &tp : tempPtrByScope[pn->name]) emit1("free", tp);
-                    tempPtrByScope[pn->name].clear();
+                std::string scopeName = "PROC_" + mangleWithScope(pn->name, parentScope);
+                if (tempPtrByScope.count(scopeName)) {
+                    for (auto &tp : tempPtrByScope[scopeName]) emit1("free", tp);
+                    //tempPtrByScope[scopeName].clear();
                 }
 
                 emit("ret");
@@ -647,6 +665,7 @@ namespace pascal {
                 int intParamIndex = 1;
                 int ptrParamIndex = 0;
                 int floatParamIndex = 0;
+                functionSetReturn = false;
 
                 if (!fn->parameters.empty()) {
                     for (auto& p_node : fn->parameters) {
@@ -696,9 +715,10 @@ namespace pascal {
                     }
                 }
 
-                if (tempPtrByScope.count(fn->name)) {
-                    for (auto &tp : tempPtrByScope[fn->name]) emit1("free", tp);
-                    tempPtrByScope[fn->name].clear();
+                std::string scopeName = "FUNC_" + mangleWithScope(fn->name, parentScope);
+                if (tempPtrByScope.count(scopeName)) {
+                    for (auto &tp : tempPtrByScope[scopeName]) emit1("free", tp);
+                    //tempPtrByScope[scopeName].clear();
                 }
 
                 if (!functionSetReturn) {
@@ -738,7 +758,14 @@ namespace pascal {
             out << "\tsection data {\n";
             for (const auto& reg : registers) out << "\t\tint " << reg << " = 0\n";
             for (const auto& floatReg : floatRegisters) out << "\t\tfloat " << floatReg << " = 0.0\n";
-            for (const auto& p : ptrRegisters) out << "\t\tptr " << p << " = null\n";
+            {
+                std::set<std::string> temps;
+                for (const auto& p : ptrRegisters) temps.insert(p);
+                for (const auto& t : allTempPtrs) temps.insert(t);
+                for (const auto& kv : tempPtrByScope) for (const auto& t : kv.second) temps.insert(t);
+                for (const auto& tempPtr : temps) out << "\t\tptr " << tempPtr << " = null\n";
+            }
+
             for (const auto& constant : realConstants) out << "\t\tfloat " << constant.first << " = " << constant.second << "\n";
             if (needsEmptyString) out << "\t\tstring empty_str = \"\"\n";
             for (const auto& pair : stringLiterals) out << "\t\tstring " << pair.second << " = " << escapeStringForMxvm(pair.first) << "\n";
@@ -831,7 +858,7 @@ namespace pascal {
                         varRecordType[mangledId] = typeStr;
                         varRecordType[id] = typeStr;
                         int bytes = getTypeSizeByName(typeStr);
-                        emit3("alloc", slotVar(slot), "1", std::to_string(bytes));
+                        emit3("alloc", slotVar(slot), "8", std::to_string(bytes));
                         std::string currentScope = getCurrentScopeName();
                         recordsToFreeInScope[currentScope].push_back(mangledId);
                     }
@@ -954,11 +981,11 @@ namespace pascal {
                 resultLocation = allocFloatReg();
                 emit2("mov", resultLocation, "xmm0");
             } else if (returnType == VarType::STRING || returnType == VarType::PTR || returnType == VarType::RECORD) {
-                resultLocation = allocPtrReg();
-                emit("return " + resultLocation);
+                resultLocation = allocTempPtr();
+                emit2("mov", resultLocation, "arg0");
             } else {
                 resultLocation = allocReg();
-                emit("return " + resultLocation);
+                emit2("mov", resultLocation, "rax");
             }
             pushValue(resultLocation);
 
@@ -1051,22 +1078,33 @@ namespace pascal {
                 auto it = arrayInfo.find(arr->arrayName);
                 if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + arr->arrayName);
                 ArrayInfo &info = it->second;
+
                 std::string rhs = eval(node.expression.get());
                 std::string idx = eval(arr->index.get());
-                std::string mangled = findMangledArrayName(arr->arrayName);
-                
-                
-                std::string offsetReg = allocReg();
-                emit2("mov", offsetReg, idx);
-                emit2("sub", offsetReg, std::to_string(info.lowerBound));
-                emit2("mul", offsetReg, std::to_string(info.elementSize));
+                if (getExpressionType(arr->index.get()) == VarType::DOUBLE) {
+                    std::string intIdx = allocReg();
+                    emit2("to_int", intIdx, idx);
+                    if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+                    idx = intIdx;
+                }
 
-                
-                emit4("store", rhs, mangled, offsetReg, std::to_string(info.elementSize));
-                
+            #ifdef MXVM_BOUNDS_CHECK
+                {
+                    std::string idxCopy = allocReg();
+                    emit2("mov", idxCopy, idx);
+                    emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
+                }
+            #endif
+
+                std::string offset = allocReg();
+                emit2("mov", offset, idx);
+                if (info.lowerBound != 0) emit2("sub", offset, std::to_string(info.lowerBound));
+                std::string mangled = findMangledArrayName(arr->arrayName);
+                emit4("store", rhs, mangled, offset, "8");
+
                 if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
                 if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
-                freeReg(offsetReg);
+                freeReg(offset);
                 return;
             }
 
@@ -1086,9 +1124,8 @@ namespace pascal {
                 auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
 
                 int byteOffset = ofs_sz.first;
-                int elementSize = ofs_sz.second; 
 
-                emit4("store", rhs, baseName, std::to_string(byteOffset), std::to_string(elementSize));
+                emit4("store", rhs, baseName, std::to_string(byteOffset), "8");
                 if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
                 return;
             }
@@ -1193,36 +1230,26 @@ namespace pascal {
 
             if (node.operator_ == BinaryOpNode::PLUS && (isStrLike(lt) || isStrLike(rt))) {
                 usedModules.insert("string");
-                std::string leftVal  = eval(node.left.get());
-                std::string rightVal = eval(node.right.get());
-
-                
-                std::string len1 = allocReg();
-                emit_invoke("strlen", {leftVal});
+                std::string left  = eval(node.left.get());
+                std::string right = eval(node.right.get());
+                std::string len1 = allocReg(), len2 = allocReg(), totalLen = allocReg();
+                emit_invoke("strlen", {left});
                 emit("return " + len1);
-
-                std::string len2 = allocReg();
-                emit_invoke("strlen", {rightVal});
+                emit_invoke("strlen", {right});
                 emit("return " + len2);
+                emit2("mov", totalLen, len1);
+                emit2("add", totalLen, len2);
+                emit2("add", totalLen, "1");
 
-                std::string total = allocReg();
-                emit2("mov", total, len1);
-                emit2("add", total, len2);
-                emit2("add", total, "1");
+                std::string result_str = allocTempPtr();
+                emit3("alloc", result_str, "1", totalLen);
+                emit_invoke("strncpy", {result_str, left, len1});
+                emit_invoke("strncat", {result_str, right, len2});
 
-                std::string resultPtr = allocPtrReg();
-                emit3("alloc", resultPtr, "1", total);                
-                emit_invoke("strncpy", {resultPtr, leftVal, len1});
-                emit_invoke("strncat", {resultPtr, rightVal, len2});
-
-                pushValue(resultPtr);
-
-                if (isReg(leftVal) && !isParmReg(leftVal)) freeReg(leftVal);
-                if (isReg(rightVal) && !isParmReg(rightVal)) freeReg(rightVal);
-                if (isReg(len1) && !isParmReg(len1)) freeReg(len1);
-                if (isReg(len2) && !isParmReg(len2)) freeReg(len2);
-                if (isReg(total) && !isParmReg(total)) freeReg(total);
-                addTempPtr(resultPtr);
+                pushValue(result_str);
+                freeReg(len1); freeReg(len2); freeReg(totalLen);
+                if (isReg(left) && !isParmReg(left)) freeReg(left);
+                if (isReg(right) && !isParmReg(right)) freeReg(right);
                 return;
             }
 
@@ -1422,7 +1449,7 @@ namespace pascal {
                         default: throw std::runtime_error("Unsupported operator for floats in constant expression.");
                     }
                     return std::to_string(result);
-                } else { // Integer operation
+                } else { 
                     long long result;
                     switch (binOp->operator_) {
                         case BinaryOpNode::PLUS:     result = toI(L) + toI(R); break;
@@ -1504,6 +1531,8 @@ namespace pascal {
             if (isReg(condResult) && !isParmReg(condResult)) freeReg(condResult);
         }
 
+       
+
         void visit(CaseStmtNode& node) override {
             std::string switchExpr = eval(node.expression.get());
             std::string endLabel = newLabel("CASE_END");
@@ -1532,21 +1561,47 @@ namespace pascal {
 
     private:
         std::unordered_map<std::string, std::string> realConstants;
-
-        struct ArrayInfo { std::string elementType; int lowerBound; int upperBound; int size; int elementSize; };
+        void visit(ArrayTypeNode& /*node*/) override {}
+        struct ArrayInfo {
+            std::string elementType;
+            int lowerBound;
+            int upperBound;
+            int size;
+            int elementSize;
+        };
         std::unordered_map<std::string, ArrayInfo> arrayInfo;
 
         int getArrayElementSize(const std::string& elementType) {
             if (elementType == "integer" || elementType == "boolean") return 8;
             if (elementType == "real") return 8;
-            if (elementType == "char") return 1;  
-            if (elementType == "string") return 8;
+            if (elementType == "char") return 8;
+            if (elementType == "string" || elementType == "ptr") return 8;
+            auto it = recordTypes.find(elementType);
+            if (it != recordTypes.end()) return it->second.size; 
             return 8;
         }
 
-        void visit(ArrayTypeNode& /*node*/) override {}
+    void emitArrayBoundsCheck(const std::string& idxReg, int lower, int upper) {
+        #ifdef MXVM_BOUNDS_CHECK
+            
+            std::string L_ok = newLabel("IDX_OK");
+            std::string L_fail = newLabel("IDX_OOB");
+            std::string t = allocReg();
+            emit2("mov", t, idxReg);
+            emit2("cmp", t, std::to_string(lower));
+            emit1("jl", L_fail);
+            emit2("cmp", t, std::to_string(upper));
+            emit1("jg", L_fail);
+            emit1("jmp", L_ok);
+            emitLabel(L_fail);
+            emit1("exit", "1");        
+            emitLabel(L_ok);
+            if (!isParmReg(idxReg) && isReg(idxReg)) freeReg(idxReg);
+        #endif
+    }
 
-        void visit(ArrayDeclarationNode& node) override {
+
+    void visit(ArrayDeclarationNode& node) override {
             std::string arrayName = node.name;
             std::string mangledArrayName = mangleVariableName(arrayName);
 
@@ -1559,6 +1614,7 @@ namespace pascal {
             int upperBound = std::stoi(upperBoundStr);
             int size = upperBound - lowerBound + 1;
             int elementSize = getArrayElementSize(node.arrayType->elementType);
+
             ArrayInfo info{node.arrayType->elementType, lowerBound, upperBound, size, elementSize};
             arrayInfo[arrayName] = info;
 
@@ -1571,46 +1627,56 @@ namespace pascal {
             setSlotType(slot, VarType::PTR);
             varSlot[arrayName] = slot;
             varSlot[mangledArrayName] = slot;
-            emit3("alloc", mangledArrayName, std::to_string(elementSize), std::to_string(size));
+
+            emit3("alloc", mangledArrayName, "8", std::to_string(size));
+
             for (size_t i = 0; i < node.initializers.size() && i < (size_t)size; ++i) {
                 std::string value = eval(node.initializers[i].get());
-                std::string byteOffset = std::to_string(i * elementSize);
-                emit4("store", value, mangledArrayName, byteOffset, std::to_string(info.elementSize));
+                std::string byteOffset = std::to_string(i);
+                emit4("store", value, mangledArrayName, byteOffset, "8");
                 if (isReg(value) && !isParmReg(value)) freeReg(value);
             }
         }
-
         void visit(ArrayAccessNode& node) override {
             std::string mangledArrayName = findMangledArrayName(node.arrayName);
             auto it = arrayInfo.find(node.arrayName);
             if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
             ArrayInfo &info = it->second;
 
-            std::string indexValue = eval(node.index.get());
-            VarType indexType = getExpressionType(node.index.get());
-            if (indexType == VarType::DOUBLE) {
-                std::string intIndex = allocReg();
-                emit2("to_int", intIndex, indexValue);
-                if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
-                indexValue = intIndex;
+            std::string idx = eval(node.index.get());
+            if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
+                std::string intIdx = allocReg();
+                emit2("to_int", intIdx, idx);
+                if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+                idx = intIdx;
             }
 
-            std::string offsetReg = allocReg();
-            emit2("mov", offsetReg, indexValue);
-            if (info.lowerBound != 0) emit2("sub", offsetReg, std::to_string(info.lowerBound));
-            emit2("mul", offsetReg, std::to_string(info.elementSize));
+        #ifdef MXVM_BOUNDS_CHECK
+            
+            {
+                std::string idxCopy = allocReg();
+                emit2("mov", idxCopy, idx);
+                emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
+            }
+        #endif
+
+            std::string offset = allocReg();
+            emit2("mov", offset, idx);
+            if (info.lowerBound != 0) emit2("sub", offset, std::to_string(info.lowerBound));
+            
 
             VarType elemType = getExpressionType(&node);
             std::string dst = (elemType == VarType::DOUBLE) ? allocFloatReg()
-                            : (elemType == VarType::PTR || elemType == VarType::STRING || elemType == VarType::RECORD) ? allocPtrReg()
-                            : allocReg();
+                        : (elemType == VarType::PTR || elemType == VarType::STRING || elemType == VarType::RECORD) ? allocPtrReg()
+                        : allocReg();
 
-            emit4("load", dst, mangledArrayName, offsetReg, std::to_string(info.elementSize));
+            emit4("load", dst, mangledArrayName, offset, "8");
             pushValue(dst);
 
-            freeReg(offsetReg);
-            if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
+            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            freeReg(offset);
         }
+
 
         void visit(ArrayAssignmentNode& node) override {
             auto it = arrayInfo.find(node.arrayName);
@@ -1630,9 +1696,7 @@ namespace pascal {
             std::string offsetReg = allocReg();
             emit2("mov", offsetReg, index);
             if (info.lowerBound != 0) emit2("sub", offsetReg, std::to_string(info.lowerBound));
-            emit2("mul", offsetReg, std::to_string(info.elementSize));
-
-            emit4("store", value, mangled, offsetReg, std::to_string(info.elementSize));
+            emit4("store", value, mangled, offsetReg, "8");
 
             if (isReg(value) && !isParmReg(value)) freeReg(value);
             if (isReg(index) && !isParmReg(index)) freeReg(index);
@@ -1655,8 +1719,7 @@ namespace pascal {
             std::string adjustedIndexReg = allocReg();
             emit2("mov", adjustedIndexReg, indexValue);
             emit2("sub", adjustedIndexReg, std::to_string(info.lowerBound));
-            emit2("mul", adjustedIndexReg, std::to_string(info.elementSize));
-            emit4("store", value, mangledArrayName, adjustedIndexReg, std::to_string(info.elementSize));
+            emit4("store", value, mangledArrayName, adjustedIndexReg, "8");
             freeReg(adjustedIndexReg);
             if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
         }
@@ -1776,12 +1839,13 @@ namespace pascal {
         int getTypeSizeByName(const std::string& t) {
             if (t == "integer" || t == "boolean") return 8;
             if (t == "real") return 8;
-            if (t == "char") return 1;  
-            if (t == "string") return 8;
+            if (t == "char") return 8;        
+            if (t == "string" || t == "ptr") return 8;
             auto it = recordTypes.find(t);
             if (it != recordTypes.end()) return it->second.size;
-            return 8;
+            return 8;       
         }
+
         bool isRecordTypeName(const std::string& t) { return recordTypes.find(t) != recordTypes.end(); }
 
         std::pair<int,int> getRecordFieldOffsetAndSize(const std::string& recType, const std::string& field) {
@@ -1823,7 +1887,7 @@ namespace pascal {
                     RecordField rf{fieldName, typeStr, offset, sz};
                     info.nameToIndex[rf.name] = (int)info.fields.size();
                     info.fields.push_back(rf);
-                    offset += sz;  
+                    offset += sz;
                 }
             }
             info.size = offset;
@@ -1844,22 +1908,17 @@ namespace pascal {
             auto ofs_sz = getRecordFieldOffsetAndSize(recType, node.fieldName);
 
             int byteOffset = ofs_sz.first;
-            int elementSize = ofs_sz.second; 
+            int elementSize = ofs_sz.second;
 
             VarType fieldType = getExpressionType(&node);
-            std::string dst;
+            std::string dst =
+                (fieldType == VarType::DOUBLE) ? allocFloatReg() :
+                (fieldType == VarType::PTR || fieldType == VarType::STRING || fieldType == VarType::RECORD) ? allocPtrReg()
+                : allocReg();
 
-            if (fieldType == VarType::DOUBLE) {
-                dst = allocFloatReg();
-            } else if(fieldType == VarType::PTR || fieldType == VarType::STRING || fieldType == VarType::RECORD) {
-                dst = allocPtrReg();
-            } else {
-                dst = allocReg();
-            }
             emit4("load", dst, baseName, std::to_string(byteOffset), std::to_string(elementSize));
             pushValue(dst);
         }
-
         void visit(TypeDeclNode& node) override {
             for (auto& typeDecl : node.typeDeclarations) {
                 typeDecl->accept(*this);

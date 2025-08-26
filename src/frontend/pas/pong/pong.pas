@@ -22,13 +22,13 @@ const
 
   PADDLE_W = 6;
   PADDLE_H = 56;
-  PADDLE_STEP = 3;
-  PADDLE_STEP_AI = 2;
+  PADDLE_STEP = 4;
+  PADDLE_STEP_AI = 4;
 
   BALL_W = 6;
   BALL_H = 6;
-  BALL_SPEED_X = 2;
-  BALL_SPEED_Y = 1;
+  BALL_SPEED_X = 4;
+  BALL_SPEED_Y = 4;
 
 type
   Point = record
@@ -147,8 +147,8 @@ begin
   draw_box(paddle2.x, paddle2.y, PADDLE_W, PADDLE_H);
   draw_box(ball.x, ball.y, BALL_W, BALL_H);
 
-  sdl_draw_text(renderer, font_id, 'Score', (SCALE_W div 2) - 80, 8, 255, 255, 255, 255);
-  sdl_draw_text(renderer, font_id, 'Score', (SCALE_W div 2) + 40, 8, 255, 255, 255, 255);
+  sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score_l), (SCALE_W div 2) - 100, 8, 255, 255, 255, 255);
+  sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score_r), (SCALE_W div 2) + 20, 8, 255, 255, 255, 255);
 end;
 
 procedure init(title: string; xval, yval, wval, hval: integer);

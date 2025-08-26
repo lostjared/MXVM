@@ -947,7 +947,9 @@ namespace mxvm {
                     throw mx::Exception("NOT instruction expect integer variable");
                 }
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
-                out << "\tnotq %rax\n";
+                out << "\ttestq %rax, %rax\n";
+                out << "\tsete %al\n";
+                out << "\tmovzbq %al, %rax\n";
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else {
                 throw mx::Exception("NOT instruction requires variable");

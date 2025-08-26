@@ -21,11 +21,11 @@ event_type_result: integer;
 color_value_r,  color_value_g, color_value_b: integer;
 window_id, renderer, target_id:  integer;
 font_id: integer;
-blocks: array[0..BLOCK_W * BLOCK_H] of integer;
+blocks: array[0..BLOCK_TOTAL] of integer;
 color: array[0..3] of integer;
 function indexAt(xval, yval: integer): integer;
 begin
-    indexAt := yval * BLOCK_H + xval;
+    indexAt := yval * BLOCK_W + xval;
 end;
 procedure setcolor(color_index: integer);
 begin
@@ -46,7 +46,7 @@ begin
   begin
     blocks[iq] := blocks[iq+1];
   end;
-  blocks[0] := first;
+  blocks[BLOCK_TOTAL] := first;
 end;
 procedure render();
 var
@@ -65,6 +65,7 @@ begin
     end;
     sdl_draw_text(renderer, font_id, 'Grid Shift', 15, 15, rand() mod 255, rand() mod 255, rand() mod 255, 255);
     shift_array_left_wrap();
+
 end;
 procedure init_array();
 var
