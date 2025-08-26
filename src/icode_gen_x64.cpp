@@ -481,7 +481,7 @@ namespace mxvm {
         if (!isVariable(i.op1.op)) throw mx::Exception("FREE argument must be a variable");
         Variable &v = getVariable(i.op1.op);
         if (v.type != VarType::VAR_POINTER) throw mx::Exception("FREE argument must be a pointer");
-        if (!v.var_value.owns) throw mx::Exception("FREE on non-owned pointer");
+        if (!v.var_value.owns) throw mx::Exception("FREE on non-owned pointer: " + v.var_name);
 
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
         out << "\ttest %rcx, %rcx\n";
