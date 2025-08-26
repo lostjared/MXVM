@@ -88,6 +88,7 @@ namespace pascal {
         std::map<std::string, std::string> currentParamLocations;
         std::vector<std::pair<ProcDeclNode*, std::vector<std::string>>> deferredProcs;
         std::vector<std::string> allTempPtrs;
+        std::vector<bool> tempPtrInUse;
 
         std::string generateRealConstantName() { return "real_const_" + std::to_string(realConstantCounter++); }
 
@@ -294,11 +295,35 @@ namespace pascal {
             return prefix + "_" + std::to_string(labelCounter++);
         }
         
+        void freeTempPtr(const std::string& ptrName) {
+            for (size_t i = 0; i < allTempPtrs.size(); ++i) {
+                if (allTempPtrs[i] == ptrName) {
+                    if (tempPtrInUse[i]) {
+                        emit1("free", ptrName);
+                        tempPtrInUse[i] = false;
+                    }
+                    return;
+                }
+            }
+        }
+
         std::string allocTempPtr(const std::string& forScope = "") {
+            for (size_t i = 0; i < allTempPtrs.size(); ++i) {
+                if (!tempPtrInUse[i]) {
+                    tempPtrInUse[i] = true;
+                    std::string tempName = allTempPtrs[i];
+                    std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
+                    tempPtrByScope[scope].push_back(tempName);
+                    return tempName;
+                }
+            }
+
             std::string tempName = "_tmpptr" + std::to_string(nextTemp++);
+            allTempPtrs.push_back(tempName);
+            tempPtrInUse.push_back(true);
+            
             std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
             tempPtrByScope[scope].push_back(tempName);
-            allTempPtrs.push_back(tempName);
             return tempName;
         }
 
@@ -559,8 +584,7 @@ namespace pascal {
                 }
             }
             if (tempPtrByScope.count("")) {
-                for (auto &tp : tempPtrByScope[""]) emit1("free", tp);
-                //tempPtrByScope[""].clear();
+                for (auto &tp : tempPtrByScope[""]) freeTempPtr(tp);
             }
             emit("done");
 
@@ -641,8 +665,7 @@ namespace pascal {
 
                 std::string scopeName = "PROC_" + mangleWithScope(pn->name, parentScope);
                 if (tempPtrByScope.count(scopeName)) {
-                    for (auto &tp : tempPtrByScope[scopeName]) emit1("free", tp);
-                    //tempPtrByScope[scopeName].clear();
+                    for (auto &tp : tempPtrByScope[scopeName]) freeTempPtr(tp);
                 }
 
                 emit("ret");
@@ -717,8 +740,7 @@ namespace pascal {
 
                 std::string scopeName = "FUNC_" + mangleWithScope(fn->name, parentScope);
                 if (tempPtrByScope.count(scopeName)) {
-                    for (auto &tp : tempPtrByScope[scopeName]) emit1("free", tp);
-                    //tempPtrByScope[scopeName].clear();
+                    for (auto &tp : tempPtrByScope[scopeName]) freeTempPtr(tp);
                 }
 
                 if (!functionSetReturn) {

@@ -805,10 +805,9 @@ namespace pascal {
         };
         auto emitPtrRet = [&](const std::string& name){
             v.emit_invoke(name, a);
-            std::string r = v.allocPtrReg();
+            std::string r = v.allocTempPtr();
             v.emit("return " + r);
-            v.pushValue(r);
-            v.addTempPtr(r); 
+            v.pushValue(r); 
         };
 
         if (f=="length") {

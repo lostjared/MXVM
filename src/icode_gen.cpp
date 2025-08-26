@@ -378,6 +378,9 @@ namespace mxvm {
     void Program::gen_return(std::ostream &out, const Instruction &i) {
         if(isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
+             if (this->last_call_returns_owned_ptr) {
+                v.var_value.owns = true;
+             }
             switch(v.type) {
                 case VarType::VAR_FLOAT:
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
@@ -433,6 +436,12 @@ namespace mxvm {
             std::vector<Operand> args;
             for (size_t i = 1; i < op.size(); ++i) {
                 if (!op[i].op.empty()) args.push_back(op[i]);
+            }
+
+            if (isFunctionReturningOwnedPtr(name)) {
+                this->last_call_returns_owned_ptr = true;
+            } else {
+                this->last_call_returns_owned_ptr = false;
             }
             generateFunctionCall(out, name, args);
         }
@@ -523,6 +532,10 @@ namespace mxvm {
         if (v.type != VarType::VAR_POINTER) {
             throw mx::Exception("FREE argument must be a pointer");
         }      
+        if(v.var_value.owns != true) {
+            throw mx::Exception("FREE argument must be owned by program");
+        }
+
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tcall " << getPlatformSymbolName("free") << "\n";
     }

@@ -129,7 +129,7 @@ namespace mxvm {
     }
 
     
-    static bool isFunctionReturningOwnedPtr(const std::string& funcName) {
+     bool isFunctionReturningOwnedPtr(const std::string& funcName) {
         static const std::unordered_set<std::string> funcs = {
             "inttostr",
             "floattostr",

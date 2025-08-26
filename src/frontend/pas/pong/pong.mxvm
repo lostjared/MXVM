@@ -19,8 +19,9 @@ program Pong {
 		int r13 = 0
 		ptr _tmpptr0 = null
 		ptr _tmpptr1 = null
+		ptr _tmpptr2 = null
+		ptr _tmpptr3 = null
 		ptr arg0 = null
-		ptr arg1 = null
 		string str_0 = "Pong"
 		string str_1 = "font.ttf"
 		string str_2 = "Score: "
@@ -535,35 +536,35 @@ program Pong {
 		mov rsi, 6
 		call PROC_draw_box
 		invoke inttostr, score_l
-		return arg0
+		return _tmpptr0
 		invoke strlen, str_2
 		return r9
-		invoke strlen, arg0
-		return r10
-		mov r11, r9
-		add r11, r10
-		add r11, 1
-		alloc _tmpptr0, 1, r11
-		invoke strncpy, _tmpptr0, str_2, r9
-		invoke strncat, _tmpptr0, arg0, r10
-		invoke draw_text, renderer, font_id, _tmpptr0, 220, 8, 255, 255, 255, 255
-		invoke inttostr, score_r
-		return arg1
-		invoke strlen, str_2
-		return r9
-		invoke strlen, arg1
+		invoke strlen, _tmpptr0
 		return r10
 		mov r11, r9
 		add r11, r10
 		add r11, 1
 		alloc _tmpptr1, 1, r11
 		invoke strncpy, _tmpptr1, str_2, r9
-		invoke strncat, _tmpptr1, arg1, r10
-		invoke draw_text, renderer, font_id, _tmpptr1, 340, 8, 255, 255, 255, 255
-		free arg0
+		invoke strncat, _tmpptr1, _tmpptr0, r10
+		invoke draw_text, renderer, font_id, _tmpptr1, 220, 8, 255, 255, 255, 255
+		invoke inttostr, score_r
+		return _tmpptr2
+		invoke strlen, str_2
+		return r9
+		invoke strlen, _tmpptr2
+		return r10
+		mov r11, r9
+		add r11, r10
+		add r11, 1
+		alloc _tmpptr3, 1, r11
+		invoke strncpy, _tmpptr3, str_2, r9
+		invoke strncat, _tmpptr3, _tmpptr2, r10
+		invoke draw_text, renderer, font_id, _tmpptr3, 340, 8, 255, 255, 255, 255
 		free _tmpptr0
-		free arg1
 		free _tmpptr1
+		free _tmpptr2
+		free _tmpptr3
 		ret
 	function PROC_init:
 		mov init_title, arg0

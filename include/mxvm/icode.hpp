@@ -376,6 +376,7 @@ namespace mxvm {
     };
 
     void except_assert(std::string reason, bool value);
+    bool isFunctionReturningOwnedPtr(const std::string& funcName);
     
 }
 
