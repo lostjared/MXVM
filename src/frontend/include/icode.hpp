@@ -512,32 +512,29 @@ namespace pascal {
                 int ptrParamIndex = 0;
                 //int floatParamIndex = 0;
 
-                if (!pn->parameters.empty()) {
+                              if (!pn->parameters.empty()) {
                     for (auto& p_node : pn->parameters) {
                         if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
                             for (const auto& id : param->identifiers) {
                                 VarType paramType = getTypeFromString(param->type);
                                 std::string incomingReg;
+                                VarType targetType = paramType;
+
+                                
                                 if (paramType == VarType::STRING || paramType == VarType::RECORD) {
                                     if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) incomingReg = ptrRegisters[ptrParamIndex++];
-                                    paramType = VarType::PTR;
-                                    std::string mangledId = mangleVariableName(id);
-                                    int localSlot = newSlotFor(mangledId);
-                                    setSlotType(localSlot, paramType);
-                                    emit2("mov", slotVar(localSlot), incomingReg);
-                                    currentParamTypes[id] = param->type;
-                                } else {
+                                    targetType = VarType::PTR;
+                                } else { 
                                     if (static_cast<size_t>(intParamIndex) < registers.size()) incomingReg = registers[intParamIndex++];
                                 }
 
                                 if (!incomingReg.empty()) {
                                     std::string mangledId = mangleVariableName(id);
                                     int localSlot = newSlotFor(mangledId);
-                                    //varSlot[id] = localSlot;
-                                    setSlotType(localSlot, paramType);
+                                    setSlotType(localSlot, targetType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
                                 }
-                                currentParamTypes[id] = param->type; 
+                                currentParamTypes[id] = param->type;
                             }
                         }
                     }
@@ -558,7 +555,6 @@ namespace pascal {
                 scopeHierarchy = oldHierarchy;  
             }
 
-            
             for (size_t i = 0; i < deferredFuncs.size(); ++i) {
                 auto fn = deferredFuncs[i].first;
                 auto oldHierarchy = scopeHierarchy; 
@@ -1082,6 +1078,22 @@ namespace pascal {
             if (dynamic_cast<StringNode*>(node)) { return VarType::STRING; }
             if (dynamic_cast<BooleanNode*>(node)) return VarType::BOOL;
             if (auto varNode = dynamic_cast<VariableNode*>(node)) return getVarType(varNode->name);
+            
+            if (auto fieldNode = dynamic_cast<FieldAccessNode*>(node)) {
+                std::string baseRawName;
+                if (auto v = dynamic_cast<VariableNode*>(fieldNode->recordExpr.get())) {
+                    baseRawName = v->name;
+                }
+                std::string recType = getVarRecordTypeName(baseRawName);
+                auto it = recordTypes.find(recType);
+                if (it != recordTypes.end()) {
+                    auto jt = it->second.nameToIndex.find(fieldNode->fieldName);
+                    if (jt != it->second.nameToIndex.end()) {
+                        const auto& f = it->second.fields[jt->second];
+                        return getTypeFromString(f.typeName);
+                    }
+                }
+            }
             if (auto a = dynamic_cast<ArrayAccessNode*>(node)) {
                 auto it = arrayInfo.find(a->arrayName);
                 if (it != arrayInfo.end()) {
@@ -1551,7 +1563,14 @@ namespace pascal {
             auto ofs_sz = getRecordFieldOffsetAndSize(recType, node.fieldName);
             int fieldIndex = ofs_sz.first / 8;
             int elSize = ofs_sz.second;
-            std::string dst = allocReg();
+            VarType fieldType = getExpressionType(&node);
+            std::string dst;
+
+            if (fieldType == VarType::DOUBLE) {
+                dst = allocFloatReg();
+            } else {
+                dst = allocReg();
+            }
             emit4("load", dst, baseName, std::to_string(fieldIndex), std::to_string(elSize));
             pushValue(dst);
         }

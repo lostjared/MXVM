@@ -825,8 +825,31 @@ namespace mxvm {
                     throw mx::Exception("LOAD: size mismatch for float");
                 }
                 break;
-            case VarType::VAR_STRING:
-                break;
+                case VarType::VAR_POINTER:
+                    if (size == sizeof(void*)) {
+                        dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
+                        dest.var_value.type = VarType::VAR_POINTER;
+                    } else {
+                        throw mx::Exception("LOAD: size mismatch for pointer");
+                    }
+                    break;
+                case VarType::VAR_STRING:
+                if (size == sizeof(void*)) {
+                    void* str_ptr = *reinterpret_cast<void**>(base);
+                    if (str_ptr) {      
+                        dest.var_value.str_value = std::string(static_cast<char*>(str_ptr));
+                        dest.var_value.type = VarType::VAR_STRING;
+                    } else {
+                        dest.var_value.str_value = "";
+                        dest.var_value.type = VarType::VAR_STRING;
+                    }
+                } else if (size == sizeof(char)) {
+                    dest.var_value.str_value = std::string(1, *reinterpret_cast<char*>(base));
+                    dest.var_value.type = VarType::VAR_STRING;
+                } else {
+                    throw mx::Exception("LOAD: size mismatch for string");
+                }
+            break;
             default:
                 throw mx::Exception("LOAD: unsupported destination type");
         }
@@ -836,12 +859,14 @@ namespace mxvm {
        
         int64_t value = 0;
         VarType type;
+        Variable src;
+
         if(instr.op1.type == OperandType::OP_CONSTANT) {
             value = std::stoll(instr.op1.op, nullptr, 0);
             type = VarType::VAR_INTEGER;
         }
         else {
-            Variable &src = getVariable(instr.op1.op);
+            src = getVariable(instr.op1.op);
             value = src.var_value.int_value;
             type = src.type;
         }
@@ -911,8 +936,20 @@ namespace mxvm {
                     throw mx::Exception("STORE: size mismatch for float");
                 }
                 break;
-            case VarType::VAR_STRING:
+            case VarType::VAR_POINTER:
+                if (size == sizeof(void*)) {
+                    *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
+                } else {
+                    throw mx::Exception("STORE: size mismatch for pointer type");
+                }
                 break;
+            case VarType::VAR_STRING:
+            if (size == sizeof(void*)) {
+                *reinterpret_cast<void**>(base) = src.var_value.str_value.empty() ? nullptr : (void*)src.var_value.str_value.c_str();
+            } else {
+                throw mx::Exception("STORE: size mismatch for string type");
+            }
+            break;
             default:
                 throw mx::Exception("STORE: unsupported source type");
         }
