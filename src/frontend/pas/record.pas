@@ -10,8 +10,13 @@ var
   z: integer;
 
 procedure printPoint(pi: Point);
+var
+px: Point;
 begin
-  write(pi.x, ':', pi.y);
+  px.x := 10;
+  px.y := 10;
+  writeln(pi.x, ':', pi.y);
+  writeln(px.x, ':', px.y);
 end;
 
 begin

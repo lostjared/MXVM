@@ -572,6 +572,18 @@ namespace pascal {
 
                 if (pn->block) pn->block->accept(*this);
                                 
+                
+                if (recordsToFreeInScope.count(pn->name)) {
+                    for (const auto& recordVar : recordsToFreeInScope[pn->name]) {
+                        emit1("free", recordVar);
+                    }
+                }
+                if (functionScopedArrays.count(pn->name)) {
+                    for (auto &an : functionScopedArrays[pn->name]) {
+                        emit1("free", an);
+                    }
+                }
+
                 emit("ret");
                 scopeHierarchy = oldHierarchy;  
             }
