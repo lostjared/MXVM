@@ -22,7 +22,7 @@ namespace pascal {
         int getLineNumber() const { return line_number; }
     };
 
-    class CompoundStmtNode; // Forward declaration
+    class CompoundStmtNode; 
 
     class BlockNode : public ASTNode {
     public:
@@ -49,7 +49,7 @@ namespace pascal {
     class VarDeclNode : public ASTNode {
     public:
         std::vector<std::string> identifiers;
-        std::variant<std::string, std::unique_ptr<ASTNode>> type; // <-- updated
+        std::variant<std::string, std::unique_ptr<ASTNode>> type; 
         std::vector<std::unique_ptr<ASTNode>> initializers;
 
         VarDeclNode(std::vector<std::string> ids, std::string t,
@@ -106,33 +106,28 @@ namespace pascal {
         std::string toString() const override;
     };
 
-    class ProcDeclNode : public ASTNode {
-    public:
-        std::string name;
-        std::vector<std::unique_ptr<ASTNode>> parameters;
-        std::unique_ptr<ASTNode> block;
-        
-        ProcDeclNode(const std::string& procName, 
-                     std::vector<std::unique_ptr<ASTNode>> params,
-                     std::unique_ptr<ASTNode> procBlock)
-            : name(procName), parameters(std::move(params)), block(std::move(procBlock)) {}
-        
-        void accept(ASTVisitor& visitor) override;
-        std::string toString() const override;
-    };
-
     class FuncDeclNode : public ASTNode {
     public:
         std::string name;
         std::vector<std::unique_ptr<ASTNode>> parameters;
         std::string returnType;
-        std::unique_ptr<ASTNode> block;
+        std::shared_ptr<ASTNode> block; 
+
+        FuncDeclNode(const std::string& n, std::vector<std::unique_ptr<ASTNode>> p, const std::string& rt, std::unique_ptr<ASTNode> b)
+            : name(n), parameters(std::move(p)), returnType(rt), block(std::move(b)) {}
         
-        FuncDeclNode(const std::string& funcName,
-                     std::vector<std::unique_ptr<ASTNode>> params,
-                     const std::string& retType,
-                     std::unique_ptr<ASTNode> funcBlock)
-            : name(funcName), parameters(std::move(params)), returnType(retType), block(std::move(funcBlock)) {}
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ProcDeclNode : public ASTNode {
+    public:
+        std::string name;
+        std::vector<std::unique_ptr<ASTNode>> parameters;
+        std::shared_ptr<ASTNode> block; 
+
+        ProcDeclNode(const std::string& n, std::vector<std::unique_ptr<ASTNode>> p, std::unique_ptr<ASTNode> b)
+            : name(n), parameters(std::move(p)), block(std::move(b)) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;

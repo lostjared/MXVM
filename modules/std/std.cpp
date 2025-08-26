@@ -235,7 +235,7 @@ extern "C" void mxvm_std_calloc(mxvm::Program *program, std::vector<mxvm::Operan
     program->vars["%rax"].var_value.ptr_value = result;
 }
 
-extern "C" void mxvm_std_free(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+extern "C" void mxvm_std_release(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1) {
         throw mx::Exception("free requires 1 argument (pointer).");
     }

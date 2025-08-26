@@ -517,9 +517,9 @@ namespace mxvm {
         if (!isVariable(i.op2.op)) throw mx::Exception("LOAD source must be pointer variable");
         Variable &ptrVar = getVariable(i.op2.op);
 
-        size_t size = 8; 
+        size_t stride = 8; 
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            size = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
+            stride = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
         }
 
         
@@ -538,18 +538,20 @@ namespace mxvm {
             throw mx::Exception("Load invalid type: " + i.op2.op);
         }
 
-        std::string mem_operand = "(%rax, %rcx, " + std::to_string(size) + ")";
+        std::string mem_operand;
+        if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+            mem_operand = "(%rax, %rcx, " + std::to_string(stride) + ")";
+        } else {
+            out << "\timulq $" << stride << ", %rcx\n";
+            out << "\taddq %rcx, %rax\n";
+            mem_operand = "(%rax)";
+        }
         
-
         switch (dest.type) {
             case VarType::VAR_INTEGER:
             case VarType::VAR_POINTER:
-            case VarType::VAR_STRING: 
-                if (size == 1) {
-                    out << "\tmovzbq " << mem_operand << ", %rdx\n";
-                } else {
-                    out << "\tmovq " << mem_operand << ", %rdx\n";
-                }
+            case VarType::VAR_EXTERN:
+                out << "\tmovq " << mem_operand << ", %rdx\n";
                 out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                 break;
             case VarType::VAR_FLOAT:
@@ -571,30 +573,35 @@ namespace mxvm {
 
         if (ptrVar.type == VarType::VAR_POINTER) {
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        } else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0) {
+            out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
         } else {
-            throw mx::Exception("STORE must target a pointer variable");
+            throw mx::Exception("STORE must target a pointer or string buffer variable");
         }
 
         if (!i.op3.op.empty()) {
             x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
         } else {
-            throw mx::Exception("STORE requires third argument: element index");
+            out << "\txorq %rcx, %rcx\n";
         }
 
-        size_t elemSize = 8; 
+        size_t stride = 8; 
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            elemSize = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
+            stride = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
         }
 
-        std::string mem_operand = "(%rax, %rcx, " + std::to_string(elemSize) + ")";
+        std::string mem_operand;
+        if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+            mem_operand = "(%rax, %rcx, " + std::to_string(stride) + ")";
+        } else {
+            out << "\timulq $" << stride << ", %rcx\n";
+            out << "\taddq %rcx, %rax\n";
+            mem_operand = "(%rax)";
+        }
         
         if (!isVariable(i.op1.op) && i.op1.type == OperandType::OP_CONSTANT) {
             uint64_t value = std::stoll(i.op1.op, nullptr, 0);
-            switch (elemSize) {
-                case 1: out << "\tmovb $" << (value & 0xFF) << ", " << mem_operand << "\n"; break;
-                case 8: out << "\tmovq $" << value << ", " << mem_operand << "\n"; break;
-                default: throw mx::Exception("STORE: unsupported elemSize for constant");
-            }
+            out << "\tmovq $" << value << ", " << mem_operand << "\n";
         } else { 
             Variable &src = getVariable(i.op1.op);
             switch (src.type) {
@@ -606,12 +613,10 @@ namespace mxvm {
                     break;
                 case VarType::VAR_STRING:
                     out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdx\n";
-                    if (elemSize != 8) throw mx::Exception("STORE: string field must have size 8 (pointer size)");
                     out << "\tmovq %rdx, " << mem_operand << "\n";
                     break;
                 case VarType::VAR_BYTE:
                     out << "\tmovb " << getMangledName(i.op1) << "(%rip), %dl\n";
-                    if (elemSize != 1) throw mx::Exception("STORE: byte source to non-byte destination size");
                     out << "\tmovb %dl, " << mem_operand << "\n";
                     break;
                 case VarType::VAR_FLOAT:

@@ -7,4 +7,10 @@ module string {
     extern strfind
     extern substr
     extern strat
+    extern pos
+    extern copy
+    extern insert
+    extern delete
+    extern inttostr
+    extern strtoint
 }

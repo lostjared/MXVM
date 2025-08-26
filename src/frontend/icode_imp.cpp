@@ -40,14 +40,14 @@ namespace pascal {
             if (funcName == "writeln" || funcName == "write") {
                 for(const auto& arg : arguments) {
                     std::string val = visitor.eval(arg.get());
-                    CodeGenVisitor::VarType type = visitor.getExpressionType(arg.get());
-                    if (type == CodeGenVisitor::VarType::STRING || type == CodeGenVisitor::VarType::PTR) {
+                    VarType type = visitor.getExpressionType(arg.get());
+                    if (type == VarType::STRING || type == VarType::PTR) {
                         visitor.usedStrings.insert("fmt_str");
                         visitor.emit2("print", "fmt_str", val);
-                    } else if (type == CodeGenVisitor::VarType::DOUBLE) {
+                    } else if (type == VarType::DOUBLE) {
                         visitor.usedStrings.insert("fmt_float");
                         visitor.emit2("print", "fmt_float", val);
-                    } else if (type == CodeGenVisitor::VarType::CHAR) {
+                    } else if (type == VarType::CHAR) {
                         visitor.usedStrings.insert("fmt_chr");
                         visitor.emit2("print", "fmt_chr", val);
                     } else { 
@@ -69,7 +69,7 @@ namespace pascal {
                     return;
                 }
                 
-                for (auto &arg : arguments) {
+                for ( auto &arg : arguments) {
                     if (auto varNode = dynamic_cast<VariableNode*>(arg.get())) {
                         std::string varName = varNode->name;
                         int slot = visitor.newSlotFor(varName);
@@ -78,10 +78,10 @@ namespace pascal {
                         auto varType = visitor.getVarType(varName);
                         visitor.emit1("getline", "input_buffer");
                         
-                        if (varType == CodeGenVisitor::VarType::DOUBLE) {
+                        if (varType == VarType::DOUBLE) {
                             visitor.emit2("to_float", memLoc, "input_buffer");
                         }
-                        else if (varType == CodeGenVisitor::VarType::INT) {
+                        else if (varType == VarType::INT) {
                             visitor.emit2("to_int", memLoc, "input_buffer");
                         }
                         
@@ -121,7 +121,7 @@ namespace pascal {
                 if (arguments.size() != 1) 
                     throw std::runtime_error("Error on line " + std::to_string(lineNum) + 
                                             ": free requires 1 argument");
-                visitor.emit_invoke("free", args);
+                visitor.emit_invoke("release", args);
             }
             else if (funcName == "halt") {
                 if (arguments.size() != 1) 
@@ -160,7 +160,7 @@ namespace pascal {
                     std::string argLocation = visitor.eval(argNode.get());
                     auto argType = visitor.getExpressionType(argNode.get());
 
-                    if (argType != CodeGenVisitor::VarType::DOUBLE) {
+                    if (argType != VarType::DOUBLE) {
                         std::string floatReg = visitor.allocFloatReg();
                         visitor.emit2("to_float", floatReg, argLocation);
                         if (visitor.isReg(argLocation)) visitor.freeReg(argLocation);
@@ -216,7 +216,7 @@ namespace pascal {
                 std::string argLocation = visitor.eval(arguments[0].get());
 
                 auto argType = visitor.getExpressionType(arguments[0].get());
-                if (argType == CodeGenVisitor::VarType::DOUBLE) {
+                if (argType == VarType::DOUBLE) {
                     visitor.pushValue(argLocation);
                     return true;
                 }
@@ -273,7 +273,7 @@ namespace pascal {
         for (auto& arg : arguments) args.push_back(visitor.eval(arg.get()));
 
         auto freeArgs = [&](){
-            for (const std::string& a : args) if (visitor.isReg(a)) visitor.freeReg(a);
+            for ( const std::string& a : args) if (visitor.isReg(a)) visitor.freeReg(a);
         };
 
         if (funcName == "sdl_init") {
@@ -524,7 +524,7 @@ namespace pascal {
         for (auto& arg : arguments) args.push_back(visitor.eval(arg.get()));
 
         auto freeArgs = [&](){
-            for (const std::string& a : args) if (visitor.isReg(a)) visitor.freeReg(a);
+            for ( const std::string& a : args) if (visitor.isReg(a)) visitor.freeReg(a);
         };
 
         auto emitCallWithReturn = [&](const std::string& name)->std::string {
@@ -763,5 +763,81 @@ namespace pascal {
         }
 
         return false;
+    }
+
+    bool StringFunctionHandler::canHandle(const std::string& f) const {
+        static const std::unordered_set<std::string> funcs = {
+            "length","pos","copy","insert","delete","inttostr","strtoint"
+        };
+        return funcs.count(f)!=0;
+    }
+
+    VarType StringFunctionHandler::getReturnType(const std::string& f) const {
+        if (f=="length"||f=="pos"||f=="strtoint") return VarType::INT;
+        if (f=="copy"||f=="insert"||f=="delete"||f=="inttostr") return VarType::PTR;
+        return VarType::UNKNOWN;
+    }
+
+    void StringFunctionHandler::generate(CodeGenVisitor& v,
+        const std::string& f,
+        const std::vector<std::unique_ptr<ASTNode>>& args) {
+        generateWithResult(v,f,args);
+    }
+
+    bool StringFunctionHandler::generateWithResult(CodeGenVisitor& v,
+        const std::string& f,
+        const std::vector<std::unique_ptr<ASTNode>>& arguments) {
+
+        v.usedModules.insert("string");
+        std::vector<std::string> a;
+        a.reserve(arguments.size());
+        for (auto &n : arguments) a.push_back(v.eval(n.get()));
+
+        auto freeArgs = [&](){
+            for (auto &x : a) if (v.isReg(x) && !v.isParmReg(x)) v.freeReg(x);
+        };
+
+        auto emitIntRet = [&](const std::string& name){
+            v.emit_invoke(name, a);
+            std::string r = v.allocReg();
+            v.emit("return " + r);
+            v.pushValue(r);
+        };
+        auto emitPtrRet = [&](const std::string& name){
+            v.emit_invoke(name, a);
+            std::string r = v.allocPtrReg();
+            v.emit("return " + r);
+            v.pushValue(r);
+            v.addTempPtr(r); 
+        };
+
+        if (f=="length") {
+            if (a.size()!=1) throw std::runtime_error("length expects 1 arg");
+            emitIntRet("strlen");
+        } else if (f=="pos") {
+            if (a.size()!=2) throw std::runtime_error("pos expects 2 args");
+            emitIntRet("strfind");
+        } else if (f=="strtoint") {
+            if (a.size()!=1) throw std::runtime_error("strtoint expects 1 arg");
+            emitIntRet("strtoint");
+        } else if (f=="inttostr") {
+            if (a.size()!=1) throw std::runtime_error("inttostr expects 1 arg");
+            emitPtrRet("inttostr");
+        } else if (f=="copy") {
+            if (a.size()!=3) throw std::runtime_error("copy expects 3 args");
+            emitPtrRet("copy");
+        } else if (f=="insert") {
+            if (a.size()!=3) throw std::runtime_error("insert expects 3 args");
+            emitPtrRet("insert");
+        } else if (f=="delete") {
+            if (a.size()!=3) throw std::runtime_error("delete expects 3 args");
+            emitPtrRet("delete");
+        } else {
+            freeArgs();
+            return false;
+        }
+
+        freeArgs();
+        return true;
     }
 }

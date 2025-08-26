@@ -79,3 +79,8 @@ int64_t float_to_int(double d) {
 double int_to_float(int64_t i) {
     return (double)i;
 }
+
+void release(void *ptr) {
+    if(ptr != NULL)
+        free(ptr);
+}

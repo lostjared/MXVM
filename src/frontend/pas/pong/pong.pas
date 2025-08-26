@@ -22,13 +22,13 @@ const
 
   PADDLE_W = 6;
   PADDLE_H = 56;
-  PADDLE_STEP = 6;
-  PADDLE_STEP_AI = 6;
+  PADDLE_STEP = 3;
+  PADDLE_STEP_AI = 2;
 
   BALL_W = 6;
   BALL_H = 6;
-  BALL_SPEED_X = 4;
-  BALL_SPEED_Y = 2;
+  BALL_SPEED_X = 2;
+  BALL_SPEED_Y = 1;
 
 type
   Point = record
@@ -60,8 +60,8 @@ begin
   if (sdl_get_ticks() mod 2) = 0 then ball_dy := BALL_SPEED_Y else ball_dy := -BALL_SPEED_Y;
 end;
 
-procedure clamp_paddle(var p: Point);
-begin
+procedure clamp_paddle(p: Point);
+begin 
   if p.y < 0 then p.y := 0;
   if p.y + PADDLE_H > SCALE_H then p.y := SCALE_H - PADDLE_H;
 end;
@@ -75,7 +75,7 @@ procedure update_input();
 begin
   if sdl_is_key_pressed(SDL_SCANCODE_UP) <> 0 then paddle1.y := paddle1.y - PADDLE_STEP;
   if sdl_is_key_pressed(SDL_SCANCODE_DOWN) <> 0 then paddle1.y := paddle1.y + PADDLE_STEP;
-  clamp_paddle(paddle1);
+    clamp_paddle(paddle1); 
 end;
 
 procedure update_ai();
@@ -103,7 +103,7 @@ begin
     ball_dx := -ball_dx;
   end;
 
-  if aabb(ball.x, ball.y, BALL_W, BALL_H, paddle2.x, paddle2.y, PADDLE_W, PADDLE_H) then
+ if aabb(ball.x, ball.y, BALL_W, BALL_H, paddle2.x, paddle2.y, PADDLE_W, PADDLE_H) then
   begin
     ball.x := paddle2.x - BALL_W;
     ball_dx := -ball_dx;
@@ -119,7 +119,7 @@ begin
   begin
     score_l := score_l + 1;
     reset_ball(false);
-  end;
+  end; 
 end;
 
 procedure render_center_line();

@@ -72,9 +72,9 @@ program AppSkeleton {
 	start:
 		mov title, str_0
 		mov filename, str_1
-		alloc paddle1, 8, 2
-		alloc paddle2, 8, 2
-		alloc ball, 8, 2
+		alloc paddle1, 1, 16
+		alloc paddle2, 1, 16
+		alloc ball, 1, 16
 		mov arg0, title
 		mov rbx, 100
 		mov rcx, 100
@@ -118,8 +118,7 @@ program AppSkeleton {
 	CMP_TRUE_10:
 		mov r9, 1
 	CMP_END_11:
-		mov r10, r9
-		cmp r10, 0
+		cmp r9, 0
 		je ELSE_8
 		mov r9, 0
 		mov running, r9
@@ -133,8 +132,7 @@ program AppSkeleton {
 	CMP_TRUE_14:
 		mov r9, 1
 	CMP_END_15:
-		mov r10, r9
-		cmp r10, 0
+		cmp r9, 0
 		je ELSE_12
 		invoke get_key_code
 		return r9
@@ -146,8 +144,7 @@ program AppSkeleton {
 	CMP_TRUE_18:
 		mov r9, 1
 	CMP_END_19:
-		mov r10, r9
-		cmp r10, 0
+		cmp r9, 0
 		je ELSE_16
 		mov r9, 0
 		mov running, r9
@@ -167,6 +164,7 @@ program AppSkeleton {
 		invoke delay, 16
 		jmp WHILE_0
 	ENDWHILE_1:
+		call PROC_cleanup
 		free paddle1
 		free paddle2
 		free ball
@@ -180,8 +178,8 @@ program AppSkeleton {
 		ret
 	function PROC_reset_ball:
 		mov reset_ball_to_right, rbx
-		store 317, ball, 0, 8
-		store 177, ball, 1, 8
+		store 317, ball, 0, 1
+		store 177, ball, 8, 1
 		mov rbx, 1
 		mov rdx, rbx
 		cmp reset_ball_to_right, rdx
@@ -191,125 +189,87 @@ program AppSkeleton {
 	CMP_TRUE_22:
 		mov rcx, 1
 	CMP_END_23:
-		mov rdx, rcx
-		cmp rdx, 0
+		cmp rcx, 0
 		je ELSE_20
-		mov ball_dx, 4
+		mov ball_dx, 2
 		jmp ENDIF_21
 	ELSE_20:
-		mov rsi, 0
-		sub rsi, 4
-		mov ball_dx, rsi
+		mov rdx, 0
+		sub rdx, 2
+		mov ball_dx, rdx
 	ENDIF_21:
 		invoke get_ticks
-		return rdi
-		mov r8, rdi
-		mod r8, 2
-		mov r10, r8
-		cmp r10, 0
+		return rsi
+		mov rdi, rsi
+		mod rdi, 2
+		mov r9, rdi
+		cmp r9, 0
 		je CMP_TRUE_26
-		mov r9, 0
+		mov r8, 0
 		jmp CMP_END_27
 	CMP_TRUE_26:
-		mov r9, 1
+		mov r8, 1
 	CMP_END_27:
-		mov r10, r9
-		cmp r10, 0
+		cmp r8, 0
 		je ELSE_24
-		mov ball_dy, 2
+		mov ball_dy, 1
 		jmp ENDIF_25
 	ELSE_24:
 		mov r9, 0
-		sub r9, 2
+		sub r9, 1
 		mov ball_dy, r9
 	ENDIF_25:
 		ret
 	function PROC_clamp_paddle:
 		mov clamp_paddle_p, arg0
-		load rbx, clamp_paddle_p, 1, 8
-		mov rdx, rbx
-		cmp rdx, 0
-		jl CMP_TRUE_30
-		mov rcx, 0
-		jmp CMP_END_31
-	CMP_TRUE_30:
-		mov rcx, 1
-	CMP_END_31:
-		mov rdx, rcx
-		cmp rdx, 0
-		je ELSE_28
-		store 0, clamp_paddle_p, 1, 8
-		jmp ENDIF_29
-	ELSE_28:
-	ENDIF_29:
-		load rsi, clamp_paddle_p, 1, 8
-		mov rdi, rsi
-		add rdi, 56
-		mov r9, rdi
-		cmp r9, 360
-		jg CMP_TRUE_34
-		mov r8, 0
-		jmp CMP_END_35
-	CMP_TRUE_34:
-		mov r8, 1
-	CMP_END_35:
-		mov r9, r8
-		cmp r9, 0
-		je ELSE_32
-		store 304, clamp_paddle_p, 1, 8
-		jmp ENDIF_33
-	ELSE_32:
-	ENDIF_33:
 		ret
 	function PROC_update_input:
 		invoke is_key_pressed, 82
 		return rbx
 		mov rdx, rbx
 		cmp rdx, 0
-		jne CMP_TRUE_38
+		jne CMP_TRUE_30
 		mov rcx, 0
-		jmp CMP_END_39
-	CMP_TRUE_38:
+		jmp CMP_END_31
+	CMP_TRUE_30:
 		mov rcx, 1
-	CMP_END_39:
-		mov rdx, rcx
-		cmp rdx, 0
-		je ELSE_36
-		load rsi, paddle1, 1, 8
-		mov rdi, rsi
-		sub rdi, 6
-		store rdi, paddle1, 1, 8
-		jmp ENDIF_37
-	ELSE_36:
-	ENDIF_37:
+	CMP_END_31:
+		cmp rcx, 0
+		je ELSE_28
+		load rdx, paddle1, 8, 1
+		mov rsi, rdx
+		sub rsi, 3
+		store rsi, paddle1, 8, 1
+		jmp ENDIF_29
+	ELSE_28:
+	ENDIF_29:
 		invoke is_key_pressed, 81
-		return r8
-		mov r10, r8
-		cmp r10, 0
-		jne CMP_TRUE_42
-		mov r9, 0
-		jmp CMP_END_43
-	CMP_TRUE_42:
-		mov r9, 1
-	CMP_END_43:
-		mov r10, r9
-		cmp r10, 0
-		je ELSE_40
-		load r9, paddle1, 1, 8
-		add r9, 6
-		store r9, paddle1, 1, 8
-		jmp ENDIF_41
-	ELSE_40:
-	ENDIF_41:
+		return rdi
+		mov r9, rdi
+		cmp r9, 0
+		jne CMP_TRUE_34
+		mov r8, 0
+		jmp CMP_END_35
+	CMP_TRUE_34:
+		mov r8, 1
+	CMP_END_35:
+		cmp r8, 0
+		je ELSE_32
+		load r9, paddle1, 8, 1
+		add r9, 3
+		store r9, paddle1, 8, 1
+		jmp ENDIF_33
+	ELSE_32:
+	ENDIF_33:
 		mov arg0, paddle1
 		call PROC_clamp_paddle
 		ret
 	function PROC_update_ai:
-		load rbx, ball, 1, 8
+		load rbx, ball, 8, 1
 		mov rcx, rbx
 		add rcx, 3
 		mov update_ai_center_ball, rcx
-		load rdx, paddle2, 1, 8
+		load rdx, paddle2, 8, 1
 		mov rsi, rdx
 		add rsi, 28
 		mov update_ai_center_p2, rsi
@@ -317,199 +277,191 @@ program AppSkeleton {
 		sub rdi, 4
 		mov r9, rdi
 		cmp update_ai_center_ball, r9
-		jl CMP_TRUE_46
+		jl CMP_TRUE_38
+		mov r8, 0
+		jmp CMP_END_39
+	CMP_TRUE_38:
+		mov r8, 1
+	CMP_END_39:
+		cmp r8, 0
+		je ELSE_36
+		load r9, paddle2, 8, 1
+		sub r9, 2
+		store r9, paddle2, 8, 1
+		jmp ENDIF_37
+	ELSE_36:
+		mov r9, update_ai_center_p2
+		add r9, 4
+		mov r11, r9
+		cmp update_ai_center_ball, r11
+		jg CMP_TRUE_42
+		mov r10, 0
+		jmp CMP_END_43
+	CMP_TRUE_42:
+		mov r10, 1
+	CMP_END_43:
+		cmp r10, 0
+		je ELSE_40
+		load r9, paddle2, 8, 1
+		add r9, 2
+		store r9, paddle2, 8, 1
+		jmp ENDIF_41
+	ELSE_40:
+	ENDIF_41:
+	ENDIF_37:
+		mov arg0, paddle2
+		call PROC_clamp_paddle
+		ret
+	function PROC_update_ball:
+		load rbx, ball, 0, 1
+		mov rcx, rbx
+		add rcx, ball_dx
+		store rcx, ball, 0, 1
+		load rdx, ball, 8, 1
+		mov rsi, rdx
+		add rsi, ball_dy
+		store rsi, ball, 8, 1
+		load rdi, ball, 8, 1
+		mov r9, rdi
+		cmp r9, 0
+		jle CMP_TRUE_46
 		mov r8, 0
 		jmp CMP_END_47
 	CMP_TRUE_46:
 		mov r8, 1
 	CMP_END_47:
-		mov r9, r8
-		cmp r9, 0
+		cmp r8, 0
 		je ELSE_44
-		load r9, paddle2, 1, 8
-		sub r9, 6
-		store r9, paddle2, 1, 8
+		store 0, ball, 8, 1
+		mov r9, 0
+		sub r9, ball_dy
+		mov ball_dy, r9
 		jmp ENDIF_45
 	ELSE_44:
-		mov r9, update_ai_center_p2
-		add r9, 4
+	ENDIF_45:
+		load r9, ball, 8, 1
+		add r9, 6
 		mov r11, r9
-		cmp update_ai_center_ball, r11
-		jg CMP_TRUE_50
+		cmp r11, 360
+		jge CMP_TRUE_50
 		mov r10, 0
 		jmp CMP_END_51
 	CMP_TRUE_50:
 		mov r10, 1
 	CMP_END_51:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_48
-		load r9, paddle2, 1, 8
-		add r9, 6
-		store r9, paddle2, 1, 8
-		jmp ENDIF_49
-	ELSE_48:
-	ENDIF_49:
-	ENDIF_45:
-		mov arg0, paddle2
-		call PROC_clamp_paddle
-		ret
-	function PROC_update_ball:
-		load rbx, ball, 0, 8
-		mov rcx, rbx
-		add rcx, ball_dx
-		store rcx, ball, 0, 8
-		load rdx, ball, 1, 8
-		mov rsi, rdx
-		add rsi, ball_dy
-		store rsi, ball, 1, 8
-		load rdi, ball, 1, 8
-		mov r9, rdi
-		cmp r9, 0
-		jle CMP_TRUE_54
-		mov r8, 0
-		jmp CMP_END_55
-	CMP_TRUE_54:
-		mov r8, 1
-	CMP_END_55:
-		mov r9, r8
-		cmp r9, 0
-		je ELSE_52
-		store 0, ball, 1, 8
+		store 354, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
+		jmp ENDIF_49
+	ELSE_48:
+	ENDIF_49:
+		load r9, ball, 0, 1
+		mov rbx, r9
+		load r10, ball, 8, 1
+		mov rcx, r10
+		mov rdx, 6
+		mov rsi, 6
+		load r11, paddle1, 0, 1
+		mov rdi, r11
+		load r12, paddle1, 8, 1
+		mov r8, r12
+		mov r9, 6
+		mov r10, 56
+		call FUNC_aabb
+		return r13
+		cmp r13, 0
+		je ELSE_52
+		load r9, paddle1, 0, 1
+		add r9, 6
+		store r9, ball, 0, 1
+		mov r9, 0
+		sub r9, ball_dx
+		mov ball_dx, r9
 		jmp ENDIF_53
 	ELSE_52:
 	ENDIF_53:
-		load r9, ball, 1, 8
+		load r9, ball, 0, 1
+		mov rbx, r9
+		load r10, ball, 8, 1
+		mov rcx, r10
+		mov rdx, 6
+		mov rsi, 6
+		load r11, paddle2, 0, 1
+		mov rdi, r11
+		load r12, paddle2, 8, 1
+		mov r8, r12
+		mov r9, 6
+		mov r10, 56
+		call FUNC_aabb
+		return r13
+		cmp r13, 0
+		je ELSE_54
+		load r9, paddle2, 0, 1
+		sub r9, 6
+		store r9, ball, 0, 1
+		mov r9, 0
+		sub r9, ball_dx
+		mov ball_dx, r9
+		jmp ENDIF_55
+	ELSE_54:
+	ENDIF_55:
+		load r9, ball, 0, 1
 		add r9, 6
 		mov r11, r9
-		cmp r11, 360
-		jge CMP_TRUE_58
+		cmp r11, 0
+		jl CMP_TRUE_58
 		mov r10, 0
 		jmp CMP_END_59
 	CMP_TRUE_58:
 		mov r10, 1
 	CMP_END_59:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_56
-		store 354, ball, 1, 8
-		mov r9, 0
-		sub r9, ball_dy
-		mov ball_dy, r9
-		jmp ENDIF_57
-	ELSE_56:
-	ENDIF_57:
-		load r9, ball, 0, 8
-		mov rbx, r9
-		load r10, ball, 1, 8
-		mov rcx, r10
-		mov rdx, 6
-		mov rsi, 6
-		load r11, paddle1, 0, 8
-		mov rdi, r11
-		load r12, paddle1, 1, 8
-		mov r8, r12
-		mov r9, 6
-		mov r10, 56
-		call FUNC_aabb
-		mov r13, rax
-		mov r9, r13
-		cmp r9, 0
-		je ELSE_60
-		load r9, paddle1, 0, 8
-		add r9, 6
-		store r9, ball, 0, 8
-		mov r9, 0
-		sub r9, ball_dx
-		mov ball_dx, r9
-		jmp ENDIF_61
-	ELSE_60:
-	ENDIF_61:
-		load r9, ball, 0, 8
-		mov rbx, r9
-		load r10, ball, 1, 8
-		mov rcx, r10
-		mov rdx, 6
-		mov rsi, 6
-		load r11, paddle2, 0, 8
-		mov rdi, r11
-		load r12, paddle2, 1, 8
-		mov r8, r12
-		mov r9, 6
-		mov r10, 56
-		call FUNC_aabb
-		mov r13, rax
-		mov r9, r13
-		cmp r9, 0
-		je ELSE_62
-		load r9, paddle2, 0, 8
-		sub r9, 6
-		store r9, ball, 0, 8
-		mov r9, 0
-		sub r9, ball_dx
-		mov ball_dx, r9
-		jmp ENDIF_63
-	ELSE_62:
-	ENDIF_63:
-		load r9, ball, 0, 8
-		add r9, 6
-		mov r11, r9
-		cmp r11, 0
-		jl CMP_TRUE_66
-		mov r10, 0
-		jmp CMP_END_67
-	CMP_TRUE_66:
-		mov r10, 1
-	CMP_END_67:
-		mov r9, r10
-		cmp r9, 0
-		je ELSE_64
 		mov r9, score_r
 		add r9, 1
 		mov score_r, r9
 		mov r9, 1
 		mov rbx, r9
 		call PROC_reset_ball
-		jmp ENDIF_65
-	ELSE_64:
-	ENDIF_65:
-		load r9, ball, 0, 8
+		jmp ENDIF_57
+	ELSE_56:
+	ENDIF_57:
+		load r9, ball, 0, 1
 		mov r11, r9
 		cmp r11, 640
-		jg CMP_TRUE_70
+		jg CMP_TRUE_62
 		mov r10, 0
-		jmp CMP_END_71
-	CMP_TRUE_70:
+		jmp CMP_END_63
+	CMP_TRUE_62:
 		mov r10, 1
-	CMP_END_71:
-		mov r9, r10
-		cmp r9, 0
-		je ELSE_68
+	CMP_END_63:
+		cmp r10, 0
+		je ELSE_60
 		mov r9, score_l
 		add r9, 1
 		mov score_l, r9
 		mov r9, 0
 		mov rbx, r9
 		call PROC_reset_ball
-		jmp ENDIF_69
-	ELSE_68:
-	ENDIF_69:
+		jmp ENDIF_61
+	ELSE_60:
+	ENDIF_61:
 		ret
 	function PROC_render_center_line:
 		mov render_center_line_yy, 0
-	WHILE_72:
+	WHILE_64:
 		cmp render_center_line_yy, 360
-		jl CMP_TRUE_74
+		jl CMP_TRUE_66
 		mov rbx, 0
-		jmp CMP_END_75
-	CMP_TRUE_74:
+		jmp CMP_END_67
+	CMP_TRUE_66:
 		mov rbx, 1
-	CMP_END_75:
+	CMP_END_67:
 		cmp rbx, 0
-		je ENDWHILE_73
+		je ENDWHILE_65
 		mov rbx, 319
 		mov rcx, render_center_line_yy
 		mov rdx, 2
@@ -518,8 +470,8 @@ program AppSkeleton {
 		mov rcx, render_center_line_yy
 		add rcx, 16
 		mov render_center_line_yy, rcx
-		jmp WHILE_72
-	ENDWHILE_73:
+		jmp WHILE_64
+	ENDWHILE_65:
 		ret
 	function PROC_render:
 		invoke set_render_target, renderer, target_id
@@ -527,21 +479,21 @@ program AppSkeleton {
 		invoke clear, renderer
 		invoke set_draw_color, renderer, 255, 255, 255, 255
 		call PROC_render_center_line
-		load rbx, paddle1, 0, 8
-		load rcx, paddle1, 1, 8
+		load rbx, paddle1, 0, 1
+		load rcx, paddle1, 8, 1
 		mov rdx, 6
 		mov rsi, 56
 		call PROC_draw_box
-		load rdx, paddle2, 0, 8
+		load rdx, paddle2, 0, 1
 		mov rbx, rdx
-		load rsi, paddle2, 1, 8
+		load rsi, paddle2, 8, 1
 		mov rcx, rsi
 		mov rdx, 6
 		mov rsi, 56
 		call PROC_draw_box
-		load rdi, ball, 0, 8
+		load rdi, ball, 0, 1
 		mov rbx, rdi
-		load r8, ball, 1, 8
+		load r8, ball, 8, 1
 		mov rcx, r8
 		mov rdx, 6
 		mov rsi, 6
@@ -559,70 +511,67 @@ program AppSkeleton {
 		return rbx
 		mov init_result, rbx
 		cmp init_result, 0
-		jne CMP_TRUE_78
+		jne CMP_TRUE_70
 		mov rcx, 0
-		jmp CMP_END_79
-	CMP_TRUE_78:
+		jmp CMP_END_71
+	CMP_TRUE_70:
 		mov rcx, 1
-	CMP_END_79:
-		mov rdx, rcx
-		cmp rdx, 0
-		je ELSE_76
+	CMP_END_71:
+		cmp rcx, 0
+		je ELSE_68
 		print fmt_str, str_3
 		print newline
 		exit 1
-		jmp ENDIF_77
-	ELSE_76:
-	ENDIF_77:
+		jmp ENDIF_69
+	ELSE_68:
+	ENDIF_69:
 		invoke create_window, title, init_xval, init_yval, init_wval, init_hval, 4
-		return rsi
-		mov window_id, rsi
+		return rdx
+		mov window_id, rdx
+		mov rsi, 0
+		sub rsi, 1
+		mov r8, rsi
+		cmp window_id, r8
+		je CMP_TRUE_74
 		mov rdi, 0
-		sub rdi, 1
-		mov r9, rdi
-		cmp window_id, r9
-		je CMP_TRUE_82
-		mov r8, 0
-		jmp CMP_END_83
-	CMP_TRUE_82:
-		mov r8, 1
-	CMP_END_83:
-		mov r9, r8
-		cmp r9, 0
-		je ELSE_80
+		jmp CMP_END_75
+	CMP_TRUE_74:
+		mov rdi, 1
+	CMP_END_75:
+		cmp rdi, 0
+		je ELSE_72
 		print fmt_str, str_4
 		print newline
 		invoke quit
 		exit 1
-		jmp ENDIF_81
-	ELSE_80:
-	ENDIF_81:
+		jmp ENDIF_73
+	ELSE_72:
+	ENDIF_73:
+		mov r8, 0
+		sub r8, 1
+		invoke create_renderer, window_id, r8, 2
+		return r9
+		mov renderer, r9
+		mov r8, 0
+		sub r8, 1
+		mov r10, r8
+		cmp renderer, r10
+		je CMP_TRUE_78
 		mov r9, 0
-		sub r9, 1
-		invoke create_renderer, window_id, r9, 2
-		return r10
-		mov renderer, r10
-		mov r9, 0
-		sub r9, 1
-		mov r11, r9
-		cmp renderer, r11
-		je CMP_TRUE_86
-		mov r10, 0
-		jmp CMP_END_87
-	CMP_TRUE_86:
-		mov r10, 1
-	CMP_END_87:
-		mov r9, r10
+		jmp CMP_END_79
+	CMP_TRUE_78:
+		mov r9, 1
+	CMP_END_79:
 		cmp r9, 0
-		je ELSE_84
+		je ELSE_76
 		print fmt_str, str_5
 		print newline
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_85
-	ELSE_84:
-	ENDIF_85:
+		jmp ENDIF_77
+	ELSE_76:
+	ENDIF_77:
 		invoke create_render_target, renderer, 640, 360
 		return r9
 		mov target_id, r9
@@ -630,43 +579,41 @@ program AppSkeleton {
 		sub r9, 1
 		mov r11, r9
 		cmp target_id, r11
-		je CMP_TRUE_90
+		je CMP_TRUE_82
 		mov r10, 0
-		jmp CMP_END_91
-	CMP_TRUE_90:
+		jmp CMP_END_83
+	CMP_TRUE_82:
 		mov r10, 1
-	CMP_END_91:
-		mov r9, r10
-		cmp r9, 0
-		je ELSE_88
+	CMP_END_83:
+		cmp r10, 0
+		je ELSE_80
 		print fmt_str, str_6
 		print newline
 		invoke destroy_renderer, renderer
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_89
-	ELSE_88:
-	ENDIF_89:
+		jmp ENDIF_81
+	ELSE_80:
+	ENDIF_81:
 		invoke init_text
 		return r9
 		mov r11, r9
 		cmp r11, 1
-		jne CMP_TRUE_94
+		jne CMP_TRUE_86
 		mov r10, 0
-		jmp CMP_END_95
-	CMP_TRUE_94:
+		jmp CMP_END_87
+	CMP_TRUE_86:
 		mov r10, 1
-	CMP_END_95:
-		mov r9, r10
-		cmp r9, 0
-		je ELSE_92
+	CMP_END_87:
+		cmp r10, 0
+		je ELSE_84
 		print fmt_str, str_7
 		print newline
 		exit 1
-		jmp ENDIF_93
-	ELSE_92:
-	ENDIF_93:
+		jmp ENDIF_85
+	ELSE_84:
+	ENDIF_85:
 		invoke load_font, filename, 16
 		return r9
 		mov font_id, r9
@@ -674,26 +621,25 @@ program AppSkeleton {
 		sub r9, 1
 		mov r11, r9
 		cmp font_id, r11
-		je CMP_TRUE_98
+		je CMP_TRUE_90
 		mov r10, 0
-		jmp CMP_END_99
-	CMP_TRUE_98:
+		jmp CMP_END_91
+	CMP_TRUE_90:
 		mov r10, 1
-	CMP_END_99:
-		mov r9, r10
-		cmp r9, 0
-		je ELSE_96
+	CMP_END_91:
+		cmp r10, 0
+		je ELSE_88
 		print fmt_str, str_8
 		print fmt_str, filename
 		print newline
 		exit 1
-		jmp ENDIF_97
-	ELSE_96:
-	ENDIF_97:
-		store 16, paddle1, 0, 8
-		store 152, paddle1, 1, 8
-		store 618, paddle2, 0, 8
-		store 152, paddle2, 1, 8
+		jmp ENDIF_89
+	ELSE_88:
+	ENDIF_89:
+		store 16, paddle1, 0, 1
+		store 152, paddle1, 8, 1
+		store 618, paddle2, 0, 1
+		store 152, paddle2, 8, 1
 		mov r9, 1
 		mov rbx, r9
 		call PROC_reset_ball
@@ -720,77 +666,71 @@ program AppSkeleton {
 		add rbx, aabb_aw
 		mov rdx, rbx
 		cmp rdx, aabb_bx
-		jle CMP_TRUE_100
+		jle CMP_TRUE_92
 		mov rcx, 0
-		jmp CMP_END_101
-	CMP_TRUE_100:
+		jmp CMP_END_93
+	CMP_TRUE_92:
 		mov rcx, 1
-	CMP_END_101:
+	CMP_END_93:
 		mov rdx, aabb_bx
 		add rdx, aabb_bw
 		mov rdi, rdx
 		cmp rdi, aabb_ax
-		jle CMP_TRUE_102
+		jle CMP_TRUE_94
 		mov rsi, 0
-		jmp CMP_END_103
-	CMP_TRUE_102:
+		jmp CMP_END_95
+	CMP_TRUE_94:
 		mov rsi, 1
-	CMP_END_103:
+	CMP_END_95:
 		cmp rcx, 0
-		jne OR_ONE_104
+		jne OR_ONE_96
 		cmp rsi, 0
-		jne OR_ONE_104
+		jne OR_ONE_96
 		mov rdi, 0
-		jmp OR_END_105
-	OR_ONE_104:
+		jmp OR_END_97
+	OR_ONE_96:
 		mov rdi, 1
-	OR_END_105:
+	OR_END_97:
 		mov r8, aabb_ay
 		add r8, aabb_ah
 		mov r10, r8
 		cmp r10, aabb_by
-		jle CMP_TRUE_106
+		jle CMP_TRUE_98
 		mov r9, 0
-		jmp CMP_END_107
-	CMP_TRUE_106:
+		jmp CMP_END_99
+	CMP_TRUE_98:
 		mov r9, 1
-	CMP_END_107:
+	CMP_END_99:
 		cmp rdi, 0
-		jne OR_ONE_108
+		jne OR_ONE_100
 		cmp r9, 0
-		jne OR_ONE_108
+		jne OR_ONE_100
 		mov r10, 0
-		jmp OR_END_109
-	OR_ONE_108:
+		jmp OR_END_101
+	OR_ONE_100:
 		mov r10, 1
-	OR_END_109:
+	OR_END_101:
 		mov r9, aabb_by
 		add r9, aabb_bh
 		mov r12, r9
 		cmp r12, aabb_ay
-		jle CMP_TRUE_110
+		jle CMP_TRUE_102
 		mov r11, 0
-		jmp CMP_END_111
-	CMP_TRUE_110:
+		jmp CMP_END_103
+	CMP_TRUE_102:
 		mov r11, 1
-	CMP_END_111:
+	CMP_END_103:
 		cmp r10, 0
-		jne OR_ONE_112
+		jne OR_ONE_104
 		cmp r11, 0
-		jne OR_ONE_112
+		jne OR_ONE_104
 		mov r9, 0
-		jmp OR_END_113
-	OR_ONE_112:
+		jmp OR_END_105
+	OR_ONE_104:
 		mov r9, 1
-	OR_END_113:
-		cmp r9, 0
-		je NOT_TRUE_114
-		mov r10, 0
-		jmp NOT_END_115
-	NOT_TRUE_114:
-		mov r10, 1
-	NOT_END_115:
-		mov rax, r10
+	OR_END_105:
+		not r9
+		mov rax, r9
 		ret
 	}
 }

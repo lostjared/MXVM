@@ -16,7 +16,6 @@ program AppSkeleton {
 		int r11 = 0
 		int r12 = 0
 		ptr arg0 = null
-		float real_const_0 = 528.000000
 		string str_0 = "Space"
 		string str_1 = "font.ttf"
 		string str_2 = "Grid Shift"
@@ -103,8 +102,7 @@ program AppSkeleton {
 	CMP_TRUE_10:
 		mov r9, 1
 	CMP_END_11:
-		mov r10, r9
-		cmp r10, 0
+		cmp r9, 0
 		je ELSE_8
 		mov r9, 0
 		mov running, r9
@@ -137,8 +135,7 @@ program AppSkeleton {
 	AND_ZERO_18:
 		mov r10, 0
 	AND_END_19:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_12
 		mov r9, 0
 		mov running, r9
@@ -173,63 +170,78 @@ program AppSkeleton {
 	CASE_0_21:
 		mov rbx, 0
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 1
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 2
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		jmp CASE_END_20
 	CASE_1_22:
 		mov rbx, 0
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 1
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		mov rbx, 2
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		jmp CASE_END_20
 	CASE_2_23:
 		mov rbx, 0
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		mov rbx, 1
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 2
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		jmp CASE_END_20
 	CASE_3_24:
 		mov rbx, 0
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		mov rbx, 1
 		sub rbx, 0
+		mul rbx, 8
 		store 0, color, rbx, 8
 		mov rbx, 2
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		jmp CASE_END_20
 	CASE_4_25:
 		mov rbx, 0
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 1
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		mov rbx, 2
 		sub rbx, 0
+		mul rbx, 8
 		store 255, color, rbx, 8
 		jmp CASE_END_20
 	CASE_END_20:
 		ret
 	function PROC_shift_array_left_wrap:
 		mov rbx, 0
-		sub rbx, 0
+		mul rbx, 8
 		load rcx, blocks, rbx, 8
 		mov shift_array_left_wrap_first, rcx
 		mov shift_array_left_wrap_iq, 0
@@ -240,18 +252,19 @@ program AppSkeleton {
 		mov rdx, shift_array_left_wrap_iq
 		add rdx, 1
 		mov rsi, rdx
-		sub rsi, 0
+		mul rsi, 8
 		load rdi, blocks, rsi, 8
 		mov rsi, shift_array_left_wrap_iq
 		sub rsi, 0
+		mul rsi, 8
 		store rdi, blocks, rsi, 8
 		add shift_array_left_wrap_iq, 1
 		jmp FOR_27
 	ENDFOR_28:
-		to_int rsi, real_const_0
-		mov r8, rsi
-		sub r8, 0
-		store shift_array_left_wrap_first, blocks, r8, 8
+		mov rsi, 0
+		sub rsi, 0
+		mul rsi, 8
+		store shift_array_left_wrap_first, blocks, rsi, 8
 		ret
 	function PROC_render:
 		invoke set_render_target, renderer, target_id
@@ -268,21 +281,21 @@ program AppSkeleton {
 		mov rbx, render_ix
 		mov rcx, render_iy
 		call FUNC_indexAt
-		mov rdx, rax
+		return rdx
 		mov rsi, rdx
-		sub rsi, 0
+		mul rsi, 8
 		load rdi, blocks, rsi, 8
 		mov render_block, rdi
 		mov rbx, render_block
 		call PROC_setcolor
 		mov rsi, 0
-		sub rsi, 0
+		mul rsi, 8
 		load r8, color, rsi, 8
 		mov rsi, 1
-		sub rsi, 0
+		mul rsi, 8
 		load r9, color, rsi, 8
 		mov rsi, 2
-		sub rsi, 0
+		mul rsi, 8
 		load r10, color, rsi, 8
 		invoke set_draw_color, renderer, r8, r9, r10, 255
 		mov rsi, render_ix
@@ -321,6 +334,7 @@ program AppSkeleton {
 		mod rdx, 4
 		mov rsi, init_array_index
 		sub rsi, 0
+		mul rsi, 8
 		store rdx, blocks, rsi, 8
 		add init_array_index, 1
 		jmp FOR_33
@@ -342,8 +356,7 @@ program AppSkeleton {
 	CMP_TRUE_37:
 		mov rcx, 1
 	CMP_END_38:
-		mov rdx, rcx
-		cmp rdx, 0
+		cmp rcx, 0
 		je ELSE_35
 		print fmt_str, str_3
 		print newline
@@ -352,20 +365,19 @@ program AppSkeleton {
 	ELSE_35:
 	ENDIF_36:
 		invoke create_window, title, init_x, init_y, init_w, init_h, 4
-		return rsi
-		mov window_id, rsi
-		mov rdi, 0
-		sub rdi, 1
-		mov r9, rdi
-		cmp window_id, r9
+		return rdx
+		mov window_id, rdx
+		mov rsi, 0
+		sub rsi, 1
+		mov r8, rsi
+		cmp window_id, r8
 		je CMP_TRUE_41
-		mov r8, 0
+		mov rdi, 0
 		jmp CMP_END_42
 	CMP_TRUE_41:
-		mov r8, 1
+		mov rdi, 1
 	CMP_END_42:
-		mov r9, r8
-		cmp r9, 0
+		cmp rdi, 0
 		je ELSE_39
 		print fmt_str, str_4
 		print newline
@@ -374,22 +386,21 @@ program AppSkeleton {
 		jmp ENDIF_40
 	ELSE_39:
 	ENDIF_40:
-		mov r9, 0
-		sub r9, 1
-		invoke create_renderer, window_id, r9, 2
-		return r10
-		mov renderer, r10
-		mov r9, 0
-		sub r9, 1
-		mov r11, r9
-		cmp renderer, r11
+		mov r8, 0
+		sub r8, 1
+		invoke create_renderer, window_id, r8, 2
+		return r9
+		mov renderer, r9
+		mov r8, 0
+		sub r8, 1
+		mov r10, r8
+		cmp renderer, r10
 		je CMP_TRUE_45
-		mov r10, 0
+		mov r9, 0
 		jmp CMP_END_46
 	CMP_TRUE_45:
-		mov r10, 1
+		mov r9, 1
 	CMP_END_46:
-		mov r9, r10
 		cmp r9, 0
 		je ELSE_43
 		print fmt_str, str_5
@@ -413,8 +424,7 @@ program AppSkeleton {
 	CMP_TRUE_49:
 		mov r10, 1
 	CMP_END_50:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_47
 		print fmt_str, str_6
 		print newline
@@ -438,8 +448,7 @@ program AppSkeleton {
 	CMP_TRUE_53:
 		mov r10, 1
 	CMP_END_54:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_51
 		print fmt_str, str_7
 		print newline
@@ -460,8 +469,7 @@ program AppSkeleton {
 	CMP_TRUE_57:
 		mov r10, 1
 	CMP_END_58:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_55
 		print fmt_str, str_8
 		print fmt_str, filename

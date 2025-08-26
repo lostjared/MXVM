@@ -16,7 +16,7 @@ module std {
     extern srand
     extern malloc
     extern calloc
-    extern free
+    extern release
     extern toupper
     extern tolower
     extern isalpha

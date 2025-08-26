@@ -46,7 +46,7 @@ begin
   begin
     blocks[iq] := blocks[iq+1];
   end;
-  blocks[BLOCK_TOTAL] := first;
+  blocks[0] := first;
 end;
 procedure render();
 var

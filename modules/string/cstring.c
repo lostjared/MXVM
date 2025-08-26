@@ -1,6 +1,8 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h> 
+#include <stdio.h>  
 
 int64_t strfind(const char *src, const char *search, long n) {
     if (!src || !search || n < 0) return -1;
@@ -27,4 +29,90 @@ int64_t substr(char *dest, int64_t size, const char *src, int64_t pos, int64_t l
 int64_t strat(const char *src, int64_t pos) {
     char c = *(src + pos);
     return (int64_t)c;
+}
+
+int64_t pos(const char* substr, const char* s) {
+    if (!substr || !s) return 0;
+    const char* found = strstr(s, substr);
+    if (!found) return 0;
+    return (int64_t)(found - s) + 1;
+}
+
+char* copy(const char* s, int64_t index, int64_t count) {
+    if (!s || index < 1 || count < 0) return NULL;
+    
+    size_t s_len = strlen(s);
+    size_t start_pos = (size_t)index - 1;
+    if (start_pos > s_len) return NULL;
+
+    size_t copy_len = (size_t)count;
+    if (start_pos + copy_len > s_len) {
+        copy_len = s_len - start_pos;
+    }
+
+    char* new_buf = (char*)malloc(copy_len + 1);
+    if (!new_buf) return NULL;
+
+    memcpy(new_buf, s + start_pos, copy_len);
+    new_buf[copy_len] = '\0';
+    return new_buf;
+}
+
+char* insert(const char* source, const char* dest, int64_t index) {
+    if (!source || !dest || index < 1) return NULL;
+
+    size_t source_len = strlen(source);
+    size_t dest_len = strlen(dest);
+    size_t insert_pos = (size_t)index - 1;
+    if (insert_pos > dest_len) insert_pos = dest_len;
+
+    size_t new_len = source_len + dest_len;
+    char* new_buf = (char*)malloc(new_len + 1);
+    if (!new_buf) return NULL;
+
+    memcpy(new_buf, dest, insert_pos);
+    memcpy(new_buf + insert_pos, source, source_len);
+    memcpy(new_buf + insert_pos + source_len, dest + insert_pos, dest_len - insert_pos);
+    
+    new_buf[new_len] = '\0';
+    return new_buf;
+}
+
+char* delete_str(const char* s, int64_t index, int64_t count) {
+    if (!s || index < 1 || count < 0) return NULL;
+
+    size_t s_len = strlen(s);
+    size_t start_pos = (size_t)index - 1;
+    if (start_pos >= s_len) { 
+        char* new_buf = (char*)malloc(s_len + 1);
+        if (!new_buf) return NULL;
+        strcpy(new_buf, s);
+        return new_buf;
+    }
+
+    size_t del_count = (size_t)count;
+    if (start_pos + del_count > s_len) {
+        del_count = s_len - start_pos;
+    }
+
+    size_t new_len = s_len - del_count;
+    char* new_buf = (char*)malloc(new_len + 1);
+    if (!new_buf) return NULL;
+
+    memcpy(new_buf, s, start_pos);
+    memcpy(new_buf + start_pos, s + start_pos + del_count, s_len - (start_pos + del_count));  
+    new_buf[new_len] = '\0';
+    return new_buf;
+}
+
+char* inttostr(int64_t value) {
+    char* buf = (char*)malloc(21); 
+    if (!buf) return NULL;
+    snprintf(buf, 21, "%ld", value);
+    return buf;
+}
+
+int64_t strtoint(const char* s) {
+    if (!s) return 0;
+    return atoll(s); 
 }

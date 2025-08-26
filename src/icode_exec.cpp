@@ -738,13 +738,13 @@ namespace mxvm {
 
     void Program::exec_load(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
-            throw mx::Exception("LOAD destination must be a variable\n");
-            return;
+            throw mx::Exception("LOAD destination must be a variable");
         }
         Variable& dest = getVariable(instr.op1.op);
         void* ptr = nullptr;
         size_t index = 0;
-        size_t size = 8;
+        size_t stride = 8; 
+
         if (isVariable(instr.op2.op)) {
             Variable& ptrVar = getVariable(instr.op2.op);
             if (ptrVar.type != VarType::VAR_POINTER && ptrVar.type != VarType::VAR_STRING) {
@@ -753,8 +753,7 @@ namespace mxvm {
             if(ptrVar.type == VarType::VAR_POINTER)
                 ptr = ptrVar.var_value.ptr_value;
             else
-                ptr = ptrVar.var_value.str_value.data();
-
+                ptr = (void*)ptrVar.var_value.str_value.data();
         } else {
             throw mx::Exception("LOAD source must be a pointer variable");
         }
@@ -767,89 +766,40 @@ namespace mxvm {
             }
         }
 
-        if (!instr.vop.empty()) {
+        if (!instr.vop.empty() && !instr.vop[0].op.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
-                size = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
+                stride = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
             } else {
-                size = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
+                stride = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             }
         } 
 
-        Variable& ptrVar = getVariable(instr.op2.op);
-
-
-
-        if (ptrVar.type == VarType::VAR_POINTER && index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " " + instr.op1.op  + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.ptr_count));
-        }
-        if (ptrVar.type == VarType::VAR_POINTER && size > ptrVar.var_value.ptr_size) {
-            throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
-        }
-        if (ptrVar.type == VarType::VAR_STRING && index >= ptrVar.var_value.str_value.length()) {
-            throw mx::Exception("LOAD: index out of bounds for " + ptrVar.var_name + " " + instr.op1.op + " index: " + std::to_string(index) + " > " + std::to_string(ptrVar.var_value.str_value.length()));
-        }
-        if (ptrVar.type == VarType::VAR_STRING && size > 1) {
-            throw mx::Exception("LOAD: size out of bounds for " + ptrVar.var_name);
-        }
-
-        char* base = static_cast<char*>(ptr) + index * size;
+        char* base = static_cast<char*>(ptr) + index * stride;
         switch (dest.type) {
             case VarType::VAR_INTEGER:
-                if (size == sizeof(int64_t)) {
-                    dest.var_value.int_value = *reinterpret_cast<int64_t*>(base);
-                    dest.var_value.type = VarType::VAR_INTEGER;
-                } else if (size == sizeof(unsigned char)) {
-                    dest.var_value.int_value = *reinterpret_cast<unsigned char*>(base);
-                    dest.var_value.type = VarType::VAR_INTEGER;
-                } else {
-                    throw mx::Exception("LOAD: size mismatch for integer");
-                }
-                break;
             case VarType::VAR_BYTE:
-                if (size == sizeof(unsigned char)) {
-                    dest.var_value.int_value = *reinterpret_cast<unsigned char*>(base);
-                    dest.var_value.type = VarType::VAR_BYTE;
-                } else if (size == sizeof(int64_t)) {
-                    dest.var_value.int_value = static_cast<unsigned char>(*reinterpret_cast<int64_t*>(base));
-                    dest.var_value.type = VarType::VAR_BYTE;
-                } else {
-                    throw mx::Exception("LOAD: size mismatch for byte");
-                }
+                dest.var_value.int_value = *reinterpret_cast<int64_t*>(base);
+                dest.var_value.type = dest.type;
                 break;
             case VarType::VAR_FLOAT:
-                if (size == sizeof(double)) {
-                    dest.var_value.float_value = *reinterpret_cast<double*>(base);
-                    dest.var_value.type = VarType::VAR_FLOAT;
-                } else {
-                    throw mx::Exception("LOAD: size mismatch for float");
-                }
+                dest.var_value.float_value = *reinterpret_cast<double*>(base);
+                dest.var_value.type = VarType::VAR_FLOAT;
                 break;
-                case VarType::VAR_POINTER:
-                    if (size == sizeof(void*)) {
-                        dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
-                        dest.var_value.type = VarType::VAR_POINTER;
-                    } else {
-                        throw mx::Exception("LOAD: size mismatch for pointer");
-                    }
-                    break;
-                case VarType::VAR_STRING:
-                if (size == sizeof(void*)) {
-                    void* str_ptr = *reinterpret_cast<void**>(base);
-                    if (str_ptr) {      
-                        dest.var_value.str_value = std::string(static_cast<char*>(str_ptr));
-                        dest.var_value.type = VarType::VAR_STRING;
-                    } else {
-                        dest.var_value.str_value = "";
-                        dest.var_value.type = VarType::VAR_STRING;
-                    }
-                } else if (size == sizeof(char)) {
-                    dest.var_value.str_value = std::string(1, *reinterpret_cast<char*>(base));
-                    dest.var_value.type = VarType::VAR_STRING;
+            case VarType::VAR_POINTER:
+                dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
+                dest.var_value.type = VarType::VAR_POINTER;
+                break;
+            case VarType::VAR_STRING: {
+                void* str_ptr = *reinterpret_cast<void**>(base);
+                if (str_ptr) {      
+                    dest.var_value.str_value = std::string(static_cast<char*>(str_ptr));
                 } else {
-                    throw mx::Exception("LOAD: size mismatch for string");
+                    dest.var_value.str_value = "";
                 }
-            break;
+                dest.var_value.type = VarType::VAR_STRING;
+                break;
+            }
             default:
                 throw mx::Exception("LOAD: unsupported destination type");
         }
@@ -875,65 +825,34 @@ namespace mxvm {
             }
         }
 
-        size_t size = 8;
+        size_t stride = 8;
         if (!instr.vop.empty() && !instr.vop[0].op.empty()) {
             const auto& sizeOp = instr.vop[0];
             if (isVariable(sizeOp.op)) {
-                size = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
+                stride = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
             } else {
-                size = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
+                stride = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             }
         }
 
-        if (index >= ptrVar.var_value.ptr_count) {
-            throw mx::Exception("STORE: index out of bounds for " + ptrVar.var_name);
-        }
-        if (size > ptrVar.var_value.ptr_size) {
-            throw mx::Exception("STORE: size out of bounds for " + ptrVar.var_name);
-        }
-        char* base = static_cast<char*>(ptr) + index * size;
+        char* base = static_cast<char*>(ptr) + index * stride;
         if (instr.op1.type == OperandType::OP_CONSTANT) {
-        
-            if (size == sizeof(int64_t)) {
-                *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
-            } else {
-                throw mx::Exception("STORE: size mismatch for integer constant");
-            }
+            *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
         } else {
-
             Variable& src = getVariable(instr.op1.op);
             switch (src.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_BYTE:
-                    if (size == sizeof(int64_t)) {
-                        *reinterpret_cast<int64_t*>(base) = src.var_value.int_value;
-                    } else if (size == sizeof(unsigned char)) {
-                        *reinterpret_cast<unsigned char*>(base) = static_cast<unsigned char>(src.var_value.int_value);
-                    } else {
-                        throw mx::Exception("STORE: size mismatch for integer/byte type");
-                    }
+                    *reinterpret_cast<int64_t*>(base) = src.var_value.int_value;
                     break;
                 case VarType::VAR_FLOAT:
-                    if (size == sizeof(double)) {
-                        *reinterpret_cast<double*>(base) = src.var_value.float_value;
-                    } else {
-                        throw mx::Exception("STORE: size mismatch for float type");
-                    }
+                    *reinterpret_cast<double*>(base) = src.var_value.float_value;
                     break;
                 case VarType::VAR_POINTER:
-                    if (size == sizeof(void*)) {
-                        *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
-                    } else {
-                        throw mx::Exception("STORE: size mismatch for pointer type");
-                    }
+                    *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
                     break;
                 case VarType::VAR_STRING:
-                    if (size == sizeof(void*)) {
-                        *reinterpret_cast<void**>(base) = src.var_value.str_value.empty() ? 
-                            nullptr : (void*)src.var_value.str_value.c_str();
-                    } else {
-                        throw mx::Exception("STORE: size mismatch for string type");
-                    }
+                    *reinterpret_cast<const char**>(base) = src.var_value.str_value.c_str();
                     break;
                 default:
                     throw mx::Exception("STORE: unsupported source type");
@@ -1050,7 +969,7 @@ namespace mxvm {
         if(dest.var_value.type != VarType::VAR_INTEGER) {
             throw mx::Exception("Error NOT bitwise operation must be on integer value");
         }
-        dest.var_value.int_value = ~dest.var_value.int_value;
+        dest.var_value.int_value = (dest.var_value.int_value == 0) ? 1 : 0;
         dest.var_value.type = VarType::VAR_INTEGER;
     }
 
