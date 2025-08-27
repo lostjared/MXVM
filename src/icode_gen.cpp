@@ -64,9 +64,6 @@ namespace mxvm {
         }    
         for(auto &v : var_names) {
             auto varx = getVariable(v);
-            //if(varx.type == VarType::VAR_EXTERN) {
-                //out << "\t.extern " << getPlatformSymbolName(getMangledName(v)) << "\n";
-           // }
         }
                 
         if(platform == Platform::LINUX) {
@@ -491,7 +488,6 @@ namespace mxvm {
         throw mx::Exception("ALLOC destination must be a pointer\n");
     }
     
-    // Handle element size (op2) - can be variable or constant
     if (!i.op2.op.empty()) {
         if (isVariable(i.op2.op)) {
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rsi\n";
@@ -499,10 +495,9 @@ namespace mxvm {
             out << "\tmovq $" << i.op2.op << ", %rsi\n";
         }
     } else {
-        out << "\tmovq $8, %rsi\n";  // Default element size
+        out << "\tmovq $8, %rsi\n";  
     }
     
-    // Handle count (op3) - can be variable or constant  
     if (!i.op3.op.empty()) {
         if (isVariable(i.op3.op)) {
             out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rdi\n";
@@ -510,13 +505,12 @@ namespace mxvm {
             out << "\tmovq $" << i.op3.op << ", %rdi\n";
         }
     } else {
-        out << "\tmovq $1, %rdi\n";  // Default count
+        out << "\tmovq $1, %rdi\n";  
     }
     
-    // Calculate total size: count * element_size
-    out << "\timulq %rsi, %rdi\n";  // rdi = count * element_size
-    out << "\tmovq %rdi, %rdi\n";   // size argument for calloc
-    out << "\tmovq $1, %rsi\n";     // element size argument for calloc
+    out << "\timulq %rsi, %rdi\n";  
+    out << "\tmovq %rdi, %rdi\n";   
+    out << "\tmovq $1, %rsi\n";     
     
     out << "\tcall " << getPlatformSymbolName("calloc") << "\n";
     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
@@ -536,7 +530,6 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
     }
     Variable &ptrVar = getVariable(i.op2.op);
 
-    // 1. Load base pointer into %rax
     if (ptrVar.type == VarType::VAR_POINTER) {
         out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
     } else if (ptrVar.type == VarType::VAR_STRING) {
@@ -545,7 +538,6 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
         throw mx::Exception("LOAD source must be a pointer or string buffer: " + i.op2.op);
     }
 
-    // 2. Handle offset (op3) - can be variable or constant
     if (!i.op3.op.empty()) {
         if (isVariable(i.op3.op)) {
             out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
@@ -553,18 +545,15 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
             out << "\tmovq $" << i.op3.op << ", %rcx\n";
         }
     } else {
-        out << "\txorq %rcx, %rcx\n";  // Default offset is 0
+        out << "\txorq %rcx, %rcx\n";  
     }
 
-    // 3. Handle stride (vop[0]) - can be variable or constant
     if (!i.vop.empty() && !i.vop[0].op.empty()) {
         if (isVariable(i.vop[0].op)) {
-            // Variable stride - must calculate address manually
             out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %rdx\n";
-            out << "\timulq %rdx, %rcx\n";  // rcx = offset * stride
-            out << "\taddq %rcx, %rax\n";   // rax = base + (offset * stride)
+            out << "\timulq %rdx, %rcx\n";  
+            out << "\taddq %rcx, %rax\n";   
             
-            // Load from calculated address
             switch (dest.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
@@ -584,11 +573,9 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
                     throw mx::Exception("LOAD: unsupported destination type");
             }
         } else {
-            // Constant stride
             size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
             
             if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-                // Use efficient scaled addressing
                 switch (dest.type) {
                     case VarType::VAR_INTEGER:
                     case VarType::VAR_POINTER:
@@ -608,7 +595,6 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
                         throw mx::Exception("LOAD: unsupported destination type");
                 }
             } else {
-                // Non-standard stride - use multiplication
                 out << "\timulq $" << stride << ", %rcx\n";
                 out << "\taddq %rcx, %rax\n";
                 
@@ -633,7 +619,6 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
             }
         }
     } else {
-        // No stride specified - default to byte offset
         switch (dest.type) {
             case VarType::VAR_INTEGER:
             case VarType::VAR_POINTER:
@@ -661,7 +646,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
     }
     Variable &ptrVar = getVariable(i.op2.op);
 
-    // 1. Load base pointer into %rax
     if (ptrVar.type == VarType::VAR_POINTER) {
         out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
     } else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0) {
@@ -670,7 +654,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
         throw mx::Exception("STORE must target pointer or string buffer");
     }
 
-    // 2. Handle offset (op3) - can be variable or constant
     if (!i.op3.op.empty()) {
         if (isVariable(i.op3.op)) {
             out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
@@ -678,10 +661,9 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
             out << "\tmovq $" << i.op3.op << ", %rcx\n";
         }
     } else {
-        out << "\txorq %rcx, %rcx\n";  // Default offset is 0
+        out << "\txorq %rcx, %rcx\n";  
     }
 
-    // 3. Get source value into register
     if (isVariable(i.op1.op)) {
         Variable &src = getVariable(i.op1.op);
         switch (src.type) {
@@ -703,19 +685,15 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                 throw mx::Exception("STORE: unsupported source type");
         }
     } else {
-        // It's a constant
         out << "\tmovq $" << i.op1.op << ", %rdx\n";
     }
 
-    // 4. Handle stride (vop[0]) - can be variable or constant
     if (!i.vop.empty() && !i.vop[0].op.empty()) {
         if (isVariable(i.vop[0].op)) {
-            // Variable stride - must calculate address manually
             out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
-            out << "\timulq %r8, %rcx\n";   // rcx = offset * stride
-            out << "\taddq %rcx, %rax\n";   // rax = base + (offset * stride)
+            out << "\timulq %r8, %rcx\n";   
+            out << "\taddq %rcx, %rax\n";   
             
-            // Store at calculated address
             if (isVariable(i.op1.op)) {
                 Variable &src = getVariable(i.op1.op);
                 if (src.type == VarType::VAR_FLOAT) {
@@ -729,11 +707,9 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                 out << "\tmovq %rdx, (%rax)\n";
             }
         } else {
-            // Constant stride
             size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
             
             if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-                // Use efficient scaled addressing
                 if (isVariable(i.op1.op)) {
                     Variable &src = getVariable(i.op1.op);
                     if (src.type == VarType::VAR_FLOAT) {
@@ -747,7 +723,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                     out << "\tmovq %rdx, (%rax,%rcx," << stride << ")\n";
                 }
             } else {
-                // Non-standard stride - use multiplication
                 out << "\timulq $" << stride << ", %rcx\n";
                 out << "\taddq %rcx, %rax\n";
                 
@@ -766,7 +741,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
             }
         }
     } else {
-        // No stride specified - default to byte offset
         if (isVariable(i.op1.op)) {
             Variable &src = getVariable(i.op1.op);
             if (src.type == VarType::VAR_FLOAT) {
@@ -1517,27 +1491,22 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
         if (isVariable(i.op2.op)) {
             Variable &src = getVariable(i.op2.op);
             
-            // Handle type conversions like the interpreter does
             if (dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_FLOAT) {
-                // Float to float
                 out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type == VarType::VAR_FLOAT && src.type != VarType::VAR_FLOAT) {
-                // Integer/byte/pointer to float
                 if (src.type == VarType::VAR_BYTE) {
                     out << "\tmovzbq " << getMangledName(i.op2) << "(%rip), %rax\n";
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                 } else if (src.type == VarType::VAR_STRING) {
                     out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
                     out << "\tcall " << getPlatformSymbolName("atof") << "\n";
-                    // atof returns result in %xmm0
                 } else {
                     out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                 }
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type != VarType::VAR_FLOAT && src.type == VarType::VAR_FLOAT) {
-                // Float to integer/byte/pointer
                 out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                 out << "\tcvttsd2si %xmm0, %rax\n";
                 if (dest.type == VarType::VAR_BYTE) {
@@ -1546,16 +1515,13 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 }
             } else if (dest.type == VarType::VAR_POINTER && src.type == VarType::VAR_STRING) {
-                // String to pointer (address of string)
                 out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_STRING) {
-                // String to integer (parse string)
                 out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
                 out << "\tcall " << getPlatformSymbolName("atol") << "\n";
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type == VarType::VAR_BYTE && src.type != VarType::VAR_BYTE) {
-                // Any type to byte (truncate)
                 if (src.type == VarType::VAR_FLOAT) {
                     out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                     out << "\tcvttsd2si %xmm0, %rax\n";
@@ -1565,7 +1531,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                     out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
                 }
             } else if (dest.type != VarType::VAR_BYTE && src.type == VarType::VAR_BYTE) {
-                // Byte to any other type (zero extend)
                 out << "\tmovzbq " << getMangledName(i.op2) << "(%rip), %rax\n";
                 if (dest.type == VarType::VAR_FLOAT) {
                     out << "\tcvtsi2sd %rax, %xmm0\n";
@@ -1574,7 +1539,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 }
             } else {
-                // Same types or compatible types (integer, pointer, extern)
                 switch (dest.type) {
                     case VarType::VAR_INTEGER:
                     case VarType::VAR_POINTER:
@@ -1587,7 +1551,6 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                         out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
                         break;
                     case VarType::VAR_STRING:
-                        // String to string - copy the pointer/address
                         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
                         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                         break;
@@ -1596,20 +1559,16 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                 }
             }
         } else {
-            // Source is a constant
             if (i.op2.type == OperandType::OP_CONSTANT) {
                 if (dest.type == VarType::VAR_FLOAT) {
-                    // Parse constant as float
                     double val = std::stod(i.op2.op);
                     uint64_t bits;
                     std::memcpy(&bits, &val, sizeof(bits));
                     out << "\tmovq $" << bits << ", %rax\n";
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if (dest.type == VarType::VAR_BYTE) {
-                    // Constant to byte
                     out << "\tmovb $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
-                    // Constant to integer/pointer/extern
                     out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
                 }
             } else {
