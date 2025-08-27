@@ -20,8 +20,8 @@ begin
   writeln(px.x, ':', px.y);
   for i := 0 to 9 do
   begin
-    px.test_val[i] := i + 255.0 * 0.1;
-    writeln(px.test_val[i]);
+    px.test_val[i] := i + 0.1 * 100.5;
+    writeln(px.test_val[i], 0.5);
   end;
 end;
 
@@ -32,4 +32,5 @@ begin
   z := p.x * p.y;
   printPoint(p);
   writeln('equals: ', z);
+  writeln(0.5);
 end.

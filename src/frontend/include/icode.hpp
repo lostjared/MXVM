@@ -1324,7 +1324,7 @@ namespace pascal {
             auto isStrLike = [&](VarType v){ return v == VarType::STRING || v == VarType::PTR; };
             VarType lt = getExpressionType(node.left.get());
             VarType rt = getExpressionType(node.right.get());
-
+            
             if (node.operator_ == BinaryOpNode::PLUS && (isStrLike(lt) || isStrLike(rt))) {
                 usedModules.insert("string");
                 std::string left  = eval(node.left.get());
@@ -1350,6 +1350,7 @@ namespace pascal {
                 return;
             }
 
+
             try {
                 std::string folded = foldNumeric(&node);
                 if (!folded.empty()) {
@@ -1360,6 +1361,7 @@ namespace pascal {
                 }
             } catch (...) { }
 
+
             auto evalOperand = [&](ASTNode* n)->std::string {
                 if (auto var = dynamic_cast<VariableNode*>(n)) {
                     std::string v;
@@ -1368,31 +1370,65 @@ namespace pascal {
                 return eval(n);
             };
 
-            std::string left  = evalOperand(node.left.get());
+            std::string left = evalOperand(node.left.get());
             std::string right = evalOperand(node.right.get());
 
 
-            bool isRealDivide = (node.operator_ == BinaryOpNode::DIVIDE);
-            if (isRealDivide) {
-                bool leftIsNum  = isIntegerLiteral(left)  || isFloatLiteral(left);
-                bool rightIsNum = isIntegerLiteral(right) || isFloatLiteral(right);
-                if (leftIsNum && rightIsNum) {
-                    if (isIntegerLiteral(left) && isIntegerLiteral(right)) {
-                        left += ".0";
-                        right += ".0";
-                    }
-                } else {
-                    if (lt != VarType::DOUBLE && rt != VarType::DOUBLE) {
-                        if (isIntegerLiteral(left) && !isFloatLiteral(left))  left += ".0";
-                        else if (isIntegerLiteral(right) && !isFloatLiteral(right)) right += ".0";
-                    }
-                }
+            bool needsFloatOp = (lt == VarType::DOUBLE || rt == VarType::DOUBLE || 
+                                isFloatLiteral(left) || isFloatLiteral(right) ||
+                                node.operator_ == BinaryOpNode::DIVIDE);
+            
+
+            if (node.operator_ == BinaryOpNode::DIVIDE) {
+                needsFloatOp = true;
+                if (isIntegerLiteral(left) && !isFloatLiteral(left)) left += ".0";
+                if (isIntegerLiteral(right) && !isFloatLiteral(right)) right += ".0";
             }
+            
 
             if (node.operator_ == BinaryOpNode::DIV && (isFloatLiteral(left) || isFloatLiteral(right))) {
-                if (isFloatLiteral(left))  left  = std::to_string((long long)std::stod(left));
+                if (isFloatLiteral(left)) left = std::to_string((long long)std::stod(left));
                 if (isFloatLiteral(right)) right = std::to_string((long long)std::stod(right));
+                needsFloatOp = false;
             }
+
+
+            if (needsFloatOp && (node.operator_ == BinaryOpNode::PLUS || 
+                                node.operator_ == BinaryOpNode::MINUS || 
+                                node.operator_ == BinaryOpNode::MULTIPLY || 
+                                node.operator_ == BinaryOpNode::DIVIDE)) {
+                if (!isFloatLiteral(left) && !isFloatReg(left)) {
+                    std::string floatReg = allocFloatReg();
+                    emit2("to_float", floatReg, left);
+                    if (isReg(left) && !isParmReg(left)) freeReg(left);
+                    left = floatReg;
+                }
+                
+
+                if (!isFloatLiteral(right) && !isFloatReg(right)) {
+                    std::string floatReg = allocFloatReg();
+                    emit2("to_float", floatReg, right);
+                    if (isReg(right) && !isParmReg(right)) freeReg(right);
+                    right = floatReg;
+                }
+                
+
+                std::string dst;
+                if (isFloatReg(left) && !isParmReg(left)) dst = left;
+                else {
+                    dst = allocFloatReg();
+                    emit2("mov", dst, left);
+                }
+                
+                emit2(node.operator_ == BinaryOpNode::DIVIDE ? "div" : 
+                    node.operator_ == BinaryOpNode::MULTIPLY ? "mul" : 
+                    node.operator_ == BinaryOpNode::MINUS ? "sub" : "add", dst, right);
+                
+                if (isReg(right) && !isParmReg(right)) freeReg(right);
+                pushValue(dst);
+                return;
+            }
+
 
             auto emitBinary = [&](const char* op) {
                 std::string dst;
@@ -1408,7 +1444,7 @@ namespace pascal {
                 case BinaryOpNode::PLUS:      emitBinary("add"); break;
                 case BinaryOpNode::MINUS:     emitBinary("sub"); break;
                 case BinaryOpNode::MULTIPLY:  emitBinary("mul"); break;
-                case BinaryOpNode::DIVIDE:    emitBinary("div"); break;
+                case BinaryOpNode::DIVIDE:    emitBinary("div"); break; // Should be handled by float case above
                 case BinaryOpNode::DIV:       emitBinary("div"); break;
                 case BinaryOpNode::MOD:       emitBinary("mod"); break;
                 case BinaryOpNode::AND:       pushLogicalAnd(left, right); break;
@@ -1448,19 +1484,18 @@ namespace pascal {
                 }
             }
             if (auto a = dynamic_cast<ArrayAccessNode*>(node)) {
-                std::string arrayName = getArrayNameFromBase(a->base.get());
-                auto it = arrayInfo.find(arrayName);
-                if (it != arrayInfo.end()) {
-                    const std::string& t = it->second.elementType;
-                    if (t == "integer") return VarType::INT;
-                    if (t == "real") return VarType::DOUBLE;
-                    if (t == "char") return VarType::CHAR;
-                    if (t == "string") return VarType::STRING;
-                    if (t == "boolean") return VarType::BOOL;
-                    if (t == "ptr") return VarType::PTR;
-                    if (isRecordTypeName(t)) return VarType::RECORD;
-                }
+            ArrayInfo* info = getArrayInfoForArrayAccess(a);
+            if (info) {
+                const std::string& t = info->elementType;
+                if (t == "integer") return VarType::INT;
+                if (t == "real") return VarType::DOUBLE;
+                if (t == "char") return VarType::CHAR;
+                if (t == "string") return VarType::STRING;
+                if (t == "boolean") return VarType::BOOL;
+                if (t == "ptr") return VarType::PTR;
+                if (isRecordTypeName(t)) return VarType::RECORD;
             }
+        }
             if (auto b = dynamic_cast<BinaryOpNode*>(node)) {
                 VarType lt = getExpressionType(b->left.get());
                 VarType rt = getExpressionType(b->right.get());
