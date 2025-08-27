@@ -361,6 +361,7 @@ program AppSkeleton {
 		store 255, color, r9, 8
 		jmp CASE_END_20
 	CASE_END_20:
+	PROC_END_setcolor:
 		ret
 	function PROC_shift_array_left_wrap:
 		mov rbx, 0
@@ -422,6 +423,7 @@ program AppSkeleton {
 	IDX_OK_65:
 		mov r10, 528
 		store shift_array_left_wrap_first, blocks, r10, 8
+	PROC_END_shift_array_left_wrap:
 		ret
 	function PROC_render:
 		invoke set_render_target, renderer, target_id
@@ -513,6 +515,7 @@ program AppSkeleton {
 		mod r13, 255
 		invoke draw_text, renderer, font_id, str_2, 15, 15, r10, r11, r13, 255
 		call PROC_shift_array_left_wrap
+	PROC_END_render:
 		ret
 	function PROC_init_array:
 		mov init_array_index, 0
@@ -539,6 +542,7 @@ program AppSkeleton {
 		add init_array_index, 1
 		jmp FOR_79
 	ENDFOR_80:
+	PROC_END_init_array:
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -679,6 +683,7 @@ program AppSkeleton {
 	ELSE_103:
 	ENDIF_104:
 		call PROC_init_array
+	PROC_END_init:
 		ret
 	function PROC_cleanup:
 		invoke destroy_render_target, target_id
@@ -686,6 +691,7 @@ program AppSkeleton {
 		invoke destroy_window, window_id
 		invoke quit_text
 		invoke quit
+	PROC_END_cleanup:
 		ret
 	function FUNC_indexAt:
 		mov indexAt_xval, rbx
@@ -695,6 +701,7 @@ program AppSkeleton {
 		mov rcx, rbx
 		add rcx, indexAt_xval
 		mov rax, rcx
+	FUNC_END_indexAt:
 		ret
 	}
 }

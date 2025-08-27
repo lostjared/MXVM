@@ -279,7 +279,7 @@ namespace pascal {
     }
 
     std::string ArrayAccessNode::toString() const {
-        return "ArrayAccess: " + arrayName + "[" + index->toString() + "]";
+        return "ArrayAccess: ";
     }
 
     void ArrayAssignmentNode::accept(ASTVisitor& visitor) {

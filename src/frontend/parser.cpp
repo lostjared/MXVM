@@ -231,7 +231,6 @@ namespace pascal {
                 expr = parseExpression();
             }
             expectToken(";");
-            //next(); 
             auto exitNode = std::make_unique<ExitNode>(std::move(expr));
             exitNode->setLineNumber(lineNum);
             return exitNode;
@@ -489,11 +488,7 @@ namespace pascal {
                     auto index = parseExpression();
                     expectToken("]");
                     next();
-                    if (auto varNode = dynamic_cast<VariableNode*>(left.get())) {
-                        left = std::make_unique<ArrayAccessNode>(varNode->name, std::move(index));
-                    } else {
-                        error("Array base must be an identifier");
-                    }
+                    left = std::make_unique<ArrayAccessNode>(std::move(left), std::move(index));
                     left->setLineNumber(lineNum);
                 } else if (peekIs(".")) {
                     next();
@@ -630,7 +625,7 @@ namespace pascal {
         if (!peekIs(":")) {
             error("Expected ':' after variable identifier(s)");
         }
-        next(); // skip ':'
+        next(); 
 
         std::unique_ptr<ASTNode> declNode;
 
@@ -804,12 +799,35 @@ namespace pascal {
             }
             expectToken(":");
             next();
-            expectToken(types::TokenType::TT_ID);
-            std::string fieldType = token->getTokenValue();
-            next();
+
+            if (peekIs("array")) {
+                next(); 
+                expectToken("[");
+                next(); 
+                auto lowerBound = parseExpression();
+                expectToken("..");
+                next(); 
+                auto upperBound = parseExpression();
+                expectToken("]");
+                next(); 
+                expectToken("of");
+                next(); 
+                expectToken(types::TokenType::TT_ID);
+                std::string elementType = token->getTokenValue();
+                next();
+
+                auto arrayType = std::make_unique<ArrayTypeNode>(elementType, std::move(lowerBound), std::move(upperBound));
+                fields.push_back(std::make_unique<VarDeclNode>(std::move(identifiers), std::move(arrayType)));
+
+            } else {
+                expectToken(types::TokenType::TT_ID);
+                std::string fieldType = token->getTokenValue();
+                next();
+                fields.push_back(std::make_unique<VarDeclNode>(std::move(identifiers), fieldType));
+            }
+
             expectToken(";");
             next();
-            fields.push_back(std::make_unique<VarDeclNode>(std::move(identifiers), fieldType));
         }
 
         expectToken("end");
@@ -829,19 +847,14 @@ namespace pascal {
 
         while (true) {
             if (peekIs("[")) {
-                next(); // consume '['
+                next(); 
                 auto index = parseExpression();
                 expectToken("]");
-                next(); // consume ']'
-                if (auto varNode = dynamic_cast<VariableNode*>(left.get())) {
-                    left = std::make_unique<ArrayAccessNode>(varNode->name, std::move(index));
-                } else {
-                    error("Array base must be an identifier");
-                    return nullptr;
-                }
+                next(); 
+                left = std::make_unique<ArrayAccessNode>(std::move(left), std::move(index));
                 left->setLineNumber(lineNum);
             } else if (peekIs(".")) {
-                next(); // consume '.'
+                next(); 
                 expectToken(types::TokenType::TT_ID);
                 std::string fieldName = token->getTokenValue();
                 next();

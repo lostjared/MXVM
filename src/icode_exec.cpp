@@ -283,8 +283,11 @@ namespace mxvm {
         dest.var_value.owns = false;
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
-               dest.var_value = src.var_value;
+            dest.var_value = src.var_value; 
             dest.type = src.type;
+            if (dest.type != VarType::VAR_POINTER) {
+                dest.type = src.type;
+            }
             if (dest.type == VarType::VAR_POINTER) {
                 dest.var_value.owns = false;
             }
@@ -807,14 +810,27 @@ namespace mxvm {
 
     
     void Program::exec_store(const Instruction& instr) {
+        void* ptr = nullptr;
+        
         if (!isVariable(instr.op2.op)) {
-            throw mx::Exception("STORE destination must be a pointer variable");
+            throw mx::Exception("STORE destination must be a variable or register");
         }
+        
         Variable& ptrVar = getVariable(instr.op2.op);
-        if (ptrVar.type != VarType::VAR_POINTER || ptrVar.var_value.ptr_value == nullptr) {
-            throw mx::Exception("STORE destination must be a valid pointer: " + ptrVar.var_name);
+        
+        if (ptrVar.type == VarType::VAR_POINTER) {
+            if (ptrVar.var_value.ptr_value == nullptr) {
+                throw mx::Exception("STORE destination pointer is null: " + ptrVar.var_name);
+            }
+            ptr = ptrVar.var_value.ptr_value;
+        } else if (ptrVar.type == VarType::VAR_INTEGER) {
+            if (ptrVar.var_value.int_value == 0) {
+                throw mx::Exception("STORE destination contains null pointer: " + ptrVar.var_name);
+            }
+            ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptrVar.var_value.int_value));
+        } else {
+            throw mx::Exception("STORE destination must be a pointer or integer containing a pointer address: " + ptrVar.var_name + " (type: " + std::to_string(static_cast<int>(ptrVar.type)) + ")");
         }
-        void* ptr = ptrVar.var_value.ptr_value;
 
         size_t index = 0;
         if (!instr.op3.op.empty()) {
@@ -836,6 +852,7 @@ namespace mxvm {
         }
 
         char* base = static_cast<char*>(ptr) + index * stride;
+        
         if (instr.op1.type == OperandType::OP_CONSTANT) {
             *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
         } else {
@@ -858,8 +875,7 @@ namespace mxvm {
                     throw mx::Exception("STORE: unsupported source type");
             }
         }
-    }
-    
+    }  
     void Program::exec_and(const Instruction& instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("AND destination must be a variable");

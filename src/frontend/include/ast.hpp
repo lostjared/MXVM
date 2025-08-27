@@ -213,12 +213,12 @@ namespace pascal {
 
     class ArrayAccessNode : public ASTNode {
     public:
-        std::string arrayName;
+        std::unique_ptr<ASTNode> base; 
         std::unique_ptr<ASTNode> index;
         
-        ArrayAccessNode(std::string arrayName, std::unique_ptr<ASTNode> index)
-            : arrayName(std::move(arrayName)), index(std::move(index)) {}
-        
+        ArrayAccessNode(std::unique_ptr<ASTNode> base, std::unique_ptr<ASTNode> index)
+            : base(std::move(base)), index(std::move(index)) {}
+     
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
     };

@@ -180,6 +180,7 @@ program Pong {
 		mov draw_box_pw, rdx
 		mov draw_box_ph, rsi
 		invoke fill_rect, renderer, draw_box_px, draw_box_py, draw_box_pw, draw_box_ph
+	PROC_END_draw_box:
 		ret
 	function PROC_reset_ball:
 		mov reset_ball_to_right, rbx
@@ -224,6 +225,7 @@ program Pong {
 		sub r9, 4
 		mov ball_dy, r9
 	ENDIF_25:
+	PROC_END_reset_ball:
 		ret
 	function PROC_clamp_paddle:
 		mov clamp_paddle_p, arg0
@@ -259,6 +261,7 @@ program Pong {
 		jmp ENDIF_33
 	ELSE_32:
 	ENDIF_33:
+	PROC_END_clamp_paddle:
 		ret
 	function PROC_update_input:
 		invoke is_key_pressed, 82
@@ -300,6 +303,7 @@ program Pong {
 	ENDIF_41:
 		mov arg0, paddle1
 		call PROC_clamp_paddle
+	PROC_END_update_input:
 		ret
 	function PROC_update_ai:
 		load rbx, ball, 8, 8
@@ -348,6 +352,7 @@ program Pong {
 	ENDIF_45:
 		mov arg0, paddle2
 		call PROC_clamp_paddle
+	PROC_END_update_ai:
 		ret
 	function PROC_update_ball:
 		load rbx, ball, 0, 8
@@ -486,6 +491,7 @@ program Pong {
 		jmp ENDIF_69
 	ELSE_68:
 	ENDIF_69:
+	PROC_END_update_ball:
 		ret
 	function PROC_render_center_line:
 		mov render_center_line_yy, 0
@@ -509,6 +515,7 @@ program Pong {
 		mov render_center_line_yy, rcx
 		jmp WHILE_72
 	ENDWHILE_73:
+	PROC_END_render_center_line:
 		ret
 	function PROC_render:
 		invoke set_render_target, renderer, target_id
@@ -561,10 +568,7 @@ program Pong {
 		invoke strncpy, _tmpptr3, str_2, r9
 		invoke strncat, _tmpptr3, _tmpptr2, r10
 		invoke draw_text, renderer, font_id, _tmpptr3, 340, 8, 255, 255, 255, 255
-		free _tmpptr0
-		free _tmpptr1
-		free _tmpptr2
-		free _tmpptr3
+	PROC_END_render:
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -710,6 +714,7 @@ program Pong {
 		call PROC_reset_ball
 		mov score_l, 0
 		mov score_r, 0
+	PROC_END_init:
 		ret
 	function PROC_cleanup:
 		invoke destroy_render_target, target_id
@@ -717,6 +722,7 @@ program Pong {
 		invoke destroy_window, window_id
 		invoke quit_text
 		invoke quit
+	PROC_END_cleanup:
 		ret
 	function FUNC_aabb:
 		mov aabb_ax, rbx
@@ -796,6 +802,7 @@ program Pong {
 	OR_END_113:
 		not r9
 		mov rax, r9
+	FUNC_END_aabb:
 		ret
 	}
 }
