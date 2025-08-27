@@ -589,8 +589,8 @@ void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
                             out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                             return;
                         case VarType::VAR_FLOAT:
-                            out << "\tmovsd " << "(%rax,%rcx," << val << "), %xmm0\n";
-                            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                            out << "\tmovsd " << "(%rax,%rcx," << val << "), %xmm7\n";
+                            out << "\tmovsd %xmm7, " << getMangledName(i.op1) << "(%rip)\n";
                             return;
                         case VarType::VAR_BYTE:
                             out << "\tmovzbq " << "(%rax,%rcx," << val << "), %rdx\n";
