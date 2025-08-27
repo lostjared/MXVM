@@ -861,7 +861,6 @@ namespace pascal {
             } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
                 auto& typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
                 if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
-                    // Handle array declarations - existing code is correct
                     std::string lowerBoundStr = evaluateConstantExpression(arrayTypeNode->lowerBound.get());
                     std::string upperBoundStr = evaluateConstantExpression(arrayTypeNode->upperBound.get());
                     
@@ -909,13 +908,13 @@ namespace pascal {
                 setSlotType(slot, VarType::PTR); 
                 
                 updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                // FIX: For single records, allocate 1 record of recordSize bytes
+                
                 emit3("alloc", slotVar(slot), std::to_string(recordSize), "1");
                 
                 std::string currentScope = getCurrentScopeName();
                 recordsToFreeInScope[currentScope].push_back(mangledName);
             } else {
-                // Handle other types...
+                
                 auto arrayInfoIt = arrayInfo.find(varName);
                 if (arrayInfoIt != arrayInfo.end()) {
                     setVarType(varName, VarType::PTR);
@@ -1352,7 +1351,7 @@ namespace pascal {
                 case BinaryOpNode::PLUS:      emitBinary("add"); break;
                 case BinaryOpNode::MINUS:     emitBinary("sub"); break;
                 case BinaryOpNode::MULTIPLY:  emitBinary("mul"); break;
-                case BinaryOpNode::DIVIDE:    emitBinary("div"); break; // Should be handled by float case above
+                case BinaryOpNode::DIVIDE:    emitBinary("div"); break; 
                 case BinaryOpNode::DIV:       emitBinary("div"); break;
                 case BinaryOpNode::MOD:       emitBinary("mod"); break;
                 case BinaryOpNode::AND:       pushLogicalAnd(left, right); break;
@@ -1718,11 +1717,11 @@ namespace pascal {
 
         auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
         int byteOffset  = fieldInfo.offset;
-  //     int elementSize = fieldInfo.size;
+  
 
         std::string base = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
 
-        // If field is an array OR record, return ADDRESS (no load)
+  
         if (fieldInfo.isArray || isRecordTypeName(fieldInfo.typeName)) {
             std::string p = allocTempPtr();
             emit2("mov", p, base);
@@ -1731,7 +1730,7 @@ namespace pascal {
             return;
         }
 
-        // Scalar/pointer field -> LOAD with (index = byteOffset, stride = 1)  << FIX
+  
         VarType fieldType = getTypeFromString(fieldInfo.typeName);
         std::string dst;
         if (isPtrLike(fieldType)) {
@@ -1792,7 +1791,7 @@ namespace pascal {
                 throw std::runtime_error("Unsupported array base in assignment");
             }
 
-            // Type coercion rhs -> elementType as needed
+            
             VarType elemType = getTypeFromString(info->elementType);
             VarType rhsType  = getExpressionType(node.expression.get());
             if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
@@ -1807,7 +1806,7 @@ namespace pascal {
                 rhs = intReg;
             }
 
-            // Scalar/ptr elements: STORE with (index=elemIndex, stride=elementSize)
+            
             if (isRecordTypeName(info->elementType)) {
                 throw std::runtime_error("Cannot assign directly to record array element");
             } else {
@@ -1820,7 +1819,7 @@ namespace pascal {
             return;
         }
 
-        // Record field assignment: rec.field := expr
+        
         if (auto field = dynamic_cast<FieldAccessNode*>(node.variable.get())) {
             std::string rhs = eval(node.expression.get());
             std::string baseName;
@@ -1865,14 +1864,14 @@ namespace pascal {
 
             std::string base = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
 
-            // Store into record field: (index=byteOffset, stride=1)  << FIX
+            
             emit4("store", rhs, base, std::to_string(byteOffset), "1");
 
             if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
             return;
         }
 
-        // Simple variable assignment (unchanged)
+        
         auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
         if (!varPtr) return;
 
@@ -2014,12 +2013,12 @@ namespace pascal {
         }
     #endif
 
-        // elementIndex = idx - lowerBound  (NO bytes here)
+        
         std::string elemIndex = allocReg();
         emit2("mov", elemIndex, idx);
         if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
-        // Determine base pointer
+        
         std::string base;
         if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
             std::string mangledArrayName = findMangledArrayName(var->name);
@@ -2038,7 +2037,7 @@ namespace pascal {
             throw std::runtime_error("Unsupported array base in access");
         }
 
-        // If element is a record, return its ADDRESS = base + elemIndex*elementSize
+        
         if (isRecordTypeName(info->elementType)) {
             std::string offsetBytes = allocReg();
             emit2("mov", offsetBytes, elemIndex);
@@ -2055,7 +2054,7 @@ namespace pascal {
             return;
         }
 
-        // Scalar / pointer element: LOAD with (index=elemIndex, stride=elementSize)
+        
         VarType elemType = getExpressionType(&node);
         std::string dst;
         if (elemType == VarType::DOUBLE) dst = allocFloatReg();
