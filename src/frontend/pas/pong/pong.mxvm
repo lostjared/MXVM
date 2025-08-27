@@ -184,8 +184,8 @@ program Pong {
 		ret
 	function PROC_reset_ball:
 		mov reset_ball_to_right, rbx
-		store 317, ball, 0, 8
-		store 177, ball, 8, 8
+		store 317, ball, 0, 1
+		store 177, ball, 8, 1
 		mov rbx, 1
 		mov rdx, rbx
 		cmp reset_ball_to_right, rdx
@@ -229,7 +229,7 @@ program Pong {
 		ret
 	function PROC_clamp_paddle:
 		mov clamp_paddle_p, arg0
-		load rbx, clamp_paddle_p, 8, 8
+		load rbx, clamp_paddle_p, 8, 1
 		mov rdx, rbx
 		cmp rdx, 0
 		jl CMP_TRUE_30
@@ -240,11 +240,11 @@ program Pong {
 	CMP_END_31:
 		cmp rcx, 0
 		je ELSE_28
-		store 0, clamp_paddle_p, 8, 8
+		store 0, clamp_paddle_p, 8, 1
 		jmp ENDIF_29
 	ELSE_28:
 	ENDIF_29:
-		load rdx, clamp_paddle_p, 8, 8
+		load rdx, clamp_paddle_p, 8, 1
 		mov rsi, rdx
 		add rsi, 56
 		mov r8, rsi
@@ -257,7 +257,7 @@ program Pong {
 	CMP_END_35:
 		cmp rdi, 0
 		je ELSE_32
-		store 304, clamp_paddle_p, 8, 8
+		store 304, clamp_paddle_p, 8, 1
 		jmp ENDIF_33
 	ELSE_32:
 	ENDIF_33:
@@ -276,10 +276,10 @@ program Pong {
 	CMP_END_39:
 		cmp rcx, 0
 		je ELSE_36
-		load rdx, paddle1, 8, 8
+		load rdx, paddle1, 8, 1
 		mov rsi, rdx
 		sub rsi, 4
-		store rsi, paddle1, 8, 8
+		store rsi, paddle1, 8, 1
 		jmp ENDIF_37
 	ELSE_36:
 	ENDIF_37:
@@ -295,9 +295,9 @@ program Pong {
 	CMP_END_43:
 		cmp r8, 0
 		je ELSE_40
-		load r9, paddle1, 8, 8
+		load r9, paddle1, 8, 1
 		add r9, 4
-		store r9, paddle1, 8, 8
+		store r9, paddle1, 8, 1
 		jmp ENDIF_41
 	ELSE_40:
 	ENDIF_41:
@@ -306,11 +306,11 @@ program Pong {
 	PROC_END_update_input:
 		ret
 	function PROC_update_ai:
-		load rbx, ball, 8, 8
+		load rbx, ball, 8, 1
 		mov rcx, rbx
 		add rcx, 3
 		mov center_ball, rcx
-		load rdx, paddle2, 8, 8
+		load rdx, paddle2, 8, 1
 		mov rsi, rdx
 		add rsi, 28
 		mov center_p2, rsi
@@ -326,9 +326,9 @@ program Pong {
 	CMP_END_47:
 		cmp r8, 0
 		je ELSE_44
-		load r9, paddle2, 8, 8
+		load r9, paddle2, 8, 1
 		sub r9, 4
-		store r9, paddle2, 8, 8
+		store r9, paddle2, 8, 1
 		jmp ENDIF_45
 	ELSE_44:
 		mov r9, center_p2
@@ -343,9 +343,9 @@ program Pong {
 	CMP_END_51:
 		cmp r10, 0
 		je ELSE_48
-		load r9, paddle2, 8, 8
+		load r9, paddle2, 8, 1
 		add r9, 4
-		store r9, paddle2, 8, 8
+		store r9, paddle2, 8, 1
 		jmp ENDIF_49
 	ELSE_48:
 	ENDIF_49:
@@ -355,15 +355,15 @@ program Pong {
 	PROC_END_update_ai:
 		ret
 	function PROC_update_ball:
-		load rbx, ball, 0, 8
+		load rbx, ball, 0, 1
 		mov rcx, rbx
 		add rcx, ball_dx
-		store rcx, ball, 0, 8
-		load rdx, ball, 8, 8
+		store rcx, ball, 0, 1
+		load rdx, ball, 8, 1
 		mov rsi, rdx
 		add rsi, ball_dy
-		store rsi, ball, 8, 8
-		load rdi, ball, 8, 8
+		store rsi, ball, 8, 1
+		load rdi, ball, 8, 1
 		mov r9, rdi
 		cmp r9, 0
 		jle CMP_TRUE_54
@@ -374,14 +374,14 @@ program Pong {
 	CMP_END_55:
 		cmp r8, 0
 		je ELSE_52
-		store 0, ball, 8, 8
+		store 0, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
 		jmp ENDIF_53
 	ELSE_52:
 	ENDIF_53:
-		load r9, ball, 8, 8
+		load r9, ball, 8, 1
 		add r9, 6
 		mov r11, r9
 		cmp r11, 360
@@ -393,22 +393,22 @@ program Pong {
 	CMP_END_59:
 		cmp r10, 0
 		je ELSE_56
-		store 354, ball, 8, 8
+		store 354, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
 		jmp ENDIF_57
 	ELSE_56:
 	ENDIF_57:
-		load r9, ball, 0, 8
+		load r9, ball, 0, 1
 		mov rbx, r9
-		load r10, ball, 8, 8
+		load r10, ball, 8, 1
 		mov rcx, r10
 		mov rdx, 6
 		mov rsi, 6
-		load r11, paddle1, 0, 8
+		load r11, paddle1, 0, 1
 		mov rdi, r11
-		load r12, paddle1, 8, 8
+		load r12, paddle1, 8, 1
 		mov r8, r12
 		mov r9, 6
 		mov r10, 56
@@ -416,24 +416,24 @@ program Pong {
 		mov r13, rax
 		cmp r13, 0
 		je ELSE_60
-		load r9, paddle1, 0, 8
+		load r9, paddle1, 0, 1
 		add r9, 6
-		store r9, ball, 0, 8
+		store r9, ball, 0, 1
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
 		jmp ENDIF_61
 	ELSE_60:
 	ENDIF_61:
-		load r9, ball, 0, 8
+		load r9, ball, 0, 1
 		mov rbx, r9
-		load r10, ball, 8, 8
+		load r10, ball, 8, 1
 		mov rcx, r10
 		mov rdx, 6
 		mov rsi, 6
-		load r11, paddle2, 0, 8
+		load r11, paddle2, 0, 1
 		mov rdi, r11
-		load r12, paddle2, 8, 8
+		load r12, paddle2, 8, 1
 		mov r8, r12
 		mov r9, 6
 		mov r10, 56
@@ -441,16 +441,16 @@ program Pong {
 		mov r13, rax
 		cmp r13, 0
 		je ELSE_62
-		load r9, paddle2, 0, 8
+		load r9, paddle2, 0, 1
 		sub r9, 6
-		store r9, ball, 0, 8
+		store r9, ball, 0, 1
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
 		jmp ENDIF_63
 	ELSE_62:
 	ENDIF_63:
-		load r9, ball, 0, 8
+		load r9, ball, 0, 1
 		add r9, 6
 		mov r11, r9
 		cmp r11, 0
@@ -471,7 +471,7 @@ program Pong {
 		jmp ENDIF_65
 	ELSE_64:
 	ENDIF_65:
-		load r9, ball, 0, 8
+		load r9, ball, 0, 1
 		mov r11, r9
 		cmp r11, 640
 		jg CMP_TRUE_70
@@ -523,21 +523,21 @@ program Pong {
 		invoke clear, renderer
 		invoke set_draw_color, renderer, 255, 255, 255, 255
 		call PROC_render_center_line
-		load rbx, paddle1, 0, 8
-		load rcx, paddle1, 8, 8
+		load rbx, paddle1, 0, 1
+		load rcx, paddle1, 8, 1
 		mov rdx, 6
 		mov rsi, 56
 		call PROC_draw_box
-		load rdx, paddle2, 0, 8
+		load rdx, paddle2, 0, 1
 		mov rbx, rdx
-		load rsi, paddle2, 8, 8
+		load rsi, paddle2, 8, 1
 		mov rcx, rsi
 		mov rdx, 6
 		mov rsi, 56
 		call PROC_draw_box
-		load rdi, ball, 0, 8
+		load rdi, ball, 0, 1
 		mov rbx, rdi
-		load r8, ball, 8, 8
+		load r8, ball, 8, 1
 		mov rcx, r8
 		mov rdx, 6
 		mov rsi, 6
@@ -569,6 +569,10 @@ program Pong {
 		invoke strncat, _tmpptr3, _tmpptr2, r10
 		invoke draw_text, renderer, font_id, _tmpptr3, 340, 8, 255, 255, 255, 255
 	PROC_END_render:
+		free _tmpptr0
+		free _tmpptr1
+		free _tmpptr2
+		free _tmpptr3
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -705,10 +709,10 @@ program Pong {
 		jmp ENDIF_97
 	ELSE_96:
 	ENDIF_97:
-		store 16, paddle1, 0, 8
-		store 152, paddle1, 8, 8
-		store 618, paddle2, 0, 8
-		store 152, paddle2, 8, 8
+		store 16, paddle1, 0, 1
+		store 152, paddle1, 8, 1
+		store 618, paddle2, 0, 1
+		store 152, paddle2, 8, 1
 		mov r9, 1
 		mov rbx, r9
 		call PROC_reset_ball

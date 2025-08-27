@@ -1,0 +1,215 @@
+program RecordTest {
+	section module {
+ 
+	}
+	section data {
+		int rax = 0
+		int rbx = 0
+		int rcx = 0
+		int rdx = 0
+		int rsi = 0
+		int rdi = 0
+		int r8 = 0
+		int r9 = 0
+		int r10 = 0
+		float xmm0 = 0.0
+		float xmm1 = 0.0
+		float xmm2 = 0.0
+		float xmm3 = 0.0
+		ptr _tmpptr0 = null
+		ptr _tmpptr1 = null
+		ptr _tmpptr2 = null
+		ptr _tmpptr3 = null
+		ptr _tmpptr4 = null
+		ptr _tmpptr5 = null
+		ptr _tmpptr6 = null
+		ptr _tmpptr7 = null
+		ptr arg0 = null
+		float real_const_1 = 50.0
+		float real_const_0 = 25.0
+		string str_0 = "equals: "
+		string str_1 = ","
+		string str_2 = "|"
+		string str_3 = ":"
+		string fmt_int = "%lld "
+		string fmt_str = "%s "
+		string fmt_float = "%.6f "
+		string newline = "\n"
+		ptr p = null
+		int z = 0
+		ptr pz = null
+		ptr printPoint_pi = null
+		ptr px = null
+	}
+	section code {
+	start:
+		alloc p, 64, 1
+		alloc pz, 64, 11
+		store 5, p, 0, 1
+		store 10, p, 8, 1
+		mov xmm0, real_const_0
+		mov rbx, 0
+		mov rcx, rbx
+		cmp rcx, 0
+		jl IDX_OOB_1
+		cmp rcx, 5
+		jg IDX_OOB_1
+		jmp IDX_OK_0
+	IDX_OOB_1:
+		exit 1
+	IDX_OK_0:
+		mov rcx, 0
+		mov _tmpptr0, p
+		add _tmpptr0, 16
+		store xmm0, _tmpptr0, rcx, 8
+		mov xmm1, real_const_1
+		mov rcx, 1
+		mov rdx, rcx
+		cmp rdx, 0
+		jl IDX_OOB_3
+		cmp rdx, 5
+		jg IDX_OOB_3
+		jmp IDX_OK_2
+	IDX_OOB_3:
+		exit 1
+	IDX_OK_2:
+		mov rdx, 1
+		mov _tmpptr1, p
+		add _tmpptr1, 16
+		store xmm1, _tmpptr1, rdx, 8
+		load rdx, p, 0, 1
+		load rsi, p, 8, 1
+		mov rdi, rdx
+		mul rdi, rsi
+		mov z, rdi
+		mov arg0, p
+		call PROC_printPoint
+		print fmt_str, str_0
+		print fmt_int, z
+		print newline
+		mov r8, 0
+		mov r9, r8
+		cmp r9, 0
+		jl IDX_OOB_5
+		cmp r9, 5
+		jg IDX_OOB_5
+		jmp IDX_OK_4
+	IDX_OOB_5:
+		exit 1
+	IDX_OK_4:
+		mov r8, 0
+		mov _tmpptr2, p
+		add _tmpptr2, 16
+		load xmm2, _tmpptr2, r8, 8
+		print fmt_float, xmm2
+		print fmt_str, str_1
+		mov r8, 1
+		mov r9, r8
+		cmp r9, 0
+		jl IDX_OOB_7
+		cmp r9, 5
+		jg IDX_OOB_7
+		jmp IDX_OK_6
+	IDX_OOB_7:
+		exit 1
+	IDX_OK_6:
+		mov r8, 1
+		mov _tmpptr3, p
+		add _tmpptr3, 16
+		load xmm3, _tmpptr3, r8, 8
+		print fmt_float, xmm3
+		print newline
+		mov r8, 0
+		mov r9, r8
+		cmp r9, 0
+		jl IDX_OOB_9
+		cmp r9, 10
+		jg IDX_OOB_9
+		jmp IDX_OK_8
+	IDX_OOB_9:
+		exit 1
+	IDX_OK_8:
+		mov r8, 0
+		mov r9, r8
+		mul r9, 64
+		mov _tmpptr4, pz
+		add _tmpptr4, r9
+		store 5, _tmpptr4, 0, 1
+		mov r8, 0
+		mov r9, r8
+		cmp r9, 0
+		jl IDX_OOB_11
+		cmp r9, 10
+		jg IDX_OOB_11
+		jmp IDX_OK_10
+	IDX_OOB_11:
+		exit 1
+	IDX_OK_10:
+		mov r8, 0
+		mov r9, r8
+		mul r9, 64
+		mov _tmpptr5, pz
+		add _tmpptr5, r9
+		store 10, _tmpptr5, 8, 1
+		mov r8, 0
+		mov r9, r8
+		cmp r9, 0
+		jl IDX_OOB_13
+		cmp r9, 10
+		jg IDX_OOB_13
+		jmp IDX_OK_12
+	IDX_OOB_13:
+		exit 1
+	IDX_OK_12:
+		mov r8, 0
+		mov r9, r8
+		mul r9, 64
+		mov _tmpptr6, pz
+		add _tmpptr6, r9
+		load r8, _tmpptr6, 0, 1
+		print fmt_int, r8
+		print fmt_str, str_2
+		mov r9, 0
+		mov r10, r9
+		cmp r10, 0
+		jl IDX_OOB_15
+		cmp r10, 10
+		jg IDX_OOB_15
+		jmp IDX_OK_14
+	IDX_OOB_15:
+		exit 1
+	IDX_OK_14:
+		mov r9, 0
+		mov r10, r9
+		mul r10, 64
+		mov _tmpptr7, pz
+		add _tmpptr7, r10
+		load r9, _tmpptr7, 8, 1
+		print fmt_int, r9
+		print newline
+		free pz
+		free p
+		done
+	function PROC_printPoint:
+		mov printPoint_pi, arg0
+		alloc px, 64, 1
+		store 10, px, 0, 1
+		store 10, px, 8, 1
+		load rbx, printPoint_pi, 0, 1
+		print fmt_int, rbx
+		print fmt_str, str_3
+		load rcx, printPoint_pi, 8, 1
+		print fmt_int, rcx
+		print newline
+		load rdx, px, 0, 1
+		print fmt_int, rdx
+		print fmt_str, str_3
+		load rsi, px, 8, 1
+		print fmt_int, rsi
+		print newline
+	PROC_END_printPoint:
+		free px
+		ret
+	}
+}
+

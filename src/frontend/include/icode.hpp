@@ -308,11 +308,15 @@ namespace pascal {
         }
 
         std::string allocTempPtr(const std::string& forScope = "") {
+            std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
+            if (scope.empty()) {
+                scope = "";
+            }
+
             for (size_t i = 0; i < allTempPtrs.size(); ++i) {
                 if (!tempPtrInUse[i]) {
                     tempPtrInUse[i] = true;
                     std::string tempName = allTempPtrs[i];
-                    std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
                     tempPtrByScope[scope].push_back(tempName);
                     return tempName;
                 }
@@ -321,8 +325,7 @@ namespace pascal {
             std::string tempName = "_tmpptr" + std::to_string(nextTemp++);
             allTempPtrs.push_back(tempName);
             tempPtrInUse.push_back(true);
-            
-            std::string scope = forScope.empty() ? getCurrentScopeName() : forScope;
+
             tempPtrByScope[scope].push_back(tempName);
             return tempName;
         }
@@ -588,29 +591,29 @@ namespace pascal {
                     emit1("free", recordVar);
                 }
             }
-            if (tempPtrByScope.count("")) {
-                for (auto &tp : tempPtrByScope[""]) freeTempPtr(tp);
-            }
+        
             emit("done");
 
             generatingDeferredCode = true; 
             
             for (size_t i = 0; i < deferredProcs.size(); ++i) {
                 auto pn = deferredProcs[i].first;
-                auto oldHierarchy = scopeHierarchy;  
+                auto oldHierarchy = scopeHierarchy;
                 scopeHierarchy = deferredProcs[i].second;
-                
+
                 std::vector<std::string> parentScope(scopeHierarchy.begin(), scopeHierarchy.end() - 1);
                 std::string mangledName = mangleWithScope(pn->name, parentScope);
-                
-                emitLabel(funcLabel("function PROC_", mangledName)); 
+
+                std::string scopeName = "PROC_" + mangledName;
+
+                emitLabel(funcLabel("function PROC_", mangledName));
                 currentFunctionName = pn->name;
                 currentParamLocations.clear();
-                currentParamTypes.clear(); 
+                currentParamTypes.clear();
 
                 if (!pn->parameters.empty()) {
-                    size_t intParamIndex = 1;      
-                    size_t ptrParamIndex = 0;      
+                    size_t intParamIndex = 1;
+                    size_t ptrParamIndex = 0;
                     size_t floatParamIndex = 0;
                     for (auto& p_node : pn->parameters) {
                         if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
@@ -645,9 +648,8 @@ namespace pascal {
                 }
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
-                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false; 
+                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
-
                 for(const auto& pair : currentParamLocations) {
                     for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
                         if (registers[reg_idx] == pair.second) { regInUse[reg_idx] = true; break; }
@@ -655,24 +657,34 @@ namespace pascal {
                 }
 
                 if (pn->block) pn->block->accept(*this);
-                
+
                 emitLabel("PROC_END_" + mangledName);
+
+                for (const auto& recVar : recordsToFreeInScope[scopeName]) {
+                    emit1("free", recVar);
+                }
+                for (const auto& tp : tempPtrByScope[scopeName]) {
+                    emit1("free", tp);
+                }
+
                 emit("ret");
-                scopeHierarchy = oldHierarchy;  
+                scopeHierarchy = oldHierarchy;
             }
 
-            for (size_t i = 0; i < deferredFuncs.size(); ++i) {
+          for (size_t i = 0; i < deferredFuncs.size(); ++i) {
                 auto fn = deferredFuncs[i].first;
-                auto oldHierarchy = scopeHierarchy; 
+                auto oldHierarchy = scopeHierarchy;
                 scopeHierarchy = deferredFuncs[i].second;
-                
+
                 std::vector<std::string> parentScope(scopeHierarchy.begin(), scopeHierarchy.end() - 1);
                 std::string mangledName = mangleWithScope(fn->name, parentScope);
 
-                emitLabel(funcLabel("function FUNC_", mangledName)); 
+                std::string scopeName = "FUNC_" + mangledName;
+
+                emitLabel(funcLabel("function FUNC_", mangledName));
                 currentFunctionName = fn->name;
                 currentParamLocations.clear();
-                currentParamTypes.clear(); 
+                currentParamTypes.clear();
 
                 int intParamIndex = 1;
                 int ptrParamIndex = 0;
@@ -697,18 +709,18 @@ namespace pascal {
                                 if (!incomingReg.empty()) {
                                     std::string mangledId = mangleVariableName(id);
                                     int localSlot = newSlotFor(mangledId);
-            
+
                                     setSlotType(localSlot, paramType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
                                 }
-                                currentParamTypes[id] = param->type; 
+                                currentParamTypes[id] = param->type;
                             }
                         }
                     }
                 }
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
-                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false; 
+                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
                 for(const auto& pair : currentParamLocations) {
                     for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
@@ -717,9 +729,9 @@ namespace pascal {
                 }
 
                 if (fn->block) fn->block->accept(*this);
-            
+
                 emitLabel("FUNC_END_" + mangledName);
-                
+
                 if (!functionSetReturn) {
                     VarType rt = getVarType(fn->name);
                     if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD) {
@@ -733,8 +745,16 @@ namespace pascal {
                         emit2("mov","rax","0");
                     }
                 }
+
+                for (const auto& recVar : recordsToFreeInScope[scopeName]) {
+                    emit1("free", recVar);
+                }
+                for (const auto& tp : tempPtrByScope[scopeName]) {
+                    emit1("free", tp);
+                }
+
                 emit("ret");
-                scopeHierarchy = oldHierarchy;  
+                scopeHierarchy = oldHierarchy;
             }
 
             generatingDeferredCode = false; 
@@ -1010,19 +1030,24 @@ namespace pascal {
         void visit(FuncDeclNode& node) override {
             std::string mangledName = mangleVariableName(node.name);
             if (declaredFuncs.count(mangledName)) {
-                return; 
+                return;
             }
             declaredFuncs[mangledName] = true;
 
-            FuncInfo funcInfo; funcInfo.returnType = getTypeFromString(node.returnType);
-            for (auto& p : node.parameters)
-                if (auto pn = dynamic_cast<ParameterNode*>(p.get()))
-                    for (size_t i = 0; i < pn->identifiers.size(); ++i)
+            FuncInfo funcInfo;
+            funcInfo.returnType = getTypeFromString(node.returnType);
+            for (auto& p : node.parameters) {
+                if (auto pn = dynamic_cast<ParameterNode*>(p.get())) {
+                    for (size_t i = 0; i < pn->identifiers.size(); ++i) {
                         funcInfo.paramTypes.push_back(getTypeFromString(pn->type));
+                    }
+                }
+            }
             funcSignatures[node.name] = funcInfo;
             setVarType(node.name, funcInfo.returnType);
 
-            auto path = scopeHierarchy; path.push_back(node.name);
+            auto path = scopeHierarchy;
+            path.push_back(node.name);
             deferredFuncs.push_back({&node, path});
 
             scopeHierarchy.push_back(node.name);
@@ -1038,15 +1063,16 @@ namespace pascal {
             scopeHierarchy.pop_back();
         }
 
-        void visit(ProcDeclNode& node) override { 
+        void visit(ProcDeclNode& node) override {
             std::string mangledName = mangleVariableName(node.name);
             if (declaredProcs.count(mangledName)) {
-                return; 
+                return;
             }
             declaredProcs[mangledName] = true;
 
-            auto path = scopeHierarchy; path.push_back(node.name); 
-            deferredProcs.push_back({&node, path}); 
+            auto path = scopeHierarchy;
+            path.push_back(node.name);
+            deferredProcs.push_back({&node, path});
 
             scopeHierarchy.push_back(node.name);
             if (node.block) {

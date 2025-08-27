@@ -479,124 +479,76 @@ namespace mxvm {
     }
 
     void Program::gen_alloc(std::ostream &out, const Instruction &i) {
-    if (!isVariable(i.op1.op)) {
-        throw mx::Exception("ALLOC destination must be a variable");
-    }
-
-    Variable &v = getVariable(i.op1.op);
-    if(v.type != VarType::VAR_POINTER) {
-        throw mx::Exception("ALLOC destination must be a pointer\n");
-    }
-    
-    if (!i.op2.op.empty()) {
-        if (isVariable(i.op2.op)) {
-            out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rsi\n";
-        } else {
-            out << "\tmovq $" << i.op2.op << ", %rsi\n";
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("ALLOC destination must be a variable");
         }
-    } else {
-        out << "\tmovq $8, %rsi\n";  
-    }
-    
-    if (!i.op3.op.empty()) {
-        if (isVariable(i.op3.op)) {
-            out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rdi\n";
-        } else {
-            out << "\tmovq $" << i.op3.op << ", %rdi\n";
+
+        Variable &v = getVariable(i.op1.op);
+        if (v.type != VarType::VAR_POINTER) {
+            throw mx::Exception("ALLOC destination must be a pointer\n");
         }
-    } else {
-        out << "\tmovq $1, %rdi\n";  
-    }
-    
-    out << "\timulq %rsi, %rdi\n";  
-    out << "\tmovq %rdi, %rdi\n";   
-    out << "\tmovq $1, %rsi\n";     
-    
-    out << "\tcall " << getPlatformSymbolName("calloc") << "\n";
-    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-    
-    Variable &var = getVariable(i.op1.op);
-    var.var_value.owns = true;
-}
 
-void Program::gen_load(std::ostream &out, const Instruction &i) {
-    if (!isVariable(i.op1.op)) {
-        throw mx::Exception("LOAD destination: " + i.op1.op + " must be a variable");
-    }
-    Variable &dest = getVariable(i.op1.op);
-
-    if (!isVariable(i.op2.op)) {
-        throw mx::Exception("LOAD source: " + i.op2.op + " must be a pointer variable");
-    }
-    Variable &ptrVar = getVariable(i.op2.op);
-
-    if (ptrVar.type == VarType::VAR_POINTER) {
-        out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-    } else if (ptrVar.type == VarType::VAR_STRING) {
-        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
-    } else {
-        throw mx::Exception("LOAD source must be a pointer or string buffer: " + i.op2.op);
-    }
-
-    if (!i.op3.op.empty()) {
-        if (isVariable(i.op3.op)) {
-            out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
-        } else {
-            out << "\tmovq $" << i.op3.op << ", %rcx\n";
-        }
-    } else {
-        out << "\txorq %rcx, %rcx\n";  
-    }
-
-    if (!i.vop.empty() && !i.vop[0].op.empty()) {
-        if (isVariable(i.vop[0].op)) {
-            out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %rdx\n";
-            out << "\timulq %rdx, %rcx\n";  
-            out << "\taddq %rcx, %rax\n";   
-            
-            switch (dest.type) {
-                case VarType::VAR_INTEGER:
-                case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq (%rax), %rdx\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                    break;
-                case VarType::VAR_FLOAT:
-                    out << "\tmovsd (%rax), %xmm0\n";
-                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                    break;
-                case VarType::VAR_BYTE:
-                    out << "\tmovzbq (%rax), %rdx\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                    break;
-                default:
-                    throw mx::Exception("LOAD: unsupported destination type");
+        if (!i.op2.op.empty()) {
+            if (isVariable(i.op2.op)) {
+                out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rsi\n";
+            } else {
+                out << "\tmovq $" << i.op2.op << ", %rsi\n";
             }
         } else {
-            size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
-            
-            if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-                switch (dest.type) {
-                    case VarType::VAR_INTEGER:
-                    case VarType::VAR_POINTER:
-                    case VarType::VAR_EXTERN:
-                        out << "\tmovq (%rax,%rcx," << stride << "), %rdx\n";
-                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                        break;
-                    case VarType::VAR_FLOAT:
-                        out << "\tmovsd (%rax,%rcx," << stride << "), %xmm0\n";
-                        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                        break;
-                    case VarType::VAR_BYTE:
-                        out << "\tmovzbq (%rax,%rcx," << stride << "), %rdx\n";
-                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                        break;
-                    default:
-                        throw mx::Exception("LOAD: unsupported destination type");
-                }
+            out << "\tmovq $8, %rsi\n";  
+        }
+        
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rdi\n";
+            } else if (i.op3.type == OperandType::OP_CONSTANT) {
+                out << "\tmovq $" << i.op3.op << ", %rdi\n";
             } else {
-                out << "\timulq $" << stride << ", %rcx\n";
-                out << "\taddq %rcx, %rax\n";
+                throw mx::Exception("ALLOC: invalid count operand " + i.op3.op);
+            }
+        } else {
+            out << "\tmovq $1, %rdi\n";
+        
+        }
+        out << "\tcall " << getPlatformSymbolName("calloc") << "\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        v.var_value.owns = true;
+    }
+
+    void Program::gen_load(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("LOAD destination: " + i.op1.op + " must be a variable");
+        }
+        Variable &dest = getVariable(i.op1.op);
+
+        if (!isVariable(i.op2.op)) {
+            throw mx::Exception("LOAD source: " + i.op2.op + " must be a pointer variable");
+        }
+        Variable &ptrVar = getVariable(i.op2.op);
+
+        if (ptrVar.type == VarType::VAR_POINTER) {
+            out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        } else if (ptrVar.type == VarType::VAR_STRING) {
+            out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        } else {
+            throw mx::Exception("LOAD source must be a pointer or string buffer: " + i.op2.op);
+        }
+
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
+            } else {
+                out << "\tmovq $" << i.op3.op << ", %rcx\n";
+            }
+        } else {
+            out << "\txorq %rcx, %rcx\n";  
+        }
+
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %rdx\n";
+                out << "\timulq %rdx, %rcx\n";  
+                out << "\taddq %rcx, %rax\n";   
                 
                 switch (dest.type) {
                     case VarType::VAR_INTEGER:
@@ -616,115 +568,127 @@ void Program::gen_load(std::ostream &out, const Instruction &i) {
                     default:
                         throw mx::Exception("LOAD: unsupported destination type");
                 }
-            }
-        }
-    } else {
-        switch (dest.type) {
-            case VarType::VAR_INTEGER:
-            case VarType::VAR_POINTER:
-            case VarType::VAR_EXTERN:
-                out << "\tmovq (%rax,%rcx,1), %rdx\n";
-                out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            case VarType::VAR_FLOAT:
-                out << "\tmovsd (%rax,%rcx,1), %xmm0\n";
-                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            case VarType::VAR_BYTE:
-                out << "\tmovzbq (%rax,%rcx,1), %rdx\n";
-                out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            default:
-                throw mx::Exception("LOAD: unsupported destination type");
-        }
-    }
-}
-
-void Program::gen_store(std::ostream &out, const Instruction &i) {
-    if (!isVariable(i.op2.op)) {
-        throw mx::Exception("STORE destination must be a pointer variable: " + i.op2.op);
-    }
-    Variable &ptrVar = getVariable(i.op2.op);
-
-    if (ptrVar.type == VarType::VAR_POINTER) {
-        out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-    } else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0) {
-        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
-    } else {
-        throw mx::Exception("STORE must target pointer or string buffer");
-    }
-
-    if (!i.op3.op.empty()) {
-        if (isVariable(i.op3.op)) {
-            out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
-        } else {
-            out << "\tmovq $" << i.op3.op << ", %rcx\n";
-        }
-    } else {
-        out << "\txorq %rcx, %rcx\n";  
-    }
-
-    if (isVariable(i.op1.op)) {
-        Variable &src = getVariable(i.op1.op);
-        switch (src.type) {
-            case VarType::VAR_INTEGER:
-            case VarType::VAR_POINTER:
-            case VarType::VAR_EXTERN:
-                out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdx\n";
-                break;
-            case VarType::VAR_STRING:
-                out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdx\n";
-                break;
-            case VarType::VAR_BYTE:
-                out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %rdx\n";
-                break;
-            case VarType::VAR_FLOAT:
-                out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
-                break;
-            default:
-                throw mx::Exception("STORE: unsupported source type");
-        }
-    } else {
-        out << "\tmovq $" << i.op1.op << ", %rdx\n";
-    }
-
-    if (!i.vop.empty() && !i.vop[0].op.empty()) {
-        if (isVariable(i.vop[0].op)) {
-            out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
-            out << "\timulq %r8, %rcx\n";   
-            out << "\taddq %rcx, %rax\n";   
-            
-            if (isVariable(i.op1.op)) {
-                Variable &src = getVariable(i.op1.op);
-                if (src.type == VarType::VAR_FLOAT) {
-                    out << "\tmovsd %xmm0, (%rax)\n";
-                } else if (src.type == VarType::VAR_BYTE) {
-                    out << "\tmovb %dl, (%rax)\n";
-                } else {
-                    out << "\tmovq %rdx, (%rax)\n";
-                }
             } else {
-                out << "\tmovq %rdx, (%rax)\n";
-            }
-        } else {
-            size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
-            
-            if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-                if (isVariable(i.op1.op)) {
-                    Variable &src = getVariable(i.op1.op);
-                    if (src.type == VarType::VAR_FLOAT) {
-                        out << "\tmovsd %xmm0, (%rax,%rcx," << stride << ")\n";
-                    } else if (src.type == VarType::VAR_BYTE) {
-                        out << "\tmovb %dl, (%rax,%rcx," << stride << ")\n";
-                    } else {
-                        out << "\tmovq %rdx, (%rax,%rcx," << stride << ")\n";
+                size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+                
+                if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+                    switch (dest.type) {
+                        case VarType::VAR_INTEGER:
+                        case VarType::VAR_POINTER:
+                        case VarType::VAR_EXTERN:
+                            out << "\tmovq (%rax,%rcx," << stride << "), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        case VarType::VAR_FLOAT:
+                            out << "\tmovsd (%rax,%rcx," << stride << "), %xmm0\n";
+                            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        case VarType::VAR_BYTE:
+                            out << "\tmovzbq (%rax,%rcx," << stride << "), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        default:
+                            throw mx::Exception("LOAD: unsupported destination type");
                     }
                 } else {
-                    out << "\tmovq %rdx, (%rax,%rcx," << stride << ")\n";
+                    out << "\timulq $" << stride << ", %rcx\n";
+                    out << "\taddq %rcx, %rax\n";
+                    
+                    switch (dest.type) {
+                        case VarType::VAR_INTEGER:
+                        case VarType::VAR_POINTER:
+                        case VarType::VAR_EXTERN:
+                            out << "\tmovq (%rax), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        case VarType::VAR_FLOAT:
+                            out << "\tmovsd (%rax), %xmm0\n";
+                            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        case VarType::VAR_BYTE:
+                            out << "\tmovzbq (%rax), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            break;
+                        default:
+                            throw mx::Exception("LOAD: unsupported destination type");
+                    }
                 }
+            }
+        } else {
+            switch (dest.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq (%rax,%rcx,1), %rdx\n";
+                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                    break;
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd (%rax,%rcx,1), %xmm0\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                    break;
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq (%rax,%rcx,1), %rdx\n";
+                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                    break;
+                default:
+                    throw mx::Exception("LOAD: unsupported destination type");
+            }
+        }
+    }
+
+    void Program::gen_store(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op2.op)) {
+            throw mx::Exception("STORE destination must be a pointer variable: " + i.op2.op);
+        }
+        Variable &ptrVar = getVariable(i.op2.op);
+
+        if (ptrVar.type == VarType::VAR_POINTER) {
+            out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        } else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0) {
+            out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        } else {
+            throw mx::Exception("STORE must target pointer or string buffer");
+        }
+
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
             } else {
-                out << "\timulq $" << stride << ", %rcx\n";
-                out << "\taddq %rcx, %rax\n";
+                out << "\tmovq $" << i.op3.op << ", %rcx\n";
+            }
+        } else {
+            out << "\txorq %rcx, %rcx\n";  
+        }
+
+        if (isVariable(i.op1.op)) {
+            Variable &src = getVariable(i.op1.op);
+            switch (src.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdx\n";
+                    break;
+                case VarType::VAR_STRING:
+                    out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdx\n";
+                    break;
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %rdx\n";
+                    break;
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
+                    break;
+                default:
+                    throw mx::Exception("STORE: unsupported source type");
+            }
+        } else {
+            out << "\tmovq $" << i.op1.op << ", %rdx\n";
+        }
+
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
+                out << "\timulq %r8, %rcx\n";   
+                out << "\taddq %rcx, %rax\n";   
                 
                 if (isVariable(i.op1.op)) {
                     Variable &src = getVariable(i.op1.op);
@@ -738,25 +702,55 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
                 } else {
                     out << "\tmovq %rdx, (%rax)\n";
                 }
+            } else {
+                size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+                
+                if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+                    if (isVariable(i.op1.op)) {
+                        Variable &src = getVariable(i.op1.op);
+                        if (src.type == VarType::VAR_FLOAT) {
+                            out << "\tmovsd %xmm0, (%rax,%rcx," << stride << ")\n";
+                        } else if (src.type == VarType::VAR_BYTE) {
+                            out << "\tmovb %dl, (%rax,%rcx," << stride << ")\n";
+                        } else {
+                            out << "\tmovq %rdx, (%rax,%rcx," << stride << ")\n";
+                        }
+                    } else {
+                        out << "\tmovq %rdx, (%rax,%rcx," << stride << ")\n";
+                    }
+                } else {
+                    out << "\timulq $" << stride << ", %rcx\n";
+                    out << "\taddq %rcx, %rax\n";
+                    
+                    if (isVariable(i.op1.op)) {
+                        Variable &src = getVariable(i.op1.op);
+                        if (src.type == VarType::VAR_FLOAT) {
+                            out << "\tmovsd %xmm0, (%rax)\n";
+                        } else if (src.type == VarType::VAR_BYTE) {
+                            out << "\tmovb %dl, (%rax)\n";
+                        } else {
+                            out << "\tmovq %rdx, (%rax)\n";
+                        }
+                    } else {
+                        out << "\tmovq %rdx, (%rax)\n";
+                    }
+                }
             }
-        }
-    } else {
-        if (isVariable(i.op1.op)) {
-            Variable &src = getVariable(i.op1.op);
-            if (src.type == VarType::VAR_FLOAT) {
-                out << "\tmovsd %xmm0, (%rax,%rcx,1)\n";
-            } else if (src.type == VarType::VAR_BYTE) {
-                out << "\tmovb %dl, (%rax,%rcx,1)\n";
+        } else {
+            if (isVariable(i.op1.op)) {
+                Variable &src = getVariable(i.op1.op);
+                if (src.type == VarType::VAR_FLOAT) {
+                    out << "\tmovsd %xmm0, (%rax,%rcx,1)\n";
+                } else if (src.type == VarType::VAR_BYTE) {
+                    out << "\tmovb %dl, (%rax,%rcx,1)\n";
+                } else {
+                    out << "\tmovq %rdx, (%rax,%rcx,1)\n";
+                }
             } else {
                 out << "\tmovq %rdx, (%rax,%rcx,1)\n";
             }
-        } else {
-            out << "\tmovq %rdx, (%rax,%rcx,1)\n";
         }
     }
-}
-
-
 
     void Program::gen_free(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) {
@@ -1576,51 +1570,49 @@ void Program::gen_store(std::ostream &out, const Instruction &i) {
             }
         }
     }
+
     void Program::gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
-         if(i.op3.op.empty()) {
-            if(isVariable(i.op1.op)) {
-                Variable &v = getVariable(i.op1.op);
-                if(v.type == VarType::VAR_INTEGER) {
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op1);
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op2);
-                    if(arth == "mul")
-                        arth = "imul";
-                    out << "\t" << arth << "q %r11, %r10\n";
-                    out << "\tmovq %r10, " << getMangledName(i.op1) << "(%rip)\n";
-                } else if(v.type == VarType::VAR_FLOAT) {
-                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
-                    generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
-                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                } else {
-                    
-                    throw mx::Exception("Variable type not impelmented for add function");
-                }
+        auto emitIntegerOp = [&](const Operand &lhs, const Operand &rhs, const Operand &dest) {
+            generateLoadVar(out, VarType::VAR_INTEGER, "%r10", lhs);
+            generateLoadVar(out, VarType::VAR_INTEGER, "%r11", rhs);
+            if (arth == "mul") arth = "imul";
+            out << "\t" << arth << "q %r11, %r10\n";
+            out << "\tmovq %r10, " << getMangledName(dest) << "(%rip)\n";
+        };
+
+        if (i.op3.op.empty()) {
+            if (!isVariable(i.op1.op)) {
+                throw mx::Exception("First argument of arithmetic must be a variable: " + i.op1.op);
+            }
+            Variable &v = getVariable(i.op1.op);
+
+            if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
+                emitIntegerOp(i.op1, i.op2, i.op1);
+            } else if (v.type == VarType::VAR_FLOAT) {
+                generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
             } else {
-                throw mx::Exception("First argument: " + i.op1.op + " of add instruction must ba a variable.");
+                throw mx::Exception("Unsupported variable type for arithmetic");
             }
-         } else {
-            if(isVariable(i.op1.op)) {
-                Variable &v = getVariable(i.op1.op);
-                if(v.type == VarType::VAR_INTEGER) {
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%r10", i.op2);
-                    generateLoadVar(out, VarType::VAR_INTEGER, "%r11", i.op3);
-                    if(arth == "mul")
-                        arth = "imul";
-                    out << "\t" << arth << "q %r11, %r10\n";
-                    out << "\tmovq %r10, " << getMangledName(i.op1) << "(%rip)\n";
-                } else if(v.type == VarType::VAR_FLOAT) {
-                    generateLoadVar(out,VarType::VAR_FLOAT,"%xmm0", i.op2);
-                    generateLoadVar(out,VarType::VAR_FLOAT, "%xmm1", i.op3);
-                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                } else {
-                    throw mx::Exception("Variable type not impelmented for add function");
-                }
-            } else{
-                throw mx::Exception("First argument of add instruction must be a variable.\n");
+        } else {
+            if (!isVariable(i.op1.op)) {
+                throw mx::Exception("First argument of arithmetic must be a variable: " + i.op1.op);
             }
-         }
+            Variable &v = getVariable(i.op1.op);
+
+            if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
+                emitIntegerOp(i.op2, i.op3, i.op1);
+            } else if (v.type == VarType::VAR_FLOAT) {
+                generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
+                out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+            } else {
+                throw mx::Exception("Unsupported variable type for arithmetic");
+            }
+        }
     }
 
     void Program::gen_exit(std::ostream &out, const Instruction &i) {
