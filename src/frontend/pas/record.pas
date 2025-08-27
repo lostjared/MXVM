@@ -3,7 +3,6 @@ type
   Point = record
     x: integer;
     y: integer;
-    value: string;
     test_val: real;
   end;
 var
@@ -25,10 +24,8 @@ begin
   p.x := 5;
   p.y := 10;
   p.test_val := 25.0;
-  p.value := 'test 1 2 3';
-  z := p.x * p.y;
+   z := p.x * p.y;
   printPoint(p);
   writeln('equals: ', z);
-  writeln(p.value);
   writeln(p.test_val);
 end.

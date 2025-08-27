@@ -1268,6 +1268,24 @@ namespace pascal {
             if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
         }
 
+        void emitArrayBoundsCheck(const std::string& idxReg, int lower, int upper) {
+#ifdef MXVM_BOUNDS_CHECK
+            std::string L_ok = newLabel("IDX_OK");
+            std::string L_fail = newLabel("IDX_OOB");
+            std::string t = allocReg();
+            emit2("mov", t, idxReg);
+            emit2("cmp", t, std::to_string(lower));
+            emit1("jl", L_fail);
+            emit2("cmp", t, std::to_string(upper));
+            emit1("jg", L_fail);
+            emit1("jmp", L_ok);
+            emitLabel(L_fail);
+            emit1("exit", "1");
+            emitLabel(L_ok);
+            if (isReg(t)) freeReg(t);
+#endif
+        }
+
         std::string getVarRecordTypeNameFromExpr(ASTNode* expr) {
             if (auto v = dynamic_cast<VariableNode*>(expr)) {
                 auto paramIt = currentParamTypes.find(v->name);
@@ -1760,26 +1778,6 @@ namespace pascal {
             return 8;
         }
 
-    void emitArrayBoundsCheck(const std::string& idxReg, int lower, int upper) {
-        #ifdef MXVM_BOUNDS_CHECK
-            
-            std::string L_ok = newLabel("IDX_OK");
-            std::string L_fail = newLabel("IDX_OOB");
-            std::string t = allocReg();
-            emit2("mov", t, idxReg);
-            emit2("cmp", t, std::to_string(lower));
-            emit1("jl", L_fail);
-            emit2("cmp", t, std::to_string(upper));
-            emit1("jg", L_fail);
-            emit1("jmp", L_ok);
-            emitLabel(L_fail);
-            emit1("exit", "1");        
-            emitLabel(L_ok);
-            if (!isParmReg(idxReg) && isReg(idxReg)) freeReg(idxReg);
-        #endif
-    }
-
-
     void visit(ArrayDeclarationNode& node) override {
         std::string mangledName = findMangledName(node.name);
         std::string elementType = node.arrayType->elementType;
@@ -1839,19 +1837,20 @@ namespace pascal {
             idx = intIdx;
         }
 
-        #ifdef MXVM_BOUNDS_CHECK
+    #ifdef MXVM_BOUNDS_CHECK
         {
             std::string idxCopy = allocReg();
             emit2("mov", idxCopy, idx);
             emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
+            if (isReg(idxCopy)) freeReg(idxCopy);
         }
-        #endif
+    #endif
 
         std::string offset = allocReg();
         emit2("mov", offset, idx);
         if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
-
         emit2("mul", offset, std::to_string(info->elementSize));
+
         std::string base;
         if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
             std::string mangledArrayName = findMangledArrayName(var->name);
@@ -1862,7 +1861,6 @@ namespace pascal {
             std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
             auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
             int fieldOffset = ofs_sz.first;
-            
             std::string arrayPtr = allocTempPtr();
             emit2("mov", arrayPtr, recPtr);
             emit2("add", arrayPtr, std::to_string(fieldOffset));
@@ -1871,28 +1869,25 @@ namespace pascal {
             throw std::runtime_error("Unsupported array base in access");
         }
 
+        VarType elemType = getExpressionType(&node);
         if (isRecordTypeName(info->elementType)) {
             std::string elemPtr = allocTempPtr();
             emit2("mov", elemPtr, base);
             emit2("add", elemPtr, offset);
             pushValue(elemPtr);
         } else {
-            VarType elemType = getExpressionType(&node);
-            if (elemType == VarType::PTR || elemType == VarType::RECORD || elemType == VarType::STRING) {
-                std::string elemPtr = allocTempPtr();
-                emit2("mov", elemPtr, base);
-                emit2("add", elemPtr, offset);
-                pushValue(elemPtr);
-            } else {
-                std::string dst = (elemType == VarType::DOUBLE) ? allocFloatReg() : allocReg();
-                emit4("load", dst, base, offset, std::to_string(info->elementSize));
-                pushValue(dst);
-            }
+            std::string dst;
+            if (elemType == VarType::DOUBLE) dst = allocFloatReg();
+            else if (elemType == VarType::PTR || elemType == VarType::STRING) dst = allocTempPtr();
+            else dst = allocReg();
+            emit4("load", dst, base, offset, std::to_string(info->elementSize));
+            pushValue(dst);
         }
 
         if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
         freeReg(offset);
-    }   
+    }
+   
 
     void emitArrayAlloc(const std::string& name, int elemSize, int numElements) {
         emit3("alloc", name, std::to_string(elemSize), std::to_string(numElements));
@@ -1971,39 +1966,67 @@ namespace pascal {
         }
     }
 
-        void visit(ArrayAssignmentNode& node) override {
-            auto it = arrayInfo.find(node.arrayName);
-            if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
-            ArrayInfo &info = it->second;
+   void visit(ArrayAssignmentNode& node) override {
+        auto it = arrayInfo.find(node.arrayName);
+        if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
+        ArrayInfo &info = it->second;
 
-            std::string value = eval(node.value.get());
-            std::string index = eval(node.index.get());
-            if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
-                std::string intIndex = allocReg();
-                emit2("to_int", intIndex, index);  
-                if (isReg(index) && !isParmReg(index)) freeReg(index);
-                index = intIndex;
-            }
-
-            std::string mangled = findMangledArrayName(node.arrayName);
-            std::string offsetReg = allocReg();
-            emit2("mov", offsetReg, index);
-            if (info.lowerBound != 0) emit2("sub", offsetReg, std::to_string(info.lowerBound));
-            
-            emit4("store", value, mangled, offsetReg, "8");
-
-            if (isReg(value) && !isParmReg(value)) freeReg(value);
+        std::string value = eval(node.value.get());
+        std::string index = eval(node.index.get());
+        if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
+            std::string intIndex = allocReg();
+            emit2("to_int", intIndex, index);
             if (isReg(index) && !isParmReg(index)) freeReg(index);
-            freeReg(offsetReg);
+            index = intIndex;
+        }
+    #ifdef MXVM_BOUNDS_CHECK
+        {
+            std::string idxCopy = allocReg();
+            emit2("mov", idxCopy, index);
+            emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
+            if (isReg(idxCopy)) freeReg(idxCopy);
+        }
+    #endif
+        std::string offsetReg = allocReg();
+        emit2("mov", offsetReg, index);
+        if (info.lowerBound != 0) emit2("sub", offsetReg, std::to_string(info.lowerBound));
+        emit2("mul", offsetReg, std::to_string(info.elementSize));
+
+        VarType elemType = VarType::INT;
+        if (info.elementType == "real") elemType = VarType::DOUBLE;
+        else if (info.elementType == "string" || info.elementType == "ptr") elemType = VarType::PTR;
+        else if (isRecordTypeName(info.elementType)) elemType = VarType::RECORD;
+
+        VarType rhsType = getExpressionType(node.value.get());
+        if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(value)) {
+            std::string f = allocFloatReg();
+            emit2("to_float", f, value);
+            if (isReg(value) && !isParmReg(value)) freeReg(value);
+            value = f;
+        } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(value)) {
+            std::string i = allocReg();
+            emit2("to_int", i, value);
+            if (isReg(value) && !isParmReg(value)) freeReg(value);
+            value = i;
         }
 
-        int getRecordTypeSize(const std::string& typeName) {
-            auto it = recordTypes.find(typeName);
-            if (it != recordTypes.end()) {
-                return it->second.size;
-            }
-            return 8;  
+        std::string mangled = findMangledArrayName(node.arrayName);
+        std::string base = ensurePtrBase(mangled);
+        emit4("store", value, base, offsetReg, std::to_string(info.elementSize));
+
+        if (isReg(value) && !isParmReg(value)) freeReg(value);
+        if (isReg(index) && !isParmReg(index)) freeReg(index);
+        freeReg(offsetReg);
+    }
+
+
+    int getRecordTypeSize(const std::string& typeName) {
+        auto it = recordTypes.find(typeName);
+        if (it != recordTypes.end()) {
+            return it->second.size;
         }
+        return 8;  
+    }
 
         void visitArrayAssignment(ArrayAccessNode& node, const std::string& value) {
             std::string arrayName = getArrayNameFromBase(node.base.get());

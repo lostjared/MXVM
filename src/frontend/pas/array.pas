@@ -1,6 +1,6 @@
 program ArrayExample;
 var
-  numbers: array[1..5] of integer;  { array of 5 integers }
+  numbers: array[1..5] of real; 
   i: integer;
 
 begin
