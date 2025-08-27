@@ -290,7 +290,7 @@ namespace mxvm {
             out << "main:\n";
             out << "\tpush %rbp\n";
             out << "\tmov %rsp, %rbp\n";
-            
+            x64_sp_mod16 = 8;
             if(uses_std_module) {
                 out << "\t# Set up program arguments for std module\n";
                 out << "\tmov %rcx, %r12\n";
@@ -313,7 +313,7 @@ namespace mxvm {
                     out << name + "_" + l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
-                    x64_sp_mod16 = 0; 
+                     x64_sp_mod16 = 8 ; 
                     break;
                 }
             }
