@@ -4,3 +4,4 @@
 *.txt
 *.s
 debug_info.txt
+*.o
