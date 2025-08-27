@@ -1016,7 +1016,7 @@ namespace mxvm {
         } else {
             if (isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
-                if (v.type == VarType::VAR_INTEGER) {
+                if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
                     if (arth == "mul") arth = "imul";
