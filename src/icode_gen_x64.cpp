@@ -159,20 +159,29 @@ namespace mxvm {
 
         static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
         unsigned xmm_count = 0;
+        unsigned int_count = 0;
+
         for (size_t i = 0; i < args.size() && i < 4; i++) {
             VarType t = VarType::VAR_INTEGER;
-            if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
+            if (isVariable(args[i].op)) {
+                t = getVariable(args[i].op).type;
+            }
+
             if (t == VarType::VAR_FLOAT) {
-                std::string xmm = "%xmm" + std::to_string((int)i);
-                x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm, args[i]);
+                std::string xmm_reg = "%xmm" + std::to_string(i);
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, xmm_reg, args[i]);
                 xmm_count++;
             } else {
                 x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
+                int_count++;
             }
         }
 
-        if (xmm_count == 0) out << "\txor %eax, %eax\n";
-        else out << "\tmov $" << (unsigned)xmm_count << ", %al\n";
+        if (name == "printf") {
+             out << "\tmov $" << xmm_count << ", %al\n";
+        } else {
+             out << "\txor %eax, %eax\n";
+        }
 
         out << "\tcall " << name << "\n";
         x64_release_call_area(out, frame);
