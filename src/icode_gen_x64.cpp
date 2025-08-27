@@ -626,48 +626,56 @@ namespace mxvm {
             throw mx::Exception("LOAD: invalid base type");
         }
 
-        
         if (ptrVar.type == VarType::VAR_POINTER) {
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-        } else {
+        } else { 
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
         }
-
+        
+        
         out << "\ttest %rax, %rax\n";
         out << "\tjz .null_ptr_error_" << error_label_count << "\n";
 
+        
+        size_t base_offset = 0;
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
                 out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
             } else {
-                out << "\tmovq $" << i.op3.op << ", %rcx\n";
+                base_offset = std::stoll(i.op3.op);
+                out << "\tmovq $" << base_offset << ", %rcx\n";
             }
         } else {
             out << "\txorq %rcx, %rcx\n";
         }
 
-        if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            const std::string &sv = i.vop[0].op;
-            if (isVariable(sv)) {
-                out << "\tmovq " << getMangledName(sv) << "(%rip), %r8\n";
-                out << "\timulq %r8, %rcx\n";
-            } else {
-                long long val = std::stoll(sv);
-                if (val == 1) {
-                } else if (val == 2) {
-                    out << "\tshlq $1, %rcx\n";
-                } else if (val == 4) {
-                    out << "\tshlq $2, %rcx\n";
-                } else if (val == 8) {
-                    out << "\tshlq $3, %rcx\n";
-                } else {
-                    out << "\timulq $" << sv << ", %rcx\n";
-                }
-            }
-        }
-
+        
         out << "\taddq %rcx, %rax\n";
 
+        
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
+            } else {
+                out << "\tmovq $" << i.vop[0].op << ", %r8\n";
+            }
+            
+        
+            if (i.vop.size() > 1 && !i.vop[1].op.empty()) {
+                if (isVariable(i.vop[1].op)) {
+                    out << "\tmovq " << getMangledName(i.vop[1]) << "(%rip), %r9\n";
+                    out << "\timulq %r9, %r8\n";
+                } else {
+                    size_t stride = static_cast<size_t>(std::stoll(i.vop[1].op, nullptr, 0));
+                    out << "\timulq $" << stride << ", %r8\n";
+                }
+            }
+            
+            
+            out << "\taddq %r8, %rax\n";
+        }
+
+        
         switch (dest.type) {
             case VarType::VAR_INTEGER:
             case VarType::VAR_POINTER:
@@ -686,61 +694,79 @@ namespace mxvm {
             default:
                 throw mx::Exception("LOAD: unsupported destination type");
         }
-
+        
+        
         out << "\tjmp .load_done_" << error_label_count << "\n";
         out << ".null_ptr_error_" << error_label_count << ":\n";
         out << "\t# Handle null pointer error\n";
         out << ".load_done_" << error_label_count << ":\n";
-
+        
         error_label_count++;
     }
-    
+        
 
     void Program::x64_gen_store(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op2.op)) {
             throw mx::Exception("STORE destination must be a variable");
         }
-        
+
         Variable& ptrVar = getVariable(i.op2.op);
         if (ptrVar.type != VarType::VAR_POINTER && 
             !(ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0)) {
             throw mx::Exception("STORE destination must be a pointer or string buffer");
         }
-        
+
         
         if (ptrVar.type == VarType::VAR_POINTER) {
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         } else { 
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         }
+
      
         out << "\ttest %rcx, %rcx\n";
         out << "\tjz .null_ptr_error_" << error_label_count << "\n";
-        
+
+     
+        size_t base_offset = 0;
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
                 out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rdx\n";
             } else {
-                out << "\tmovq $" << i.op3.op << ", %rdx\n";
+                base_offset = std::stoll(i.op3.op);
+                out << "\tmovq $" << base_offset << ", %rdx\n";
             }
         } else {
             out << "\txorq %rdx, %rdx\n";
         }
-        
+
+     
+        out << "\taddq %rdx, %rcx\n";
+
+     
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
                 out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
-                out << "\timulq %r8, %rdx\n";
             } else {
-                size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
-                if (stride > 1) {
-                    out << "\timulq $" << stride << ", %rdx\n";
+                out << "\tmovq $" << i.vop[0].op << ", %r8\n";
+            }
+            
+     
+            if (i.vop.size() > 1 && !i.vop[1].op.empty()) {
+                if (isVariable(i.vop[1].op)) {
+                    out << "\tmovq " << getMangledName(i.vop[1]) << "(%rip), %r9\n";
+                    out << "\timulq %r9, %r8\n";
+                } else {
+                    size_t stride = static_cast<size_t>(std::stoll(i.vop[1].op, nullptr, 0));
+                    out << "\timulq $" << stride << ", %r8\n";
                 }
             }
+            
+     
+            out << "\taddq %r8, %rcx\n";
         }
-        
-        out << "\taddq %rdx, %rcx\n";
-        
+
+     
         if (isVariable(i.op1.op)) {
             Variable& src = getVariable(i.op1.op);
             switch (src.type) {
@@ -766,27 +792,31 @@ namespace mxvm {
                     throw mx::Exception("STORE: unsupported source type");
             }
         } else {
+     
             if (i.op1.op.find('.') != std::string::npos || 
                 i.op1.op.find('e') != std::string::npos || 
                 i.op1.op.find('E') != std::string::npos) {
+     
                 double val = std::stod(i.op1.op);
                 uint64_t bits;
                 memcpy(&bits, &val, sizeof(bits));
                 out << "\tmovq $" << bits << ", %rax\n";
                 out << "\tmovq %rax, (%rcx)\n";
             } else {
+     
                 out << "\tmovq $" << i.op1.op << ", %rax\n";
                 out << "\tmovq %rax, (%rcx)\n";
             }
         }
-        
+    `
         out << "\tjmp .store_done_" << error_label_count << "\n";
         out << ".null_ptr_error_" << error_label_count << ":\n";
         out << "\t# Handle null pointer error\n";
         out << ".store_done_" << error_label_count << ":\n";
-        
+
         error_label_count++;
-    }    
+    }
+
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         size_t total = x64_reserve_call_area(out, 0);
