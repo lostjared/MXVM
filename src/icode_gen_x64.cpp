@@ -30,14 +30,16 @@ namespace mxvm {
     }
 
     size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
-            const size_t need = 32 + spill_bytes;
-            const size_t aligned_need = (need + 15) & ~15;
-            out << "\tsub $" << aligned_need << ", %rsp\n";
-            return aligned_need;
+        const size_t need = 32 + spill_bytes;
+        const size_t aligned_need = (need + 15) & ~15;
+        out << "\tsub $" << aligned_need << ", %rsp\n";
+        x64_sp_mod16 = (x64_sp_mod16 + aligned_need) % 16;
+        return aligned_need;
     }
 
     void Program::x64_release_call_area(std::ostream &out, size_t total) {
         out << "\tadd $" << total << ", %rsp\n";
+        x64_sp_mod16 = (x64_sp_mod16 + (16 - (total % 16))) % 16;
     }
      void Program::x64_emit_iob_func(std::ostream &out, int index, const std::string &dstReg) {
         out << "\tmov $" << index << ", %ecx\n";
@@ -128,9 +130,10 @@ namespace mxvm {
         };
         return funcs.count(funcName) > 0;
     }
+    
     void Program::x64_generateFunctionCall(std::ostream &out,
-                                    const std::string &name,
-                                    std::vector<Operand> &args) {
+                                        const std::string &name,
+                                        std::vector<Operand> &args) {
         xmm_offset = 0;
         const size_t stack_args = (args.size() > 4) ? (args.size() - 4) : 0;
         const size_t spill_bytes = stack_args * 8;
@@ -153,7 +156,7 @@ namespace mxvm {
                     const size_t off = 32 + 8 * (int_count - 4);
                     x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm7", args[i]);
                     out << "\tmovsd %xmm7, " << off << "(%rsp)\n";
-                    int_count++;
+                    int_count++; 
                 }
             } else {
                 if (int_count < 4) {
@@ -605,7 +608,7 @@ namespace mxvm {
                     out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
                 } else if (dest.type == VarType::VAR_BYTE) {
                     out << "\tmovb $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
-                } else { // Integer, Pointer
+                } else { 
                     out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
                 }
             }
@@ -623,12 +626,13 @@ namespace mxvm {
             throw mx::Exception("LOAD: invalid base type");
         }
 
+        
         if (ptrVar.type == VarType::VAR_POINTER) {
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-        } else { 
+        } else {
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
         }
-        
+
         out << "\ttest %rax, %rax\n";
         out << "\tjz .null_ptr_error_" << error_label_count << "\n";
 
@@ -682,12 +686,12 @@ namespace mxvm {
             default:
                 throw mx::Exception("LOAD: unsupported destination type");
         }
-        
+
         out << "\tjmp .load_done_" << error_label_count << "\n";
         out << ".null_ptr_error_" << error_label_count << ":\n";
         out << "\t# Handle null pointer error\n";
         out << ".load_done_" << error_label_count << ":\n";
-        
+
         error_label_count++;
     }
     
@@ -709,9 +713,9 @@ namespace mxvm {
         } else { 
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         }
-        
+     
         out << "\ttest %rcx, %rcx\n";
-        out << "\tjz .null_ptr_error_" <<+error_label_count << "\n";
+        out << "\tjz .null_ptr_error_" << error_label_count << "\n";
         
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
@@ -782,8 +786,7 @@ namespace mxvm {
         out << ".store_done_" << error_label_count << ":\n";
         
         error_label_count++;
-    }
-    
+    }    
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
         size_t total = x64_reserve_call_area(out, 0);
