@@ -808,7 +808,7 @@ namespace mxvm {
                 out << "\tmovq %rax, (%rcx)\n";
             }
         }
-    `
+    
         out << "\tjmp .store_done_" << error_label_count << "\n";
         out << ".null_ptr_error_" << error_label_count << ":\n";
         out << "\t# Handle null pointer error\n";
