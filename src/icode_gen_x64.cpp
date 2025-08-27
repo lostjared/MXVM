@@ -301,8 +301,6 @@ namespace mxvm {
             }
         }
 
-        x64_sp_mod16 = 0; 
-
         bool done_found = false;
 
         for (size_t i = 0; i < inc.size(); ++i) {
