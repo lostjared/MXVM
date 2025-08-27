@@ -523,35 +523,76 @@ namespace mxvm {
     }
 
     void Program::x64_gen_mov(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op)) throw mx::Exception("mov first operand must be variable");
-        Variable &v = getVariable(i.op1.op);
-        if (isVariable(i.op2.op)) {
-            Variable &v2 = getVariable(i.op2.op);
-            if (v2.type != v.type) {
-                if (v.type == VarType::VAR_POINTER && v2.type == VarType::VAR_STRING) {
-                    out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
-                    getVariable(i.op1.op).var_value.owns = false;
-                    return;
-                }
-                throw mx::Exception("mov type mismatch");
+            if (!isVariable(i.op1.op)) {
+                throw mx::Exception("MOV first operand must be a variable");
             }
-            if (v.type == VarType::VAR_POINTER) getVariable(i.op1.op).var_value.owns = false;
-            switch (v.type) {
-                case VarType::VAR_INTEGER: x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2); out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n"; break;
-                case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:  x64_generateLoadVar(out, v.type, "%rax", i.op2); out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n"; break;
-                case VarType::VAR_FLOAT:   x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2); out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n"; break;
-                case VarType::VAR_STRING:  x64_generateLoadVar(out, VarType::VAR_STRING, "%rax", i.op2); out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n"; break;
-                case VarType::VAR_BYTE:    x64_generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2); out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n"; break;
-                default: throw mx::Exception("mov unsupported type");
-            }
-        } else {
-            if (i.op2.type == OperandType::OP_CONSTANT)
-                out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
-        }
-    }
+            Variable &dest = getVariable(i.op1.op);
 
+            if (isVariable(i.op2.op)) {
+                Variable &src = getVariable(i.op2.op);
+
+                if (dest.type == src.type) {
+                    
+                    if (dest.type == VarType::VAR_FLOAT) {
+                        x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                    } else if (dest.type == VarType::VAR_BYTE) {
+                        x64_generateLoadVar(out, VarType::VAR_BYTE, "%rax", i.op2);
+                        out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
+                    } else { 
+                        x64_generateLoadVar(out, dest.type, "%rax", i.op2);
+                        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    }
+                } else {
+                
+                    if (dest.type == VarType::VAR_FLOAT) { 
+                        if (src.type == VarType::VAR_INTEGER || src.type == VarType::VAR_BYTE) {
+                            x64_generateLoadVar(out, src.type, "%rax", i.op2);
+                            out << "\tcvtsi2sdq %rax, %xmm0\n";
+                            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                        } else {
+                            throw mx::Exception("MOV: unsupported conversion to float");
+                        }
+                    } else if (src.type == VarType::VAR_FLOAT) { 
+                        if (dest.type == VarType::VAR_INTEGER || dest.type == VarType::VAR_BYTE) {
+                            x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                            out << "\tcvttsd2siq %xmm0, %rax\n"; 
+                            if (dest.type == VarType::VAR_BYTE) {
+                                out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
+                            } else {
+                                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                            }
+                        } else {
+                            throw mx::Exception("MOV: unsupported conversion from float");
+                        }
+                    } else if (dest.type == VarType::VAR_POINTER && src.type == VarType::VAR_STRING) {
+                        out << "\tleaq " << getMangledName(i.op2.op) << "(%rip), %rax\n";
+                        out << "\tmovq %rax, " << getMangledName(i.op1.op) << "(%rip)\n";
+                        getVariable(i.op1.op).var_value.owns = false;
+                    } else { 
+                        x64_generateLoadVar(out, src.type, "%rax", i.op2); 
+                        if (dest.type == VarType::VAR_BYTE) {
+                            out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
+                        } else {
+                            out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                        }
+                    }
+                }
+            } else {
+                if (dest.type == VarType::VAR_FLOAT) {
+                    double val = std::stod(i.op2.op);
+                    uint64_t bits;
+                    std::memcpy(&bits, &val, sizeof(bits));
+                    out << "\tmovq $" << bits << ", %rax\n";
+                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                } else if (dest.type == VarType::VAR_BYTE) {
+                    out << "\tmovb $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+                } else { // Integer, Pointer
+                    out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+                }
+            }
+        }
+    
 
 void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
     if (!isVariable(i.op1.op)) throw mx::Exception("LOAD dest must be variable");
