@@ -546,61 +546,82 @@ namespace mxvm {
     }
 
 
-    void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
-        if (!isVariable(i.op1.op)) throw mx::Exception("LOAD dest must be variable");
-        Variable &dest = getVariable(i.op1.op);
-        if (!isVariable(i.op2.op)) throw mx::Exception("LOAD source must be pointer variable");
-        Variable &ptrVar = getVariable(i.op2.op);
+void Program::x64_gen_load(std::ostream &out, const Instruction &i) {
+    if (!isVariable(i.op1.op)) throw mx::Exception("LOAD dest must be variable");
+    Variable &dest = getVariable(i.op1.op);
+    if (!isVariable(i.op2.op)) throw mx::Exception("LOAD source must be pointer variable");
+    Variable &ptrVar = getVariable(i.op2.op);
 
-        size_t stride = 8; 
-        if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            stride = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
-        }
+    if (!i.op3.op.empty())
+        x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+    else
+        out << "\txorq %rcx, %rcx\n";
 
-        
-        if (!i.op3.op.empty()) {
-            x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
-        } else {
-            out << "\txorq %rcx, %rcx\n";
-        }
-
-        
-        if (ptrVar.type == VarType::VAR_POINTER) {
-            out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-        } else if (ptrVar.type == VarType::VAR_STRING) {
-            out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
-        } else {
-            throw mx::Exception("Load invalid type: " + i.op2.op);
-        }
-
-        std::string mem_operand;
-        if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-            mem_operand = "(%rax, %rcx, " + std::to_string(stride) + ")";
-        } else {
-            out << "\timulq $" << stride << ", %rcx\n";
-            out << "\taddq %rcx, %rax\n";
-            mem_operand = "(%rax)";
-        }
-        
-        switch (dest.type) {
-            case VarType::VAR_INTEGER:
-            case VarType::VAR_POINTER:
-            case VarType::VAR_EXTERN:
-                out << "\tmovq " << mem_operand << ", %rdx\n";
-                out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            case VarType::VAR_FLOAT:
-                out << "\tmovsd " << mem_operand << ", %xmm0\n";
-                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            case VarType::VAR_BYTE:
-                out << "\tmovb " << mem_operand << ", %dl\n";
-                out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
-                break;
-            default:
-                throw mx::Exception("LOAD: unsupported destination type");
-        }
+    if (ptrVar.type == VarType::VAR_POINTER) {
+        out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+    } else if (ptrVar.type == VarType::VAR_STRING) {
+        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
+    } else {
+        throw mx::Exception("Load invalid base type: " + i.op2.op);
     }
+
+    if (!i.vop.empty() && !i.vop[0].op.empty()) {
+        const std::string &sv = i.vop[0].op;
+        if (!isVariable(sv)) {
+            char *endp = nullptr;
+            errno = 0;
+            long long val = strtoll(sv.c_str(), &endp, 0);
+            if (errno == 0 && endp && *endp == '\0') {
+                if (val == 1 || val == 2 || val == 4 || val == 8) {
+                    out << "\t# scaled-index addressing\n";
+                    switch (dest.type) {
+                        case VarType::VAR_INTEGER:
+                        case VarType::VAR_POINTER:
+                        case VarType::VAR_EXTERN:
+                            out << "\tmovq " << "(%rax,%rcx," << val << "), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            return;
+                        case VarType::VAR_FLOAT:
+                            out << "\tmovsd " << "(%rax,%rcx," << val << "), %xmm0\n";
+                            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                            return;
+                        case VarType::VAR_BYTE:
+                            out << "\tmovzbq " << "(%rax,%rcx," << val << "), %rdx\n";
+                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            return;
+                        default: throw mx::Exception("LOAD: unsupported destination type");
+                    }
+                }
+            }
+        }
+        if (isVariable(sv)) {
+            x64_generateLoadVar(out, VarType::VAR_INTEGER, "%r8", i.vop[0]);
+            out << "\timulq %r8, %rcx\n";
+        } else {
+            out << "\timulq $" << sv << ", %rcx\n";
+        }
+        out << "\taddq %rcx, %rax\n";
+    }
+
+    switch (dest.type) {
+        case VarType::VAR_INTEGER:
+        case VarType::VAR_POINTER:
+        case VarType::VAR_EXTERN:
+            out << "\tmovq (%rax), %rdx\n";
+            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+            break;
+        case VarType::VAR_FLOAT:
+            out << "\tmovsd (%rax), %xmm0\n";
+            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+            break;
+        case VarType::VAR_BYTE:
+            out << "\tmovzbq (%rax), %rdx\n";
+            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+            break;
+        default:
+            throw mx::Exception("LOAD: unsupported destination type");
+    }
+}
 
     void Program::x64_gen_store(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op2.op)) throw mx::Exception("STORE destination must be pointer variable: " + i.op2.op);
@@ -619,25 +640,48 @@ namespace mxvm {
         else
             out << "\txorq %rcx, %rcx\n";
 
-        size_t stride = 8;
-        if (!i.vop.empty() && !i.vop[0].op.empty())
-            stride = (size_t)std::stoll(i.vop[0].op, nullptr, 0);
+        std::string mem_operand = "(%rax,%rcx,1)"; 
+        bool can_use_scaled = false;
+        long long cstride = 1;
 
-        std::string mem_operand;
-        if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
-            mem_operand = "(%rax, %rcx, " + std::to_string(stride) + ")";
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            const std::string &sv = i.vop[0].op;
+            if (!isVariable(sv)) {
+                char *endp = nullptr;
+                errno = 0;
+                long long val = strtoll(sv.c_str(), &endp, 0);
+                if (errno == 0 && endp && *endp == '\0' && (val == 1 || val == 2 || val == 4 || val == 8)) {
+                    can_use_scaled = true;
+                    cstride = val;
+                }
+            }
+            if (can_use_scaled) {
+                mem_operand = "(%rax,%rcx," + std::to_string(cstride) + ")";
+            } else {
+                if (isVariable(sv)) {
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%r8", i.vop[0]);
+                    out << "\timulq %r8, %rcx\n";
+                } else {
+                    out << "\timulq $" << sv << ", %rcx\n";
+                }
+                out << "\taddq %rcx, %rax\n";
+                mem_operand = "(%rax)";
+            }
         } else {
-            out << "\timulq $" << stride << ", %rcx\n";
-            out << "\taddq %rcx, %rax\n";
-            mem_operand = "(%rax)";
+            mem_operand = "(%rax,%rcx,1)";
         }
 
+        // constant source?
         if (!isVariable(i.op1.op) && i.op1.type == OperandType::OP_CONSTANT) {
             unsigned long long value = std::stoull(i.op1.op, nullptr, 0);
-            if (stride == 1)       out << "\tmovb $" << (value & 0xFFull) << ", " << mem_operand << "\n";
-            else if (stride == 2)  out << "\tmovw $" << (value & 0xFFFFull) << ", " << mem_operand << "\n";
-            else if (stride == 4)  out << "\tmovl $" << (value & 0xFFFFFFFFull) << ", " << mem_operand << "\n";
-            else                   out << "\tmovq $" << value << ", " << mem_operand << "\n";
+            if (can_use_scaled) {
+                if (cstride == 1)       out << "\tmovb $" << (value & 0xFFull)        << ", " << mem_operand << "\n";
+                else if (cstride == 2)  out << "\tmovw $" << (value & 0xFFFFull)      << ", " << mem_operand << "\n";
+                else if (cstride == 4)  out << "\tmovl $" << (value & 0xFFFFFFFFull)  << ", " << mem_operand << "\n";
+                else                    out << "\tmovq $" <<  value                    << ", " << mem_operand << "\n";
+            } else {
+                out << "\tmovq $" << value << ", " << mem_operand << "\n";
+            }
             return;
         }
 
@@ -661,10 +705,10 @@ namespace mxvm {
                 out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
                 out << "\tmovsd %xmm0, " << mem_operand << "\n";
                 break;
-            default: throw mx::Exception("STORE: unsupported source type");
+            default:
+                throw mx::Exception("STORE: unsupported source type");
         }
     }
-
 
     void Program::x64_gen_to_int(std::ostream &out, const Instruction &i) {
         out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rcx\n";
