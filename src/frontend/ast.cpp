@@ -334,4 +334,12 @@ namespace pascal {
         return "TypeAliasNode(" + typeName + " = " + baseType + ")";
     }
 
+    std::string ExitNode::toString() const {
+        return "exit";
+    }
+
+    void ExitNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
 }

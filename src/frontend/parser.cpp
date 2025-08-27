@@ -63,7 +63,7 @@ namespace pascal {
                lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
                lower == "and" || lower == "or" || lower == "not" ||
                lower == "case" || lower == "of" || lower == "repeat" || lower == "until" || 
-               lower == "array" || lower == "of" || lower == "type" || lower == "record";
+               lower == "array" || lower == "of" || lower == "type" || lower == "record" || lower == "exit";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseArrayDeclaration(const std::string& varName) {
@@ -218,7 +218,24 @@ namespace pascal {
             return emptyNode;
         }
 
-        if (peekIs("begin")) {
+        if (peekIs("exit")) {
+            int lineNum = token->getLine();
+            next(); 
+            std::unique_ptr<ASTNode> expr;
+            if (peekIs("(")) {
+                next(); 
+                expr = parseExpression();
+                expectToken(")");
+                next(); 
+            } else if (!peekIs(";")) {
+                expr = parseExpression();
+            }
+            expectToken(";");
+            //next(); 
+            auto exitNode = std::make_unique<ExitNode>(std::move(expr));
+            exitNode->setLineNumber(lineNum);
+            return exitNode;
+        } else if (peekIs("begin")) {
             return parseCompoundStatement();
         } else if (peekIs("if")) {
             return parseIfStatement();
@@ -251,7 +268,7 @@ namespace pascal {
 
             error("Invalid statement: expected ':=' for assignment or '(' for procedure call");
             return nullptr;
-        } else {
+        }  else {
             auto emptyNode = std::make_unique<EmptyStmtNode>();
             emptyNode->setLineNumber(token ? token->getLine() : 1);
             return emptyNode;

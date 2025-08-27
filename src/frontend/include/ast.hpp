@@ -22,6 +22,16 @@ namespace pascal {
         int getLineNumber() const { return line_number; }
     };
 
+    
+    class ExitNode :  public ASTNode {
+    public:
+        virtual void accept(ASTVisitor &visitor) override;
+        virtual std::string toString() const override;
+        std::unique_ptr<ASTNode> expr;
+        ExitNode() = default;
+        explicit ExitNode(std::unique_ptr<ASTNode> e) : expr(std::move(e)) {}
+    };
+
     class CompoundStmtNode; 
 
     class BlockNode : public ASTNode {
@@ -487,6 +497,7 @@ namespace pascal {
         virtual void visit(FieldAccessNode& node) = 0;
         virtual void visit(TypeDeclNode& node) = 0;
         virtual void visit(TypeAliasNode& node) = 0;
+        virtual void visit(ExitNode &node) = 0;
     };
 } 
 
