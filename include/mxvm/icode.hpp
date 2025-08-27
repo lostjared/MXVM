@@ -208,7 +208,6 @@ namespace mxvm {
         std::string getRegisterByIndex(int index, VarType type);
         void gen_print(std::ostream &out, const Instruction &i);
         void gen_arth(std::ostream &out, std::string arth, const Instruction &i);
-        void gen_div(std::ostream &out, const Instruction &i);
         void gen_exit(std::ostream &out, const Instruction &i);
         void gen_mov(std::ostream &out, const Instruction &i);
         void gen_jmp(std::ostream &out, const Instruction &i);
@@ -227,7 +226,6 @@ namespace mxvm {
         void gen_stack_load(std::ostream &out, const Instruction &i);
         void gen_stack_store(std::ostream &out, const Instruction &i);
         void gen_stack_sub(std::ostream &out, const Instruction &i);
-        void gen_mod(std::ostream &out, const Instruction &i);
         void gen_getline(std::ostream &out, const Instruction &i);
         void gen_to_int(std::ostream &out, const Instruction &i);
         void gen_to_float(std::ostream &out, const Instruction  &i);
@@ -245,6 +243,12 @@ namespace mxvm {
         void gen_jno(std::ostream &out, const Instruction &i);
         void gen_js(std::ostream &out, const Instruction &i);
         void gen_jns(std::ostream &out, const Instruction &i);
+        void gen_add(std::ostream &out, const Instruction &i);
+        void gen_sub(std::ostream &out, const Instruction &i);
+        void gen_mul(std::ostream &out, const Instruction &i);
+        void gen_div(std::ostream &out, const Instruction &i);
+        void gen_mod(std::ostream &out, const Instruction &i);
+
         std::string gen_optimize(const std::string  &code, const Platform &platform);
         std::string optimize_darwin(const std::string &code);
         std::string optimize_core(const std::string &code);

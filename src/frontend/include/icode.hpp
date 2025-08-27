@@ -831,185 +831,181 @@ namespace pascal {
         }
 
 
-        void visit(VarDeclNode& node) override {
-            for (const auto& varName : node.identifiers) {
-                std::string mangledName = findMangledName(varName);
-                std::string typeName;
+    void visit(VarDeclNode& node) override {
+        for (const auto& varName : node.identifiers) {
+            std::string mangledName = findMangledName(varName);
+            std::string typeName;
 
-                if (std::holds_alternative<std::string>(node.type)) {
-                    typeName = std::get<std::string>(node.type);
-                } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
-                    auto& typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
-                    if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
-                        std::string lowerBoundStr = evaluateConstantExpression(arrayTypeNode->lowerBound.get());
-                        std::string upperBoundStr = evaluateConstantExpression(arrayTypeNode->upperBound.get());
-                        
-                        int lowerBound = std::stoi(lowerBoundStr);
-                        int upperBound = std::stoi(upperBoundStr);
-                        int size = upperBound - lowerBound + 1;
-                        int elementSize = getArrayElementSize(arrayTypeNode->elementType);
-
-                        ArrayInfo info{arrayTypeNode->elementType, lowerBound, upperBound, size, elementSize};
-                        arrayInfo[varName] = info;
-
-                        std::string currentScope = getCurrentScopeName();
-                        if (currentScope.empty()) {
-                            globalArrays.push_back(mangledName);
-                        } else {
-                            functionScopedArrays[currentScope].push_back(mangledName);
-                        }
-
-                        setVarType(varName, VarType::PTR); 
-                        int slot = newSlotFor(mangledName);
-                        setSlotType(slot, VarType::PTR);
-                        varSlot[varName] = slot;
-                        varSlot[mangledName] = slot;
-
-                        emit3("alloc", mangledName, "8", std::to_string(size));
-                        return; 
-                    } else {
-                        typeName = "record"; 
-                    }
-                } else {
-                    typeName = "unknown";
-                }
-
-                
-                int slot = newSlotFor(mangledName);
-                varSlot[varName] = slot;
-                varSlot[mangledName] = slot;
-
-                
-                auto recordTypeIt = recordTypes.find(typeName);
-                if (recordTypeIt != recordTypes.end()) {
-                
-                    varRecordType[mangledName] = typeName;
-                    varRecordType[varName] = typeName;
-                    int recordSize = recordTypeIt->second.size;
+            if (std::holds_alternative<std::string>(node.type)) {
+                typeName = std::get<std::string>(node.type);
+            } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
+                auto& typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
+                if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
+                    // Handle array declarations - existing code is correct
+                    std::string lowerBoundStr = evaluateConstantExpression(arrayTypeNode->lowerBound.get());
+                    std::string upperBoundStr = evaluateConstantExpression(arrayTypeNode->upperBound.get());
                     
-                    setVarType(varName, VarType::RECORD);
-                    setSlotType(slot, VarType::PTR); 
-                    
-                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                    emit3("alloc", slotVar(slot), "8", std::to_string(recordSize));
-                    
+                    int lowerBound = std::stoi(lowerBoundStr);
+                    int upperBound = std::stoi(upperBoundStr);
+                    int size = upperBound - lowerBound + 1;
+                    int elementSize = getArrayElementSize(arrayTypeNode->elementType);
+
+                    ArrayInfo info{arrayTypeNode->elementType, lowerBound, upperBound, size, elementSize};
+                    arrayInfo[varName] = info;
+
                     std::string currentScope = getCurrentScopeName();
-                    recordsToFreeInScope[currentScope].push_back(mangledName);
-                } else {
-                    
-                    auto arrayInfoIt = arrayInfo.find(varName);
-                    if (arrayInfoIt != arrayInfo.end()) {
-                    
-                        setVarType(varName, VarType::PTR);
-                        setSlotType(slot, VarType::PTR);
+                    if (currentScope.empty()) {
+                        globalArrays.push_back(mangledName);
                     } else {
+                        functionScopedArrays[currentScope].push_back(mangledName);
+                    }
+
+                    setVarType(varName, VarType::PTR); 
+                    int slot = newSlotFor(mangledName);
+                    setSlotType(slot, VarType::PTR);
+                    varSlot[varName] = slot;
+                    varSlot[mangledName] = slot;
+
+                    emit3("alloc", mangledName, std::to_string(elementSize), std::to_string(size));
+                    return; 
+                } else {
+                    typeName = "record"; 
+                }
+            } else {
+                typeName = "unknown";
+            }
+
+            int slot = newSlotFor(mangledName);
+            varSlot[varName] = slot;
+            varSlot[mangledName] = slot;
+
+            auto recordTypeIt = recordTypes.find(typeName);
+            if (recordTypeIt != recordTypes.end()) {
+                varRecordType[mangledName] = typeName;
+                varRecordType[varName] = typeName;
+                int recordSize = recordTypeIt->second.size;
+                
+                setVarType(varName, VarType::RECORD);
+                setSlotType(slot, VarType::PTR); 
+                
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                // FIX: For single records, allocate 1 record of recordSize bytes
+                emit3("alloc", slotVar(slot), std::to_string(recordSize), "1");
+                
+                std::string currentScope = getCurrentScopeName();
+                recordsToFreeInScope[currentScope].push_back(mangledName);
+            } else {
+                // Handle other types...
+                auto arrayInfoIt = arrayInfo.find(varName);
+                if (arrayInfoIt != arrayInfo.end()) {
+                    setVarType(varName, VarType::PTR);
+                    setSlotType(slot, VarType::PTR);
+                } else {
+                    VarType vType = getTypeFromString(typeName);
+                    setVarType(varName, vType);
+                    setSlotType(slot, vType);
                     
-                        VarType vType = getTypeFromString(typeName);
-                        setVarType(varName, vType);
-                        setSlotType(slot, vType);
-                        
-                    
-                        if (vType == VarType::PTR || vType == VarType::RECORD) {
-                            updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                        } else if (vType == VarType::DOUBLE) {
-                            updateDataSectionInitialValue(slotVar(slot), "float", "0.0");
-                        } else {
-                            updateDataSectionInitialValue(slotVar(slot), "int", "0");
-                        }
+                    if (vType == VarType::PTR || vType == VarType::RECORD) {
+                        updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                    } else if (vType == VarType::DOUBLE) {
+                        updateDataSectionInitialValue(slotVar(slot), "float", "0.0");
+                    } else {
+                        updateDataSectionInitialValue(slotVar(slot), "int", "0");
                     }
                 }
             }
         }
+    }
 
-        VarType getTypeFromString(const std::string& typeStr) {
-            if (typeStr == "integer" || typeStr == "boolean") return VarType::INT;
-            if (typeStr == "real") return VarType::DOUBLE;
-            if (typeStr == "string") return VarType::PTR;          
-            if (typeStr == "char") return VarType::CHAR;
-            if (isRecordTypeName(typeStr)) return VarType::RECORD;
-            return VarType::UNKNOWN;
-        }
+    VarType getTypeFromString(const std::string& typeStr) {
+        if (typeStr == "integer" || typeStr == "boolean") return VarType::INT;
+        if (typeStr == "real") return VarType::DOUBLE;
+        if (typeStr == "string") return VarType::PTR;          
+        if (typeStr == "char") return VarType::CHAR;
+        if (isRecordTypeName(typeStr)) return VarType::RECORD;
+        return VarType::UNKNOWN;
+    }
 
-        void visit(ProcCallNode& node) override {
-            auto handler = builtinRegistry.findHandler(node.name);
-            if (handler) { handler->generate(*this, node.name, node.arguments); return; }
+    void visit(ProcCallNode& node) override {
+        auto handler = builtinRegistry.findHandler(node.name);
+        if (handler) { handler->generate(*this, node.name, node.arguments); return; }
 
-            std::vector<std::string> evaluated_args;
-            size_t intRegIdx = 1;      
-            size_t ptrRegIdx = 0;      
-            size_t floatRegIdx = 0;
+        std::vector<std::string> evaluated_args;
+        size_t intRegIdx = 1;      
+        size_t ptrRegIdx = 0;      
+        size_t floatRegIdx = 0;
 
-            for (auto& arg : node.arguments) {
-                std::string argVal = eval(arg.get());
-                evaluated_args.push_back(argVal);
-                VarType argType = getExpressionType(arg.get());
+        for (auto& arg : node.arguments) {
+            std::string argVal = eval(arg.get());
+            evaluated_args.push_back(argVal);
+            VarType argType = getExpressionType(arg.get());
 
-                std::string targetReg;
-                if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
-                    if (ptrRegIdx < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
-                } else if (argType == VarType::DOUBLE) {
-                    if (floatRegIdx < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
-                } else {
-                    if (intRegIdx < registers.size()) targetReg = registers[intRegIdx++];
-                }
-                if (!targetReg.empty()) emit2("mov", targetReg, argVal);
-            }
-
-            std::string mangledName = findMangledFuncName(node.name, true);
-            emit1("call", "PROC_" + mangledName);
-
-            for (const auto& arg : evaluated_args)
-                if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
-        }
-
-        void visit(FuncCallNode& node) override {
-            auto handler = builtinRegistry.findHandler(node.name);
-            if (handler) {
-                if (handler->generateWithResult(*this, node.name, node.arguments)) return;
-            }
-
-            std::vector<std::string> evaluated_args;
-            size_t intRegIdx = 1;
-            size_t ptrRegIdx = 0;
-            size_t floatRegIdx = 0;
-
-            for (auto& arg : node.arguments) {
-                std::string argVal = eval(arg.get());
-                evaluated_args.push_back(argVal);
-                VarType argType = getExpressionType(arg.get());
-                std::string targetReg;
-                if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
-                    if (ptrRegIdx < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
-                } else if (argType == VarType::DOUBLE) {
-                    if (floatRegIdx < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
-                } else {
-                    if (intRegIdx < registers.size()) targetReg = registers[intRegIdx++];
-                }
-                if (!targetReg.empty()) emit2("mov", targetReg, argVal);
-            }
-
-            std::string mangledName = findMangledFuncName(node.name, false);
-            emit1("call", "FUNC_" + mangledName);
-
-            auto it = funcSignatures.find(node.name);
-            VarType returnType = (it != funcSignatures.end()) ? it->second.returnType : VarType::INT;
-
-            std::string resultLocation;
-            if (returnType == VarType::DOUBLE) {
-                resultLocation = allocFloatReg();
-                emit2("mov", resultLocation, "xmm0");
-            } else if (returnType == VarType::STRING || returnType == VarType::PTR || returnType == VarType::RECORD) {
-                resultLocation = allocTempPtr();
-                emit2("mov", resultLocation, "arg0");
+            std::string targetReg;
+            if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
+                if (ptrRegIdx < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
+            } else if (argType == VarType::DOUBLE) {
+                if (floatRegIdx < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
             } else {
-                resultLocation = allocReg();
-                emit2("mov", resultLocation, "rax");
+                if (intRegIdx < registers.size()) targetReg = registers[intRegIdx++];
             }
-            pushValue(resultLocation);
-
-            for (const auto& arg : evaluated_args)
-                if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
+            if (!targetReg.empty()) emit2("mov", targetReg, argVal);
         }
+
+        std::string mangledName = findMangledFuncName(node.name, true);
+        emit1("call", "PROC_" + mangledName);
+
+        for (const auto& arg : evaluated_args)
+            if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
+    }
+
+    void visit(FuncCallNode& node) override {
+        auto handler = builtinRegistry.findHandler(node.name);
+        if (handler) {
+            if (handler->generateWithResult(*this, node.name, node.arguments)) return;
+        }
+
+        std::vector<std::string> evaluated_args;
+        size_t intRegIdx = 1;
+        size_t ptrRegIdx = 0;
+        size_t floatRegIdx = 0;
+
+        for (auto& arg : node.arguments) {
+            std::string argVal = eval(arg.get());
+            evaluated_args.push_back(argVal);
+            VarType argType = getExpressionType(arg.get());
+            std::string targetReg;
+            if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
+                if (ptrRegIdx < ptrRegisters.size()) targetReg = ptrRegisters[ptrRegIdx++];
+            } else if (argType == VarType::DOUBLE) {
+                if (floatRegIdx < floatRegisters.size()) targetReg = floatRegisters[floatRegIdx++];
+            } else {
+                if (intRegIdx < registers.size()) targetReg = registers[intRegIdx++];
+            }
+            if (!targetReg.empty()) emit2("mov", targetReg, argVal);
+        }
+
+        std::string mangledName = findMangledFuncName(node.name, false);
+        emit1("call", "FUNC_" + mangledName);
+
+        auto it = funcSignatures.find(node.name);
+        VarType returnType = (it != funcSignatures.end()) ? it->second.returnType : VarType::INT;
+
+        std::string resultLocation;
+        if (returnType == VarType::DOUBLE) {
+            resultLocation = allocFloatReg();
+            emit2("mov", resultLocation, "xmm0");
+        } else if (returnType == VarType::STRING || returnType == VarType::PTR || returnType == VarType::RECORD) {
+            resultLocation = allocTempPtr();
+            emit2("mov", resultLocation, "arg0");
+        } else {
+            resultLocation = allocReg();
+            emit2("mov", resultLocation, "rax");
+        }
+        pushValue(resultLocation);
+
+        for (const auto& arg : evaluated_args)
+            if (isReg(arg) && !isParmReg(arg)) freeReg(arg);
+    }
 
         void visit(FuncDeclNode& node) override {
             std::string mangledName = mangleVariableName(node.name);
@@ -1091,15 +1087,14 @@ namespace pascal {
             }
         }
 
-        void visit(AssignmentNode& node) override {
-            
+       void visit(AssignmentNode& node) override {
             if (auto arr = dynamic_cast<ArrayAccessNode*>(node.variable.get())) {
-            
                 ArrayInfo* info = getArrayInfoForArrayAccess(arr);
                 if (!info) throw std::runtime_error("Unknown array: " + getArrayNameFromBase(arr->base.get()));
 
                 std::string rhs = eval(node.expression.get());
                 std::string idx = eval(arr->index.get());
+                
                 if (getExpressionType(arr->index.get()) == VarType::DOUBLE) {
                     std::string intIdx = allocReg();
                     emit2("to_int", intIdx, idx);  
@@ -1107,25 +1102,23 @@ namespace pascal {
                     idx = intIdx;
                 }
 
-#ifdef MXVM_BOUNDS_CHECK
+        #ifdef MXVM_BOUNDS_CHECK
                 {
                     std::string idxCopy = allocReg();
                     emit2("mov", idxCopy, idx);
                     emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
                 }
-#endif
+        #endif
 
                 std::string offset = allocReg();
                 emit2("mov", offset, idx);
                 if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
-
-                
-                std::string base;
+                emit2("mul", offset, std::to_string(info->elementSize));
+               std::string base;
                 if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
                     std::string mangled = findMangledArrayName(var->name);
                     base = ensurePtrBase(mangled);
                 } else if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
-                    
                     field->recordExpr->accept(*this);
                     std::string recPtr = popValue();
                     std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
@@ -1141,13 +1134,24 @@ namespace pascal {
                 }
 
                 VarType elemType = getTypeFromString(info->elementType);
-                if (elemType == VarType::PTR || elemType == VarType::RECORD || info->elementType == "ptr") {
-                    emit4("load", "arg0", base, offset, "8");
-                    std::string elemPtr = allocTempPtr();
-                    emit2("mov", elemPtr, "arg0");
-                    emit4("store", rhs, elemPtr, "0", "8");
+                VarType rhsType = getExpressionType(node.expression.get());
+                
+                if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
+                    std::string floatReg = allocFloatReg();
+                    emit2("to_float", floatReg, rhs);
+                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                    rhs = floatReg;
+                } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
+                    std::string intReg = allocReg();
+                    emit2("to_int", intReg, rhs);
+                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                    rhs = intReg;
+                }
+
+                if (isRecordTypeName(info->elementType)) {
+                    throw std::runtime_error("Cannot assign directly to record array element");
                 } else {
-                    emit4("store", rhs, base, offset, "8");
+                    emit4("store", rhs, base, offset, std::to_string(info->elementSize));
                 }
 
                 if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
@@ -1156,19 +1160,37 @@ namespace pascal {
                 return;
             }
             
-
             if (auto field = dynamic_cast<FieldAccessNode*>(node.variable.get())) {
                 std::string rhs = eval(node.expression.get());
+                std::string baseName;
+                std::string recType;
+                bool baseIsDirectPointer = false;
                 
+                if (auto v = dynamic_cast<VariableNode*>(field->recordExpr.get())) {
+                    baseName = findMangledName(v->name);
+                    recType = getVarRecordTypeName(v->name);
+                } else {
+                    field->recordExpr->accept(*this);
+                    baseName = popValue();
+                    baseIsDirectPointer = true;
+                    recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                }
+
+                auto recTypeIt = recordTypes.find(recType);
+                if (recTypeIt == recordTypes.end()) {
+                    throw std::runtime_error("Unknown record type: " + recType);
+                }
                 
-                field->recordExpr->accept(*this);
-                std::string baseName = popValue(); 
+                auto& recInfo = recTypeIt->second;
+                auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
+                if (fieldIndexIt == recInfo.nameToIndex.end()) {
+                    throw std::runtime_error("Field not found in record: " + field->fieldName);
+                }
+                
+                auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
+                int byteOffset = fieldInfo.offset;
 
-                std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
-                int byteOffset = ofs_sz.first;
-
-                VarType fieldType = getTypeFromString(field->fieldName);
+                VarType fieldType = getTypeFromString(fieldInfo.typeName);
                 VarType rhsType = getExpressionType(node.expression.get());
                 
                 if (fieldType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
@@ -1183,20 +1205,28 @@ namespace pascal {
                     rhs = intReg;
                 }
 
+                std::string base;
+                if (baseIsDirectPointer) {
+                    base = baseName;  
+                } else {
+                    base = ensurePtrBase(baseName);  
+                }
                 
-                std::string base = ensurePtrBase(baseName);
-                emit4("store", rhs, base, std::to_string(byteOffset), "8");
+                emit4("store", rhs, base, std::to_string(byteOffset), std::to_string(fieldInfo.size));
                 if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
                 return;
             }
 
+            
             auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
             if (!varPtr) return;
+            
             std::string varName = varPtr->name;
             std::string rhs = eval(node.expression.get());
             
             VarType varType = getVarType(varName);
             VarType exprType = getExpressionType(node.expression.get());
+            
             
             if (varType == VarType::DOUBLE && exprType != VarType::DOUBLE && !isFloatReg(rhs)) {
                 std::string floatReg = allocFloatReg();
@@ -1210,12 +1240,15 @@ namespace pascal {
                 rhs = intReg;
             }
             
+            
             auto it = currentParamLocations.find(varName);
             if (it != currentParamLocations.end()) {
                 emit2("mov", it->second, rhs);
                 if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
                 return;
             }
+            
+            
             if (!currentFunctionName.empty() && varName == currentFunctionName) {
                 VarType rt = getVarType(currentFunctionName);
                 if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
@@ -1226,10 +1259,12 @@ namespace pascal {
                     emit2("mov","rax",rhs);
                 functionSetReturn = true;
             } else {
+            
                 std::string mangled = findMangledName(varName);
                 emit2("mov", mangled, rhs);
                 recordLocation(varName, {ValueLocation::MEMORY, mangled});
             }
+            
             if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
         }
 
@@ -1251,6 +1286,15 @@ namespace pascal {
                     return it2->second;
                 }
             }
+
+            if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(expr)) {
+                ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
+                if (info && isRecordTypeName(info->elementType)) {
+                    return info->elementType;
+                }
+            }
+            
+
             return "";
         }
 
@@ -1736,124 +1780,184 @@ namespace pascal {
     }
 
 
-        void visit(ArrayDeclarationNode& node) override {
-            std::string arrayName = node.name;
-            std::string mangledArrayName = mangleVariableName(arrayName);
-
-            std::string lowerBoundStr = eval(node.arrayType->lowerBound.get());
-            std::string upperBoundStr = eval(node.arrayType->upperBound.get());
-            lowerBoundStr = coerceToIntImmediate(lowerBoundStr);
-            upperBoundStr = coerceToIntImmediate(upperBoundStr);
-
-            int lowerBound = std::stoi(lowerBoundStr);
-            int upperBound = std::stoi(upperBoundStr);
-            int size = upperBound - lowerBound + 1;
-            int elementSize = getArrayElementSize(node.arrayType->elementType);
-
-            ArrayInfo info{node.arrayType->elementType, lowerBound, upperBound, size, elementSize};
-            arrayInfo[arrayName] = info;
-
-            std::string currentScope = getCurrentScopeName();
-            if (currentScope.empty()) globalArrays.push_back(mangledArrayName);
-            else functionScopedArrays[currentScope].push_back(mangledArrayName);
-
-            setVarType(arrayName, VarType::PTR);
-            int slot = newSlotFor(mangledArrayName);
-            setSlotType(slot, VarType::PTR);
-            varSlot[arrayName] = slot;
-            varSlot[mangledArrayName] = slot;
-
-            emit3("alloc", mangledArrayName, "8", std::to_string(size));
-
-            for (size_t i = 0; i < node.initializers.size() && i < (size_t)size; ++i) {
-                std::string value = eval(node.initializers[i].get());
-                std::string byteOffset = std::to_string(i);
-                emit4("store", value, mangledArrayName, byteOffset, "8");
-                if (isReg(value) && !isParmReg(value)) freeReg(value);
+    void visit(ArrayDeclarationNode& node) override {
+        std::string mangledName = findMangledName(node.name);
+        std::string elementType = node.arrayType->elementType;
+        
+        int lowerBound = std::stoi(evaluateConstantExpression(node.arrayType->lowerBound.get()));
+        int upperBound = std::stoi(evaluateConstantExpression(node.arrayType->upperBound.get()));
+        int size = upperBound - lowerBound + 1;
+        
+        
+        int elementSize = 8; 
+        
+        if (isRecordTypeName(elementType)) {
+        
+            auto it = recordTypes.find(elementType);
+            if (it != recordTypes.end()) {
+                elementSize = it->second.size;
             }
+        } else {
+        
+            elementSize = getArrayElementSize(elementType);
+        }
+        
+        ArrayInfo info;
+        info.elementType = elementType;
+        info.lowerBound = lowerBound;
+        info.upperBound = upperBound;
+        info.size = size;
+        info.elementSize = elementSize;
+        arrayInfo[node.name] = info;
+        int slot = newSlotFor(mangledName);
+        varSlot[node.name] = slot;          
+        varSlot[mangledName] = slot;        
+        setVarType(node.name, VarType::PTR);
+        setSlotType(slot, VarType::PTR);
+        updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+        emit3("alloc", mangledName, std::to_string(elementSize), std::to_string(size));
+        std::string currentScope = getCurrentScopeName();
+        if (currentScope.empty()) {
+            globalArrays.push_back(mangledName);
+        } else {
+            functionScopedArrays[currentScope].push_back(mangledName);
+        }
+    }
+
+    void visit(ArrayAccessNode& node) override {
+        ArrayInfo* info = getArrayInfoForArrayAccess(&node);
+        if (!info) {
+            std::string arrayName = getArrayNameFromBase(node.base.get());
+            throw std::runtime_error("Unknown array: " + arrayName);
         }
 
-        void visit(ArrayAccessNode& node) override {
-            ArrayInfo* info = getArrayInfoForArrayAccess(&node);
-            if (!info) {
-                std::string arrayName = getArrayNameFromBase(node.base.get());
-                throw std::runtime_error("Unknown array: " + arrayName);
-            }
+        std::string idx = eval(node.index.get());
+        if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
+            std::string intIdx = allocReg();
+            emit2("to_int", intIdx, idx);
+            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            idx = intIdx;
+        }
 
-            std::string idx = eval(node.index.get());
-            if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
-                std::string intIdx = allocReg();
-                emit2("to_int", intIdx, idx);
-                if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
-                idx = intIdx;
-            }
+        #ifdef MXVM_BOUNDS_CHECK
+        {
+            std::string idxCopy = allocReg();
+            emit2("mov", idxCopy, idx);
+            emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
+        }
+        #endif
 
-            #ifdef MXVM_BOUNDS_CHECK
-            {
-                std::string idxCopy = allocReg();
-                emit2("mov", idxCopy, idx);
-                emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
-            }
-            #endif
+        std::string offset = allocReg();
+        emit2("mov", offset, idx);
+        if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
 
-            std::string offset = allocReg();
-            emit2("mov", offset, idx);
-            if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
+        emit2("mul", offset, std::to_string(info->elementSize));
+        std::string base;
+        if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
+            std::string mangledArrayName = findMangledArrayName(var->name);
+            base = ensurePtrBase(mangledArrayName);
+        } else if (auto field = dynamic_cast<FieldAccessNode*>(node.base.get())) {
+            field->recordExpr->accept(*this);
+            std::string recPtr = popValue();
+            std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+            auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
+            int fieldOffset = ofs_sz.first;
+            
+            std::string arrayPtr = allocTempPtr();
+            emit2("mov", arrayPtr, recPtr);
+            emit2("add", arrayPtr, std::to_string(fieldOffset));
+            base = arrayPtr;
+        } else {
+            throw std::runtime_error("Unsupported array base in access");
+        }
 
-            std::string base;
-            if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
-                std::string mangledArrayName = findMangledArrayName(var->name);
-                base = ensurePtrBase(mangledArrayName);
-            } else if (auto field = dynamic_cast<FieldAccessNode*>(node.base.get())) {
-                field->recordExpr->accept(*this);
-                std::string recPtr = popValue();
-                std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
-                int fieldOffset = ofs_sz.first;
-                std::string arrayPtr = allocTempPtr();
-                emit2("mov", arrayPtr, recPtr);
-                emit2("add", arrayPtr, std::to_string(fieldOffset));
-                base = arrayPtr;
-            } else {
-                throw std::runtime_error("Unsupported array base in access");
-            }
-
+        if (isRecordTypeName(info->elementType)) {
+            std::string elemPtr = allocTempPtr();
+            emit2("mov", elemPtr, base);
+            emit2("add", elemPtr, offset);
+            pushValue(elemPtr);
+        } else {
             VarType elemType = getExpressionType(&node);
-            if (elemType == VarType::PTR || elemType == VarType::RECORD || elemType == VarType::STRING || 
-                info->elementType == "ptr") {
-                emit4("load", "arg0", base, offset, "8");
-                std::string dst = allocTempPtr();                 
-                emit2("mov", dst, "arg0");
-                pushValue(dst);
+            if (elemType == VarType::PTR || elemType == VarType::RECORD || elemType == VarType::STRING) {
+                std::string elemPtr = allocTempPtr();
+                emit2("mov", elemPtr, base);
+                emit2("add", elemPtr, offset);
+                pushValue(elemPtr);
             } else {
                 std::string dst = (elemType == VarType::DOUBLE) ? allocFloatReg() : allocReg();
-                emit4("load", dst, base, offset, "8");
+                emit4("load", dst, base, offset, std::to_string(info->elementSize));
                 pushValue(dst);
             }
-
-            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);        
-            freeReg(offset);
         }
-       
-       void visit(FieldAccessNode& node) override {
-            std::string baseName;
-            std::string baseRawName;
 
-            if (auto v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
-                baseRawName = v->name;
-                baseName = findMangledName(v->name);
-            } else {
-                node.recordExpr->accept(*this);
-                baseName = popValue();
+        if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+        freeReg(offset);
+    }   
+
+    void emitArrayAlloc(const std::string& name, int elemSize, int numElements) {
+        emit3("alloc", name, std::to_string(elemSize), std::to_string(numElements));
+    }
+
+    void visit(FieldAccessNode& node) override {
+        std::string baseName;
+        std::string baseRawName;
+        std::string recType;
+        bool baseIsDirectPointer = false; 
+        if (auto v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
+            baseRawName = v->name;
+            baseName = findMangledName(v->name);
+            recType = getVarRecordTypeName(baseRawName);
+        } else if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(node.recordExpr.get())) {
+            node.recordExpr->accept(*this);
+            baseName = popValue();
+            baseIsDirectPointer = true; 
+            
+            ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
+            if (info && isRecordTypeName(info->elementType)) {
+                recType = info->elementType;
             }
+        } else {
+            node.recordExpr->accept(*this);
+            baseName = popValue();
+            baseIsDirectPointer = true; 
+            recType = getVarRecordTypeName(baseRawName.empty() ? baseName : baseRawName);
+        }
+        
+        if (recType.empty()) {
+            throw std::runtime_error("Cannot determine record type for field access: " + node.fieldName);
+        }
+        
+        auto recTypeIt = recordTypes.find(recType);
+        if (recTypeIt == recordTypes.end()) {
+            throw std::runtime_error("Unknown record type: " + recType);
+        }
+        
+        auto& recInfo = recTypeIt->second;
+        auto fieldIndexIt = recInfo.nameToIndex.find(node.fieldName);
+        if (fieldIndexIt == recInfo.nameToIndex.end()) {
+            throw std::runtime_error("Field not found in record: " + node.fieldName);
+        }
+        
+        auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
+        int byteOffset = fieldInfo.offset;
+        int elementSize = fieldInfo.size;
 
-            std::string recType = getVarRecordTypeName(baseRawName.empty() ? baseName : baseRawName);
-            auto ofs_sz = getRecordFieldOffsetAndSize(recType, node.fieldName);
-            int byteOffset  = ofs_sz.first;
-            int elementSize = ofs_sz.second;
-
+        std::string base;
+        if (baseIsDirectPointer) {
+            base = baseName; 
+        } else {
+            base = ensurePtrBase(baseName); 
+        }
+        
+        if (fieldInfo.isArray) {
+            std::string arrayPtr = allocTempPtr();
+            emit2("mov", arrayPtr, base);
+            emit2("add", arrayPtr, std::to_string(byteOffset));
+            pushValue(arrayPtr);
+        } else {
             VarType fieldType = getExpressionType(&node);
             std::string dst;
+            
             if (isPtrLike(fieldType)) {
                 dst = allocTempPtr();
             } else if (fieldType == VarType::DOUBLE) {
@@ -1861,12 +1965,11 @@ namespace pascal {
             } else {
                 dst = allocReg();
             }
-
             
-            std::string base = ensurePtrBase(baseName);
             emit4("load", dst, base, std::to_string(byteOffset), std::to_string(elementSize));
             pushValue(dst);
         }
+    }
 
         void visit(ArrayAssignmentNode& node) override {
             auto it = arrayInfo.find(node.arrayName);
@@ -1892,6 +1995,14 @@ namespace pascal {
             if (isReg(value) && !isParmReg(value)) freeReg(value);
             if (isReg(index) && !isParmReg(index)) freeReg(index);
             freeReg(offsetReg);
+        }
+
+        int getRecordTypeSize(const std::string& typeName) {
+            auto it = recordTypes.find(typeName);
+            if (it != recordTypes.end()) {
+                return it->second.size;
+            }
+            return 8;  
         }
 
         void visitArrayAssignment(ArrayAccessNode& node, const std::string& value) {

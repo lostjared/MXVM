@@ -55,15 +55,15 @@ program Pong {
 		int draw_box_ph = 0
 		int reset_ball_to_right = 0
 		ptr clamp_paddle_p = null
-		int update_ai_center_ball = 0
-		int update_ai_center_p2 = 0
-		int render_center_line_yy = 0
+		int center_ball = 0
+		int center_p2 = 0
+		int yy = 0
 		ptr init_title = null
 		int init_xval = 0
 		int init_yval = 0
 		int init_wval = 0
 		int init_hval = 0
-		int init_result = 0
+		int result = 0
 		int aabb_ax = 0
 		int aabb_ay = 0
 		int aabb_aw = 0
@@ -77,9 +77,9 @@ program Pong {
 	start:
 		mov title, str_0
 		mov filename, str_1
-		alloc paddle1, 8, 16
-		alloc paddle2, 8, 16
-		alloc ball, 8, 16
+		alloc paddle1, 16, 1
+		alloc paddle2, 16, 1
+		alloc ball, 16, 1
 		mov arg0, title
 		mov rbx, 100
 		mov rcx, 100
@@ -309,15 +309,15 @@ program Pong {
 		load rbx, ball, 8, 8
 		mov rcx, rbx
 		add rcx, 3
-		mov update_ai_center_ball, rcx
+		mov center_ball, rcx
 		load rdx, paddle2, 8, 8
 		mov rsi, rdx
 		add rsi, 28
-		mov update_ai_center_p2, rsi
-		mov rdi, update_ai_center_p2
+		mov center_p2, rsi
+		mov rdi, center_p2
 		sub rdi, 4
 		mov r9, rdi
-		cmp update_ai_center_ball, r9
+		cmp center_ball, r9
 		jl CMP_TRUE_46
 		mov r8, 0
 		jmp CMP_END_47
@@ -331,10 +331,10 @@ program Pong {
 		store r9, paddle2, 8, 8
 		jmp ENDIF_45
 	ELSE_44:
-		mov r9, update_ai_center_p2
+		mov r9, center_p2
 		add r9, 4
 		mov r11, r9
-		cmp update_ai_center_ball, r11
+		cmp center_ball, r11
 		jg CMP_TRUE_50
 		mov r10, 0
 		jmp CMP_END_51
@@ -494,9 +494,9 @@ program Pong {
 	PROC_END_update_ball:
 		ret
 	function PROC_render_center_line:
-		mov render_center_line_yy, 0
+		mov yy, 0
 	WHILE_72:
-		cmp render_center_line_yy, 360
+		cmp yy, 360
 		jl CMP_TRUE_74
 		mov rbx, 0
 		jmp CMP_END_75
@@ -506,13 +506,13 @@ program Pong {
 		cmp rbx, 0
 		je ENDWHILE_73
 		mov rbx, 319
-		mov rcx, render_center_line_yy
+		mov rcx, yy
 		mov rdx, 2
 		mov rsi, 8
 		call PROC_draw_box
-		mov rcx, render_center_line_yy
+		mov rcx, yy
 		add rcx, 16
-		mov render_center_line_yy, rcx
+		mov yy, rcx
 		jmp WHILE_72
 	ENDWHILE_73:
 	PROC_END_render_center_line:
@@ -578,8 +578,8 @@ program Pong {
 		mov init_hval, rsi
 		invoke init
 		return rbx
-		mov init_result, rbx
-		cmp init_result, 0
+		mov result, rbx
+		cmp result, 0
 		jne CMP_TRUE_78
 		mov rcx, 0
 		jmp CMP_END_79
