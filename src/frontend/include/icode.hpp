@@ -1087,186 +1087,6 @@ namespace pascal {
             }
         }
 
-       void visit(AssignmentNode& node) override {
-            if (auto arr = dynamic_cast<ArrayAccessNode*>(node.variable.get())) {
-                ArrayInfo* info = getArrayInfoForArrayAccess(arr);
-                if (!info) throw std::runtime_error("Unknown array: " + getArrayNameFromBase(arr->base.get()));
-
-                std::string rhs = eval(node.expression.get());
-                std::string idx = eval(arr->index.get());
-                
-                if (getExpressionType(arr->index.get()) == VarType::DOUBLE) {
-                    std::string intIdx = allocReg();
-                    emit2("to_int", intIdx, idx);  
-                    if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
-                    idx = intIdx;
-                }
-
-        #ifdef MXVM_BOUNDS_CHECK
-                {
-                    std::string idxCopy = allocReg();
-                    emit2("mov", idxCopy, idx);
-                    emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
-                }
-        #endif
-
-                std::string offset = allocReg();
-                emit2("mov", offset, idx);
-                if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
-                emit2("mul", offset, std::to_string(info->elementSize));
-               std::string base;
-                if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
-                    std::string mangled = findMangledArrayName(var->name);
-                    base = ensurePtrBase(mangled);
-                } else if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
-                    field->recordExpr->accept(*this);
-                    std::string recPtr = popValue();
-                    std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                    auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
-                    int fieldOffset = ofs_sz.first;
-                
-                    std::string arrayPtr = allocTempPtr();
-                    emit2("mov", arrayPtr, recPtr);
-                    emit2("add", arrayPtr, std::to_string(fieldOffset));
-                    base = arrayPtr;
-                } else {
-                    throw std::runtime_error("Unsupported array base in assignment");
-                }
-
-                VarType elemType = getTypeFromString(info->elementType);
-                VarType rhsType = getExpressionType(node.expression.get());
-                
-                if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
-                    std::string floatReg = allocFloatReg();
-                    emit2("to_float", floatReg, rhs);
-                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                    rhs = floatReg;
-                } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
-                    std::string intReg = allocReg();
-                    emit2("to_int", intReg, rhs);
-                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                    rhs = intReg;
-                }
-
-                if (isRecordTypeName(info->elementType)) {
-                    throw std::runtime_error("Cannot assign directly to record array element");
-                } else {
-                    emit4("store", rhs, base, offset, std::to_string(info->elementSize));
-                }
-
-                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
-                freeReg(offset);
-                return;
-            }
-            
-            if (auto field = dynamic_cast<FieldAccessNode*>(node.variable.get())) {
-                std::string rhs = eval(node.expression.get());
-                std::string baseName;
-                std::string recType;
-                bool baseIsDirectPointer = false;
-                
-                if (auto v = dynamic_cast<VariableNode*>(field->recordExpr.get())) {
-                    baseName = findMangledName(v->name);
-                    recType = getVarRecordTypeName(v->name);
-                } else {
-                    field->recordExpr->accept(*this);
-                    baseName = popValue();
-                    baseIsDirectPointer = true;
-                    recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                }
-
-                auto recTypeIt = recordTypes.find(recType);
-                if (recTypeIt == recordTypes.end()) {
-                    throw std::runtime_error("Unknown record type: " + recType);
-                }
-                
-                auto& recInfo = recTypeIt->second;
-                auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
-                if (fieldIndexIt == recInfo.nameToIndex.end()) {
-                    throw std::runtime_error("Field not found in record: " + field->fieldName);
-                }
-                
-                auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
-                int byteOffset = fieldInfo.offset;
-
-                VarType fieldType = getTypeFromString(fieldInfo.typeName);
-                VarType rhsType = getExpressionType(node.expression.get());
-                
-                if (fieldType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
-                    std::string floatReg = allocFloatReg();
-                    emit2("to_float", floatReg, rhs);
-                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                    rhs = floatReg;
-                } else if (fieldType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
-                    std::string intReg = allocReg();
-                    emit2("to_int", intReg, rhs);
-                    if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                    rhs = intReg;
-                }
-
-                std::string base;
-                if (baseIsDirectPointer) {
-                    base = baseName;  
-                } else {
-                    base = ensurePtrBase(baseName);  
-                }
-                
-                emit4("store", rhs, base, std::to_string(byteOffset), std::to_string(fieldInfo.size));
-                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                return;
-            }
-
-            
-            auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
-            if (!varPtr) return;
-            
-            std::string varName = varPtr->name;
-            std::string rhs = eval(node.expression.get());
-            
-            VarType varType = getVarType(varName);
-            VarType exprType = getExpressionType(node.expression.get());
-            
-            
-            if (varType == VarType::DOUBLE && exprType != VarType::DOUBLE && !isFloatReg(rhs)) {
-                std::string floatReg = allocFloatReg();
-                emit2("to_float", floatReg, rhs);
-                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                rhs = floatReg;
-            } else if (varType != VarType::DOUBLE && exprType == VarType::DOUBLE && isFloatReg(rhs)) {
-                std::string intReg = allocReg();
-                emit2("to_int", intReg, rhs);
-                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                rhs = intReg;
-            }
-            
-            
-            auto it = currentParamLocations.find(varName);
-            if (it != currentParamLocations.end()) {
-                emit2("mov", it->second, rhs);
-                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-                return;
-            }
-            
-            
-            if (!currentFunctionName.empty() && varName == currentFunctionName) {
-                VarType rt = getVarType(currentFunctionName);
-                if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
-                    emit2("mov","arg0",rhs);      
-                else if (rt == VarType::DOUBLE)
-                    emit2("mov","xmm0",rhs);
-                else
-                    emit2("mov","rax",rhs);
-                functionSetReturn = true;
-            } else {
-            
-                std::string mangled = findMangledName(varName);
-                emit2("mov", mangled, rhs);
-                recordLocation(varName, {ValueLocation::MEMORY, mangled});
-            }
-            
-            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-        }
 
         void emitArrayBoundsCheck(const std::string& idxReg, int lower, int upper) {
 #ifdef MXVM_BOUNDS_CHECK
@@ -1533,14 +1353,15 @@ namespace pascal {
                 if (it != funcSignatures.end()) return it->second.returnType;
             }
             if (auto fieldNode = dynamic_cast<FieldAccessNode*>(node)) {
-                std::string baseRawName;
-                if (auto v = dynamic_cast<VariableNode*>(fieldNode->recordExpr.get())) baseRawName = v->name;
-                std::string recType = getVarRecordTypeName(baseRawName);
+                std::string recType = getVarRecordTypeNameFromExpr(fieldNode->recordExpr.get());
                 auto it = recordTypes.find(recType);
                 if (it != recordTypes.end()) {
                     auto jt = it->second.nameToIndex.find(fieldNode->fieldName);
                     if (jt != it->second.nameToIndex.end()) {
                         const auto& f = it->second.fields[jt->second];
+                        if (f.isArray) {
+                            return VarType::PTR;
+                        }
                         return getTypeFromString(f.typeName);
                     }
                 }
@@ -1822,6 +1643,327 @@ namespace pascal {
         }
     }
 
+    
+   
+
+    void emitArrayAlloc(const std::string& name, int elemSize, int numElements) {
+        emit3("alloc", name, std::to_string(elemSize), std::to_string(numElements));
+    }
+
+    void visit(FieldAccessNode& node) override {
+        std::string baseName;
+        std::string baseRawName;
+        std::string recType;
+        bool baseIsDirectPointer = false;
+
+        if (auto v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
+            baseRawName = v->name;
+            baseName = findMangledName(v->name);
+            recType = getVarRecordTypeName(baseRawName);
+        } else if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(node.recordExpr.get())) {
+            node.recordExpr->accept(*this);
+            baseName = popValue();
+            baseIsDirectPointer = true;
+            ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
+            if (info && isRecordTypeName(info->elementType)) {
+                recType = info->elementType;
+            }
+        } else {
+            node.recordExpr->accept(*this);
+            baseName = popValue();
+            baseIsDirectPointer = true;
+            recType = getVarRecordTypeName(baseRawName.empty() ? baseName : baseRawName);
+        }
+
+        if (recType.empty()) {
+            throw std::runtime_error("Cannot determine record type for field access: " + node.fieldName);
+        }
+
+        auto recTypeIt = recordTypes.find(recType);
+        if (recTypeIt == recordTypes.end()) {
+            throw std::runtime_error("Unknown record type: " + recType);
+        }
+
+        auto& recInfo = recTypeIt->second;
+        auto fieldIndexIt = recInfo.nameToIndex.find(node.fieldName);
+        if (fieldIndexIt == recInfo.nameToIndex.end()) {
+            throw std::runtime_error("Field not found in record: " + node.fieldName);
+        }
+
+        auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
+        int byteOffset  = fieldInfo.offset;
+  //     int elementSize = fieldInfo.size;
+
+        std::string base = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+
+        // If field is an array OR record, return ADDRESS (no load)
+        if (fieldInfo.isArray || isRecordTypeName(fieldInfo.typeName)) {
+            std::string p = allocTempPtr();
+            emit2("mov", p, base);
+            emit2("add", p, std::to_string(byteOffset));
+            pushValue(p);
+            return;
+        }
+
+        // Scalar/pointer field -> LOAD with (index = byteOffset, stride = 1)  << FIX
+        VarType fieldType = getTypeFromString(fieldInfo.typeName);
+        std::string dst;
+        if (isPtrLike(fieldType)) {
+            dst = allocTempPtr();
+        } else if (fieldType == VarType::DOUBLE) {
+            dst = allocFloatReg();
+        } else {
+            dst = allocReg();
+        }
+
+        emit4("load", dst, base, std::to_string(byteOffset), "1");
+        pushValue(dst);
+    }
+   
+    void visit(AssignmentNode& node) override {
+        if (auto arr = dynamic_cast<ArrayAccessNode*>(node.variable.get())) {
+            ArrayInfo* info = getArrayInfoForArrayAccess(arr);
+            if (!info) throw std::runtime_error("Unknown array: " + getArrayNameFromBase(arr->base.get()));
+
+            std::string rhs = eval(node.expression.get());
+            std::string idx = eval(arr->index.get());
+
+            if (getExpressionType(arr->index.get()) == VarType::DOUBLE) {
+                std::string intIdx = allocReg();
+                emit2("to_int", intIdx, idx);
+                if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+                idx = intIdx;
+            }
+
+        #ifdef MXVM_BOUNDS_CHECK
+            {
+                std::string idxCopy = allocReg();
+                emit2("mov", idxCopy, idx);
+                emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
+            }
+        #endif
+
+            std::string elemIndex = allocReg();
+            emit2("mov", elemIndex, idx);
+            if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
+
+            std::string base;
+            if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
+                std::string mangled = findMangledArrayName(var->name);
+                base = ensurePtrBase(mangled);
+            } else if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
+                field->recordExpr->accept(*this);
+                std::string recPtr = popValue();
+                std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
+                int fieldOffset = ofs_sz.first;
+
+                std::string arrayPtr = allocTempPtr();
+                emit2("mov", arrayPtr, recPtr);
+                emit2("add", arrayPtr, std::to_string(fieldOffset));
+                base = arrayPtr;
+            } else {
+                throw std::runtime_error("Unsupported array base in assignment");
+            }
+
+            // Type coercion rhs -> elementType as needed
+            VarType elemType = getTypeFromString(info->elementType);
+            VarType rhsType  = getExpressionType(node.expression.get());
+            if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
+                std::string floatReg = allocFloatReg();
+                emit2("to_float", floatReg, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = floatReg;
+            } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
+                std::string intReg = allocReg();
+                emit2("to_int", intReg, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = intReg;
+            }
+
+            // Scalar/ptr elements: STORE with (index=elemIndex, stride=elementSize)
+            if (isRecordTypeName(info->elementType)) {
+                throw std::runtime_error("Cannot assign directly to record array element");
+            } else {
+                emit4("store", rhs, base, elemIndex, std::to_string(info->elementSize));
+            }
+
+            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            freeReg(elemIndex);
+            return;
+        }
+
+        // Record field assignment: rec.field := expr
+        if (auto field = dynamic_cast<FieldAccessNode*>(node.variable.get())) {
+            std::string rhs = eval(node.expression.get());
+            std::string baseName;
+            std::string recType;
+            bool baseIsDirectPointer = false;
+
+            if (auto v = dynamic_cast<VariableNode*>(field->recordExpr.get())) {
+                baseName = findMangledName(v->name);
+                recType = getVarRecordTypeName(v->name);
+            } else {
+                field->recordExpr->accept(*this);
+                baseName = popValue();
+                baseIsDirectPointer = true;
+                recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+            }
+
+            auto recTypeIt = recordTypes.find(recType);
+            if (recTypeIt == recordTypes.end()) {
+                throw std::runtime_error("Unknown record type: " + recType);
+            }
+            auto& recInfo = recTypeIt->second;
+            auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
+            if (fieldIndexIt == recInfo.nameToIndex.end()) {
+                throw std::runtime_error("Field not found in record: " + field->fieldName);
+            }
+            auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
+            int byteOffset  = fieldInfo.offset;
+
+            VarType fieldType = getTypeFromString(fieldInfo.typeName);
+            VarType rhsType   = getExpressionType(node.expression.get());
+            if (fieldType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
+                std::string floatReg = allocFloatReg();
+                emit2("to_float", floatReg, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = floatReg;
+            } else if (fieldType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
+                std::string intReg = allocReg();
+                emit2("to_int", intReg, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = intReg;
+            }
+
+            std::string base = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+
+            // Store into record field: (index=byteOffset, stride=1)  << FIX
+            emit4("store", rhs, base, std::to_string(byteOffset), "1");
+
+            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+            return;
+        }
+
+        // Simple variable assignment (unchanged)
+        auto varPtr = dynamic_cast<VariableNode*>(node.variable.get());
+        if (!varPtr) return;
+
+        std::string varName = varPtr->name;
+        std::string rhs = eval(node.expression.get());
+
+        VarType varType = getVarType(varName);
+        VarType exprType = getExpressionType(node.expression.get());
+
+        if (varType == VarType::DOUBLE && exprType != VarType::DOUBLE && !isFloatReg(rhs)) {
+            std::string floatReg = allocFloatReg();
+            emit2("to_float", floatReg, rhs);
+            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+            rhs = floatReg;
+        } else if (varType != VarType::DOUBLE && exprType == VarType::DOUBLE && isFloatReg(rhs)) {
+            std::string intReg = allocReg();
+            emit2("to_int", intReg, rhs);
+            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+            rhs = intReg;
+        }
+
+        auto it = currentParamLocations.find(varName);
+        if (it != currentParamLocations.end()) {
+            emit2("mov", it->second, rhs);
+            if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+            return;
+        }
+
+        if (!currentFunctionName.empty() && varName == currentFunctionName) {
+            VarType rt = getVarType(currentFunctionName);
+            if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
+                emit2("mov", "arg0", rhs);
+            else if (rt == VarType::DOUBLE)
+                emit2("mov", "xmm0", rhs);
+            else
+                emit2("mov", "rax", rhs);
+            functionSetReturn = true;
+        } else {
+            std::string mangled = findMangledName(varName);
+            emit2("mov", mangled, rhs);
+            recordLocation(varName, {ValueLocation::MEMORY, mangled});
+        }
+
+        if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+        }
+
+
+    int getRecordTypeSize(const std::string& typeName) {
+        auto it = recordTypes.find(typeName);
+        if (it != recordTypes.end()) {
+            return it->second.size;
+        }
+        return 8;  
+    }
+
+    void visit(ArrayAssignmentNode& node) override {
+        auto it = arrayInfo.find(node.arrayName);
+        if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
+        ArrayInfo &info = it->second;
+
+        std::string value = eval(node.value.get());
+        std::string index = eval(node.index.get());
+
+        if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
+            std::string intIndex = allocReg();
+            emit2("to_int", intIndex, index);
+            if (isReg(index) && !isParmReg(index)) freeReg(index);
+            index = intIndex;
+        }
+
+    #ifdef MXVM_BOUNDS_CHECK
+        {
+            std::string idxCopy = allocReg();
+            emit2("mov", idxCopy, index);
+            emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
+            if (isReg(idxCopy)) freeReg(idxCopy);
+        }
+    #endif
+
+        std::string elementIndex = allocReg();
+        emit2("mov", elementIndex, index);
+        if (info.lowerBound != 0) emit2("sub", elementIndex, std::to_string(info.lowerBound));
+
+        VarType elemType = VarType::INT;
+        if (info.elementType == "real") elemType = VarType::DOUBLE;
+        else if (info.elementType == "string" || info.elementType == "ptr") elemType = VarType::PTR;
+        else if (isRecordTypeName(info.elementType)) elemType = VarType::RECORD;
+
+        VarType rhsType = getExpressionType(node.value.get());
+        if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(value)) {
+            std::string f = allocFloatReg();
+            emit2("to_float", f, value);
+            if (isReg(value) && !isParmReg(value)) freeReg(value);
+            value = f;
+        } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(value)) {
+            std::string i = allocReg();
+            emit2("to_int", i, value);
+            if (isReg(value) && !isParmReg(value)) freeReg(value);
+            value = i;
+        }
+
+        if (isRecordTypeName(info.elementType)) {
+            throw std::runtime_error("Cannot assign directly to record array element");
+        }
+
+        std::string mangled = findMangledArrayName(node.arrayName);
+        std::string base = ensurePtrBase(mangled);
+
+        emit4("store", value, base, elementIndex, std::to_string(info.elementSize));
+
+        if (isReg(value) && !isParmReg(value)) freeReg(value);
+        if (isReg(index) && !isParmReg(index)) freeReg(index);
+        freeReg(elementIndex);
+    }
+
+
+    
     void visit(ArrayAccessNode& node) override {
         ArrayInfo* info = getArrayInfoForArrayAccess(&node);
         if (!info) {
@@ -1846,11 +1988,12 @@ namespace pascal {
         }
     #endif
 
-        std::string offset = allocReg();
-        emit2("mov", offset, idx);
-        if (info->lowerBound != 0) emit2("sub", offset, std::to_string(info->lowerBound));
-        emit2("mul", offset, std::to_string(info->elementSize));
+        // elementIndex = idx - lowerBound  (NO bytes here)
+        std::string elemIndex = allocReg();
+        emit2("mov", elemIndex, idx);
+        if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
+        // Determine base pointer
         std::string base;
         if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
             std::string mangledArrayName = findMangledArrayName(var->name);
@@ -1869,187 +2012,37 @@ namespace pascal {
             throw std::runtime_error("Unsupported array base in access");
         }
 
-        VarType elemType = getExpressionType(&node);
+        // If element is a record, return its ADDRESS = base + elemIndex*elementSize
         if (isRecordTypeName(info->elementType)) {
+            std::string offsetBytes = allocReg();
+            emit2("mov", offsetBytes, elemIndex);
+            emit2("mul", offsetBytes, std::to_string(info->elementSize));
+
             std::string elemPtr = allocTempPtr();
             emit2("mov", elemPtr, base);
-            emit2("add", elemPtr, offset);
+            emit2("add", elemPtr, offsetBytes);
             pushValue(elemPtr);
-        } else {
-            std::string dst;
-            if (elemType == VarType::DOUBLE) dst = allocFloatReg();
-            else if (elemType == VarType::PTR || elemType == VarType::STRING) dst = allocTempPtr();
-            else dst = allocReg();
-            emit4("load", dst, base, offset, std::to_string(info->elementSize));
-            pushValue(dst);
+
+            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            freeReg(elemIndex);
+            freeReg(offsetBytes);
+            return;
         }
+
+        // Scalar / pointer element: LOAD with (index=elemIndex, stride=elementSize)
+        VarType elemType = getExpressionType(&node);
+        std::string dst;
+        if (elemType == VarType::DOUBLE) dst = allocFloatReg();
+        else if (elemType == VarType::PTR || elemType == VarType::STRING) dst = allocTempPtr();
+        else dst = allocReg();
+
+        emit4("load", dst, base, elemIndex, std::to_string(info->elementSize));
+        pushValue(dst);
 
         if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
-        freeReg(offset);
-    }
-   
-
-    void emitArrayAlloc(const std::string& name, int elemSize, int numElements) {
-        emit3("alloc", name, std::to_string(elemSize), std::to_string(numElements));
+        freeReg(elemIndex);
     }
 
-    void visit(FieldAccessNode& node) override {
-        std::string baseName;
-        std::string baseRawName;
-        std::string recType;
-        bool baseIsDirectPointer = false; 
-        if (auto v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
-            baseRawName = v->name;
-            baseName = findMangledName(v->name);
-            recType = getVarRecordTypeName(baseRawName);
-        } else if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(node.recordExpr.get())) {
-            node.recordExpr->accept(*this);
-            baseName = popValue();
-            baseIsDirectPointer = true; 
-            
-            ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
-            if (info && isRecordTypeName(info->elementType)) {
-                recType = info->elementType;
-            }
-        } else {
-            node.recordExpr->accept(*this);
-            baseName = popValue();
-            baseIsDirectPointer = true; 
-            recType = getVarRecordTypeName(baseRawName.empty() ? baseName : baseRawName);
-        }
-        
-        if (recType.empty()) {
-            throw std::runtime_error("Cannot determine record type for field access: " + node.fieldName);
-        }
-        
-        auto recTypeIt = recordTypes.find(recType);
-        if (recTypeIt == recordTypes.end()) {
-            throw std::runtime_error("Unknown record type: " + recType);
-        }
-        
-        auto& recInfo = recTypeIt->second;
-        auto fieldIndexIt = recInfo.nameToIndex.find(node.fieldName);
-        if (fieldIndexIt == recInfo.nameToIndex.end()) {
-            throw std::runtime_error("Field not found in record: " + node.fieldName);
-        }
-        
-        auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
-        int byteOffset = fieldInfo.offset;
-        int elementSize = fieldInfo.size;
-
-        std::string base;
-        if (baseIsDirectPointer) {
-            base = baseName; 
-        } else {
-            base = ensurePtrBase(baseName); 
-        }
-        
-        if (fieldInfo.isArray) {
-            std::string arrayPtr = allocTempPtr();
-            emit2("mov", arrayPtr, base);
-            emit2("add", arrayPtr, std::to_string(byteOffset));
-            pushValue(arrayPtr);
-        } else {
-            VarType fieldType = getExpressionType(&node);
-            std::string dst;
-            
-            if (isPtrLike(fieldType)) {
-                dst = allocTempPtr();
-            } else if (fieldType == VarType::DOUBLE) {
-                dst = allocFloatReg();
-            } else {
-                dst = allocReg();
-            }
-            
-            emit4("load", dst, base, std::to_string(byteOffset), std::to_string(elementSize));
-            pushValue(dst);
-        }
-    }
-
-   void visit(ArrayAssignmentNode& node) override {
-        auto it = arrayInfo.find(node.arrayName);
-        if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + node.arrayName);
-        ArrayInfo &info = it->second;
-
-        std::string value = eval(node.value.get());
-        std::string index = eval(node.index.get());
-        if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
-            std::string intIndex = allocReg();
-            emit2("to_int", intIndex, index);
-            if (isReg(index) && !isParmReg(index)) freeReg(index);
-            index = intIndex;
-        }
-    #ifdef MXVM_BOUNDS_CHECK
-        {
-            std::string idxCopy = allocReg();
-            emit2("mov", idxCopy, index);
-            emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
-            if (isReg(idxCopy)) freeReg(idxCopy);
-        }
-    #endif
-        std::string offsetReg = allocReg();
-        emit2("mov", offsetReg, index);
-        if (info.lowerBound != 0) emit2("sub", offsetReg, std::to_string(info.lowerBound));
-        emit2("mul", offsetReg, std::to_string(info.elementSize));
-
-        VarType elemType = VarType::INT;
-        if (info.elementType == "real") elemType = VarType::DOUBLE;
-        else if (info.elementType == "string" || info.elementType == "ptr") elemType = VarType::PTR;
-        else if (isRecordTypeName(info.elementType)) elemType = VarType::RECORD;
-
-        VarType rhsType = getExpressionType(node.value.get());
-        if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(value)) {
-            std::string f = allocFloatReg();
-            emit2("to_float", f, value);
-            if (isReg(value) && !isParmReg(value)) freeReg(value);
-            value = f;
-        } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(value)) {
-            std::string i = allocReg();
-            emit2("to_int", i, value);
-            if (isReg(value) && !isParmReg(value)) freeReg(value);
-            value = i;
-        }
-
-        std::string mangled = findMangledArrayName(node.arrayName);
-        std::string base = ensurePtrBase(mangled);
-        emit4("store", value, base, offsetReg, std::to_string(info.elementSize));
-
-        if (isReg(value) && !isParmReg(value)) freeReg(value);
-        if (isReg(index) && !isParmReg(index)) freeReg(index);
-        freeReg(offsetReg);
-    }
-
-
-    int getRecordTypeSize(const std::string& typeName) {
-        auto it = recordTypes.find(typeName);
-        if (it != recordTypes.end()) {
-            return it->second.size;
-        }
-        return 8;  
-    }
-
-        void visitArrayAssignment(ArrayAccessNode& node, const std::string& value) {
-            std::string arrayName = getArrayNameFromBase(node.base.get());
-            std::string mangledArrayName = findMangledArrayName(arrayName);
-            auto it = arrayInfo.find(arrayName);
-            if (it == arrayInfo.end()) throw std::runtime_error("Unknown array: " + arrayName);
-            ArrayInfo& info = it->second;
-
-            std::string indexValue = eval(node.index.get());
-            VarType indexType = getExpressionType(node.index.get());
-            if (indexType == VarType::DOUBLE) {
-                std::string intIndex = allocReg();
-                emit2("to_int", intIndex, indexValue);
-                if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
-                indexValue = intIndex;
-            }
-            std::string adjustedIndexReg = allocReg();
-            emit2("mov", adjustedIndexReg, indexValue);
-            emit2("sub", adjustedIndexReg, std::to_string(info.lowerBound));
-            emit4("store", value, mangledArrayName, adjustedIndexReg, "8");
-            freeReg(adjustedIndexReg);
-            if (isReg(indexValue) && !isParmReg(indexValue)) freeReg(indexValue);
-        }
 
         std::string findMangledFuncName(const std::string& name, bool isProc) const {
             auto& lookupMap = isProc ? declaredProcs : declaredFuncs;
