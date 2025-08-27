@@ -11,11 +11,14 @@ namespace mxx {
         scanner.scan();
         index = 0;
         token = nullptr;
-        declaredVars.clear();
-        declaredConsts.clear();
+        scopeStack.clear();
+        declaredProcs.clear();
+        declaredFuncs.clear();
+        pushScope(); 
         next();
         parseProgram();
         if (token) failHere("Unexpected tokens after end of program");
+        popScope(); 
         return true;
     }
 
@@ -106,16 +109,22 @@ namespace mxx {
         return lower(token->getTokenValue()) == k;
     }
 
-    void TPValidator::declareVar(const std::string& name, const scan::TToken* at) {
-        auto key = lower(name);
-        if (declaredVars.count(key)) failAt(at, "Redeclaration of variable '" + name + "'");
-        declaredVars.insert(key);
+    void TPValidator::pushScope() {
+        scopeStack.emplace_back();
+    }
+
+    void TPValidator::popScope() {
+        if (!scopeStack.empty()) {
+            scopeStack.pop_back();
+        }
     }
 
     void TPValidator::declareConst(const std::string& name, const scan::TToken* at) {
         auto key = lower(name);
-        if (declaredConsts.count(key)) failAt(at, "Redeclaration of constant '" + name + "'");
-        declaredConsts.insert(key);
+        if (scopeStack.back().consts.count(key)) {
+            failAt(at, "Redeclaration of constant '" + name + "' in the same scope");
+        }
+        scopeStack.back().consts.insert(key);
     }
     
     bool TPValidator::isBuiltinConst(const std::string& name) const {
@@ -125,26 +134,34 @@ namespace mxx {
 
     void TPValidator::checkVar(const std::string& name, const scan::TToken* at) {
         auto key = lower(name);
-        if (!declaredVars.count(key) &&
-            !declaredFuncs.count(key) &&
-            !declaredProcs.count(key) &&
-            !isBuiltinConst(name) && !isPascalKeyword(key)) {
+        for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+            if (it->vars.count(key)) return;
+        }
+
+        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
     }
 
     void TPValidator::checkVarOrConst(const std::string& name, const scan::TToken* at) {
         auto key = lower(name);
-        if (!declaredVars.count(key) && !declaredConsts.count(key)
-            && !declaredFuncs.count(key) && !declaredProcs.count(key)
-            && !isBuiltinConst(name) && !isPascalKeyword(key)) {
+        for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+            if (it->vars.count(key) || it->consts.count(key)) return;
+        }
+        
+        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
     }
 
     void TPValidator::checkConstOnly(const std::string& name, const scan::TToken* at) {
-        if (!declaredConsts.count(lower(name)) && !isBuiltinConst(name))
+        auto key = lower(name);
+        for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+            if (it->consts.count(key)) return;
+        }
+        if (!isBuiltinConst(name)) {
             failAt(at, "Constant expression requires constant '" + name + "'");
+        }
     }
 
     void TPValidator::parseProgram() {
@@ -262,23 +279,12 @@ namespace mxx {
         }
     }
     void TPValidator::parseSubprogram() {
-        if (isKW("procedure")) {
+        bool isProc = isKW("procedure");
+        if (isProc) {
             requireKW("procedure");
             next();
             require(types::TokenType::TT_ID);
             declaredProcs.insert(lower(token->getTokenValue()));
-            next();
-            if (match("(")) parseFormalParams();
-            require(";");
-            next();
-            if (isKW("forward")) {
-                next();
-                require(";");
-                next();
-                return;
-            }
-            parseBlock();
-            require(";");
             next();
         } else {
             requireKW("function");
@@ -286,22 +292,35 @@ namespace mxx {
             require(types::TokenType::TT_ID);
             declaredFuncs.insert(lower(token->getTokenValue()));
             next();
-            if (match("(")) parseFormalParams();
+        }
+
+        pushScope(); 
+
+        if (match("(")) parseFormalParams();
+        
+        if (isProc) {
+            require(";");
+            next();
+        } else { 
             require(":");
             next();
             parseTypeName();
             require(";");
             next();
-            if (isKW("forward")) {
-                next();
-                require(";");
-                next();
-                return;
-            }
-            parseBlock();
+        }
+
+        if (isKW("forward")) {
+            next();
             require(";");
             next();
+            popScope();
+            return;
         }
+
+        parseBlock();
+        require(";");
+        next();
+        popScope(); 
     }
 
     void TPValidator::parseFormalParams() {
@@ -383,7 +402,7 @@ namespace mxx {
     void TPValidator::parseTypeName() {
         require(types::TokenType::TT_ID);
         std::string name = token->getTokenValue();
-        if (!isBuiltinType()) checkType(name, token);
+        checkType(name, token);
         next();
     }
 
@@ -710,14 +729,24 @@ namespace mxx {
             isKW("smallint") || isKW("cardinal") || isKW("string") || isKW("text");
     }
 
-    void TPValidator::declareType(const std::string& name, const scan::TToken* at) {
+    void TPValidator::checkType(const std::string& name, const scan::TToken* at) {
         auto key = lower(name);
-        if (declaredTypes.count(key)) failAt(at, "Redeclaration of type '" + name + "'");
-        declaredTypes.insert(key);
+        for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+            if (it->types.count(key)) return;
+        }
+        if (!isBuiltinType()) {
+            failAt(at, "Unknown type identifier '" + name + "'");
+        }
+    }
+        
+    mxx::Scope* TPValidator::currentScope() {
+        if (scopeStack.empty()) return nullptr;
+        return &scopeStack.back();
     }
 
-    void TPValidator::checkType(const std::string& name, const scan::TToken* at) {
-        if (!declaredTypes.count(lower(name))) failAt(at, "Unknown type identifier '" + name + "'");
+    const mxx::Scope* TPValidator::currentScope() const {
+        if (scopeStack.empty()) return nullptr;
+        return &scopeStack.back();
     }
     
     static const std::unordered_set<std::string> pascal_keywords = {
@@ -733,6 +762,65 @@ namespace mxx {
 
     bool TPValidator::isPascalKeyword(const std::string& s) const {
         return pascal_keywords.count(lower(s));
+    }
+
+    
+    bool TPValidator::isVarDeclaredHere(const std::string& name) const {
+        return currentScope() && currentScope()->vars.count(lower(name));
+    }
+    bool TPValidator::isTypeDeclaredHere(const std::string& name) const {
+        return currentScope() && currentScope()->types.count(lower(name));
+    }
+    bool TPValidator::isFuncDeclaredHere(const std::string& name) const {
+        return currentScope() && currentScope()->funcs.count(lower(name));
+    }
+    bool TPValidator::isProcDeclaredHere(const std::string& name) const {
+        return currentScope() && currentScope()->procs.count(lower(name));
+    }
+    bool TPValidator::isParamDeclaredHere(const std::string& name) const {
+        return currentScope() && currentScope()->params.count(lower(name));
+    }
+
+    void TPValidator::declareVar(const std::string& name, const scan::TToken* at) {
+        if (isVarDeclaredHere(name) || isParamDeclaredHere(name) ||
+            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isProcDeclaredHere(name)) {
+            failAt(at, "Redeclaration of variable '" + name + "' in this scope");
+        }
+        currentScope()->vars.insert(name);
+    }
+
+    void TPValidator::declareType(const std::string& name, const scan::TToken* at) {
+        auto key = lower(name);
+        if (isTypeDeclaredHere(key) || isVarDeclaredHere(key) || isFuncDeclaredHere(key) ||
+            isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
+            failAt(at, "Redeclaration of type '" + name + "' in this scope");
+        }
+        currentScope()->types.insert(key);
+    }
+
+
+    void TPValidator::declareFunc(const std::string& name, const scan::TToken* at) {
+        if (isFuncDeclaredHere(name) || isVarDeclaredHere(name) ||
+            isTypeDeclaredHere(name) || isProcDeclaredHere(name) || isParamDeclaredHere(name)) {
+            failAt(at, "Redeclaration of function '" + name + "' in this scope");
+        }
+        currentScope()->funcs.insert(name);
+    }
+
+    void TPValidator::declareProc(const std::string& name, const scan::TToken* at) {
+        if (isProcDeclaredHere(name) || isVarDeclaredHere(name) ||
+            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isParamDeclaredHere(name)) {
+            failAt(at, "Redeclaration of procedure '" + name + "' in this scope");
+        }
+        currentScope()->procs.insert(name);
+    }
+
+    void TPValidator::declareParam(const std::string& name, const scan::TToken* at) {
+        if (isParamDeclaredHere(name) || isVarDeclaredHere(name) ||
+            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isProcDeclaredHere(name)) {
+            failAt(at, "Redeclaration of parameter '" + name + "' in this scope");
+        }
+        currentScope()->params.insert(name);
     }
 
 }

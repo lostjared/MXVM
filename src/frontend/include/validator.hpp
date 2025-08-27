@@ -10,11 +10,22 @@
 
 namespace mxx {
 
+    struct Scope {
+        std::unordered_set<std::string> vars;
+        std::unordered_set<std::string> consts;
+        std::unordered_set<std::string> types;
+        std::unordered_set<std::string> funcs;
+        std::unordered_set<std::string> procs;
+        std::unordered_set<std::string> params;
+    };
+
     class TPValidator {
     public:
         explicit TPValidator(const std::string& source_);
         bool validate(const std::string& name);
     private:
+
+        std::vector<Scope> scopeStack;
         scan::Scanner scanner;
         const scan::TToken* token = nullptr;
         std::string source;
@@ -27,9 +38,25 @@ namespace mxx {
         std::unordered_set<std::string> declaredConsts;
         std::unordered_set<std::string> declaredFuncs;
         std::unordered_set<std::string> declaredProcs;
+        void pushScope();
+        void popScope();
+        Scope* currentScope();
+        const Scope* currentScope() const;
+        bool isVariableInCurrentScope(const std::string& name) const;
+        std::string currentScopeName() const;
 
+
+        bool isVarDeclaredHere(const std::string& name) const;
+        bool isTypeDeclaredHere(const std::string& name) const;
+        bool isFuncDeclaredHere(const std::string& name) const;
+        bool isProcDeclaredHere(const std::string& name) const;
+        bool isParamDeclaredHere(const std::string& name) const;
         void declareVar(const std::string& name, const scan::TToken* at);
         void declareConst(const std::string& name, const scan::TToken* at);
+        void declareFunc(const std::string& name, const scan::TToken* at);
+        void declareProc(const std::string& name, const scan::TToken* at);
+        void declareParam(const std::string& name, const scan::TToken* at);
+
 
         void checkVar(const std::string& name, const scan::TToken* at);
         void checkVarOrConst(const std::string& name, const scan::TToken* at);
@@ -44,7 +71,6 @@ namespace mxx {
         void declareType(const std::string& name, const scan::TToken* at);
         void checkType(const std::string& name, const scan::TToken* at);
         bool isBuiltinConst(const std::string& name) const;
-
         bool next();
         bool match(const std::string& s) const;
         bool match(types::TokenType t) const;
@@ -98,6 +124,10 @@ namespace mxx {
         bool isAddOp() const;
         bool isMulOp() const;
         bool isSetOp() const;
+    private:
+        static std::string toLower(const std::string& s);
+        void predeclareType(const std::string& name); 
+        bool isBuiltinTypeName(const std::string& key) const;
     };
 } 
 #endif
