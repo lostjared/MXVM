@@ -262,9 +262,25 @@ namespace pascal {
     }
 
     std::string ArrayTypeNode::toString() const {
-        return "ArrayType: " + elementType + "[" + 
-               lowerBound->toString() + ".." + upperBound->toString() + "]";
+        std::string elemTypeStr = "unknown";
+        if (elementType) {
+            elemTypeStr = elementType->toString();
+        }
+        
+        std::string lowerStr = "?";
+        if (lowerBound) {
+            lowerStr = lowerBound->toString();
+        }
+        
+        std::string upperStr = "?";
+        if (upperBound) {
+            upperStr = upperBound->toString();
+        }
+        
+        return "ArrayType: " + elemTypeStr + "[" + lowerStr + ".." + upperStr + "]";
     }
+
+    std::string ExitNode::toString() const { return "exit"; }
 
     void ArrayDeclarationNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
@@ -334,11 +350,20 @@ namespace pascal {
         return "TypeAliasNode(" + typeName + " = " + baseType + ")";
     }
 
-    std::string ExitNode::toString() const {
-        return "exit";
+    void ArrayTypeDeclarationNode::accept(ASTVisitor& visitor) {
+        visitor.visit(*this);
     }
 
+    std::string ArrayTypeDeclarationNode::toString() const {
+        return name;
+    }
+
+
     void ExitNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void SimpleTypeNode::accept(ASTVisitor& visitor) {
         visitor.visit(*this);
     }
 

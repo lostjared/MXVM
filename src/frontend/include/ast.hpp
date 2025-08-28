@@ -59,16 +59,14 @@ namespace pascal {
     class VarDeclNode : public ASTNode {
     public:
         std::vector<std::string> identifiers;
-        std::variant<std::string, std::unique_ptr<ASTNode>> type; 
+        std::variant<std::string, std::unique_ptr<ASTNode>> type;
         std::vector<std::unique_ptr<ASTNode>> initializers;
 
-        VarDeclNode(std::vector<std::string> ids, std::string t,
-                    std::vector<std::unique_ptr<ASTNode>> inits = {})
-            : identifiers(std::move(ids)), type(std::move(t)), initializers(std::move(inits)) {}
-
-        VarDeclNode(std::vector<std::string> ids, std::unique_ptr<ASTNode> t,
-                    std::vector<std::unique_ptr<ASTNode>> inits = {})
-            : identifiers(std::move(ids)), type(std::move(t)), initializers(std::move(inits)) {}
+        VarDeclNode(std::vector<std::string> identifiers,
+                    std::variant<std::string, std::unique_ptr<ASTNode>> type,
+                    std::vector<std::unique_ptr<ASTNode>> initializers)
+            : identifiers(std::move(identifiers)), type(std::move(type)),
+              initializers(std::move(initializers)) {}
 
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
@@ -181,21 +179,32 @@ namespace pascal {
 
     enum class VarType;
 
-    class ArrayTypeNode : public ASTNode {
+    class SimpleTypeNode : public ASTNode {
     public:
-        std::string elementType;  
-        std::unique_ptr<ASTNode> lowerBound;
-        std::unique_ptr<ASTNode> upperBound;
+        std::string typeName;
         
-        ArrayTypeNode(std::string elementType, std::unique_ptr<ASTNode> lowerBound, 
-                     std::unique_ptr<ASTNode> upperBound)
-            : elementType(std::move(elementType)), lowerBound(std::move(lowerBound)), 
-              upperBound(std::move(upperBound)) {}
+        SimpleTypeNode(const std::string& typeName) : typeName(typeName) {}
         
         void accept(ASTVisitor& visitor) override;
-        std::string toString() const override;
+        std::string toString() const override { return "SimpleType: " + typeName; }
     };
 
+    class ArrayTypeNode : public ASTNode {
+    public:
+        std::unique_ptr<ASTNode> elementType;
+        std::unique_ptr<ASTNode> lowerBound;
+        std::unique_ptr<ASTNode> upperBound;
+
+        ArrayTypeNode(std::unique_ptr<ASTNode> elementType,  
+                    std::unique_ptr<ASTNode> lowerBound,
+                    std::unique_ptr<ASTNode> upperBound)
+            : elementType(std::move(elementType)), 
+            lowerBound(std::move(lowerBound)), 
+            upperBound(std::move(upperBound)) {}
+
+         std::string toString() const override;
+         void accept(ASTVisitor &visitor) override;
+    };
     class ArrayDeclarationNode : public ASTNode {
     public:
         std::string name;
@@ -206,6 +215,18 @@ namespace pascal {
                             std::vector<std::unique_ptr<ASTNode>> initializers = {})
             : name(std::move(name)), arrayType(std::move(arrayType)), 
               initializers(std::move(initializers)) {}
+        
+        void accept(ASTVisitor& visitor) override;
+        std::string toString() const override;
+    };
+
+    class ArrayTypeDeclarationNode : public ASTNode {
+    public:
+        std::string name;
+        std::unique_ptr<ArrayTypeNode> arrayType;
+        
+        ArrayTypeDeclarationNode(const std::string& name, std::unique_ptr<ArrayTypeNode> arrayType)
+            : name(name), arrayType(std::move(arrayType)) {}
         
         void accept(ASTVisitor& visitor) override;
         std::string toString() const override;
@@ -498,6 +519,8 @@ namespace pascal {
         virtual void visit(TypeDeclNode& node) = 0;
         virtual void visit(TypeAliasNode& node) = 0;
         virtual void visit(ExitNode &node) = 0;
+        virtual void visit(SimpleTypeNode& node) = 0;
+        virtual void visit(ArrayTypeDeclarationNode& node) = 0;
     };
 } 
 

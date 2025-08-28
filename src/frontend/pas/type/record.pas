@@ -1,37 +1,25 @@
-program RecordTest;
+program Test;
+
 type
-  Point = record
-    x: integer;
-    y: integer;
-    test_val: array[0..5] of real;
+	value = record
+	x: integer;
+	y: integer;
+	z: array[0..10] of integer;
+	end;
 
-  end;
+	zval = record
+	xx: integer;
+	yy: integer;
+	meal: value;
+	end;
 var
-  p: Point;
-  z: integer;
-  pz: array[0..10] of Point;
-
-procedure printPoint(pi: Point);
-var
-px: Point;
+px: value;
+py: zval;
 begin
-  px.x := 10;
-  px.y := 10;
-  writeln(pi.x, ':', pi.y);
-  writeln(px.x, ':', px.y);
-end;
-
-
-begin
-  p.x := 5;
-  p.y := 10;
-  p.test_val[0] := 25.0;
-  p.test_val[1] := 50.0;
-   z := p.x * p.y;
-  printPoint(p);
-  writeln('equals: ', z);
-  writeln(p.test_val[0], ',', p.test_val[1]);
-  pz[0].x := 5;
-  pz[0].y := 10;
-  writeln(pz[0].x,  '|', pz[0].y);
+px.x := 5;
+px.y := 1;
+px.z[0] := 5 * 5 + px.x;
+writeln(px.x, px.y);
+writeln(px.z[0]);
+py.meal.x := 5;
 end.

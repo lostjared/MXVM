@@ -19,6 +19,46 @@
 
 namespace pascal {
 
+
+    struct ArrayInfo {
+        std::string elementType;
+        int lowerBound = 0;
+        int upperBound = -1;
+        int size = 0;           
+        int elementSize = 8;    
+        bool elementIsArray = false;
+        std::unique_ptr<ArrayInfo> elementArray; 
+
+        
+        ArrayInfo() = default;
+        ArrayInfo(const ArrayInfo& other) 
+            : elementType(other.elementType), lowerBound(other.lowerBound), 
+              upperBound(other.upperBound), size(other.size), elementSize(other.elementSize),
+              elementIsArray(other.elementIsArray) {
+            if (other.elementArray) {
+                elementArray = std::make_unique<ArrayInfo>(*other.elementArray);
+            }
+        }
+        ArrayInfo(ArrayInfo&& other) noexcept = default;
+        ArrayInfo& operator=(const ArrayInfo& other) {
+            if (this != &other) {
+                elementType = other.elementType;
+                lowerBound = other.lowerBound;
+                upperBound = other.upperBound;
+                size = other.size;
+                elementSize = other.elementSize;
+                elementIsArray = other.elementIsArray;
+                if (other.elementArray) {
+                    elementArray = std::make_unique<ArrayInfo>(*other.elementArray);
+                } else {
+                    elementArray.reset();
+                }
+            }
+            return *this;
+        }
+        ArrayInfo& operator=(ArrayInfo&& other) noexcept = default;
+    };
+
     class CodeGenVisitor;
 
     enum class VarType { INT, DOUBLE, STRING, CHAR, RECORD, PTR, BOOL, UNKNOWN, ARRAY_INT, ARRAY_DOUBLE, ARRAY_STRING };
@@ -342,7 +382,12 @@ namespace pascal {
                 B = ensureFloatConstSymbol(B);
             emit(op + " " + A + ", " + B);
         }
-        void emit3(const std::string& op, const std::string& a, const std::string& b, const std::string& c) { emit(op + " " + a + ", " + b + ", " + c); }
+        void emit3(const std::string& op, const std::string& a, const std::string& b, const std::string& c) {
+            instructions.push_back(op + " " + a + ", " + b + ", " + c);
+            if (op == "alloc") {
+                allocatedPtrs.insert(a);
+            }
+        }
         void emit4(const std::string& op, const std::string& a, const std::string& b, const std::string& c, const std::string& d) { emit(op + " " + a + ", " + b + ", " + c + ", " + d); }
 
         std::string escapeStringForMxvm(const std::string& raw) const {
@@ -529,6 +574,58 @@ namespace pascal {
             return false;
         }
 
+        void allocateRecordFieldArrays(const std::string& recordVarName, const std::string& recordTypeName) {
+            auto recTypeIt = recordTypes.find(recordTypeName);
+            if (recTypeIt == recordTypes.end()) return;
+            auto& recInfo = recTypeIt->second;
+            std::string currentScope = getCurrentScopeName();
+
+            for (const auto& field : recInfo.fields) {
+                if (!field.isArray) continue;
+
+                std::string fieldArrayName = recordVarName + "_" + field.name;
+
+                int slot = newSlotFor(fieldArrayName);
+                setSlotType(slot, VarType::PTR);
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+
+                emit3("alloc",
+                      slotVar(slot),
+                      std::to_string(field.arrayInfo.elementSize),
+                      std::to_string(field.arrayInfo.size));
+
+                std::string basePtr = ensurePtrBase(recordVarName);
+                emit4("store", slotVar(slot), basePtr, std::to_string(field.offset), "1");
+
+                if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
+                else functionScopedArrays[currentScope].push_back(slotVar(slot));
+            }
+        }
+
+        ArrayInfo buildArrayInfoFromNode(ArrayTypeNode* atn) {
+            ArrayInfo info{};
+            info.lowerBound = std::stoi(evaluateConstantExpression(atn->lowerBound.get()));
+            info.upperBound = std::stoi(evaluateConstantExpression(atn->upperBound.get()));
+            info.size = info.upperBound - info.lowerBound + 1;
+            
+            if (auto childArr = dynamic_cast<ArrayTypeNode*>(atn->elementType.get())) {
+                info.elementType = "array";
+                info.elementIsArray = true;
+                info.elementArray = std::make_unique<ArrayInfo>(buildArrayInfoFromNode(childArr));
+                info.elementSize = info.elementArray->size * info.elementArray->elementSize; 
+            } else if (auto childSimple = dynamic_cast<SimpleTypeNode*>(atn->elementType.get())) {
+                info.elementType = childSimple->typeName;
+                info.elementSize = getArrayElementSize(info.elementType);
+            } else if (dynamic_cast<RecordTypeNode*>(atn->elementType.get())) {
+                info.elementType = "record"; 
+                info.elementSize = 8; 
+            } else {
+                info.elementType = "integer";
+                info.elementSize = 8;
+            }
+            return info;
+        }
+
     public:
         friend class IOFunctionHandler;
         friend class MathFunctionHandler;
@@ -554,6 +651,13 @@ namespace pascal {
         }
 
         std::string name = "App";
+
+         
+        void emitFree(const std::string& s) {
+            if (allocatedPtrs.erase(s)) {        // erase returns 1 if it existed
+                emit("free " + s);
+            }
+        }
 
         void generate(ASTNode* root) {
             if (!root) return;
@@ -664,7 +768,8 @@ namespace pascal {
                     emit1("free", recVar);
                 }
                 for (const auto& tp : tempPtrByScope[scopeName]) {
-                    emit1("free", tp);
+                    if(allocatedPtrs.count(tp))
+                        emitFree(tp);
                 }
 
                 emit("ret");
@@ -750,7 +855,8 @@ namespace pascal {
                     emit1("free", recVar);
                 }
                 for (const auto& tp : tempPtrByScope[scopeName]) {
-                    emit1("free", tp);
+                    if(allocatedPtrs.count(tp))
+                        emitFree("free");
                 }
 
                 emit("ret");
@@ -761,6 +867,8 @@ namespace pascal {
             currentFunctionName.clear();
             currentParamLocations.clear();
         }
+
+        void markAllocatedPtr(const std::string& p) { allocatedPtrs.insert(p); }
 
         void emit_invoke(const std::string& funcName, const std::vector<std::string>& params) {
             std::string instruction = "invoke " + funcName;
@@ -853,7 +961,7 @@ namespace pascal {
 
     void visit(VarDeclNode& node) override {
         for (const auto& varName : node.identifiers) {
-            std::string mangledName = findMangledName(varName);
+            std::string mangledName = mangleVariableName(varName);
             std::string typeName;
 
             if (std::holds_alternative<std::string>(node.type)) {
@@ -861,35 +969,26 @@ namespace pascal {
             } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
                 auto& typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
                 if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
-                    std::string lowerBoundStr = evaluateConstantExpression(arrayTypeNode->lowerBound.get());
-                    std::string upperBoundStr = evaluateConstantExpression(arrayTypeNode->upperBound.get());
-                    
-                    int lowerBound = std::stoi(lowerBoundStr);
-                    int upperBound = std::stoi(upperBoundStr);
-                    int size = upperBound - lowerBound + 1;
-                    int elementSize = getArrayElementSize(arrayTypeNode->elementType);
+                ArrayInfo info = buildArrayInfoFromNode(arrayTypeNode);
+                arrayInfo[varName] = std::move(info);
 
-                    ArrayInfo info{arrayTypeNode->elementType, lowerBound, upperBound, size, elementSize};
-                    arrayInfo[varName] = info;
+                setVarType(varName, VarType::PTR);
+                int slot = newSlotFor(mangledName);
+                setSlotType(slot, VarType::PTR);
+                varSlot[varName] = slot;
+                varSlot[mangledName] = slot;
 
-                    std::string currentScope = getCurrentScopeName();
-                    if (currentScope.empty()) {
-                        globalArrays.push_back(mangledName);
-                    } else {
-                        functionScopedArrays[currentScope].push_back(mangledName);
-                    }
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                emit3("alloc",
+                        slotVar(slot),
+                        std::to_string(arrayInfo[varName].elementSize),
+                        std::to_string(arrayInfo[varName].size));
 
-                    setVarType(varName, VarType::PTR); 
-                    int slot = newSlotFor(mangledName);
-                    setSlotType(slot, VarType::PTR);
-                    varSlot[varName] = slot;
-                    varSlot[mangledName] = slot;
-
-                    emit3("alloc", mangledName, std::to_string(elementSize), std::to_string(size));
-                    return; 
-                } else {
-                    typeName = "record"; 
-                }
+                std::string currentScope = getCurrentScopeName();
+                if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
+                else functionScopedArrays[currentScope].push_back(slotVar(slot));
+                continue;
+            }
             } else {
                 typeName = "unknown";
             }
@@ -911,10 +1010,12 @@ namespace pascal {
                 
                 emit3("alloc", slotVar(slot), std::to_string(recordSize), "1");
                 
+                
+                allocateRecordFieldArrays(mangledName, typeName);
+                
                 std::string currentScope = getCurrentScopeName();
                 recordsToFreeInScope[currentScope].push_back(mangledName);
             } else {
-                
                 auto arrayInfoIt = arrayInfo.find(varName);
                 if (arrayInfoIt != arrayInfo.end()) {
                     setVarType(varName, VarType::PTR);
@@ -934,6 +1035,13 @@ namespace pascal {
                 }
             }
         }
+    }
+
+
+    std::string storageSymbolFor(const std::string& mangled) {
+        auto it = varSlot.find(mangled);
+        if (it != varSlot.end()) return slotVar(it->second);
+        return mangled;
     }
 
     VarType getTypeFromString(const std::string& typeStr) {
@@ -1392,18 +1500,17 @@ namespace pascal {
                 }
             }
             if (auto a = dynamic_cast<ArrayAccessNode*>(node)) {
-            ArrayInfo* info = getArrayInfoForArrayAccess(a);
-            if (info) {
-                const std::string& t = info->elementType;
-                if (t == "integer") return VarType::INT;
-                if (t == "real") return VarType::DOUBLE;
-                if (t == "char") return VarType::CHAR;
-                if (t == "string") return VarType::STRING;
-                if (t == "boolean") return VarType::BOOL;
-                if (t == "ptr") return VarType::PTR;
-                if (isRecordTypeName(t)) return VarType::RECORD;
+                ArrayInfo* info = getArrayInfoForArrayAccess(a);
+                if (info) {
+                    if (info->elementIsArray) return VarType::PTR;
+                    const std::string& t = info->elementType;
+                    if (t == "integer" || t == "boolean") return VarType::INT;
+                    if (t == "real")    return VarType::DOUBLE;
+                    if (t == "char")    return VarType::CHAR;
+                    if (t == "string" || t == "ptr") return VarType::PTR;
+                    if (isRecordTypeName(t)) return VarType::RECORD;
+                }
             }
-        }
             if (auto b = dynamic_cast<BinaryOpNode*>(node)) {
                 VarType lt = getExpressionType(b->left.get());
                 VarType rt = getExpressionType(b->right.get());
@@ -1431,15 +1538,32 @@ namespace pascal {
         }
 
         void visit(VariableNode& node) override {
-            auto it = currentParamLocations.find(node.name);
-            if (it != currentParamLocations.end()) { pushValue(it->second); return; }
+            
+            if (auto pit = currentParamLocations.find(node.name); pit != currentParamLocations.end()) {
+                pushValue(pit->second);
+                return;
+            }
 
-            std::string mangledName = findMangledName(node.name);
-            auto constIt = compileTimeConstants.find(mangledName);
-            if (constIt != compileTimeConstants.end()) { pushValue(constIt->second); return; }
-            constIt = compileTimeConstants.find(node.name);
-            if (constIt != compileTimeConstants.end()) { pushValue(constIt->second); return; }
-            pushValue(findMangledName(node.name));
+            std::string mangled = findMangledName(node.name);
+
+            
+            if (auto ct = compileTimeConstants.find(mangled); ct != compileTimeConstants.end()) {
+                pushValue(ct->second);
+                return;
+            }
+            if (auto ct2 = compileTimeConstants.find(node.name); ct2 != compileTimeConstants.end()) {
+                pushValue(ct2->second);
+                return;
+            }
+
+            
+            if (auto sit = varSlot.find(mangled); sit != varSlot.end()) {
+                pushValue(slotVar(sit->second));
+                return;
+            }
+
+            
+            pushValue(mangled);
         }
 
         void visit(NumberNode& node) override {
@@ -1603,46 +1727,60 @@ namespace pascal {
         }
 
     private:
+        std::unordered_set<std::string> allocatedPtrs;   // track real alloc targets
+
         std::unordered_map<std::string, std::string> realConstants;
         void visit(ArrayTypeNode& /*node*/) override {}
-        struct ArrayInfo {
-            std::string elementType;
-            int lowerBound;
-            int upperBound;
-            int size;
-            int elementSize;
-        };
+        
         std::unordered_map<std::string, ArrayInfo> arrayInfo;
-
-        int getArrayElementSize(const std::string& elementType) {
-            if (elementType == "integer" || elementType == "boolean") return 8;
-            if (elementType == "real") return 8;
-            if (elementType == "char") return 8;
-            if (elementType == "string" || elementType == "ptr") return 8;
-            auto it = recordTypes.find(elementType);
-            if (it != recordTypes.end()) return it->second.size; 
+        int getArrayElementSize(const std::string& t) {
+            if (t == "integer" || t == "boolean") return 8;
+            if (t == "real")    return 8;
+            if (t == "char")    return 8;  
+            if (t == "string" || t == "ptr") return 8;
+            auto it = recordTypes.find(t);
+            if (it != recordTypes.end()) return it->second.size;
             return 8;
         }
 
+    std::string getTypeString(ASTNode* typeNode) {
+        if (auto simpleType = dynamic_cast<SimpleTypeNode*>(typeNode)) {
+            return simpleType->typeName;
+        } else if (dynamic_cast<ArrayTypeNode*>(typeNode)) {
+            return "array"; 
+        } else if (dynamic_cast<RecordTypeNode*>(typeNode)) {
+            return "record";
+        }
+        return "unknown";
+    }
+
     void visit(ArrayDeclarationNode& node) override {
         std::string mangledName = findMangledName(node.name);
-        std::string elementType = node.arrayType->elementType;
+        
+        
+        std::string elementType;
+        if (auto simpleType = dynamic_cast<SimpleTypeNode*>(node.arrayType->elementType.get())) {
+            elementType = simpleType->typeName;
+        } else if (dynamic_cast<ArrayTypeNode*>(node.arrayType->elementType.get())) {
+            elementType = "array";
+        } else if (dynamic_cast<RecordTypeNode*>(node.arrayType->elementType.get())) {
+            elementType = "record";
+        } else {
+            elementType = "integer"; 
+        }
         
         int lowerBound = std::stoi(evaluateConstantExpression(node.arrayType->lowerBound.get()));
         int upperBound = std::stoi(evaluateConstantExpression(node.arrayType->upperBound.get()));
         int size = upperBound - lowerBound + 1;
         
-        
         int elementSize = 8; 
         
         if (isRecordTypeName(elementType)) {
-        
             auto it = recordTypes.find(elementType);
             if (it != recordTypes.end()) {
                 elementSize = it->second.size;
             }
         } else {
-        
             elementSize = getArrayElementSize(elementType);
         }
         
@@ -1652,27 +1790,21 @@ namespace pascal {
         info.upperBound = upperBound;
         info.size = size;
         info.elementSize = elementSize;
-        arrayInfo[node.name] = info;
+        arrayInfo[node.name] = std::move(info);
+        
         int slot = newSlotFor(mangledName);
-        varSlot[node.name] = slot;          
-        varSlot[mangledName] = slot;        
+        varSlot[node.name] = slot;
+        varSlot[mangledName] = slot;
         setVarType(node.name, VarType::PTR);
         setSlotType(slot, VarType::PTR);
         updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-        emit3("alloc", mangledName, std::to_string(elementSize), std::to_string(size));
+        emit3("alloc",
+              slotVar(slot),
+              std::to_string(elementSize),
+              std::to_string(size));
         std::string currentScope = getCurrentScopeName();
-        if (currentScope.empty()) {
-            globalArrays.push_back(mangledName);
-        } else {
-            functionScopedArrays[currentScope].push_back(mangledName);
-        }
-    }
-
-    
-   
-
-    void emitArrayAlloc(const std::string& name, int elemSize, int numElements) {
-        emit3("alloc", name, std::to_string(elemSize), std::to_string(numElements));
+        if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
+        else functionScopedArrays[currentScope].push_back(slotVar(slot));
     }
 
     void visit(FieldAccessNode& node) override {
@@ -1697,7 +1829,7 @@ namespace pascal {
             node.recordExpr->accept(*this);
             baseName = popValue();
             baseIsDirectPointer = true;
-            recType = getVarRecordTypeName(baseRawName.empty() ? baseName : baseRawName);
+            recType = getVarRecordTypeNameFromExpr(node.recordExpr.get());
         }
 
         if (recType.empty()) {
@@ -1775,7 +1907,7 @@ namespace pascal {
             std::string base;
             if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
                 std::string mangled = findMangledArrayName(var->name);
-                base = ensurePtrBase(mangled);
+                base = ensurePtrBase(storageSymbolFor(mangled));
             } else if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
                 field->recordExpr->accept(*this);
                 std::string recPtr = popValue();
@@ -1911,12 +2043,18 @@ namespace pascal {
             functionSetReturn = true;
         } else {
             std::string mangled = findMangledName(varName);
-            emit2("mov", mangled, rhs);
-            recordLocation(varName, {ValueLocation::MEMORY, mangled});
+            auto it = varSlot.find(mangled);
+            if (it != varSlot.end()) {
+                emit2("mov", slotVar(it->second), rhs);
+                recordLocation(varName, {ValueLocation::MEMORY, slotVar(it->second)});
+            } else {
+                emit2("mov", mangled, rhs);
+                recordLocation(varName, {ValueLocation::MEMORY, mangled});
+            }
         }
 
         if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-        }
+    }
 
 
     int getRecordTypeSize(const std::string& typeName) {
@@ -2013,12 +2151,10 @@ namespace pascal {
         }
     #endif
 
-        
         std::string elemIndex = allocReg();
         emit2("mov", elemIndex, idx);
         if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
-        
         std::string base;
         if (auto var = dynamic_cast<VariableNode*>(node.base.get())) {
             std::string mangledArrayName = findMangledArrayName(var->name);
@@ -2033,12 +2169,14 @@ namespace pascal {
             emit2("mov", arrayPtr, recPtr);
             emit2("add", arrayPtr, std::to_string(fieldOffset));
             base = arrayPtr;
+        } else if (dynamic_cast<ArrayAccessNode*>(node.base.get())) {
+            node.base->accept(*this);
+            base = popValue();
         } else {
             throw std::runtime_error("Unsupported array base in access");
         }
 
-        
-        if (isRecordTypeName(info->elementType)) {
+        if (info->elementIsArray || isRecordTypeName(info->elementType)) {
             std::string offsetBytes = allocReg();
             emit2("mov", offsetBytes, elemIndex);
             emit2("mul", offsetBytes, std::to_string(info->elementSize));
@@ -2054,12 +2192,12 @@ namespace pascal {
             return;
         }
 
-        
         VarType elemType = getExpressionType(&node);
         std::string dst;
-        if (elemType == VarType::DOUBLE) dst = allocFloatReg();
-        else if (elemType == VarType::PTR || elemType == VarType::STRING) dst = allocTempPtr();
-        else dst = allocReg();
+        if (elemType == VarType::DOUBLE)      dst = allocFloatReg();
+        else if (elemType == VarType::PTR ||
+                elemType == VarType::STRING) dst = allocTempPtr();
+        else                                  dst = allocReg();
 
         emit4("load", dst, base, elemIndex, std::to_string(info->elementSize));
         pushValue(dst);
@@ -2067,6 +2205,7 @@ namespace pascal {
         if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
         freeReg(elemIndex);
     }
+
 
 
         std::string findMangledFuncName(const std::string& name, bool isProc) const {
@@ -2173,7 +2312,21 @@ namespace pascal {
         }
 
 
-        struct RecordField { std::string name; std::string typeName; int offset; int size; bool isArray = false; ArrayInfo arrayInfo; };
+        struct RecordField { 
+            std::string name; 
+            std::string typeName; 
+            int offset; 
+            int size; 
+            bool isArray = false; 
+            ArrayInfo arrayInfo; 
+
+            
+            RecordField() = default;
+            RecordField(const RecordField& other) = default;
+            RecordField(RecordField&& other) noexcept = default;
+            RecordField& operator=(const RecordField& other) = default;
+            RecordField& operator=(RecordField&& other) noexcept = default;
+        };
         struct RecordTypeInfo { int size = 0; std::vector<RecordField> fields; std::unordered_map<std::string,int> nameToIndex; };
         std::unordered_map<std::string, RecordTypeInfo> recordTypes;
         std::unordered_map<std::string, std::string> varRecordType;
@@ -2232,20 +2385,15 @@ namespace pascal {
                         auto& typeNode = std::get<std::unique_ptr<ASTNode>>(fieldDecl.type);
                         if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
                             rf.isArray = true;
-                            rf.typeName = "array"; 
-
-                            std::string lowerBoundStr = evaluateConstantExpression(arrayTypeNode->lowerBound.get());
-                            std::string upperBoundStr = evaluateConstantExpression(arrayTypeNode->upperBound.get());
-                            
-                            rf.arrayInfo.lowerBound = std::stoi(lowerBoundStr);
-                            rf.arrayInfo.upperBound = std::stoi(upperBoundStr);
-                            rf.arrayInfo.elementType = arrayTypeNode->elementType;
-                            rf.arrayInfo.elementSize = getArrayElementSize(rf.arrayInfo.elementType);
-                            rf.arrayInfo.size = rf.arrayInfo.upperBound - rf.arrayInfo.lowerBound + 1;
-                            
+                            rf.arrayInfo = buildArrayInfoFromNode(arrayTypeNode);
+                            rf.typeName = "array";
                             rf.size = rf.arrayInfo.size * rf.arrayInfo.elementSize;
-                        } else {
+                        } else if (dynamic_cast<RecordTypeNode*>(typeNode.get())) {
+                            rf.typeName = "record";
                             rf.size = 8; 
+                        } else {
+                            rf.typeName = getTypeString(typeNode.get());
+                            rf.size = getTypeSizeByName(rf.typeName);
                         }
                     } else {
                         rf.isArray = false;
@@ -2270,6 +2418,29 @@ namespace pascal {
 
         void visit(TypeAliasNode& node) override {
             typeAliases[node.typeName] = node.baseType;
+        }
+
+        void visit(SimpleTypeNode& node) override {
+
+        }
+      
+        void visit(ArrayTypeDeclarationNode& node) override {
+            std::string mangledName = findMangledName(node.name);
+            ArrayInfo info = buildArrayInfoFromNode(node.arrayType.get());
+            arrayInfo[node.name] = std::move(info);
+            int slot = newSlotFor(mangledName);
+            varSlot[node.name] = slot;
+            varSlot[mangledName] = slot;
+            setVarType(node.name, VarType::PTR);
+            setSlotType(slot, VarType::PTR);
+            updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+            emit3("alloc",
+                  slotVar(slot),
+                  std::to_string(arrayInfo[node.name].elementSize),
+                  std::to_string(arrayInfo[node.name].size));
+            std::string currentScope = getCurrentScopeName();
+            if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
+            else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
         }
 
         void visit(ExitNode& node) override {
@@ -2367,28 +2538,32 @@ namespace pascal {
         }
 
         
-        ArrayInfo* getArrayInfoForArrayAccess(ArrayAccessNode* arr) {
-            if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
-                auto it = arrayInfo.find(var->name);
-                if (it != arrayInfo.end()) return &it->second;
-            }
-            
-            if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
-                std::string recTypeName = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                
-                auto recTypeInfoIt = recordTypes.find(recTypeName);
-                if (recTypeInfoIt != recordTypes.end()) {
-                    auto& recInfo = recTypeInfoIt->second;
-                    auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
-                    if (fieldIndexIt != recInfo.nameToIndex.end()) {
-                        auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
-                        if (fieldInfo.isArray) {
-                            return &fieldInfo.arrayInfo;
+          ArrayInfo* getArrayInfoForArrayAccess(ArrayAccessNode* arr) {
+                if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
+                    auto it = arrayInfo.find(var->name);
+                    if (it != arrayInfo.end()) return &it->second;
+                    auto it2 = arrayInfo.find(findMangledArrayName(var->name));
+                    if (it2 != arrayInfo.end()) return &it2->second;
+                }
+                if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
+                    std::string recTypeName = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                    auto recTypeInfoIt = recordTypes.find(recTypeName);
+                    if (recTypeInfoIt != recordTypes.end()) {
+                        auto& recInfo = recTypeInfoIt->second;
+                        auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
+                        if (fieldIndexIt != recInfo.nameToIndex.end()) {
+                            auto& f = recInfo.fields[fieldIndexIt->second];
+                            if (f.isArray) return const_cast<ArrayInfo*>(&f.arrayInfo);
                         }
                     }
                 }
-            }
-            return nullptr;
+                if (auto inner = dynamic_cast<ArrayAccessNode*>(arr->base.get())) {
+                    ArrayInfo* baseInfo = getArrayInfoForArrayAccess(inner);
+                    if (baseInfo && baseInfo->elementIsArray) {
+                        return baseInfo->elementArray.get();
+                    }
+                }
+                return nullptr;
         }
     };
 

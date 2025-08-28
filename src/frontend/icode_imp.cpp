@@ -808,6 +808,7 @@ namespace pascal {
             std::string r = v.allocTempPtr();
             v.emit("return " + r);
             v.pushValue(r); 
+            v.markAllocatedPtr(r);
         };
 
         if (f=="length") {

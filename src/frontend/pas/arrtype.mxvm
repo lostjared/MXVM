@@ -1,0 +1,127 @@
+program RecordTest {
+	section module {
+ 
+	}
+	section data {
+		int rax = 0
+		int rbx = 0
+		int rcx = 0
+		int rdx = 0
+		float xmm0 = 0.0
+		ptr _tmpptr0 = null
+		ptr _tmpptr1 = null
+		ptr _tmpptr2 = null
+		ptr _tmpptr3 = null
+		ptr arg0 = null
+		float real_const_0 = 0.5
+		string str_0 = "equals: "
+		string str_1 = ":"
+		string fmt_int = "%lld "
+		string fmt_str = "%s "
+		string fmt_float = "%.6f "
+		string newline = "\n"
+		ptr p = null
+		ptr p_test_val = null
+		int z = 0
+		ptr printPoint_pi = null
+		ptr printPoint_px = null
+	}
+	section code {
+	start:
+		alloc p, 104, 1
+		alloc p_test_val, 8, 11
+		store p_test_val, p, 16, 1
+		store 5, p, 0, 1
+		store 10, p, 8, 1
+		load rbx, p, 0, 1
+		load rcx, p, 8, 1
+		mov rdx, rbx
+		mul rdx, rcx
+		mov z, rdx
+		mov arg0, p
+		call PROC_printPoint
+		print fmt_str, str_0
+		print fmt_int, z
+		print newline
+		mov xmm0, real_const_0
+		print fmt_float, xmm0
+		print newline
+		free p_test_val
+		free p
+		done
+	function PROC_printPoint:
+		mov printPoint_pi, arg0
+		alloc printPoint_px, 104, 3
+		mov rbx, 0
+		mov rcx, rbx
+		cmp rcx, 0
+		jl IDX_OOB_1
+		cmp rcx, 2
+		jg IDX_OOB_1
+		jmp IDX_OK_0
+	IDX_OOB_1:
+		exit 1
+	IDX_OK_0:
+		mov rbx, 0
+		mov rcx, rbx
+		mul rcx, 104
+		mov _tmpptr0, printPoint_px
+		add _tmpptr0, rcx
+		store 100, _tmpptr0, 0, 1
+		mov rbx, 0
+		mov rcx, rbx
+		cmp rcx, 0
+		jl IDX_OOB_3
+		cmp rcx, 2
+		jg IDX_OOB_3
+		jmp IDX_OK_2
+	IDX_OOB_3:
+		exit 1
+	IDX_OK_2:
+		mov rbx, 0
+		mov rcx, rbx
+		mul rcx, 104
+		mov _tmpptr1, printPoint_px
+		add _tmpptr1, rcx
+		store 200, _tmpptr1, 8, 1
+		mov rbx, 0
+		mov rcx, rbx
+		cmp rcx, 0
+		jl IDX_OOB_5
+		cmp rcx, 2
+		jg IDX_OOB_5
+		jmp IDX_OK_4
+	IDX_OOB_5:
+		exit 1
+	IDX_OK_4:
+		mov rbx, 0
+		mov rcx, rbx
+		mul rcx, 104
+		mov _tmpptr2, printPoint_px
+		add _tmpptr2, rcx
+		load rbx, _tmpptr2, 0, 1
+		print fmt_int, rbx
+		print fmt_str, str_1
+		mov rcx, 0
+		mov rdx, rcx
+		cmp rdx, 0
+		jl IDX_OOB_7
+		cmp rdx, 2
+		jg IDX_OOB_7
+		jmp IDX_OK_6
+	IDX_OOB_7:
+		exit 1
+	IDX_OK_6:
+		mov rcx, 0
+		mov rdx, rcx
+		mul rdx, 104
+		mov _tmpptr3, printPoint_px
+		add _tmpptr3, rdx
+		load rcx, _tmpptr3, 8, 1
+		print fmt_int, rcx
+		print newline
+	PROC_END_printPoint:
+		ret
+	}
+}
+
