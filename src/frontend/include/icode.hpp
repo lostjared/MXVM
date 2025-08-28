@@ -997,6 +997,7 @@ namespace pascal {
             std::string mangledName = mangleVariableName(varName);
             std::string typeName;
 
+
             if (std::holds_alternative<std::string>(node.type)) {
                 typeName = std::get<std::string>(node.type);
             } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
@@ -1009,37 +1010,42 @@ namespace pascal {
                     setVarType(varName, VarType::PTR);
                     int slot = newSlotFor(mangledName);
                     setSlotType(slot, VarType::PTR);
-                    varSlot[varName] = slot;
+                    varSlot[varName]     = slot;
                     varSlot[mangledName] = slot;
 
                     updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                    emit3("alloc", slotVar(slot),
+                    emit3("alloc",
+                        slotVar(slot),
                         std::to_string(arrayInfo[mangledName].elementSize),
                         std::to_string(arrayInfo[mangledName].size));
 
                     std::string currentScope = getCurrentScopeName();
                     if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
                     else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
-                    continue;
+                    continue; 
                 }
 
+            
                 if (auto* simpleTypeNode = dynamic_cast<SimpleTypeNode*>(typeNode.get())) {
                     typeName = simpleTypeNode->typeName;
+                } else if (dynamic_cast<RecordTypeNode*>(typeNode.get())) {
+                    typeName = "record";
                 }
-
             } else {
                 typeName = "unknown";
             }
 
             
             int slot = newSlotFor(mangledName);
-            varSlot[varName] = slot;
+            varSlot[varName]     = slot;
             varSlot[mangledName] = slot;
 
+            
             std::string normalizedTypeName = resolveTypeName(lc(typeName));
+
+            
             auto recordTypeIt = recordTypes.find(normalizedTypeName);
             if (recordTypeIt != recordTypes.end()) {
-                // RECORD variable
                 varRecordType[mangledName] = normalizedTypeName;
                 varRecordType[varName]     = normalizedTypeName;
 
@@ -1051,50 +1057,47 @@ namespace pascal {
                 updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
                 emit3("alloc", slotVar(slot), std::to_string(recordSize), "1");
 
+            
                 allocateRecordFieldArrays(mangledName, normalizedTypeName);
 
                 std::string currentScope = getCurrentScopeName();
                 recordsToFreeInScope[currentScope].push_back(mangledName);
+                continue; 
+            }
 
+            auto aliasIt = arrayInfo.find(normalizedTypeName);
+            if (aliasIt != arrayInfo.end()) {
+                arrayInfo[mangledName] = aliasIt->second; 
+
+                setVarType(varName, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
+
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                emit3("alloc",
+                    slotVar(slot),
+                    std::to_string(arrayInfo[mangledName].elementSize),
+                    std::to_string(arrayInfo[mangledName].size));
+
+                std::string currentScope = getCurrentScopeName();
+                if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
+                else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
+                continue; 
+            }
+
+            
+            VarType vType = getTypeFromString(typeName);
+            setVarType(varName, vType);
+            setSlotType(slot, vType);
+
+            if (vType == VarType::PTR || vType == VarType::RECORD) {
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+            } else if (vType == VarType::DOUBLE) {
+                updateDataSectionInitialValue(slotVar(slot), "float", "0.0");
             } else {
-                // Handle named array types
-                auto arrayInfoIt = arrayInfo.find(normalizedTypeName);
-                if (arrayInfoIt != arrayInfo.end()) {
-                    arrayInfo[mangledName] = arrayInfoIt->second; // Copy array info
-                    setVarType(varName, VarType::PTR);
-                    setSlotType(slot, VarType::PTR);
-                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                    emit3("alloc", slotVar(slot),
-                        std::to_string(arrayInfo[mangledName].elementSize),
-                        std::to_string(arrayInfo[mangledName].size));
-                    std::string currentScope = getCurrentScopeName();
-                    if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
-                    else functionScopedArrays[currentScope].push_back(slotVar(slot));
-                    continue; // Skip to next variable
-                }
-
-                // non-record path unchanged
-                auto arrayInfoIt_var = arrayInfo.find(varName);
-                if (arrayInfoIt_var != arrayInfo.end()) {
-                    setVarType(varName, VarType::PTR);
-                    setSlotType(slot, VarType::PTR);
-                } else {
-                    VarType vType = getTypeFromString(typeName);
-                    setVarType(varName, vType);
-                    setSlotType(slot, vType);
-
-                    if (vType == VarType::PTR || vType == VarType::RECORD) {
-                        updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                    } else if (vType == VarType::DOUBLE) {
-                        updateDataSectionInitialValue(slotVar(slot), "float", "0.0");
-                    } else {
-                        updateDataSectionInitialValue(slotVar(slot), "int", "0");
-                    }
-                }
+                updateDataSectionInitialValue(slotVar(slot), "int", "0");
             }
         }
     }
-
 
     std::string storageSymbolFor(const std::string& mangled) {
         auto it = varSlot.find(mangled);
@@ -2585,18 +2588,13 @@ namespace pascal {
                     info.fields.push_back(rf);
                     offset += rf.size;
                     
-                    std::cout << "Added field: " << rf.name << " type: " << rf.typeName 
-                            << " offset: " << rf.offset << " size: " << rf.size << std::endl;
+                    
                 }
             }
             
             info.size = offset;
             std::string recordName = lc(node.name);
             recordTypes[recordName] = info;
-            
-            // Debug output
-            std::cout << "Registered record type: " << recordName 
-                    << " with size: " << info.size << std::endl;
         }
 
         void visit(TypeDeclNode& node) override {
@@ -2610,22 +2608,9 @@ namespace pascal {
         }
       
         void visit(ArrayTypeDeclarationNode& node) override {
-            std::string mangledName = findMangledName(node.name);
+            std::string typeKey = resolveTypeName(lc(node.name));
             ArrayInfo info = buildArrayInfoFromNode(node.arrayType.get());
-            arrayInfo[node.name] = std::move(info);
-            int slot = newSlotFor(mangledName);
-            varSlot[node.name] = slot;
-            varSlot[mangledName] = slot;
-            setVarType(node.name, VarType::PTR);
-            setSlotType(slot, VarType::PTR);
-            updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-            emit3("alloc",
-                  slotVar(slot),
-                  std::to_string(arrayInfo[mangledName].elementSize),
-                  std::to_string(arrayInfo[mangledName].size));
-            std::string currentScope = getCurrentScopeName();
-            if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
-            else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
+            arrayInfo[typeKey] = std::move(info);
         }
 
         void visit(ExitNode& node) override {

@@ -22,4 +22,5 @@ px.z[0] := 5 * 5 + px.x;
 writeln(px.x, px.y);
 writeln(px.z[0]);
 py.meal.x := 5;
+writeln(py.meal.x);
 end.
