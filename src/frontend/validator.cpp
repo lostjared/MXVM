@@ -367,7 +367,7 @@ namespace mxx {
         if (isKW("record")) {
             next();
             while (!isKW("end")) {
-                parseIdentList();
+                parseFieldIdentList();
                 require(":"); next();
                 parseType();
                 require(";"); next();
@@ -825,6 +825,29 @@ namespace mxx {
         }
         currentScope()->types.insert(key);
     }
+    
+    void TPValidator::pushRecordFieldScope() { recordFieldScopes.emplace_back(); }
+    void TPValidator::popRecordFieldScope()  { if (!recordFieldScopes.empty()) recordFieldScopes.pop_back(); }
+    bool TPValidator::inRecordFieldScope() const { return !recordFieldScopes.empty(); }
 
+    void TPValidator::declareRecordField(const std::string& name, const scan::TToken* at) {
+        if (!inRecordFieldScope()) { declareVar(name, at); return; } 
+        std::string key = lower(name);
+        auto& fields = recordFieldScopes.back();
+        if (fields.count(key)) failAt(at, "Redeclaration of field '" + name + "' in this record");
+        fields.insert(key);
+    }
+
+    void TPValidator::parseFieldIdentList() {
+        require(types::TokenType::TT_ID);
+        declareRecordField(token->getTokenValue(), token);
+        next();
+        while (match(",")) {
+            next();
+            require(types::TokenType::TT_ID);
+            declareRecordField(token->getTokenValue(), token);
+            next();
+        }
+    }
 
 }
