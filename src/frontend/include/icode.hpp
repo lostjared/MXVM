@@ -603,21 +603,33 @@ namespace pascal {
         }
 
         ArrayInfo buildArrayInfoFromNode(ArrayTypeNode* atn) {
+            auto lc = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(),
+                                        [](unsigned char c){ return std::tolower(c); }); return s; };
+            auto resolveTypeName = [&](std::string t){
+                t = lc(t);
+                std::unordered_set<std::string> seen;
+                while (typeAliases.count(t) && !seen.count(t)) {
+                    seen.insert(t);
+                    t = lc(typeAliases.at(t));
+                }
+                return t;
+            };
+
             ArrayInfo info{};
             info.lowerBound = std::stoi(evaluateConstantExpression(atn->lowerBound.get()));
             info.upperBound = std::stoi(evaluateConstantExpression(atn->upperBound.get()));
             info.size = info.upperBound - info.lowerBound + 1;
-            
-            if (auto childArr = dynamic_cast<ArrayTypeNode*>(atn->elementType.get())) {
-                info.elementType = "array";
+
+            if (auto* childArr = dynamic_cast<ArrayTypeNode*>(atn->elementType.get())) {
+                info.elementType   = "array";
                 info.elementIsArray = true;
-                info.elementArray = std::make_unique<ArrayInfo>(buildArrayInfoFromNode(childArr));
-                info.elementSize = info.elementArray->size * info.elementArray->elementSize; 
-            } else if (auto childSimple = dynamic_cast<SimpleTypeNode*>(atn->elementType.get())) {
-                info.elementType = childSimple->typeName;
+                info.elementArray  = std::make_unique<ArrayInfo>(buildArrayInfoFromNode(childArr));
+                info.elementSize   = info.elementArray->size * info.elementArray->elementSize;
+            } else if (auto* childSimple = dynamic_cast<SimpleTypeNode*>(atn->elementType.get())) {
+                info.elementType = resolveTypeName(childSimple->typeName);
                 info.elementSize = getArrayElementSize(info.elementType);
             } else if (dynamic_cast<RecordTypeNode*>(atn->elementType.get())) {
-                info.elementType = "record"; 
+                info.elementType = "record";
                 info.elementSize = 8; 
             } else {
                 info.elementType = "integer";
@@ -626,6 +638,17 @@ namespace pascal {
             return info;
         }
 
+
+        int getArrayElementSize(const std::string& tIn) {
+            auto t = resolveTypeName(lc(tIn));
+            if (t == "integer" || t == "boolean") return 8;
+            if (t == "real") return 8;
+            if (t == "char") return 8;
+            if (t == "string" || t == "ptr") return 8;
+            auto it = recordTypes.find(t);
+            if (it != recordTypes.end()) return it->second.size;
+            return 8;
+        }
     public:
         friend class IOFunctionHandler;
         friend class MathFunctionHandler;
@@ -654,7 +677,7 @@ namespace pascal {
 
          
         void emitFree(const std::string& s) {
-            if (allocatedPtrs.erase(s)) {        // erase returns 1 if it existed
+            if (allocatedPtrs.erase(s)) {        
                 emit("free " + s);
             }
         }
@@ -668,6 +691,7 @@ namespace pascal {
             deferredProcs.clear();
             deferredFuncs.clear();
             valueLocations.clear();
+            
             varTypes.clear();
             globalArrays.clear();
             compileTimeConstants.clear();
@@ -678,6 +702,10 @@ namespace pascal {
             scopeHierarchy.push_back("__global__");
             generatingDeferredCode = false; 
             functionSetReturn = false;
+            recordTypes.clear();
+            varRecordType.clear();
+            typeAliases.clear();
+            arrayInfo.clear();
 
             for (size_t i = 0; i < regInUse.size(); ++i) regInUse[i] = false;
             for (size_t i = 0; i < ptrRegInUse.size(); ++i) ptrRegInUse[i] = false; 
@@ -745,7 +773,7 @@ namespace pascal {
                                 setVarType(id, useType);
                                 if (!incomingReg.empty())
                                     emit2("mov", slotVar(localSlot), incomingReg);
-                                currentParamTypes[id] = param->type;
+                                currentParamTypes[id] = resolveTypeName(param->type);
                             }
                         }
                     }
@@ -856,7 +884,7 @@ namespace pascal {
                 }
                 for (const auto& tp : tempPtrByScope[scopeName]) {
                     if(allocatedPtrs.count(tp))
-                        emitFree("free");
+                        emitFree(tp);
                 }
 
                 emit("ret");
@@ -930,11 +958,18 @@ namespace pascal {
 
        
         void visit(ProgramNode& node) override { name = node.name; if (node.block) node.block->accept(*this); }
-        
         void visit(BlockNode& node) override {
-            
             for (auto& decl : node.declarations) {
                 if (!decl) continue;
+                if (dynamic_cast<TypeDeclNode*>(decl.get())) {
+                    decl->accept(*this);
+                }
+            }
+
+            for (auto& decl : node.declarations) {
+                if (!decl) continue;
+                if (dynamic_cast<TypeDeclNode*>(decl.get())) continue; 
+
                 if (generatingDeferredCode) {
                     if (dynamic_cast<ProcDeclNode*>(decl.get()) ||
                         dynamic_cast<FuncDeclNode*>(decl.get())) {
@@ -943,11 +978,9 @@ namespace pascal {
                 }
                 decl->accept(*this);
             }
-            if (node.compoundStatement) {
-                node.compoundStatement->accept(*this);
-            }
-        }
 
+            if (node.compoundStatement) node.compoundStatement->accept(*this);
+        }
        
         std::string getTypeString(const VarDeclNode& node) {
             if (std::holds_alternative<std::string>(node.type))
@@ -968,63 +1001,88 @@ namespace pascal {
                 typeName = std::get<std::string>(node.type);
             } else if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
                 auto& typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
-                if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
-                ArrayInfo info = buildArrayInfoFromNode(arrayTypeNode);
-                arrayInfo[varName] = std::move(info);
 
-                setVarType(varName, VarType::PTR);
-                int slot = newSlotFor(mangledName);
-                setSlotType(slot, VarType::PTR);
-                varSlot[varName] = slot;
-                varSlot[mangledName] = slot;
+                if (auto* arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
+                    ArrayInfo info = buildArrayInfoFromNode(arrayTypeNode);
+                    arrayInfo[mangledName] = std::move(info);
 
-                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                emit3("alloc",
-                        slotVar(slot),
-                        std::to_string(arrayInfo[varName].elementSize),
-                        std::to_string(arrayInfo[varName].size));
+                    setVarType(varName, VarType::PTR);
+                    int slot = newSlotFor(mangledName);
+                    setSlotType(slot, VarType::PTR);
+                    varSlot[varName] = slot;
+                    varSlot[mangledName] = slot;
 
-                std::string currentScope = getCurrentScopeName();
-                if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
-                else functionScopedArrays[currentScope].push_back(slotVar(slot));
-                continue;
-            }
+                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                    emit3("alloc", slotVar(slot),
+                        std::to_string(arrayInfo[mangledName].elementSize),
+                        std::to_string(arrayInfo[mangledName].size));
+
+                    std::string currentScope = getCurrentScopeName();
+                    if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
+                    else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    continue;
+                }
+
+                if (auto* simpleTypeNode = dynamic_cast<SimpleTypeNode*>(typeNode.get())) {
+                    typeName = simpleTypeNode->typeName;
+                }
+
             } else {
                 typeName = "unknown";
             }
 
+            
             int slot = newSlotFor(mangledName);
             varSlot[varName] = slot;
             varSlot[mangledName] = slot;
 
-            auto recordTypeIt = recordTypes.find(typeName);
+            std::string normalizedTypeName = resolveTypeName(lc(typeName));
+            auto recordTypeIt = recordTypes.find(normalizedTypeName);
             if (recordTypeIt != recordTypes.end()) {
-                varRecordType[mangledName] = typeName;
-                varRecordType[varName] = typeName;
+                // RECORD variable
+                varRecordType[mangledName] = normalizedTypeName;
+                varRecordType[varName]     = normalizedTypeName;
+
                 int recordSize = recordTypeIt->second.size;
-                
+
                 setVarType(varName, VarType::RECORD);
-                setSlotType(slot, VarType::PTR); 
-                
+                setSlotType(slot, VarType::PTR);
+
                 updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                
                 emit3("alloc", slotVar(slot), std::to_string(recordSize), "1");
-                
-                
-                allocateRecordFieldArrays(mangledName, typeName);
-                
+
+                allocateRecordFieldArrays(mangledName, normalizedTypeName);
+
                 std::string currentScope = getCurrentScopeName();
                 recordsToFreeInScope[currentScope].push_back(mangledName);
+
             } else {
-                auto arrayInfoIt = arrayInfo.find(varName);
+                // Handle named array types
+                auto arrayInfoIt = arrayInfo.find(normalizedTypeName);
                 if (arrayInfoIt != arrayInfo.end()) {
+                    arrayInfo[mangledName] = arrayInfoIt->second; // Copy array info
+                    setVarType(varName, VarType::PTR);
+                    setSlotType(slot, VarType::PTR);
+                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                    emit3("alloc", slotVar(slot),
+                        std::to_string(arrayInfo[mangledName].elementSize),
+                        std::to_string(arrayInfo[mangledName].size));
+                    std::string currentScope = getCurrentScopeName();
+                    if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
+                    else functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    continue; // Skip to next variable
+                }
+
+                // non-record path unchanged
+                auto arrayInfoIt_var = arrayInfo.find(varName);
+                if (arrayInfoIt_var != arrayInfo.end()) {
                     setVarType(varName, VarType::PTR);
                     setSlotType(slot, VarType::PTR);
                 } else {
                     VarType vType = getTypeFromString(typeName);
                     setVarType(varName, vType);
                     setSlotType(slot, vType);
-                    
+
                     if (vType == VarType::PTR || vType == VarType::RECORD) {
                         updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
                     } else if (vType == VarType::DOUBLE) {
@@ -1043,13 +1101,29 @@ namespace pascal {
         if (it != varSlot.end()) return slotVar(it->second);
         return mangled;
     }
+    bool isRecordTypeName(const std::string& t) {
+        auto base = resolveTypeName(lc(t));
+        return recordTypes.find(base) != recordTypes.end();
+    }
+
+    int getTypeSizeByName(const std::string& t) {
+        auto base = resolveTypeName(lc(t));
+        if (base == "integer" || base == "boolean") return 8;
+        if (base == "real") return 8;
+        if (base == "char") return 8;
+        if (base == "string" || base == "ptr") return 8;
+        auto it = recordTypes.find(base);
+        if (it != recordTypes.end()) return it->second.size;
+        return 8;
+    }
 
     VarType getTypeFromString(const std::string& typeStr) {
-        if (typeStr == "integer" || typeStr == "boolean") return VarType::INT;
-        if (typeStr == "real") return VarType::DOUBLE;
-        if (typeStr == "string") return VarType::PTR;          
-        if (typeStr == "char") return VarType::CHAR;
-        if (isRecordTypeName(typeStr)) return VarType::RECORD;
+        auto base = resolveTypeName(lc(typeStr));
+        if (base == "integer" || base == "boolean") return VarType::INT;
+        if (base == "real") return VarType::DOUBLE;
+        if (base == "string") return VarType::PTR;
+        if (base == "char") return VarType::CHAR;
+        if (isRecordTypeName(base)) return VarType::RECORD;
         return VarType::UNKNOWN;
     }
 
@@ -1193,18 +1267,41 @@ namespace pascal {
             }
             scopeHierarchy.pop_back();
         }
+        void visit(TypeAliasNode& node) override {
+            auto lc = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(),
+                                        [](unsigned char c){ return std::tolower(c); }); return s; };
+            typeAliases[lc(node.typeName)] = lc(node.baseType);
+        }
 
         void visit(ParameterNode& node) override {
-            for (auto &id : node.identifiers) {
+            auto lc = [](std::string s){ std::transform(s.begin(), s.end(), s.begin(),
+                                        [](unsigned char c){ return std::tolower(c); }); return s;
+            };
+            for (auto &idRaw : node.identifiers) {
+                std::string id = idRaw;
                 int slot = newSlotFor(id);
-                if (!node.type.empty()) {
-                    if (node.type == "string") { setVarType(id, VarType::STRING); setSlotType(slot, VarType::STRING); }
-                    else if (node.type == "integer" || node.type == "boolean") { setVarType(id, VarType::INT); setSlotType(slot, VarType::INT); }
-                    else if (node.type == "real") { setVarType(id, VarType::DOUBLE); setSlotType(slot, VarType::DOUBLE); }
-                    else if (isRecordTypeName(node.type)) { setVarType(id, VarType::RECORD); setSlotType(slot, VarType::PTR); varRecordType[id]=node.type; }
+                std::string t = lc(node.type);
+                if (t == "string") { 
+                    setVarType(id, VarType::STRING); 
+                    setSlotType(slot, VarType::STRING); 
+                } else if (t == "integer" || t == "boolean") { 
+                    setVarType(id, VarType::INT); 
+                    setSlotType(slot, VarType::INT); 
+                } else if (t == "real") { 
+                    setVarType(id, VarType::DOUBLE); 
+                    setSlotType(slot, VarType::DOUBLE); 
+                } else {
+                    std::string rt = resolveTypeName(t);
+                    if (recordTypes.count(rt)) { 
+                        setVarType(id, VarType::RECORD); 
+                        setSlotType(slot, VarType::PTR); 
+                        varRecordType[id] = rt;  
+                        currentParamTypes[id] = rt;
+                    }
                 }
             }
         }
+
 
         void visit(CompoundStmtNode& node) override {
             for (auto &stmt : node.statements) {
@@ -1237,36 +1334,6 @@ namespace pascal {
             emitLabel(L_ok);
             if (isReg(t)) freeReg(t);
 #endif
-        }
-
-        std::string getVarRecordTypeNameFromExpr(ASTNode* expr) {
-            if (auto v = dynamic_cast<VariableNode*>(expr)) {
-                auto paramIt = currentParamTypes.find(v->name);
-                if (paramIt != currentParamTypes.end()) {
-                    return paramIt->second;
-                }
-                
-                std::string mangledName = findMangledName(v->name);
-                auto it = varRecordType.find(mangledName);
-                if (it != varRecordType.end()) {
-                    return it->second;
-                }
-                
-                auto it2 = varRecordType.find(v->name);
-                if (it2 != varRecordType.end()) {
-                    return it2->second;
-                }
-            }
-
-            if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(expr)) {
-                ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
-                if (info && isRecordTypeName(info->elementType)) {
-                    return info->elementType;
-                }
-            }
-            
-
-            return "";
         }
 
         void visit(IfStmtNode& node) override {
@@ -1487,9 +1554,10 @@ namespace pascal {
             }
             if (auto fieldNode = dynamic_cast<FieldAccessNode*>(node)) {
                 std::string recType = getVarRecordTypeNameFromExpr(fieldNode->recordExpr.get());
+                 recType = resolveTypeName(lc(recType)); 
                 auto it = recordTypes.find(recType);
                 if (it != recordTypes.end()) {
-                    auto jt = it->second.nameToIndex.find(fieldNode->fieldName);
+                    auto jt = it->second.nameToIndex.find(lc(fieldNode->fieldName));
                     if (jt != it->second.nameToIndex.end()) {
                         const auto& f = it->second.fields[jt->second];
                         if (f.isArray) {
@@ -1568,6 +1636,7 @@ namespace pascal {
 
         void visit(NumberNode& node) override {
             if (node.isReal || isRealNumber(node.value)) {
+
                 std::string reg = allocFloatReg();
                 emit2("mov", reg, ensureFloatConstSymbol(node.value));
                 pushValue(reg);
@@ -1631,6 +1700,16 @@ namespace pascal {
                         default: throw std::runtime_error("Unsupported operator for integers in constant expression.");
                     }
                     return std::to_string(result);
+                }
+            }
+            if (auto un = dynamic_cast<UnaryOpNode*>(node)) {
+                std::string v = evaluateConstantExpression(un->operand.get());
+                if (v.empty()) throw std::runtime_error("Unsupported node type in constant expression.");
+                double dv = std::stod(v);
+                switch (un->operator_) {
+                    case UnaryOpNode::MINUS: return std::to_string(-dv);
+                    case UnaryOpNode::PLUS:  return v;
+                    default: throw std::runtime_error("Unsupported unary op in constant expression.");
                 }
             }
             throw std::runtime_error("Unsupported node type in constant expression.");
@@ -1727,21 +1806,12 @@ namespace pascal {
         }
 
     private:
-        std::unordered_set<std::string> allocatedPtrs;   // track real alloc targets
+        std::unordered_set<std::string> allocatedPtrs;   
 
         std::unordered_map<std::string, std::string> realConstants;
         void visit(ArrayTypeNode& /*node*/) override {}
         
         std::unordered_map<std::string, ArrayInfo> arrayInfo;
-        int getArrayElementSize(const std::string& t) {
-            if (t == "integer" || t == "boolean") return 8;
-            if (t == "real")    return 8;
-            if (t == "char")    return 8;  
-            if (t == "string" || t == "ptr") return 8;
-            auto it = recordTypes.find(t);
-            if (it != recordTypes.end()) return it->second.size;
-            return 8;
-        }
 
     std::string getTypeString(ASTNode* typeNode) {
         if (auto simpleType = dynamic_cast<SimpleTypeNode*>(typeNode)) {
@@ -1790,8 +1860,8 @@ namespace pascal {
         info.upperBound = upperBound;
         info.size = size;
         info.elementSize = elementSize;
-        arrayInfo[node.name] = std::move(info);
-        
+        mangledName = findMangledName(node.name);
+        arrayInfo[mangledName] = std::move(info);
         int slot = newSlotFor(mangledName);
         varSlot[node.name] = slot;
         varSlot[mangledName] = slot;
@@ -1803,77 +1873,91 @@ namespace pascal {
               std::to_string(elementSize),
               std::to_string(size));
         std::string currentScope = getCurrentScopeName();
-        if (currentScope.empty()) globalArrays.push_back(slotVar(slot));
-        else functionScopedArrays[currentScope].push_back(slotVar(slot));
+        if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
+        else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
     }
 
+    static inline std::string lc(std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(),
+                    [](unsigned char c){ return std::tolower(c); });
+        return s;
+    }
+
+    std::string resolveTypeName(std::string t) const {
+        if (t.empty()) return t;
+        t = lc(t);
+        std::unordered_set<std::string> seen;
+        while (true) {
+            if (!typeAliases.count(t)) break;
+            if (seen.count(t)) break;          
+            seen.insert(t);
+            t = lc(typeAliases.at(t));
+        }
+        return t;
+    }
+
+
     void visit(FieldAccessNode& node) override {
-        std::string baseName;
-        std::string baseRawName;
-        std::string recType;
+        std::string baseName;            
+        std::string recType;             
         bool baseIsDirectPointer = false;
 
-        if (auto v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
-            baseRawName = v->name;
+        if (auto* v = dynamic_cast<VariableNode*>(node.recordExpr.get())) {
             baseName = findMangledName(v->name);
-            recType = getVarRecordTypeName(baseRawName);
-        } else if (auto arrAccess = dynamic_cast<ArrayAccessNode*>(node.recordExpr.get())) {
+            recType  = getVarRecordTypeName(v->name);               
+        } else if (dynamic_cast<ArrayAccessNode*>(node.recordExpr.get())) {
             node.recordExpr->accept(*this);
-            baseName = popValue();
+            baseName = popValue();                                  
             baseIsDirectPointer = true;
-            ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
-            if (info && isRecordTypeName(info->elementType)) {
-                recType = info->elementType;
-            }
+            recType  = getVarRecordTypeNameFromExpr(node.recordExpr.get());
         } else {
             node.recordExpr->accept(*this);
             baseName = popValue();
             baseIsDirectPointer = true;
-            recType = getVarRecordTypeNameFromExpr(node.recordExpr.get());
+            recType  = getVarRecordTypeNameFromExpr(node.recordExpr.get());
         }
 
+        recType = resolveTypeName(lc(recType));
         if (recType.empty()) {
-            throw std::runtime_error("Cannot determine record type for field access: " + node.fieldName);
+            throw std::runtime_error("Unknown record type: (empty) for field " + node.fieldName);
         }
 
         auto recTypeIt = recordTypes.find(recType);
         if (recTypeIt == recordTypes.end()) {
-            throw std::runtime_error("Unknown record type: " + recType);
+            throw std::runtime_error("Unknown record type: " + recType + " for field " + node.fieldName);
         }
 
+        const std::string fieldName = lc(node.fieldName);
         auto& recInfo = recTypeIt->second;
-        auto fieldIndexIt = recInfo.nameToIndex.find(node.fieldName);
-        if (fieldIndexIt == recInfo.nameToIndex.end()) {
-            throw std::runtime_error("Field not found in record: " + node.fieldName);
+        auto  it      = recInfo.nameToIndex.find(fieldName);
+        if (it == recInfo.nameToIndex.end()) {
+            throw std::runtime_error("Field not found in record: " + fieldName + " in type " + recType);
         }
 
-        auto& fieldInfo = recInfo.fields[fieldIndexIt->second];
-        int byteOffset  = fieldInfo.offset;
-  
+        const auto& fieldInfo = recInfo.fields[it->second];
+        const int   byteOffset = fieldInfo.offset;
 
-        std::string base = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+        std::string basePtr = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
 
-  
         if (fieldInfo.isArray || isRecordTypeName(fieldInfo.typeName)) {
             std::string p = allocTempPtr();
-            emit2("mov", p, base);
+            emit2("mov", p, basePtr);
             emit2("add", p, std::to_string(byteOffset));
             pushValue(p);
             return;
         }
 
-  
         VarType fieldType = getTypeFromString(fieldInfo.typeName);
         std::string dst;
-        if (isPtrLike(fieldType)) {
-            dst = allocTempPtr();
-        } else if (fieldType == VarType::DOUBLE) {
+        if (fieldType == VarType::DOUBLE) {
             dst = allocFloatReg();
+        } else if (fieldType == VarType::PTR || fieldType == VarType::STRING) {
+            dst = allocTempPtr();
         } else {
             dst = allocReg();
         }
 
-        emit4("load", dst, base, std::to_string(byteOffset), "1");
+        emit4("load", dst, basePtr, std::to_string(byteOffset), "1");
         pushValue(dst);
     }
    
@@ -1903,7 +1987,6 @@ namespace pascal {
             std::string elemIndex = allocReg();
             emit2("mov", elemIndex, idx);
             if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
-
             std::string base;
             if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
                 std::string mangled = findMangledArrayName(var->name);
@@ -1919,10 +2002,13 @@ namespace pascal {
                 emit2("mov", arrayPtr, recPtr);
                 emit2("add", arrayPtr, std::to_string(fieldOffset));
                 base = arrayPtr;
+            } else if (dynamic_cast<ArrayAccessNode*>(arr->base.get())) {
+                arr->base->accept(*this);
+                base = popValue();             
+                base = ensurePtrBase(base);    
             } else {
                 throw std::runtime_error("Unsupported array base in assignment");
             }
-
             
             VarType elemType = getTypeFromString(info->elementType);
             VarType rhsType  = getExpressionType(node.expression.get());
@@ -1968,12 +2054,14 @@ namespace pascal {
                 recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
             }
 
+            recType = resolveTypeName(lc(recType)); 
+
             auto recTypeIt = recordTypes.find(recType);
             if (recTypeIt == recordTypes.end()) {
                 throw std::runtime_error("Unknown record type: " + recType);
             }
             auto& recInfo = recTypeIt->second;
-            auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
+            auto fieldIndexIt = recInfo.nameToIndex.find(lc(field->fieldName)); 
             if (fieldIndexIt == recInfo.nameToIndex.end()) {
                 throw std::runtime_error("Field not found in record: " + field->fieldName);
             }
@@ -2165,6 +2253,7 @@ namespace pascal {
             std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
             auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
             int fieldOffset = ofs_sz.first;
+
             std::string arrayPtr = allocTempPtr();
             emit2("mov", arrayPtr, recPtr);
             emit2("add", arrayPtr, std::to_string(fieldOffset));
@@ -2331,93 +2420,189 @@ namespace pascal {
         std::unordered_map<std::string, RecordTypeInfo> recordTypes;
         std::unordered_map<std::string, std::string> varRecordType;
 
-        int getTypeSizeByName(const std::string& t) {
-            if (t == "integer" || t == "boolean") return 8;
-            if (t == "real") return 8;
-            if (t == "char") return 8;        
-            if (t == "string" || t == "ptr") return 8;
-            auto it = recordTypes.find(t);
-            if (it != recordTypes.end()) return it->second.size;
-            return 8;       
-        }
-
-        bool isRecordTypeName(const std::string& t) { return recordTypes.find(t) != recordTypes.end(); }
-
         std::pair<int,int> getRecordFieldOffsetAndSize(const std::string& recType, const std::string& field) {
-            auto it = recordTypes.find(recType);
+            std::string normalizedRecType = resolveTypeName(lc(recType));
+            std::string normalizedField = lc(field);
+            
+            auto it = recordTypes.find(normalizedRecType);
             if (it == recordTypes.end()) return {0,8};
-            auto jt = it->second.nameToIndex.find(field);
+            
+            auto jt = it->second.nameToIndex.find(normalizedField);
             if (jt == it->second.nameToIndex.end()) return {0,8};
+            
             const auto& f = it->second.fields[jt->second];
             return {f.offset, f.size};
         }
 
-        std::string getVarRecordTypeName(const std::string& varName) {
-            auto param_it = currentParamTypes.find(varName);
-            if (param_it != currentParamTypes.end()) {
-                return param_it->second;
-            }
-            auto it = varRecordType.find(findMangledName(varName));
-            if (it != varRecordType.end()) {
-                return it->second;
-            }
         
-            it = varRecordType.find(varName);
-            if (it != varRecordType.end()) {
-                return it->second;
+        std::string getVarRecordTypeNameFromExpr(ASTNode* expr) {
+            auto lc = [](std::string s){
+                std::transform(s.begin(), s.end(), s.begin(),
+                            [](unsigned char c){ return std::tolower(c); });
+                return s;
+            };
+            auto resolveAlias = [&](std::string t){
+                t = lc(t);
+                std::unordered_set<std::string> seen;
+                while (typeAliases.count(t) && !seen.count(t)) {
+                    seen.insert(t);
+                    t = lc(typeAliases.at(t));
+                }
+                return t;
+            };
+            if (auto* v = dynamic_cast<VariableNode*>(expr)) {
+                if (auto it = currentParamTypes.find(v->name); it != currentParamTypes.end()) {
+                    auto resolved = resolveAlias(it->second);
+                    if (recordTypes.count(resolved)) return resolved;
+                }
+                std::string mangled = findMangledName(v->name);
+                if (auto it2 = varRecordType.find(mangled); it2 != varRecordType.end()) {
+                    auto resolved = resolveAlias(it2->second);
+                    if (recordTypes.count(resolved)) return resolved;
+                }
+                if (auto it3 = varRecordType.find(v->name); it3 != varRecordType.end()) {
+                    auto resolved = resolveAlias(it3->second);
+                    if (recordTypes.count(resolved)) return resolved;
+                }
+                return "";
             }
-            return ""; 
+            if (auto* arrAccess = dynamic_cast<ArrayAccessNode*>(expr)) {
+                ArrayInfo* info = getArrayInfoForArrayAccess(arrAccess);
+                if (info) {
+                    auto elem = resolveAlias(info->elementType);
+                    if (recordTypes.count(elem)) return elem;
+                }
+                return "";
+            }
+
+            if (auto* fa = dynamic_cast<FieldAccessNode*>(expr)) {
+                std::string owner = getVarRecordTypeNameFromExpr(fa->recordExpr.get());
+                owner = resolveTypeName(lc(owner));
+                if (owner.empty()) return "";
+
+                auto rit = recordTypes.find(owner);
+                if (rit == recordTypes.end()) return "";
+               auto idxIt = rit->second.nameToIndex.find(lc(fa->fieldName));
+                if (idxIt == rit->second.nameToIndex.end()) return "";
+
+                const auto& f = rit->second.fields[idxIt->second];
+                std::string fieldType = resolveTypeName(lc(f.typeName));
+                if (recordTypes.count(fieldType)) {
+                    return fieldType;   
+                }
+                return "";              
+            }
+
+            return "";
         }
+
 
         void visit(RecordTypeNode& /*node*/) override {}
         
+        std::string getVarRecordTypeName(const std::string& varName) {
+            
+            
+            if (auto it = currentParamTypes.find(varName); it != currentParamTypes.end()) {
+                std::string resolved = resolveTypeName(it->second);
+                return resolved;
+            }
+            
+            std::string mangled = findMangledName(varName);
+            if (auto it2 = varRecordType.find(mangled); it2 != varRecordType.end()) {
+                std::string resolved = resolveTypeName(it2->second);
+                return resolved;
+            }
+            
+            if (auto it3 = varRecordType.find(varName); it3 != varRecordType.end()) {
+                std::string resolved = resolveTypeName(it3->second);
+                return resolved;
+            }
+            
+            
+            return "";
+        }
+
         void visit(RecordDeclarationNode& node) override {
             RecordTypeInfo info;
             int offset = 0;
+
+            auto lc = [](std::string s){ 
+                std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); }); 
+                return s;
+            };
+            
+            auto resolveTypeName = [&](std::string t){
+                t = lc(t);
+                std::unordered_set<std::string> seen;
+                while (typeAliases.count(t) && !seen.count(t)) {
+                    seen.insert(t);
+                    t = lc(typeAliases.at(t));
+                }
+                return t;
+            };
+
             for (auto& f : node.recordType->fields) {
                 auto& fieldDecl = static_cast<VarDeclNode&>(*f);
-                for (const auto& fieldName : fieldDecl.identifiers) {
-                    RecordField rf;
-                    rf.name = fieldName;
-                    rf.offset = offset;
+                bool fieldIsArray = false;
+                ArrayInfo arrInfo{};
+                std::string fieldTypeName = "unknown";
 
-                    if (std::holds_alternative<std::unique_ptr<ASTNode>>(fieldDecl.type)) {
-                        auto& typeNode = std::get<std::unique_ptr<ASTNode>>(fieldDecl.type);
-                        if (auto arrayTypeNode = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
-                            rf.isArray = true;
-                            rf.arrayInfo = buildArrayInfoFromNode(arrayTypeNode);
-                            rf.typeName = "array";
-                            rf.size = rf.arrayInfo.size * rf.arrayInfo.elementSize;
-                        } else if (dynamic_cast<RecordTypeNode*>(typeNode.get())) {
-                            rf.typeName = "record";
-                            rf.size = 8; 
-                        } else {
-                            rf.typeName = getTypeString(typeNode.get());
-                            rf.size = getTypeSizeByName(rf.typeName);
-                        }
+                if (std::holds_alternative<std::unique_ptr<ASTNode>>(fieldDecl.type)) {
+                    auto& typeNode = std::get<std::unique_ptr<ASTNode>>(fieldDecl.type);
+                    if (auto* at = dynamic_cast<ArrayTypeNode*>(typeNode.get())) {
+                        fieldIsArray = true;
+                        arrInfo = buildArrayInfoFromNode(at);
+                        fieldTypeName = "array";
+                    } else if (dynamic_cast<RecordTypeNode*>(typeNode.get())) {
+                        fieldTypeName = "record";
+                    } else if (auto* st = dynamic_cast<SimpleTypeNode*>(typeNode.get())) {
+                        fieldTypeName = resolveTypeName(st->typeName);
+                    }
+                } else {
+                    fieldTypeName = resolveTypeName(std::get<std::string>(fieldDecl.type));
+                }
+
+                for (const auto& rawName : fieldDecl.identifiers) {
+                    RecordField rf;
+                    rf.name = lc(rawName);
+                    rf.offset = offset;
+                    rf.isArray = fieldIsArray;
+                    
+                    if (fieldIsArray) {
+                        rf.arrayInfo = arrInfo;
+                        rf.typeName = "array";
+                        rf.size = rf.arrayInfo.size * rf.arrayInfo.elementSize;
+                    } else if (isRecordTypeName(fieldTypeName)) {
+                        rf.typeName = fieldTypeName;
+                        auto it = recordTypes.find(fieldTypeName);
+                        rf.size = (it != recordTypes.end()) ? it->second.size : 8;
                     } else {
-                        rf.isArray = false;
-                        rf.typeName = std::get<std::string>(fieldDecl.type);
+                        rf.typeName = fieldTypeName;
                         rf.size = getTypeSizeByName(rf.typeName);
                     }
                     
                     info.nameToIndex[rf.name] = (int)info.fields.size();
                     info.fields.push_back(rf);
                     offset += rf.size;
+                    
+                    std::cout << "Added field: " << rf.name << " type: " << rf.typeName 
+                            << " offset: " << rf.offset << " size: " << rf.size << std::endl;
                 }
             }
+            
             info.size = offset;
-            recordTypes[node.name] = info;
+            std::string recordName = lc(node.name);
+            recordTypes[recordName] = info;
+            
+            // Debug output
+            std::cout << "Registered record type: " << recordName 
+                    << " with size: " << info.size << std::endl;
         }
 
         void visit(TypeDeclNode& node) override {
             for (auto& typeDecl : node.typeDeclarations) {
                 typeDecl->accept(*this);
             }
-        }
-
-        void visit(TypeAliasNode& node) override {
-            typeAliases[node.typeName] = node.baseType;
         }
 
         void visit(SimpleTypeNode& node) override {
@@ -2436,8 +2621,8 @@ namespace pascal {
             updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
             emit3("alloc",
                   slotVar(slot),
-                  std::to_string(arrayInfo[node.name].elementSize),
-                  std::to_string(arrayInfo[node.name].size));
+                  std::to_string(arrayInfo[mangledName].elementSize),
+                  std::to_string(arrayInfo[mangledName].size));
             std::string currentScope = getCurrentScopeName();
             if (currentScope.empty())  globalArrays.push_back(slotVar(slot));
             else                       functionScopedArrays[currentScope].push_back(slotVar(slot));
@@ -2530,27 +2715,31 @@ namespace pascal {
                 return var->name;
             }
             if (auto field = dynamic_cast<FieldAccessNode*>(base)) {
-                
-                return field->fieldName;
+                return getArrayNameFromBase(field->recordExpr.get()) + "." + field->fieldName;
+            }
+            if (auto arr = dynamic_cast<ArrayAccessNode*>(base)) {
+                return getArrayNameFromBase(arr->base.get());
             }
             
             throw std::runtime_error("Array base is not a simple variable or field");
         }
-
         
           ArrayInfo* getArrayInfoForArrayAccess(ArrayAccessNode* arr) {
                 if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
-                    auto it = arrayInfo.find(var->name);
+                    std::string mangled = findMangledName(var->name);
+                    auto it = arrayInfo.find(mangled);
                     if (it != arrayInfo.end()) return &it->second;
-                    auto it2 = arrayInfo.find(findMangledArrayName(var->name));
-                    if (it2 != arrayInfo.end()) return &it2->second;
+                    it = arrayInfo.find(var->name);
+                    if (it != arrayInfo.end()) return &it->second;
+                    return nullptr;
                 }
                 if (auto field = dynamic_cast<FieldAccessNode*>(arr->base.get())) {
                     std::string recTypeName = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                    recTypeName = resolveTypeName(lc(recTypeName)); 
                     auto recTypeInfoIt = recordTypes.find(recTypeName);
                     if (recTypeInfoIt != recordTypes.end()) {
                         auto& recInfo = recTypeInfoIt->second;
-                        auto fieldIndexIt = recInfo.nameToIndex.find(field->fieldName);
+                        auto fieldIndexIt = recInfo.nameToIndex.find(lc(field->fieldName)); 
                         if (fieldIndexIt != recInfo.nameToIndex.end()) {
                             auto& f = recInfo.fields[fieldIndexIt->second];
                             if (f.isArray) return const_cast<ArrayInfo*>(&f.arrayInfo);

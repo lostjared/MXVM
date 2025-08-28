@@ -728,7 +728,7 @@ namespace mxvm {
             case types::TokenType::TT_HEX: return "Hex";
             case types::TokenType::TT_STR: return "String";
             case types::TokenType::TT_SYM: return "Symbol";
-            default: return "Unknown";
+            default: return "";
         }
     }
 

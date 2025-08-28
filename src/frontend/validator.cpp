@@ -782,45 +782,49 @@ namespace mxx {
     }
 
     void TPValidator::declareVar(const std::string& name, const scan::TToken* at) {
-        if (isVarDeclaredHere(name) || isParamDeclaredHere(name) ||
-            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isProcDeclaredHere(name)) {
+        std::string key = lower(name);
+        if (isVarDeclaredHere(key) || isParamDeclaredHere(key) ||
+            isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isProcDeclaredHere(key)) {
             failAt(at, "Redeclaration of variable '" + name + "' in this scope");
         }
-        currentScope()->vars.insert(name);
+        currentScope()->vars.insert(key);
+    }
+
+    void TPValidator::declareFunc(const std::string& name, const scan::TToken* at) {
+        std::string key = lower(name);
+        if (isFuncDeclaredHere(key) || isVarDeclaredHere(key) ||
+            isTypeDeclaredHere(key) || isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
+            failAt(at, "Redeclaration of function '" + name + "' in this scope");
+        }
+        currentScope()->funcs.insert(key);
+    }
+
+    void TPValidator::declareProc(const std::string& name, const scan::TToken* at) {
+        std::string key = lower(name);
+        if (isProcDeclaredHere(key) || isVarDeclaredHere(key) ||
+            isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isParamDeclaredHere(key)) {
+            failAt(at, "Redeclaration of procedure '" + name + "' in this scope");
+        }
+        currentScope()->procs.insert(key);
+    }
+
+    void TPValidator::declareParam(const std::string& name, const scan::TToken* at) {
+        std::string key = lower(name);
+        if (isParamDeclaredHere(key) || isVarDeclaredHere(key) ||
+            isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isProcDeclaredHere(key)) {
+            failAt(at, "Redeclaration of parameter '" + name + "' in this scope");
+        }
+        currentScope()->params.insert(key);
     }
 
     void TPValidator::declareType(const std::string& name, const scan::TToken* at) {
         auto key = lower(name);
-        if (isTypeDeclaredHere(key) || isVarDeclaredHere(key) || isFuncDeclaredHere(key) ||
-            isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
+        if (isTypeDeclaredHere(key) || isVarDeclaredHere(key) ||
+            isFuncDeclaredHere(key) || isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
             failAt(at, "Redeclaration of type '" + name + "' in this scope");
         }
         currentScope()->types.insert(key);
     }
 
-
-    void TPValidator::declareFunc(const std::string& name, const scan::TToken* at) {
-        if (isFuncDeclaredHere(name) || isVarDeclaredHere(name) ||
-            isTypeDeclaredHere(name) || isProcDeclaredHere(name) || isParamDeclaredHere(name)) {
-            failAt(at, "Redeclaration of function '" + name + "' in this scope");
-        }
-        currentScope()->funcs.insert(name);
-    }
-
-    void TPValidator::declareProc(const std::string& name, const scan::TToken* at) {
-        if (isProcDeclaredHere(name) || isVarDeclaredHere(name) ||
-            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isParamDeclaredHere(name)) {
-            failAt(at, "Redeclaration of procedure '" + name + "' in this scope");
-        }
-        currentScope()->procs.insert(name);
-    }
-
-    void TPValidator::declareParam(const std::string& name, const scan::TToken* at) {
-        if (isParamDeclaredHere(name) || isVarDeclaredHere(name) ||
-            isTypeDeclaredHere(name) || isFuncDeclaredHere(name) || isProcDeclaredHere(name)) {
-            failAt(at, "Redeclaration of parameter '" + name + "' in this scope");
-        }
-        currentScope()->params.insert(name);
-    }
 
 }

@@ -113,6 +113,7 @@ namespace pascal {
         bool isAddOperator();
         bool isMulOperator();
         
+        std::unique_ptr<ASTNode> parseTypeSpec() ;
         
         std::string getRelationalOp();
         std::string getAddOp();
