@@ -747,19 +747,24 @@ namespace pascal {
                     size_t intParamIndex = 1;
                     size_t ptrParamIndex = 0;
                     size_t floatParamIndex = 0;
+
                     for (auto& p_node : pn->parameters) {
-                        if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
+                        if (auto* param = dynamic_cast<ParameterNode*>(p_node.get())) {
+
+                            const std::string normType = resolveTypeName(lc(param->type));
+                            const bool isArrayParam = (arrayInfo.find(normType) != arrayInfo.end());
+
                             VarType declType = getTypeFromString(param->type);
+
                             for (const auto& id : param->identifiers) {
                                 VarType useType = declType;
-                                if (isRecordTypeName(param->type)) {
-                                    useType = VarType::PTR;
-                                }
                                 std::string incomingReg;
+
                                 if (declType == VarType::DOUBLE) {
                                     if (floatParamIndex < floatRegisters.size())
                                         incomingReg = floatRegisters[floatParamIndex++];
-                                } else if (declType == VarType::PTR || declType == VarType::STRING || declType == VarType::RECORD) {
+                                } else if (declType == VarType::PTR || declType == VarType::STRING ||
+                                        declType == VarType::RECORD || isArrayParam) {
                                     useType = VarType::PTR;
                                     if (ptrParamIndex < ptrRegisters.size())
                                         incomingReg = ptrRegisters[ptrParamIndex++];
@@ -767,18 +772,24 @@ namespace pascal {
                                     if (intParamIndex < registers.size())
                                         incomingReg = registers[intParamIndex++];
                                 }
+
                                 std::string mangledId = mangleVariableName(id);
                                 int localSlot = newSlotFor(mangledId);
                                 setSlotType(localSlot, useType);
                                 setVarType(id, useType);
+
                                 if (!incomingReg.empty())
                                     emit2("mov", slotVar(localSlot), incomingReg);
-                                currentParamTypes[id] = resolveTypeName(param->type);
+
+                                if (isArrayParam) {
+                                    arrayInfo[mangledId] = arrayInfo.at(normType);
+                                }
+
+                                currentParamTypes[id] = normType;
                             }
                         }
                     }
                 }
-
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false;
                 for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
@@ -818,39 +829,52 @@ namespace pascal {
                 currentFunctionName = fn->name;
                 currentParamLocations.clear();
                 currentParamTypes.clear();
-
-                int intParamIndex = 1;
-                int ptrParamIndex = 0;
-                int floatParamIndex = 0;
                 functionSetReturn = false;
 
                 if (!fn->parameters.empty()) {
+                    int intParamIndex = 1;
+                    int ptrParamIndex = 0;
+                    int floatParamIndex = 0;
+                    functionSetReturn = false;
+
                     for (auto& p_node : fn->parameters) {
-                        if (auto param = dynamic_cast<ParameterNode*>(p_node.get())) {
+                        if (auto* param = dynamic_cast<ParameterNode*>(p_node.get())) {
+                            const std::string normType = resolveTypeName(lc(param->type));
+                            const bool isArrayParam = (arrayInfo.find(normType) != arrayInfo.end());
+
                             for (const auto& id : param->identifiers) {
                                 VarType paramType = getTypeFromString(param->type);
                                 std::string incomingReg;
-                                if (paramType == VarType::STRING || paramType == VarType::RECORD) {
-                                    if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size()) incomingReg = ptrRegisters[ptrParamIndex++];
-                                    paramType = VarType::PTR;
+
+                                if (paramType == VarType::STRING || paramType == VarType::RECORD || isArrayParam) {
+                                    if (static_cast<size_t>(ptrParamIndex) < ptrRegisters.size())
+                                        incomingReg = ptrRegisters[ptrParamIndex++];
+                                    paramType = VarType::PTR;  
                                 } else if (paramType == VarType::DOUBLE) {
-                                    if (static_cast<size_t>(floatParamIndex) < floatRegisters.size()) incomingReg = floatRegisters[floatParamIndex++];
+                                    if (static_cast<size_t>(floatParamIndex) < floatRegisters.size())
+                                        incomingReg = floatRegisters[floatParamIndex++];
                                 } else {
-                                    if (static_cast<size_t>(intParamIndex) < registers.size()) incomingReg = registers[intParamIndex++];
+                                    if (static_cast<size_t>(intParamIndex) < registers.size())
+                                        incomingReg = registers[intParamIndex++];
                                 }
 
                                 if (!incomingReg.empty()) {
                                     std::string mangledId = mangleVariableName(id);
                                     int localSlot = newSlotFor(mangledId);
-
                                     setSlotType(localSlot, paramType);
+                                    setVarType(id, paramType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
+
+                                    if (isArrayParam) {
+                                        arrayInfo[mangledId] = arrayInfo.at(normType);
+                                    }
                                 }
-                                currentParamTypes[id] = param->type;
+                                currentParamTypes[id] = normType;
                             }
                         }
                     }
                 }
+
 
                 for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
                 for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false;
@@ -1127,6 +1151,7 @@ namespace pascal {
         if (base == "string") return VarType::PTR;
         if (base == "char") return VarType::CHAR;
         if (isRecordTypeName(base)) return VarType::RECORD;
+        if (arrayInfo.find(base) != arrayInfo.end()) return VarType::PTR; 
         return VarType::UNKNOWN;
     }
 
@@ -2595,6 +2620,11 @@ namespace pascal {
             info.size = offset;
             std::string recordName = lc(node.name);
             recordTypes[recordName] = info;
+        }
+
+        bool isArrayTypeName(const std::string& t) const {
+            auto base = resolveTypeName(lc(t));
+            return arrayInfo.find(base) != arrayInfo.end();
         }
 
         void visit(TypeDeclNode& node) override {
