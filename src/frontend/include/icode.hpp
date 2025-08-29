@@ -806,7 +806,8 @@ namespace pascal {
                 for (const auto& recVar : recordsToFreeInScope[scopeName]) {
                     emit1("free", recVar);
                 }
-                for (const auto& tp : tempPtrByScope[scopeName]) {
+                auto temp1 = tempPtrByScope[scopeName];
+                for (const auto& tp : temp1) {
                     if(allocatedPtrs.count(tp))
                         emitFree(tp);
                 }
@@ -906,7 +907,9 @@ namespace pascal {
                 for (const auto& recVar : recordsToFreeInScope[scopeName]) {
                     emit1("free", recVar);
                 }
-                for (const auto& tp : tempPtrByScope[scopeName]) {
+
+                auto temp1 = tempPtrByScope[scopeName];
+                for (const auto& tp : temp1) {
                     if(allocatedPtrs.count(tp))
                         emitFree(tp);
                 }
