@@ -261,8 +261,8 @@ begin
     i := i + 1;
   end;
 
-  {sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score), 8, 8, 255, 255, 255, 255);
-  sdl_draw_text(renderer, font_id, 'Lives: ' + inttostr(lives), 120, 8, 255, 255, 255, 255);}
+  sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score), 8, 8, 255, 255, 255, 255);
+  sdl_draw_text(renderer, font_id, 'Lives: ' + inttostr(lives), 120, 8, 255, 255, 255, 255);
 end;
 
 procedure init(title: string; xval, yval, wval, hval: integer);

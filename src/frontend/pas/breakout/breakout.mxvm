@@ -1,7 +1,8 @@
 program Breakout {
 	section module {
  		sdl,
-		std
+		std,
+		string
 	}
 	section data {
 		int rax = 0
@@ -18,15 +19,21 @@ program Breakout {
 		int r13 = 0
 		int r14 = 0
 		int r15 = 0
+		ptr _tmpptr0 = null
+		ptr _tmpptr1 = null
+		ptr _tmpptr2 = null
+		ptr _tmpptr3 = null
 		ptr arg0 = null
 		string str_0 = "font.ttf"
 		string str_1 = "Breakout"
-		string str_2 = "failed to init SDL"
-		string str_3 = "Could not create window"
-		string str_4 = "could not create renderer"
-		string str_5 = "could not create render target"
-		string str_6 = "Font subsystem failed to load"
-		string str_7 = "failed to open: "
+		string str_2 = "Score: "
+		string str_3 = "Lives: "
+		string str_4 = "failed to init SDL"
+		string str_5 = "Could not create window"
+		string str_6 = "could not create renderer"
+		string str_7 = "could not create render target"
+		string str_8 = "Font subsystem failed to load"
+		string str_9 = "failed to open: "
 		string fmt_str = "%s "
 		string newline = "\n"
 		ptr filename = null
@@ -88,9 +95,9 @@ program Breakout {
 	section code {
 	start:
 		mov filename, str_0
-		alloc paddle, 32
-		alloc ball, 32
-		alloc blocks, 480
+		alloc paddle, 32, 1
+		alloc ball, 32, 1
+		alloc blocks, 8, 60
 		mov arg0, str_1
 		mov rbx, 100
 		mov rcx, 100
@@ -206,24 +213,24 @@ program Breakout {
 	PROC_END_draw_box:
 		ret
 	function PROC_reset_ball_paddle:
-		store 284, paddle, 0, 8
-		store 336, paddle, 8, 8
-		store 72, paddle, 16, 8
-		store 10, paddle, 24, 8
-		load rbx, paddle, 0, 8
+		store 284, paddle, 0, 1
+		store 336, paddle, 8, 1
+		store 72, paddle, 16, 1
+		store 10, paddle, 24, 1
+		load rbx, paddle, 0, 1
 		mov rcx, rbx
 		add rcx, 36
 		mov rdx, rcx
 		sub rdx, 3
-		store rdx, ball, 0, 8
-		load rsi, paddle, 8, 8
+		store rdx, ball, 0, 1
+		load rsi, paddle, 8, 1
 		mov rdi, rsi
 		sub rdi, 6
 		mov r8, rdi
 		sub r8, 2
-		store r8, ball, 8, 8
-		store 6, ball, 16, 8
-		store 6, ball, 24, 8
+		store r8, ball, 8, 1
+		store 6, ball, 16, 1
+		store 6, ball, 24, 1
 		invoke get_ticks
 		return r9
 		mod r9, 2
@@ -278,9 +285,7 @@ program Breakout {
 		exit 1
 	IDX_OK_32:
 		mov r9, reset_level_i
-		mov r10, r9
-		mul r10, 8
-		store rdi, blocks, r10, 8
+		store rdi, blocks, r9, 8
 		mov r9, reset_level_i
 		add r9, 1
 		mov reset_level_i, r9
@@ -293,7 +298,7 @@ program Breakout {
 	PROC_END_reset_level:
 		ret
 	function PROC_clamp_paddle:
-		load rbx, paddle, 0, 8
+		load rbx, paddle, 0, 1
 		mov rdx, rbx
 		cmp rdx, 0
 		jl CMP_TRUE_36
@@ -304,12 +309,12 @@ program Breakout {
 	CMP_END_37:
 		cmp rcx, 0
 		je ELSE_34
-		store 0, paddle, 0, 8
+		store 0, paddle, 0, 1
 		jmp ENDIF_35
 	ELSE_34:
 	ENDIF_35:
-		load rdx, paddle, 0, 8
-		load rsi, paddle, 16, 8
+		load rdx, paddle, 0, 1
+		load rsi, paddle, 16, 1
 		mov rdi, rdx
 		add rdi, rsi
 		mov r9, rdi
@@ -322,10 +327,10 @@ program Breakout {
 	CMP_END_41:
 		cmp r8, 0
 		je ELSE_38
-		load r9, paddle, 16, 8
+		load r9, paddle, 16, 1
 		mov r10, 640
 		sub r10, r9
-		store r10, paddle, 0, 8
+		store r10, paddle, 0, 1
 		jmp ENDIF_39
 	ELSE_38:
 	ENDIF_39:
@@ -344,10 +349,10 @@ program Breakout {
 	CMP_END_45:
 		cmp rcx, 0
 		je ELSE_42
-		load rdx, paddle, 0, 8
+		load rdx, paddle, 0, 1
 		mov rsi, rdx
 		sub rsi, 6
-		store rsi, paddle, 0, 8
+		store rsi, paddle, 0, 1
 		jmp ENDIF_43
 	ELSE_42:
 	ENDIF_43:
@@ -363,9 +368,9 @@ program Breakout {
 	CMP_END_49:
 		cmp r8, 0
 		je ELSE_46
-		load r9, paddle, 0, 8
+		load r9, paddle, 0, 1
 		add r9, 6
-		store r9, paddle, 0, 8
+		store r9, paddle, 0, 1
 		jmp ENDIF_47
 	ELSE_46:
 	ENDIF_47:
@@ -373,11 +378,11 @@ program Breakout {
 	PROC_END_update_input:
 		ret
 	function PROC_update_ball:
-		load rbx, ball, 0, 8
+		load rbx, ball, 0, 1
 		mov rcx, rbx
 		add rcx, ball_dx
 		mov update_ball_nx, rcx
-		load rdx, ball, 8, 8
+		load rdx, ball, 8, 1
 		mov rsi, rdx
 		add rsi, ball_dy
 		mov update_ball_ny, rsi
@@ -413,7 +418,7 @@ program Breakout {
 		jmp ENDIF_55
 	ELSE_54:
 	ENDIF_55:
-		load r9, ball, 16, 8
+		load r9, ball, 16, 1
 		mov r10, update_ball_nx
 		add r10, r9
 		mov r11, r10
@@ -426,7 +431,7 @@ program Breakout {
 	CMP_END_61:
 		cmp r9, 0
 		je ELSE_58
-		load r9, ball, 16, 8
+		load r9, ball, 16, 1
 		mov r10, 640
 		sub r10, r9
 		mov update_ball_nx, r10
@@ -436,7 +441,7 @@ program Breakout {
 		jmp ENDIF_59
 	ELSE_58:
 	ENDIF_59:
-		load r9, ball, 24, 8
+		load r9, ball, 24, 1
 		mov r10, update_ball_ny
 		add r10, r9
 		mov r11, r10
@@ -474,36 +479,36 @@ program Breakout {
 	ENDIF_63:
 		mov rbx, update_ball_nx
 		mov rcx, update_ball_ny
-		load r9, ball, 16, 8
+		load r9, ball, 16, 1
 		mov rdx, r9
-		load r10, ball, 24, 8
+		load r10, ball, 24, 1
 		mov rsi, r10
-		load r11, paddle, 0, 8
+		load r11, paddle, 0, 1
 		mov rdi, r11
-		load r12, paddle, 8, 8
+		load r12, paddle, 8, 1
 		mov r8, r12
-		load r13, paddle, 16, 8
+		load r13, paddle, 16, 1
 		mov r9, r13
-		load r14, paddle, 24, 8
+		load r14, paddle, 24, 1
 		mov r10, r14
 		call FUNC_aabb
 		mov r15, rax
 		cmp r15, 0
 		je ELSE_70
-		load r9, paddle, 8, 8
-		load r10, ball, 24, 8
+		load r9, paddle, 8, 1
+		load r10, ball, 24, 1
 		sub r9, r10
 		sub r9, 1
 		mov update_ball_ny, r9
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
-		load r9, ball, 16, 8
+		load r9, ball, 16, 1
 		div r9, 2
 		mov r10, update_ball_nx
 		add r10, r9
-		load r9, paddle, 0, 8
-		load r11, paddle, 16, 8
+		load r9, paddle, 0, 1
+		load r11, paddle, 16, 1
 		div r11, 2
 		add r9, r11
 		mov r12, r10
@@ -585,9 +590,7 @@ program Breakout {
 		exit 1
 	IDX_OK_94:
 		mov r9, update_ball_i
-		mov r11, r9
-		mul r11, 8
-		load r10, blocks, r11, 8
+		load r10, blocks, r9, 8
 		mov r11, r10
 		cmp r11, 1
 		jge CMP_TRUE_96
@@ -619,9 +622,9 @@ program Breakout {
 		mov update_ball_bh, 16
 		mov rbx, update_ball_nx
 		mov rcx, update_ball_ny
-		load r9, ball, 16, 8
+		load r9, ball, 16, 1
 		mov rdx, r9
-		load r10, ball, 24, 8
+		load r10, ball, 24, 1
 		mov rsi, r10
 		mov rdi, update_ball_bx
 		mov r8, update_ball_by
@@ -642,16 +645,14 @@ program Breakout {
 		exit 1
 	IDX_OK_100:
 		mov r10, update_ball_i
-		mov r11, r10
-		mul r11, 8
-		store 0, blocks, r11, 8
+		store 0, blocks, r10, 8
 		mov r10, score
 		add r10, 10
 		mov score, r10
 		mov update_ball_topHit, 0
 		mov update_ball_bottomHit, 0
-		load r10, ball, 8, 8
-		load r11, ball, 24, 8
+		load r10, ball, 8, 1
+		load r11, ball, 24, 1
 		add r10, r11
 		mov r12, r10
 		cmp r12, update_ball_by
@@ -667,7 +668,7 @@ program Breakout {
 		jmp ENDIF_103
 	ELSE_102:
 	ENDIF_103:
-		load r10, ball, 8, 8
+		load r10, ball, 8, 1
 		mov r11, update_ball_by
 		add r11, update_ball_bh
 		mov r13, r10
@@ -734,8 +735,8 @@ program Breakout {
 		mov update_ball_i, r10
 		jmp WHILE_84
 	ENDWHILE_85:
-		store update_ball_nx, ball, 0, 8
-		store update_ball_ny, ball, 8, 8
+		store update_ball_nx, ball, 0, 1
+		store update_ball_ny, ball, 8, 1
 		mov update_ball_anyLeft, 0
 		mov update_ball_i, 0
 	WHILE_118:
@@ -759,9 +760,7 @@ program Breakout {
 		exit 1
 	IDX_OK_124:
 		mov r10, update_ball_i
-		mov r12, r10
-		mul r12, 8
-		load r11, blocks, r12, 8
+		load r11, blocks, r10, 8
 		mov r12, r11
 		cmp r12, 1
 		jge CMP_TRUE_126
@@ -825,14 +824,14 @@ program Breakout {
 		invoke set_draw_color, renderer, 0, 0, 0, 255
 		invoke clear, renderer
 		invoke set_draw_color, renderer, 255, 255, 255, 255
-		load rbx, paddle, 0, 8
-		load rcx, paddle, 8, 8
-		load rdx, paddle, 16, 8
-		load rsi, paddle, 24, 8
+		load rbx, paddle, 0, 1
+		load rcx, paddle, 8, 1
+		load rdx, paddle, 16, 1
+		load rsi, paddle, 24, 1
 		call PROC_draw_box
-		load rdi, ball, 0, 8
+		load rdi, ball, 0, 1
 		mov rbx, rdi
-		load r8, ball, 8, 8
+		load r8, ball, 8, 1
 		mov rcx, r8
 		mov rdx, 6
 		mov rsi, 6
@@ -860,9 +859,7 @@ program Breakout {
 		exit 1
 	IDX_OK_143:
 		mov r9, render_i
-		mov r11, r9
-		mul r11, 8
-		load r10, blocks, r11, 8
+		load r10, blocks, r9, 8
 		mov r11, r10
 		cmp r11, 1
 		jge CMP_TRUE_145
@@ -901,9 +898,7 @@ program Breakout {
 		exit 1
 	IDX_OK_147:
 		mov r9, render_i
-		mov r11, r9
-		mul r11, 8
-		load r10, blocks, r11, 8
+		load r10, blocks, r9, 8
 		mov rbx, r10
 		call PROC_setcolor
 		mov rbx, render_bx
@@ -919,7 +914,37 @@ program Breakout {
 		mov render_i, r9
 		jmp WHILE_137
 	ENDWHILE_138:
+		invoke inttostr, score
+		return _tmpptr0
+		invoke strlen, str_2
+		return r9
+		invoke strlen, _tmpptr0
+		return r10
+		mov r11, r9
+		add r11, r10
+		add r11, 1
+		alloc _tmpptr1, 1, r11
+		invoke strncpy, _tmpptr1, str_2, r9
+		invoke strncat, _tmpptr1, _tmpptr0, r10
+		invoke draw_text, renderer, font_id, _tmpptr1, 8, 8, 255, 255, 255, 255
+		invoke inttostr, lives
+		return _tmpptr2
+		invoke strlen, str_3
+		return r9
+		invoke strlen, _tmpptr2
+		return r10
+		mov r11, r9
+		add r11, r10
+		add r11, 1
+		alloc _tmpptr3, 1, r11
+		invoke strncpy, _tmpptr3, str_3, r9
+		invoke strncat, _tmpptr3, _tmpptr2, r10
+		invoke draw_text, renderer, font_id, _tmpptr3, 120, 8, 255, 255, 255, 255
 	PROC_END_render:
+		free _tmpptr0
+		free _tmpptr1
+		free _tmpptr2
+		free _tmpptr3
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -939,7 +964,7 @@ program Breakout {
 	CMP_END_152:
 		cmp rcx, 0
 		je ELSE_149
-		print fmt_str, str_2
+		print fmt_str, str_4
 		print newline
 		exit 1
 		jmp ENDIF_150
@@ -960,7 +985,7 @@ program Breakout {
 	CMP_END_156:
 		cmp rdi, 0
 		je ELSE_153
-		print fmt_str, str_3
+		print fmt_str, str_5
 		print newline
 		invoke quit
 		exit 1
@@ -984,7 +1009,7 @@ program Breakout {
 	CMP_END_160:
 		cmp r9, 0
 		je ELSE_157
-		print fmt_str, str_4
+		print fmt_str, str_6
 		print newline
 		invoke destroy_window, window_id
 		invoke quit
@@ -1007,7 +1032,7 @@ program Breakout {
 	CMP_END_164:
 		cmp r10, 0
 		je ELSE_161
-		print fmt_str, str_5
+		print fmt_str, str_7
 		print newline
 		invoke destroy_renderer, renderer
 		invoke destroy_window, window_id
@@ -1028,7 +1053,7 @@ program Breakout {
 	CMP_END_168:
 		cmp r10, 0
 		je ELSE_165
-		print fmt_str, str_6
+		print fmt_str, str_8
 		print newline
 		exit 1
 		jmp ENDIF_166
@@ -1049,7 +1074,7 @@ program Breakout {
 	CMP_END_172:
 		cmp r10, 0
 		je ELSE_169
-		print fmt_str, str_7
+		print fmt_str, str_9
 		print fmt_str, filename
 		print newline
 		exit 1
