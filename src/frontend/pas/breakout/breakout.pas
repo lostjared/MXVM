@@ -93,7 +93,7 @@ begin
   begin
     for x := 0 to GRID_COLS-1 do
     begin
-      blocks[i] := 1;
+      blocks[i] :=1 + (rand() mod 3);
       i := i + 1;
     end;
   end;
@@ -175,7 +175,7 @@ begin
   begin
     if hitOnce = 0 then
     begin
-      if blocks[i] = 1 then
+      if blocks[i] >= 1 then
       begin
         gy := i div GRID_COLS;
         gx := i - gy * GRID_COLS;
@@ -192,7 +192,7 @@ begin
           bottomHit := 0;
           if ball.y + ball.h <= by then topHit := 1;
           if ball.y >= by + bh then bottomHit := 1;
-          if (topHit = 1) or (bottomHit = 1) then
+          if (topHit >= 1) or (bottomHit >= 1) then
             ball_dy := -ball_dy
           else
             ball_dx := -ball_dx;
@@ -210,7 +210,7 @@ begin
   i := 0;
   while i < GRID_COLS * GRID_ROWS do
   begin
-    if blocks[i] = 1 then anyLeft := 1;
+    if blocks[i] >= 1 then anyLeft := 1;
     i := i + 1;
   end;
   if anyLeft = 0 then
@@ -218,6 +218,19 @@ begin
     reset_level;
     reset_ball_paddle;
   end;
+end;
+
+procedure setcolor(index: integer);
+begin
+
+case index of 
+1: sdl_set_draw_color(renderer, 255, 0, 0,25);
+2: sdl_set_draw_color(renderer, 0, 255, 0,255);
+3: sdl_set_draw_color(renderer, 0, 0, 255,255);
+else
+sdl_set_draw_color(renderer, 255, 255, 255, 255);
+end;
+
 end;
 
 procedure render;
@@ -236,19 +249,20 @@ begin
   i := 0;
   while i < GRID_COLS * GRID_ROWS do
   begin
-    if blocks[i] = 1 then
+    if blocks[i] >= 1 then
     begin
       gy := i div GRID_COLS;
       gx := i - gy * GRID_COLS;
       bx := GRID_OFFSET_X + gx * (BLOCK_W + BLOCK_SPACING_X);
       by := GRID_OFFSET_Y + gy * (BLOCK_H + BLOCK_SPACING_Y);
+      setcolor(blocks[i]);
       draw_box(bx, by, BLOCK_W, BLOCK_H);
     end;
     i := i + 1;
   end;
 
-  sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score), 8, 8, 255, 255, 255, 255);
-  sdl_draw_text(renderer, font_id, 'Lives: ' + inttostr(lives), 120, 8, 255, 255, 255, 255);
+  {sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score), 8, 8, 255, 255, 255, 255);
+  sdl_draw_text(renderer, font_id, 'Lives: ' + inttostr(lives), 120, 8, 255, 255, 255, 255);}
 end;
 
 procedure init(title: string; xval, yval, wval, hval: integer);
