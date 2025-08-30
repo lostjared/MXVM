@@ -1393,6 +1393,8 @@ namespace pascal {
         void visit(WhileStmtNode& node) override {
             std::string start = newLabel("WHILE");
             std::string end   = newLabel("ENDWHILE");
+            loopContinueLabels.push_back(start);
+            loopEndLabels.push_back(end);
             emitLabel(start);
             std::string c = eval(node.condition.get());
             emit2("cmp", c, "0");
@@ -1401,7 +1403,10 @@ namespace pascal {
             if (node.statement) node.statement->accept(*this);
             emit1("jmp", start);
             emitLabel(end);
+            loopContinueLabels.pop_back();
+            loopEndLabels.pop_back();
         }
+
 
         void visit(ForStmtNode& node) override {
             std::string startVal = eval(node.startValue.get());
@@ -1417,7 +1422,14 @@ namespace pascal {
 
             std::string loopStartLabel = newLabel("FOR");
             std::string loopEndLabel   = newLabel("ENDFOR");
+            std::string continueLabel  = newLabel("FOR_CONTINUE");
+
+            loopContinueLabels.push_back(continueLabel);
+            loopEndLabels.push_back(loopEndLabel);
+
             emitLabel(loopStartLabel);
+
+          
 
             std::string endReg = allocReg();
             emit2("mov", endReg, endVal);
@@ -1425,12 +1437,19 @@ namespace pascal {
             if (node.isDownto) emit1("jl", loopEndLabel); else emit1("jg", loopEndLabel);
 
             if (node.statement) node.statement->accept(*this);
+            emitLabel(continueLabel);
             if (node.isDownto) emit2("sub", slotVar(slot), "1"); else emit2("add", slotVar(slot), "1");
             emit1("jmp", loopStartLabel);
             emitLabel(loopEndLabel);
 
+
+            loopContinueLabels.pop_back();
+            loopEndLabels.pop_back();
+
             if (isReg(endReg) && !isParmReg(endReg)) freeReg(endReg);
             if (isReg(endVal) && !isParmReg(endVal)) freeReg(endVal);
+
+
         }
 
         void visit(BinaryOpNode& node) override {
@@ -1800,15 +1819,19 @@ namespace pascal {
         void visit(RepeatStmtNode& node) override {
             std::string startLabel = newLabel("REPEAT");
             std::string endLabel = newLabel("UNTIL");
+            loopContinueLabels.push_back(startLabel);
+            loopEndLabels.push_back(endLabel);
+
             emitLabel(startLabel);
             for (auto& stmt : node.statements) if (stmt) stmt->accept(*this);
             std::string condResult = eval(node.condition.get());
             emit2("cmp", condResult, "0");
             emit1("je", startLabel);
             if (isReg(condResult) && !isParmReg(condResult)) freeReg(condResult);
-        }
 
-       
+            loopContinueLabels.pop_back();
+            loopEndLabels.pop_back();
+        }
 
         void visit(CaseStmtNode& node) override {
             std::string switchExpr = eval(node.expression.get());
@@ -2688,12 +2711,19 @@ namespace pascal {
 
     private:
 
-        void visit(BreakNode& node) {
+        std::vector<std::string> loopEndLabels;
+        std::vector<std::string> loopContinueLabels;
 
+        void visit(BreakNode& node) override {
+            if (!loopEndLabels.empty()) {
+                emit1("jmp", loopEndLabels.back());
+            }
         }
 
-        void visit(ContinueNode& node) {
-
+        void visit(ContinueNode& node) override {
+            if (!loopContinueLabels.empty()) {
+                emit1("jmp", loopContinueLabels.back());
+            }
         }
 
         std::string getCurrentEndLabel() const {
