@@ -63,7 +63,7 @@ namespace pascal {
                lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
                lower == "and" || lower == "or" || lower == "not" ||
                lower == "case" || lower == "of" || lower == "repeat" || lower == "until" ||
-               lower == "array" || lower == "type" || lower == "record" || lower == "exit";
+               lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {
@@ -206,6 +206,20 @@ namespace pascal {
             auto exitNode = std::make_unique<ExitNode>(std::move(expr));
             exitNode->setLineNumber(lineNum);
             return exitNode;
+        } else if (peekIs("break")) {
+            int lineNum = token->getLine();
+            next();
+            expectToken(";");
+            auto breakNode = std::make_unique<BreakNode>();
+            breakNode->setLineNumber(lineNum);
+            return breakNode;
+        } else if (peekIs("continue")) {
+            int lineNum = token->getLine();
+            next();
+            expectToken(";");
+            auto continueNode = std::make_unique<ContinueNode>();
+            continueNode->setLineNumber(lineNum);
+            return continueNode;
         } else if (peekIs("begin")) {
             return parseCompoundStatement();
         } else if (peekIs("if")) {

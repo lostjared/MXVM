@@ -752,7 +752,7 @@ namespace mxx {
     static const std::unordered_set<std::string> pascal_keywords = {
         "program", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
-        "case", "of", "with", "goto","exit",
+        "case", "of", "with", "goto","exit","break","continue",
 
         "div", "mod", "and", "or", "not", "in",
         "integer", "real", "boolean", "char", "byte", "word", "longint", "shortint",
