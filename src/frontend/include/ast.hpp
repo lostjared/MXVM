@@ -32,6 +32,24 @@ namespace pascal {
         explicit ExitNode(std::unique_ptr<ASTNode> e) : expr(std::move(e)) {}
     };
 
+    class ContinueNode :  public ASTNode {
+    public:
+        virtual void accept(ASTVisitor &visitor) override;
+        virtual std::string toString() const override;
+        std::unique_ptr<ASTNode> expr;
+        ContinueNode() = default;
+        explicit ContinueNode(std::unique_ptr<ASTNode> e) : expr(std::move(e)) {}
+    };
+
+    class BreakNode :  public ASTNode {
+    public:
+        virtual void accept(ASTVisitor &visitor) override;
+        virtual std::string toString() const override;
+        std::unique_ptr<ASTNode> expr;
+        BreakNode() = default;
+        explicit BreakNode(std::unique_ptr<ASTNode> e) : expr(std::move(e)) {}
+    };
+
     class CompoundStmtNode; 
 
     class BlockNode : public ASTNode {
@@ -521,6 +539,8 @@ namespace pascal {
         virtual void visit(ExitNode &node) = 0;
         virtual void visit(SimpleTypeNode& node) = 0;
         virtual void visit(ArrayTypeDeclarationNode& node) = 0;
+        virtual void visit(ContinueNode& node) = 0;
+        virtual void visit(BreakNode&  node) = 0;
     };
 } 
 

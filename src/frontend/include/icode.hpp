@@ -2687,6 +2687,15 @@ namespace pascal {
         }
 
     private:
+
+        void visit(BreakNode& node) {
+
+        }
+
+        void visit(ContinueNode& node) {
+
+        }
+
         std::string getCurrentEndLabel() const {
             if (currentFunctionName.empty()) return "";
             

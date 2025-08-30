@@ -367,4 +367,21 @@ namespace pascal {
         visitor.visit(*this);
     }
 
+    void ContinueNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string ContinueNode::toString() const {
+        return "Continue Node";
+    }
+
+    
+    void BreakNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string BreakNode::toString() const {
+        return "Continue Node";
+    }
+
 }
