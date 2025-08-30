@@ -249,7 +249,7 @@ namespace mxvm {
                     break;
                 case DONE:
                     exec_done(instr);
-                    break;
+                    return EXIT_SUCCESS;
                 case TO_INT:
                     exec_to_int(instr);
                     break;
