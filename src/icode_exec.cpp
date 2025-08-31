@@ -1488,6 +1488,7 @@ namespace mxvm {
         }
     }
 
+   
     void Program::exec_to_float(const Instruction &instr) {
         if (!instr.op1.op.empty() && isVariable(instr.op1.op)) {
             Variable &v = getVariable(instr.op1.op);
@@ -1511,10 +1512,12 @@ namespace mxvm {
                     } else if (s.type == VarType::VAR_POINTER || s.type == VarType::VAR_EXTERN) {
                         v.var_value.float_value = static_cast<double>(reinterpret_cast<uintptr_t>(s.var_value.ptr_value));
                         v.var_value.type = VarType::VAR_FLOAT;
+                    } else {
+                        throw mx::Exception("to_float second argument must be a variable");
                     }
                 } else {
-                    throw mx::Exception("to_float second argument must be a variable");
-                }
+                    v.var_value.float_value = static_cast<double>(std::stoll(instr.op2.op, nullptr, 0));
+                    v.var_value.type = VarType::VAR_FLOAT;                }
             } else {
                 throw mx::Exception("to_float first argument must be a float variable");
             }
@@ -1522,7 +1525,6 @@ namespace mxvm {
             throw mx::Exception("to_float first argument must be a variable");
         }
     }
-
     void Program::exec_return(const Instruction &instr) {
         if(!instr.op1.op.empty() && isVariable(instr.op1.op)) {
             Variable &v = getVariable(instr.op1.op);
