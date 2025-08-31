@@ -366,6 +366,7 @@ namespace mxx {
         }
         if (isKW("record")) {
             next();
+            pushRecordFieldScope();
             while (!isKW("end")) {
                 parseFieldIdentList();
                 require(":"); next();
@@ -373,6 +374,7 @@ namespace mxx {
                 require(";"); next();
             }
             requireKW("end"); next();
+            popRecordFieldScope();
             return;
         }
         if (isKW("set")) {
@@ -656,10 +658,12 @@ namespace mxx {
             if (paren==0 && bracket==0 && token->getTokenType()==types::TokenType::TT_SYM) {
                 if (stops.count(token->getTokenValue())) return;
             }
+
             if (match("(")) { ++paren; next(); expectOperand = true; continue; }
             if (match(")")) { if (paren<=0) break; --paren; next(); expectOperand = false; continue; }
             if (match("[")) { ++bracket; next(); expectOperand = true; continue; }
             if (match("]")) { if (bracket<=0) break; --bracket; next(); expectOperand = false; continue; }
+
             if (expectOperand) {
                 if (match("+")||match("-")||isKW("not")||match("@")) { next(); continue; }
                 if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) { next(); expectOperand=false; continue; }
@@ -670,18 +674,35 @@ namespace mxx {
                     if (match("(")) {
                         parseActualParams();
                         expectOperand = false;
-                        continue;
+                    
+                    } else {
+                        checkVarOrConst(name, at);
+                        expectOperand = false;
                     }
-                    checkVarOrConst(name, at);
-                    expectOperand = false;
+
+                    
+                    while (true) {
+                        if (match("^")) { next(); continue; }
+                        if (match(".")) {
+                            next();
+                            require(types::TokenType::TT_ID); 
+                            next();
+                            continue;
+                        }
+                        if (match("[")) {
+                            next();
+                            parseExprStop({"]"});
+                            while (match(",")) { next(); parseExprStop({"]"}); }
+                            require("]"); next();
+                            continue;
+                        }
+                        break;
+                    }
                     continue;
                 }
                 failHere("Invalid expression");
             } else {
                 if (isRelOp() || isAddOp() || isMulOp() || isSetOp()) { next(); expectOperand=true; continue; }
-                if (match("^") || match(".")) { next(); expectOperand=true; continue; }
-                if (match("(")) { ++paren; next(); expectOperand=true; continue; }
-                if (match("[")) { ++bracket; next(); expectOperand=true; continue; }
                 return;
             }
         }
@@ -831,7 +852,7 @@ namespace mxx {
     bool TPValidator::inRecordFieldScope() const { return !recordFieldScopes.empty(); }
 
     void TPValidator::declareRecordField(const std::string& name, const scan::TToken* at) {
-        if (!inRecordFieldScope()) { declareVar(name, at); return; } 
+        if (!inRecordFieldScope()) { failAt(at, "Field declaration outside of record"); }
         std::string key = lower(name);
         auto& fields = recordFieldScopes.back();
         if (fields.count(key)) failAt(at, "Redeclaration of field '" + name + "' in this record");
