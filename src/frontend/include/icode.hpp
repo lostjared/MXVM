@@ -1481,8 +1481,6 @@ namespace pascal {
                 if (isReg(right) && !isParmReg(right)) freeReg(right);
                 return;
             }
-
-
             try {
                 std::string folded = foldNumeric(&node);
                 if (!folded.empty()) {
@@ -1819,20 +1817,22 @@ namespace pascal {
         void visit(RepeatStmtNode& node) override {
             std::string startLabel = newLabel("REPEAT");
             std::string endLabel = newLabel("UNTIL");
-            loopContinueLabels.push_back(startLabel);
+            std::string continueLabel = newLabel("REPEAT_CONTINUE");
+
+            loopContinueLabels.push_back(continueLabel);
             loopEndLabels.push_back(endLabel);
 
             emitLabel(startLabel);
             for (auto& stmt : node.statements) if (stmt) stmt->accept(*this);
+            emitLabel(continueLabel); 
             std::string condResult = eval(node.condition.get());
             emit2("cmp", condResult, "0");
             emit1("je", startLabel);
             if (isReg(condResult) && !isParmReg(condResult)) freeReg(condResult);
-
+            emitLabel(endLabel);
             loopContinueLabels.pop_back();
             loopEndLabels.pop_back();
         }
-
         void visit(CaseStmtNode& node) override {
             std::string switchExpr = eval(node.expression.get());
             std::string endLabel = newLabel("CASE_END");
