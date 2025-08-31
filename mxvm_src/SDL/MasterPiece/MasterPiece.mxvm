@@ -118,6 +118,8 @@ object SDLCore {
     skip_destroy_target:
         invoke destroy_renderer, renderer_id
         invoke destroy_window, window_id
+        invoke quit
+        exit 0
         ret
     }
 }
@@ -342,9 +344,9 @@ object Board {
         mov size, cols
         mul size, rows
         mov rax, size
-        alloc data, 1, rax
+        alloc data, size, 8
         mov rax, size
-        alloc marks, 1, rax
+        alloc marks, rax, 8
         mov score, 0
         call clearBoard
         call spawnPiece
@@ -354,7 +356,7 @@ object Board {
     clear_loop:
         cmp rax, size
         jge clear_done
-        store 0, data, rax, 1
+        store 0, data, rax, 8
         add rax, 1
         jmp clear_loop
     clear_done:
@@ -392,21 +394,21 @@ object Board {
         mov rax, piece_y
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne game_over_set
         mov rax, piece_y
         add rax, 1
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne game_over_set
         mov rax, piece_y
         add rax, 2
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne game_over_set
         mov rax, 0
@@ -428,21 +430,21 @@ object Board {
         mov rax, piece_y
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne cant_move
         mov rax, piece_y
         add rax, 1
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne cant_move
         mov rax, piece_y
         add rax, 2
         mov rcx, piece_x
         call indexOf
-        load rdx, data, rax, 1
+        load rdx, data, rax, 8
         cmp rdx, 0
         jne cant_move
         mov rax, 1
@@ -465,19 +467,19 @@ object Board {
         mov rcx, piece_x
         call indexOf
         mov rdx, piece_color1
-        store rdx, data, rax, 1
+        store rdx, data, rax, 8
         mov rax, piece_y
         add rax, 1
         mov rcx, piece_x
         call indexOf
         mov rdx, piece_color2
-        store rdx, data, rax, 1
+        store rdx, data, rax, 8
         mov rax, piece_y
         add rax, 2
         mov rcx, piece_x
         call indexOf
         mov rdx, piece_color3
-        store rdx, data, rax, 1
+        store rdx, data, rax, 8
         call checkMatches
         call spawnPiece
         ret
@@ -498,7 +500,7 @@ cm_done:
 cb_loop:
         cmp rax, size
         jge cb_done
-        store 0, marks, rax, 1
+        store 0, marks, rax, 8
         add rax, 1
         jmp cb_loop
 cb_done:
@@ -535,21 +537,21 @@ fy_done:
         mov rax, r10
         mov rcx, r11
         call indexOf
-        load r12, data, rax, 1
+        load r12, data, rax, 8
         cmp r12, 0
         je chm_exit
         mov rax, r10
         mov rcx, r11
         add rcx, 1
         call indexOf
-        load r13, data, rax, 1
+        load r13, data, rax, 8
         cmp r13, r12
         jne chm_exit
         mov rax, r10
         mov rcx, r11
         add rcx, 2
         call indexOf
-        load r14, data, rax, 1
+        load r14, data, rax, 8
         cmp r14, r12
         jne chm_exit
         mov rax, r10
@@ -575,7 +577,7 @@ chm_exit:
         mov rax, r10
         mov rcx, r11
         call indexOf
-        load r12, data, rax, 1
+        load r12, data, rax, 8
         cmp r12, 0
         je cddr_exit
         mov rax, r10
@@ -583,7 +585,7 @@ chm_exit:
         mov rcx, r11
         add rcx, 1
         call indexOf
-        load r13, data, rax, 1
+        load r13, data, rax, 8
         cmp r13, r12
         jne cddr_exit
         mov rax, r10
@@ -591,7 +593,7 @@ chm_exit:
         mov rcx, r11
         add rcx, 2
         call indexOf
-        load r14, data, rax, 1
+        load r14, data, rax, 8
         cmp r14, r12
         jne cddr_exit
         mov rax, r10
@@ -617,7 +619,7 @@ cddr_exit:
         mov rax, r10
         mov rcx, r11
         call indexOf
-        load r12, data, rax, 1
+        load r12, data, rax, 8
         cmp r12, 0
         je cdur_exit
         mov rax, r10
@@ -625,7 +627,7 @@ cddr_exit:
         mov rcx, r11
         add rcx, 1
         call indexOf
-        load r13, data, rax, 1
+        load r13, data, rax, 8
         cmp r13, r12
         jne cdur_exit
         mov rax, r10
@@ -633,7 +635,7 @@ cddr_exit:
         mov rcx, r11
         add rcx, 2
         call indexOf
-        load r14, data, rax, 1
+        load r14, data, rax, 8
         cmp r14, r12
         jne cdur_exit
         mov rax, r10
@@ -655,21 +657,21 @@ cdur_exit:
         mov rax, r10
         mov rcx, r11
         call indexOf
-        load r12, data, rax, 1
+        load r12, data, rax, 8
         cmp r12, 0
         je cvm_exit
         mov rax, r10
         add rax, 1
         mov rcx, r11
         call indexOf
-        load r13, data, rax, 1
+        load r13, data, rax, 8
         cmp r13, r12
         jne cvm_exit
         mov rax, r10
         add rax, 2
         mov rcx, r11
         call indexOf
-        load r14, data, rax, 1
+        load r14, data, rax, 8
         cmp r14, r12
         jne cvm_exit
         mov rax, r10
@@ -685,17 +687,17 @@ cvm_exit:
         mov rax, r8
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         mov rcx, r9
         add rcx, 1
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         mov rcx, r9
         add rcx, 2
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov match_found, 1
         ret
     function markThreeDiagonalDownRight:
@@ -704,19 +706,19 @@ cvm_exit:
         mov rax, r8
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         add rax, 1
         mov rcx, r9
         add rcx, 1
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         add rax, 2
         mov rcx, r9
         add rcx, 2
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov match_found, 1
         ret
     function markThreeDiagonalUpRight:
@@ -725,19 +727,19 @@ cvm_exit:
         mov rax, r8
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         sub rax, 1
         mov rcx, r9
         add rcx, 1
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         sub rax, 2
         mov rcx, r9
         add rcx, 2
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov match_found, 1
         ret
     function markThreeVertical:
@@ -746,17 +748,17 @@ cvm_exit:
         mov rax, r8
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         add rax, 1
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov rax, r8
         add rax, 2
         mov rcx, r9
         call indexOf
-        store 1, marks, rax, 1
+        store 1, marks, rax, 8
         mov match_found, 1
         ret
     function removeMarked:
@@ -764,10 +766,10 @@ cvm_exit:
 rm_loop:
         cmp rax, size
         jge rm_done
-        load rcx, marks, rax, 1
+        load rcx, marks, rax, 8
         cmp rcx, 1
         jne rm_skip
-        store 0, data, rax, 1
+        store 0, data, rax, 8
         add score, points_per_block
 rm_skip:
         add rax, 1
@@ -790,7 +792,7 @@ db_row_loop:
         mov rcx, t_col
         call indexOf
         mov t_idx, rax
-        load t_val, data, t_idx, 1
+        load t_val, data, t_idx, 8
         cmp t_val, 0
         je db_next_row
         cmp t_row, t_write
@@ -799,8 +801,8 @@ db_row_loop:
         mov rcx, t_col
         call indexOf
         mov t_idxw, rax
-        store t_val, data, t_idxw, 1
-        store 0, data, t_idx, 1
+        store t_val, data, t_idxw, 8
+        store 0, data, t_idx, 8
 db_stay:
         sub t_write, 1
 db_next_row:
@@ -842,7 +844,7 @@ dx:
         mov rax, r8
         mov rcx, r9
         call indexOf
-        load r10, data, rax, 1
+        load r10, data, rax, 8
         cmp r10, 0
         je dx_skip
         mov rax, r10
