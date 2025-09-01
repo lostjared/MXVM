@@ -235,17 +235,20 @@ namespace mxx {
     void TPValidator::parseTypeSection() {
         requireKW("type");
         next();
+        
         while (match(types::TokenType::TT_ID)) {
-            if (isKW("var") || isKW("const") || isKW("label") ||
-                isKW("begin") || isKW("procedure") || isKW("function")) {
+            if (isKW("procedure") || isKW("function") || isKW("var") || isKW("begin") || isKW("const")) {
                 break;
             }
+            
             const auto* nameTok = token;
             std::string name = token->getTokenValue();
             next();
             require("=");
             next();
-            parseType();
+            
+            parseType(name);
+            
             declareType(name, nameTok);
             require(";");
             next();
@@ -256,7 +259,8 @@ namespace mxx {
         requireKW("var");
         next();
         while (match(types::TokenType::TT_ID)) {
-            if (isKW("procedure") || isKW("function") || isKW("begin")) {
+            if (isKW("procedure") || isKW("function") || isKW("begin") || 
+                isKW("type") || isKW("const")) {
                 break;
             }
             declareVar(token->getTokenValue(), token);
@@ -269,7 +273,7 @@ namespace mxx {
             }
             require(":");
             next();
-            parseType();
+            parseType("");
             if (match("=")) {
                 next();
                 parseConstExpr({";"}, false);
@@ -333,7 +337,7 @@ namespace mxx {
             parseIdentList();
             require(":");
             next();
-            parseType();
+            parseType("");
             if (match(";")) { next(); continue; }
             require(")");
             next();
@@ -353,7 +357,7 @@ namespace mxx {
         }
     }
 
-    void TPValidator::parseType() {
+    void TPValidator::parseType(const std::string &typeName) {
         if (isKW("array")) {
             next();
             require("["); next();
@@ -361,16 +365,16 @@ namespace mxx {
             while (match(",")) { next(); parseSubrange(); }
             require("]"); next();
             requireKW("of"); next();
-            parseType();
+            parseType("");
             return;
         }
         if (isKW("record")) {
             next();
-            pushRecordFieldScope();
+            pushRecordFieldScope(typeName);
             while (!isKW("end")) {
                 parseFieldIdentList();
                 require(":"); next();
-                parseType();
+                parseType("");
                 require(";"); next();
             }
             requireKW("end"); next();
@@ -432,20 +436,42 @@ namespace mxx {
     void TPValidator::parseCompoundStatement() {
         requireKW("begin");
         next();
-        if (!isKW("end")) {
+        
+        if (isKW("end")) {
+            requireKW("end");
+            next();
+            return;
+        }
+        
+        while (!isKW("end")) {
+            if (token == nullptr) {
+                fail("Unexpected end of file inside compound statement");
+            }
+            
             parseStatement();
-            while (match(";")) {
+            
+            
+            if (match(";")) {
                 next();
-                if (isKW("end")) break;
-                parseStatement();
+            
+                if (isKW("end")) {
+                    break;
+                }
+            } else if (isKW("end")) {
+                
+                break;
+            } else {
+                
+                failHere("Expected ';' or 'end'");
             }
         }
+        
         requireKW("end");
         next();
     }
 
     void TPValidator::parseStatement() {
-        if (!token) failHere("Unexpected EOF in statement");
+        if (!token) failHere("Unexpected EOF in statement");    
         if (isKW("begin")) { parseCompoundStatement(); return; }
         if (isKW("if")) { parseIf(); return; }
         if (isKW("while")) { parseWhile(); return; }
@@ -457,7 +483,7 @@ namespace mxx {
         if (match(types::TokenType::TT_NUM)) failHere("Statement cannot start with number");
         if (match(types::TokenType::TT_ID)) { parseSimpleOrCallOrAssign(); return; }
         if (match(";") || match(")")) return;
-        if (isKW("end")) return;
+        if (isKW("end")) return; 
         failHere("Invalid statement start");
     }
 
@@ -847,17 +873,37 @@ namespace mxx {
         currentScope()->types.insert(key);
     }
     
-    void TPValidator::pushRecordFieldScope() { recordFieldScopes.emplace_back(); }
-    void TPValidator::popRecordFieldScope()  { if (!recordFieldScopes.empty()) recordFieldScopes.pop_back(); }
-    bool TPValidator::inRecordFieldScope() const { return !recordFieldScopes.empty(); }
+    void TPValidator::pushRecordFieldScope(const std::string& recordTypeName) {
+            currentRecordTypeName = recordTypeName;
+            
+            if (recordFieldScopesByType.find(recordTypeName) == recordFieldScopesByType.end()) {
+                recordFieldScopesByType[recordTypeName] = std::unordered_set<std::string>();
+            }
+        }
 
-    void TPValidator::declareRecordField(const std::string& name, const scan::TToken* at) {
-        if (!inRecordFieldScope()) { failAt(at, "Field declaration outside of record"); }
-        std::string key = lower(name);
-        auto& fields = recordFieldScopes.back();
-        if (fields.count(key)) failAt(at, "Redeclaration of field '" + name + "' in this record");
-        fields.insert(key);
-    }
+        void TPValidator::popRecordFieldScope() {
+            currentRecordTypeName.clear();
+        }
+
+        bool TPValidator::inRecordFieldScope() const {
+            return !currentRecordTypeName.empty();
+        }
+
+        void TPValidator::declareRecordField(const std::string& name, const scan::TToken* at) {
+            if (!inRecordFieldScope()) {
+                declareVar(name, at);
+                return;
+            }
+            
+            std::string key = lower(name);
+            auto& fields = recordFieldScopesByType[currentRecordTypeName];
+            
+            if (fields.count(key)) {
+                failAt(at, "Redeclaration of field '" + name + "' in this record");
+            }
+            
+            fields.insert(key);
+        }
 
     void TPValidator::parseFieldIdentList() {
         require(types::TokenType::TT_ID);

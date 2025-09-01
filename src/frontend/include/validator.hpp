@@ -25,7 +25,8 @@ namespace mxx {
 
         bool validate(const std::string& name);
     private:
-        std::vector<std::unordered_set<std::string>> recordFieldScopes;
+        std::unordered_map<std::string, std::unordered_set<std::string>> recordFieldScopesByType;
+        std::string currentRecordTypeName;
         std::vector<Scope> scopeStack;
         scan::Scanner scanner;
         const scan::TToken* token = nullptr;
@@ -100,7 +101,7 @@ namespace mxx {
         void parseSubprogram();
         void parseFormalParams();
         void parseIdentList();
-        void parseType();
+        void parseType(const std::string &);
         void parseTypeName();
         void parseSubrange();
         void parseConstant();
@@ -129,9 +130,10 @@ namespace mxx {
         static std::string toLower(const std::string& s);
         void predeclareType(const std::string& name); 
         bool isBuiltinTypeName(const std::string& key) const;
-        void pushRecordFieldScope();
+        void pushRecordFieldScope(const std::string& recordTypeName);
         void popRecordFieldScope();
         bool inRecordFieldScope() const;
+
         void declareRecordField(const std::string& name, const scan::TToken* at);
         void parseFieldIdentList();
     };
