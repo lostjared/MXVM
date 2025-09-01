@@ -30,33 +30,19 @@ var
 
 procedure TestNestedScopes;
 var
-  globalVar: real; { This LOCAL variable SHADOWS the global integer 'globalVar'. }
-begin
-  { This procedure tests nested scopes and shadowing. }
+  globalVar: real;
 
-  globalVar := 10.5; { Assigns to the local 'real' globalVar, not the global 'integer'. }
-
-  { Accessing the original global 'integer' is not possible here due to shadowing. }
-  { An assignment like 'globalVar := 10;' would target the local 'real' variable. }
-
-  procedure InnerProc(globalVar: boolean); { This PARAMETER SHADOWS the 'real' globalVar from the outer procedure. }
+  procedure InnerProc(globalVar: boolean);
   var
     innerVar: integer;
   begin
     innerVar := 30;
-
-    { Accessing variables from all scopes: }
-    { 1. Accesses the parameter 'globalVar' (boolean). }
-    if globalVar then
-      innerVar := 40;
-
-    { 2. The 'real' globalVar from TestNestedScopes is shadowed and inaccessible. }
-    { 3. The global 'integer' globalVar is also shadowed and inaccessible. }
-    { 4. The global constant is accessible from the outermost scope. }
+    if globalVar then innerVar := 40;
     innerVar := GlobalConst;
   end;
 
-  { Call the inner procedure, passing a boolean. }
+begin
+  globalVar := 10.5;
   InnerProc(true);
 end;
 
