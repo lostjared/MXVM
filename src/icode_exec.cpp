@@ -1525,13 +1525,38 @@ namespace mxvm {
             throw mx::Exception("to_float first argument must be a variable");
         }
     }
+
+    std::string toStringFromVarType(const VarType &v) {
+        switch(v) {
+            case VarType::VAR_BYTE:
+                return "Byte";
+            case VarType::VAR_INTEGER:
+                return "Integer";
+            case VarType::VAR_FLOAT:
+                return "Float";
+            case VarType::VAR_STRING:
+                return "String";
+            case VarType::VAR_POINTER:
+                return "Pointer";
+            case VarType::VAR_EXTERN:
+                return "Extern";
+            default:
+                return "Unknown";
+            }
+        return "Unknown";
+    }
+    
+
+
     void Program::exec_return(const Instruction &instr) {
         if(!instr.op1.op.empty() && isVariable(instr.op1.op)) {
             Variable &v = getVariable(instr.op1.op);
             std::string name = v.var_name;
             Variable &r = getVariable(result.op);
+            std::string v_type_str =  toStringFromVarType(v.type);
+            std::string r_type_str = toStringFromVarType(r.type);
             if(v.type != r.type) {
-                throw mx::Exception("Invalid return type: " + instr.op1.op + " != "  + result.op  + " type mismatch.\n");
+                throw mx::Exception("Invalid return type: " + instr.op1.op + ":" + v_type_str + " != "  + result.op + ":" + r_type_str + " type mismatch.\n");
             }
             v = r;
             v.var_name = name;
