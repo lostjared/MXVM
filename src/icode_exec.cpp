@@ -284,7 +284,6 @@ namespace mxvm {
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
             dest.var_value = src.var_value; 
-            dest.type = src.type;
             if (dest.type != VarType::VAR_POINTER) {
                 dest.type = src.type;
             }
@@ -793,17 +792,34 @@ namespace mxvm {
                 dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
                 dest.var_value.type = VarType::VAR_POINTER;
                 break;
-            case VarType::VAR_STRING: {
-                void* str_ptr = *reinterpret_cast<void**>(base);
-                if (str_ptr) {      
-                    dest.var_value.str_value = std::string(static_cast<char*>(str_ptr));
+            case VarType::VAR_STRING:  {
+                if (base == nullptr) {
+                    dest.var_value.str_value = "";
+                    dest.var_value.type = VarType::VAR_STRING;
+                    break;
+                }
+
+                const char* str_ptr = nullptr;
+                try {
+                    str_ptr = *reinterpret_cast<const char**>(base);
+                } catch (...) {
+                    dest.var_value.str_value = "";
+                    dest.var_value.type = VarType::VAR_STRING;
+                    break;
+                }
+
+                if (str_ptr != nullptr) {
+                    try {
+                        dest.var_value.str_value = str_ptr; 
+                    } catch (...) {
+                        dest.var_value.str_value = "";
+                    }
                 } else {
                     dest.var_value.str_value = "";
                 }
                 dest.var_value.type = VarType::VAR_STRING;
                 break;
-            }
-            default:
+}           default:
                 throw mx::Exception("LOAD: unsupported destination type");
         }
     }
@@ -868,8 +884,12 @@ namespace mxvm {
                 case VarType::VAR_POINTER:
                     *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
                     break;
-                case VarType::VAR_STRING:
-                    *reinterpret_cast<const char**>(base) = src.var_value.str_value.c_str();
+              case VarType::VAR_STRING:
+                    if (src.var_value.str_value.empty()) {
+                        *reinterpret_cast<const char**>(base) = "";
+                    } else {
+                        *reinterpret_cast<const char**>(base) = src.var_value.str_value.c_str();
+                    }
                     break;
                 default:
                     throw mx::Exception("STORE: unsupported source type");

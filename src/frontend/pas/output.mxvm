@@ -1,0 +1,79 @@
+program ScopeTest {
+	section module {
+ 
+	}
+	section data {
+		int rax = 0
+		int rbx = 0
+		float xmm0 = 0.0
+		float xmm1 = 0.0
+		float real_const_0 = 10.5
+		string str_0 = "Alice"
+		string str_1 = "Paris"
+		int globalVar = 0
+		ptr person1 = null
+		ptr location1 = null
+		float TestNestedScopes_globalVar = 0.0
+		int TestNestedScopes_InnerProc_globalVar = 0
+		int TestNestedScopes_InnerProc_innerVar = 0
+		int ForwardDeclaredProc_p = 0
+		int ForwardDeclaredProc_localVar = 0
+		ptr TestRecordScopes_person2 = null
+		ptr TestRecordScopes_location2 = null
+	}
+	section code {
+	start:
+		alloc person1, 16, 1
+		alloc location1, 16, 1
+		mov globalVar, 100
+		call PROC_TestNestedScopes
+		mov rbx, 5
+		call PROC_ForwardDeclaredProc
+		call PROC_TestRecordScopes
+		store 789, person1, 8, 1
+		store 987, location1, 8, 1
+		free person1
+		free location1
+		done
+	function PROC_TestNestedScopes:
+		mov xmm0, real_const_0
+		mov TestNestedScopes_globalVar, xmm0
+		mov rbx, 1
+		call PROC_TestNestedScopes_InnerProc
+	PROC_END_TestNestedScopes:
+		ret
+	function PROC_TestNestedScopes_InnerProc:
+		mov TestNestedScopes_InnerProc_globalVar, rbx
+		mov TestNestedScopes_InnerProc_innerVar, 30
+		cmp TestNestedScopes_InnerProc_globalVar, 0
+		je ELSE_0
+		mov TestNestedScopes_InnerProc_innerVar, 40
+		jmp ENDIF_1
+	ELSE_0:
+	ENDIF_1:
+		mov TestNestedScopes_InnerProc_innerVar, 100
+	PROC_END_TestNestedScopes_InnerProc:
+		ret
+	function PROC_ForwardDeclaredProc:
+		mov ForwardDeclaredProc_p, rbx
+		to_float xmm0, ForwardDeclaredProc_p
+		to_float xmm1, TestNestedScopes_globalVar
+		add xmm0, xmm1
+		to_int rbx, xmm0
+		mov ForwardDeclaredProc_localVar, rbx
+	PROC_END_ForwardDeclaredProc:
+		ret
+	function PROC_TestRecordScopes:
+		alloc TestRecordScopes_person2, 16, 1
+		alloc TestRecordScopes_location2, 16, 1
+		store str_0, TestRecordScopes_person2, 0, 1
+		store 123, TestRecordScopes_person2, 8, 1
+		store str_1, TestRecordScopes_location2, 0, 1
+		store 456, TestRecordScopes_location2, 8, 1
+	PROC_END_TestRecordScopes:
+		free TestRecordScopes_person2
+		free TestRecordScopes_location2
+		ret
+	}
+}
+
