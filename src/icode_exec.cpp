@@ -284,7 +284,6 @@ namespace mxvm {
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
             dest.var_value = src.var_value; 
-            dest.type = src.type;
             if (dest.type != VarType::VAR_POINTER) {
                 dest.type = src.type;
             }
