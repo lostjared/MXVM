@@ -1484,7 +1484,16 @@ namespace mxvm {
 
         if (isVariable(i.op2.op)) {
             Variable &src = getVariable(i.op2.op);
-            
+             if(dest.type == VarType::VAR_INTEGER  && src.type == VarType::VAR_FLOAT) {
+                out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
+                out << "\tcvttsd2si %xmm0, %rax\n";
+                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+            }
+            if(dest.type == VarType::VAR_FLOAT  && src.type == VarType::VAR_INTEGER) {
+                out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+                out << "\tcvtsi2sd %rax, %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+            }
             if (dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_FLOAT) {
                 out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
