@@ -264,10 +264,10 @@ program Breakout {
 		cmp reset_level_y, rbx
 		jg ENDFOR_29
 		mov reset_level_x, 0
-	FOR_30:
+	FOR_31:
 		mov rcx, 9
 		cmp reset_level_x, rcx
-		jg ENDFOR_31
+		jg ENDFOR_32
 		invoke rand
 		return rdx
 		mov rsi, rdx
@@ -277,21 +277,23 @@ program Breakout {
 		mov r8, reset_level_i
 		mov r9, r8
 		cmp r9, 0
-		jl IDX_OOB_33
+		jl IDX_OOB_35
 		cmp r9, 59
-		jg IDX_OOB_33
-		jmp IDX_OK_32
-	IDX_OOB_33:
+		jg IDX_OOB_35
+		jmp IDX_OK_34
+	IDX_OOB_35:
 		exit 1
-	IDX_OK_32:
+	IDX_OK_34:
 		mov r9, reset_level_i
 		store rdi, blocks, r9, 8
 		mov r9, reset_level_i
 		add r9, 1
 		mov reset_level_i, r9
+	FOR_CONTINUE_33:
 		add reset_level_x, 1
-		jmp FOR_30
-	ENDFOR_31:
+		jmp FOR_31
+	ENDFOR_32:
+	FOR_CONTINUE_30:
 		add reset_level_y, 1
 		jmp FOR_28
 	ENDFOR_29:
@@ -301,39 +303,39 @@ program Breakout {
 		load rbx, paddle, 0, 1
 		mov rdx, rbx
 		cmp rdx, 0
-		jl CMP_TRUE_36
+		jl CMP_TRUE_38
 		mov rcx, 0
-		jmp CMP_END_37
-	CMP_TRUE_36:
+		jmp CMP_END_39
+	CMP_TRUE_38:
 		mov rcx, 1
-	CMP_END_37:
+	CMP_END_39:
 		cmp rcx, 0
-		je ELSE_34
+		je ELSE_36
 		store 0, paddle, 0, 1
-		jmp ENDIF_35
-	ELSE_34:
-	ENDIF_35:
+		jmp ENDIF_37
+	ELSE_36:
+	ENDIF_37:
 		load rdx, paddle, 0, 1
 		load rsi, paddle, 16, 1
 		mov rdi, rdx
 		add rdi, rsi
 		mov r9, rdi
 		cmp r9, 640
-		jg CMP_TRUE_40
+		jg CMP_TRUE_42
 		mov r8, 0
-		jmp CMP_END_41
-	CMP_TRUE_40:
+		jmp CMP_END_43
+	CMP_TRUE_42:
 		mov r8, 1
-	CMP_END_41:
+	CMP_END_43:
 		cmp r8, 0
-		je ELSE_38
+		je ELSE_40
 		load r9, paddle, 16, 1
 		mov r10, 640
 		sub r10, r9
 		store r10, paddle, 0, 1
-		jmp ENDIF_39
-	ELSE_38:
-	ENDIF_39:
+		jmp ENDIF_41
+	ELSE_40:
+	ENDIF_41:
 	PROC_END_clamp_paddle:
 		ret
 	function PROC_update_input:
@@ -341,39 +343,39 @@ program Breakout {
 		return rbx
 		mov rdx, rbx
 		cmp rdx, 0
-		jne CMP_TRUE_44
+		jne CMP_TRUE_46
 		mov rcx, 0
-		jmp CMP_END_45
-	CMP_TRUE_44:
+		jmp CMP_END_47
+	CMP_TRUE_46:
 		mov rcx, 1
-	CMP_END_45:
+	CMP_END_47:
 		cmp rcx, 0
-		je ELSE_42
+		je ELSE_44
 		load rdx, paddle, 0, 1
 		mov rsi, rdx
 		sub rsi, 6
 		store rsi, paddle, 0, 1
-		jmp ENDIF_43
-	ELSE_42:
-	ENDIF_43:
+		jmp ENDIF_45
+	ELSE_44:
+	ENDIF_45:
 		invoke is_key_pressed, 79
 		return rdi
 		mov r9, rdi
 		cmp r9, 0
-		jne CMP_TRUE_48
+		jne CMP_TRUE_50
 		mov r8, 0
-		jmp CMP_END_49
-	CMP_TRUE_48:
+		jmp CMP_END_51
+	CMP_TRUE_50:
 		mov r8, 1
-	CMP_END_49:
+	CMP_END_51:
 		cmp r8, 0
-		je ELSE_46
+		je ELSE_48
 		load r9, paddle, 0, 1
 		add r9, 6
 		store r9, paddle, 0, 1
-		jmp ENDIF_47
-	ELSE_46:
-	ENDIF_47:
+		jmp ENDIF_49
+	ELSE_48:
+	ENDIF_49:
 		call PROC_clamp_paddle
 	PROC_END_update_input:
 		ret
@@ -387,50 +389,50 @@ program Breakout {
 		add rsi, ball_dy
 		mov update_ball_ny, rsi
 		cmp update_ball_ny, 0
-		jle CMP_TRUE_52
+		jle CMP_TRUE_54
 		mov rdi, 0
-		jmp CMP_END_53
-	CMP_TRUE_52:
+		jmp CMP_END_55
+	CMP_TRUE_54:
 		mov rdi, 1
-	CMP_END_53:
+	CMP_END_55:
 		cmp rdi, 0
-		je ELSE_50
+		je ELSE_52
 		mov update_ball_ny, 0
 		mov r8, 0
 		sub r8, ball_dy
 		mov ball_dy, r8
-		jmp ENDIF_51
-	ELSE_50:
-	ENDIF_51:
+		jmp ENDIF_53
+	ELSE_52:
+	ENDIF_53:
 		cmp update_ball_nx, 0
-		jle CMP_TRUE_56
+		jle CMP_TRUE_58
 		mov r9, 0
-		jmp CMP_END_57
-	CMP_TRUE_56:
+		jmp CMP_END_59
+	CMP_TRUE_58:
 		mov r9, 1
-	CMP_END_57:
+	CMP_END_59:
 		cmp r9, 0
-		je ELSE_54
+		je ELSE_56
 		mov update_ball_nx, 0
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
-		jmp ENDIF_55
-	ELSE_54:
-	ENDIF_55:
+		jmp ENDIF_57
+	ELSE_56:
+	ENDIF_57:
 		load r9, ball, 16, 1
 		mov r10, update_ball_nx
 		add r10, r9
 		mov r11, r10
 		cmp r11, 640
-		jge CMP_TRUE_60
+		jge CMP_TRUE_62
 		mov r9, 0
-		jmp CMP_END_61
-	CMP_TRUE_60:
+		jmp CMP_END_63
+	CMP_TRUE_62:
 		mov r9, 1
-	CMP_END_61:
+	CMP_END_63:
 		cmp r9, 0
-		je ELSE_58
+		je ELSE_60
 		load r9, ball, 16, 1
 		mov r10, 640
 		sub r10, r9
@@ -438,45 +440,45 @@ program Breakout {
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
-		jmp ENDIF_59
-	ELSE_58:
-	ENDIF_59:
+		jmp ENDIF_61
+	ELSE_60:
+	ENDIF_61:
 		load r9, ball, 24, 1
 		mov r10, update_ball_ny
 		add r10, r9
 		mov r11, r10
 		cmp r11, 360
-		jge CMP_TRUE_64
+		jge CMP_TRUE_66
 		mov r9, 0
-		jmp CMP_END_65
-	CMP_TRUE_64:
+		jmp CMP_END_67
+	CMP_TRUE_66:
 		mov r9, 1
-	CMP_END_65:
+	CMP_END_67:
 		cmp r9, 0
-		je ELSE_62
+		je ELSE_64
 		mov r9, lives
 		sub r9, 1
 		mov lives, r9
 		cmp lives, 0
-		jle CMP_TRUE_68
+		jle CMP_TRUE_70
 		mov r9, 0
-		jmp CMP_END_69
-	CMP_TRUE_68:
+		jmp CMP_END_71
+	CMP_TRUE_70:
 		mov r9, 1
-	CMP_END_69:
+	CMP_END_71:
 		cmp r9, 0
-		je ELSE_66
+		je ELSE_68
 		mov lives, 3
 		mov score, 0
 		call PROC_reset_level
-		jmp ENDIF_67
-	ELSE_66:
-	ENDIF_67:
+		jmp ENDIF_69
+	ELSE_68:
+	ENDIF_69:
 		call PROC_reset_ball_paddle
 		jmp PROC_END_update_ball
-		jmp ENDIF_63
-	ELSE_62:
-	ENDIF_63:
+		jmp ENDIF_65
+	ELSE_64:
+	ENDIF_65:
 		mov rbx, update_ball_nx
 		mov rcx, update_ball_ny
 		load r9, ball, 16, 1
@@ -494,7 +496,7 @@ program Breakout {
 		call FUNC_aabb
 		mov r15, rax
 		cmp r15, 0
-		je ELSE_70
+		je ELSE_72
 		load r9, paddle, 8, 1
 		load r10, ball, 24, 1
 		sub r9, r10
@@ -514,93 +516,93 @@ program Breakout {
 		mov r12, r10
 		mov r13, r9
 		cmp r12, r13
-		jl CMP_TRUE_74
+		jl CMP_TRUE_76
 		mov r11, 0
-		jmp CMP_END_75
-	CMP_TRUE_74:
+		jmp CMP_END_77
+	CMP_TRUE_76:
 		mov r11, 1
-	CMP_END_75:
+	CMP_END_77:
 		cmp r11, 0
-		je ELSE_72
+		je ELSE_74
 		cmp ball_dx, 0
-		jg CMP_TRUE_78
+		jg CMP_TRUE_80
 		mov r9, 0
-		jmp CMP_END_79
-	CMP_TRUE_78:
+		jmp CMP_END_81
+	CMP_TRUE_80:
 		mov r9, 1
-	CMP_END_79:
+	CMP_END_81:
 		cmp r9, 0
-		je ELSE_76
+		je ELSE_78
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
-		jmp ENDIF_77
-	ELSE_76:
-	ENDIF_77:
+		jmp ENDIF_79
+	ELSE_78:
+	ENDIF_79:
+		jmp ENDIF_75
+	ELSE_74:
+		cmp ball_dx, 0
+		jl CMP_TRUE_84
+		mov r9, 0
+		jmp CMP_END_85
+	CMP_TRUE_84:
+		mov r9, 1
+	CMP_END_85:
+		cmp r9, 0
+		je ELSE_82
+		mov r9, 0
+		sub r9, ball_dx
+		mov ball_dx, r9
+		jmp ENDIF_83
+	ELSE_82:
+	ENDIF_83:
+	ENDIF_75:
 		jmp ENDIF_73
 	ELSE_72:
-		cmp ball_dx, 0
-		jl CMP_TRUE_82
-		mov r9, 0
-		jmp CMP_END_83
-	CMP_TRUE_82:
-		mov r9, 1
-	CMP_END_83:
-		cmp r9, 0
-		je ELSE_80
-		mov r9, 0
-		sub r9, ball_dx
-		mov ball_dx, r9
-		jmp ENDIF_81
-	ELSE_80:
-	ENDIF_81:
 	ENDIF_73:
-		jmp ENDIF_71
-	ELSE_70:
-	ENDIF_71:
 		mov update_ball_hitOnce, 0
 		mov update_ball_i, 0
-	WHILE_84:
+	WHILE_86:
 		cmp update_ball_i, 60
-		jl CMP_TRUE_86
+		jl CMP_TRUE_88
 		mov r9, 0
-		jmp CMP_END_87
-	CMP_TRUE_86:
+		jmp CMP_END_89
+	CMP_TRUE_88:
 		mov r9, 1
-	CMP_END_87:
+	CMP_END_89:
 		cmp r9, 0
-		je ENDWHILE_85
+		je ENDWHILE_87
 		cmp update_ball_hitOnce, 0
-		je CMP_TRUE_90
+		je CMP_TRUE_92
 		mov r9, 0
-		jmp CMP_END_91
-	CMP_TRUE_90:
+		jmp CMP_END_93
+	CMP_TRUE_92:
 		mov r9, 1
-	CMP_END_91:
+	CMP_END_93:
 		cmp r9, 0
-		je ELSE_88
+		je ELSE_90
 		mov r9, update_ball_i
 		mov r10, r9
 		cmp r10, 0
-		jl IDX_OOB_95
+		jl IDX_OOB_97
 		cmp r10, 59
-		jg IDX_OOB_95
-		jmp IDX_OK_94
-	IDX_OOB_95:
+		jg IDX_OOB_97
+		jmp IDX_OK_96
+	IDX_OOB_97:
 		exit 1
-	IDX_OK_94:
+	IDX_OK_96:
 		mov r9, update_ball_i
 		load r10, blocks, r9, 8
 		mov r11, r10
 		cmp r11, 1
-		jge CMP_TRUE_96
+		jge CMP_TRUE_98
 		mov r9, 0
-		jmp CMP_END_97
-	CMP_TRUE_96:
+		jmp CMP_END_99
+	CMP_TRUE_98:
 		mov r9, 1
-	CMP_END_97:
+	CMP_END_99:
 		cmp r9, 0
-		je ELSE_92
+		je ELSE_94
 		mov r9, update_ball_i
 		div r9, 10
 		mov update_ball_gy, r9
@@ -633,17 +635,17 @@ program Breakout {
 		call FUNC_aabb
 		mov r11, rax
 		cmp r11, 0
-		je ELSE_98
+		je ELSE_100
 		mov r9, update_ball_i
 		mov r10, r9
 		cmp r10, 0
-		jl IDX_OOB_101
+		jl IDX_OOB_103
 		cmp r10, 59
-		jg IDX_OOB_101
-		jmp IDX_OK_100
-	IDX_OOB_101:
+		jg IDX_OOB_103
+		jmp IDX_OK_102
+	IDX_OOB_103:
 		exit 1
-	IDX_OK_100:
+	IDX_OK_102:
 		mov r10, update_ball_i
 		store 0, blocks, r10, 8
 		mov r10, score
@@ -656,167 +658,167 @@ program Breakout {
 		add r10, r11
 		mov r12, r10
 		cmp r12, update_ball_by
-		jle CMP_TRUE_104
+		jle CMP_TRUE_106
 		mov r11, 0
-		jmp CMP_END_105
-	CMP_TRUE_104:
+		jmp CMP_END_107
+	CMP_TRUE_106:
 		mov r11, 1
-	CMP_END_105:
+	CMP_END_107:
 		cmp r11, 0
-		je ELSE_102
+		je ELSE_104
 		mov update_ball_topHit, 1
-		jmp ENDIF_103
-	ELSE_102:
-	ENDIF_103:
+		jmp ENDIF_105
+	ELSE_104:
+	ENDIF_105:
 		load r10, ball, 8, 1
 		mov r11, update_ball_by
 		add r11, update_ball_bh
 		mov r13, r10
 		mov r14, r11
 		cmp r13, r14
-		jge CMP_TRUE_108
+		jge CMP_TRUE_110
 		mov r12, 0
-		jmp CMP_END_109
-	CMP_TRUE_108:
+		jmp CMP_END_111
+	CMP_TRUE_110:
 		mov r12, 1
-	CMP_END_109:
+	CMP_END_111:
 		cmp r12, 0
-		je ELSE_106
+		je ELSE_108
 		mov update_ball_bottomHit, 1
-		jmp ENDIF_107
-	ELSE_106:
-	ENDIF_107:
+		jmp ENDIF_109
+	ELSE_108:
+	ENDIF_109:
 		cmp update_ball_topHit, 1
-		jge CMP_TRUE_112
-		mov r10, 0
-		jmp CMP_END_113
-	CMP_TRUE_112:
-		mov r10, 1
-	CMP_END_113:
-		cmp update_ball_bottomHit, 1
 		jge CMP_TRUE_114
-		mov r11, 0
+		mov r10, 0
 		jmp CMP_END_115
 	CMP_TRUE_114:
-		mov r11, 1
+		mov r10, 1
 	CMP_END_115:
+		cmp update_ball_bottomHit, 1
+		jge CMP_TRUE_116
+		mov r11, 0
+		jmp CMP_END_117
+	CMP_TRUE_116:
+		mov r11, 1
+	CMP_END_117:
 		cmp r10, 0
-		jne OR_ONE_116
+		jne OR_ONE_118
 		cmp r11, 0
-		jne OR_ONE_116
+		jne OR_ONE_118
 		mov r12, 0
-		jmp OR_END_117
-	OR_ONE_116:
+		jmp OR_END_119
+	OR_ONE_118:
 		mov r12, 1
-	OR_END_117:
+	OR_END_119:
 		cmp r12, 0
-		je ELSE_110
+		je ELSE_112
 		mov r10, 0
 		sub r10, ball_dy
 		mov ball_dy, r10
-		jmp ENDIF_111
-	ELSE_110:
+		jmp ENDIF_113
+	ELSE_112:
 		mov r10, 0
 		sub r10, ball_dx
 		mov ball_dx, r10
-	ENDIF_111:
+	ENDIF_113:
 		mov update_ball_hitOnce, 1
-		jmp ENDIF_99
-	ELSE_98:
-	ENDIF_99:
-		jmp ENDIF_93
-	ELSE_92:
-	ENDIF_93:
-		jmp ENDIF_89
-	ELSE_88:
-	ENDIF_89:
+		jmp ENDIF_101
+	ELSE_100:
+	ENDIF_101:
+		jmp ENDIF_95
+	ELSE_94:
+	ENDIF_95:
+		jmp ENDIF_91
+	ELSE_90:
+	ENDIF_91:
 		mov r10, update_ball_i
 		add r10, 1
 		mov update_ball_i, r10
-		jmp WHILE_84
-	ENDWHILE_85:
+		jmp WHILE_86
+	ENDWHILE_87:
 		store update_ball_nx, ball, 0, 1
 		store update_ball_ny, ball, 8, 1
 		mov update_ball_anyLeft, 0
 		mov update_ball_i, 0
-	WHILE_118:
+	WHILE_120:
 		cmp update_ball_i, 60
-		jl CMP_TRUE_120
+		jl CMP_TRUE_122
 		mov r10, 0
-		jmp CMP_END_121
-	CMP_TRUE_120:
+		jmp CMP_END_123
+	CMP_TRUE_122:
 		mov r10, 1
-	CMP_END_121:
+	CMP_END_123:
 		cmp r10, 0
-		je ENDWHILE_119
+		je ENDWHILE_121
 		mov r10, update_ball_i
 		mov r11, r10
 		cmp r11, 0
-		jl IDX_OOB_125
+		jl IDX_OOB_127
 		cmp r11, 59
-		jg IDX_OOB_125
-		jmp IDX_OK_124
-	IDX_OOB_125:
+		jg IDX_OOB_127
+		jmp IDX_OK_126
+	IDX_OOB_127:
 		exit 1
-	IDX_OK_124:
+	IDX_OK_126:
 		mov r10, update_ball_i
 		load r11, blocks, r10, 8
 		mov r12, r11
 		cmp r12, 1
-		jge CMP_TRUE_126
+		jge CMP_TRUE_128
 		mov r10, 0
-		jmp CMP_END_127
-	CMP_TRUE_126:
+		jmp CMP_END_129
+	CMP_TRUE_128:
 		mov r10, 1
-	CMP_END_127:
+	CMP_END_129:
 		cmp r10, 0
-		je ELSE_122
+		je ELSE_124
 		mov update_ball_anyLeft, 1
-		jmp ENDIF_123
-	ELSE_122:
-	ENDIF_123:
+		jmp ENDIF_125
+	ELSE_124:
+	ENDIF_125:
 		mov r10, update_ball_i
 		add r10, 1
 		mov update_ball_i, r10
-		jmp WHILE_118
-	ENDWHILE_119:
+		jmp WHILE_120
+	ENDWHILE_121:
 		cmp update_ball_anyLeft, 0
-		je CMP_TRUE_130
+		je CMP_TRUE_132
 		mov r10, 0
-		jmp CMP_END_131
-	CMP_TRUE_130:
+		jmp CMP_END_133
+	CMP_TRUE_132:
 		mov r10, 1
-	CMP_END_131:
+	CMP_END_133:
 		cmp r10, 0
-		je ELSE_128
+		je ELSE_130
 		call PROC_reset_level
 		call PROC_reset_ball_paddle
-		jmp ENDIF_129
-	ELSE_128:
-	ENDIF_129:
+		jmp ENDIF_131
+	ELSE_130:
+	ENDIF_131:
 	PROC_END_update_ball:
 		ret
 	function PROC_setcolor:
 		mov setcolor_index, rbx
 		cmp setcolor_index, 1
-		je CASE_0_133
+		je CASE_0_135
 		cmp setcolor_index, 2
-		je CASE_1_134
+		je CASE_1_136
 		cmp setcolor_index, 3
-		je CASE_2_135
-		jmp CASE_ELSE_136
-	CASE_0_133:
+		je CASE_2_137
+		jmp CASE_ELSE_138
+	CASE_0_135:
 		invoke set_draw_color, renderer, 255, 0, 0, 25
-		jmp CASE_END_132
-	CASE_1_134:
+		jmp CASE_END_134
+	CASE_1_136:
 		invoke set_draw_color, renderer, 0, 255, 0, 255
-		jmp CASE_END_132
-	CASE_2_135:
+		jmp CASE_END_134
+	CASE_2_137:
 		invoke set_draw_color, renderer, 0, 0, 255, 255
-		jmp CASE_END_132
-	CASE_ELSE_136:
+		jmp CASE_END_134
+	CASE_ELSE_138:
 		invoke set_draw_color, renderer, 255, 255, 255, 255
-	CASE_END_132:
+	CASE_END_134:
 	PROC_END_setcolor:
 		ret
 	function PROC_render:
@@ -838,38 +840,38 @@ program Breakout {
 		call PROC_draw_box
 		invoke set_draw_color, renderer, 200, 200, 200, 255
 		mov render_i, 0
-	WHILE_137:
+	WHILE_139:
 		cmp render_i, 60
-		jl CMP_TRUE_139
+		jl CMP_TRUE_141
 		mov r9, 0
-		jmp CMP_END_140
-	CMP_TRUE_139:
+		jmp CMP_END_142
+	CMP_TRUE_141:
 		mov r9, 1
-	CMP_END_140:
+	CMP_END_142:
 		cmp r9, 0
-		je ENDWHILE_138
+		je ENDWHILE_140
 		mov r9, render_i
 		mov r10, r9
 		cmp r10, 0
-		jl IDX_OOB_144
+		jl IDX_OOB_146
 		cmp r10, 59
-		jg IDX_OOB_144
-		jmp IDX_OK_143
-	IDX_OOB_144:
+		jg IDX_OOB_146
+		jmp IDX_OK_145
+	IDX_OOB_146:
 		exit 1
-	IDX_OK_143:
+	IDX_OK_145:
 		mov r9, render_i
 		load r10, blocks, r9, 8
 		mov r11, r10
 		cmp r11, 1
-		jge CMP_TRUE_145
+		jge CMP_TRUE_147
 		mov r9, 0
-		jmp CMP_END_146
-	CMP_TRUE_145:
+		jmp CMP_END_148
+	CMP_TRUE_147:
 		mov r9, 1
-	CMP_END_146:
+	CMP_END_148:
 		cmp r9, 0
-		je ELSE_141
+		je ELSE_143
 		mov r9, render_i
 		div r9, 10
 		mov render_gy, r9
@@ -890,13 +892,13 @@ program Breakout {
 		mov r9, render_i
 		mov r10, r9
 		cmp r10, 0
-		jl IDX_OOB_148
+		jl IDX_OOB_150
 		cmp r10, 59
-		jg IDX_OOB_148
-		jmp IDX_OK_147
-	IDX_OOB_148:
+		jg IDX_OOB_150
+		jmp IDX_OK_149
+	IDX_OOB_150:
 		exit 1
-	IDX_OK_147:
+	IDX_OK_149:
 		mov r9, render_i
 		load r10, blocks, r9, 8
 		mov rbx, r10
@@ -906,14 +908,14 @@ program Breakout {
 		mov rdx, 60
 		mov rsi, 16
 		call PROC_draw_box
-		jmp ENDIF_142
-	ELSE_141:
-	ENDIF_142:
+		jmp ENDIF_144
+	ELSE_143:
+	ENDIF_144:
 		mov r9, render_i
 		add r9, 1
 		mov render_i, r9
-		jmp WHILE_137
-	ENDWHILE_138:
+		jmp WHILE_139
+	ENDWHILE_140:
 		invoke inttostr, score
 		return _tmpptr0
 		invoke strlen, str_2
@@ -956,20 +958,20 @@ program Breakout {
 		return rbx
 		mov init_result, rbx
 		cmp init_result, 0
-		jne CMP_TRUE_151
+		jne CMP_TRUE_153
 		mov rcx, 0
-		jmp CMP_END_152
-	CMP_TRUE_151:
+		jmp CMP_END_154
+	CMP_TRUE_153:
 		mov rcx, 1
-	CMP_END_152:
+	CMP_END_154:
 		cmp rcx, 0
-		je ELSE_149
+		je ELSE_151
 		print fmt_str, str_4
 		print newline
 		exit 1
-		jmp ENDIF_150
-	ELSE_149:
-	ENDIF_150:
+		jmp ENDIF_152
+	ELSE_151:
+	ENDIF_152:
 		invoke create_window, init_title, init_xval, init_yval, init_wval, init_hval, 4
 		return rdx
 		mov window_id, rdx
@@ -977,21 +979,21 @@ program Breakout {
 		sub rsi, 1
 		mov r8, rsi
 		cmp window_id, r8
-		je CMP_TRUE_155
+		je CMP_TRUE_157
 		mov rdi, 0
-		jmp CMP_END_156
-	CMP_TRUE_155:
+		jmp CMP_END_158
+	CMP_TRUE_157:
 		mov rdi, 1
-	CMP_END_156:
+	CMP_END_158:
 		cmp rdi, 0
-		je ELSE_153
+		je ELSE_155
 		print fmt_str, str_5
 		print newline
 		invoke quit
 		exit 1
-		jmp ENDIF_154
-	ELSE_153:
-	ENDIF_154:
+		jmp ENDIF_156
+	ELSE_155:
+	ENDIF_156:
 		mov r8, 0
 		sub r8, 1
 		invoke create_renderer, window_id, r8, 2
@@ -1001,22 +1003,22 @@ program Breakout {
 		sub r8, 1
 		mov r10, r8
 		cmp renderer, r10
-		je CMP_TRUE_159
+		je CMP_TRUE_161
 		mov r9, 0
-		jmp CMP_END_160
-	CMP_TRUE_159:
+		jmp CMP_END_162
+	CMP_TRUE_161:
 		mov r9, 1
-	CMP_END_160:
+	CMP_END_162:
 		cmp r9, 0
-		je ELSE_157
+		je ELSE_159
 		print fmt_str, str_6
 		print newline
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_158
-	ELSE_157:
-	ENDIF_158:
+		jmp ENDIF_160
+	ELSE_159:
+	ENDIF_160:
 		invoke create_render_target, renderer, 640, 360
 		return r9
 		mov target_id, r9
@@ -1024,41 +1026,41 @@ program Breakout {
 		sub r9, 1
 		mov r11, r9
 		cmp target_id, r11
-		je CMP_TRUE_163
+		je CMP_TRUE_165
 		mov r10, 0
-		jmp CMP_END_164
-	CMP_TRUE_163:
+		jmp CMP_END_166
+	CMP_TRUE_165:
 		mov r10, 1
-	CMP_END_164:
+	CMP_END_166:
 		cmp r10, 0
-		je ELSE_161
+		je ELSE_163
 		print fmt_str, str_7
 		print newline
 		invoke destroy_renderer, renderer
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_162
-	ELSE_161:
-	ENDIF_162:
+		jmp ENDIF_164
+	ELSE_163:
+	ENDIF_164:
 		invoke init_text
 		return r9
 		mov r11, r9
 		cmp r11, 1
-		jne CMP_TRUE_167
+		jne CMP_TRUE_169
 		mov r10, 0
-		jmp CMP_END_168
-	CMP_TRUE_167:
+		jmp CMP_END_170
+	CMP_TRUE_169:
 		mov r10, 1
-	CMP_END_168:
+	CMP_END_170:
 		cmp r10, 0
-		je ELSE_165
+		je ELSE_167
 		print fmt_str, str_8
 		print newline
 		exit 1
-		jmp ENDIF_166
-	ELSE_165:
-	ENDIF_166:
+		jmp ENDIF_168
+	ELSE_167:
+	ENDIF_168:
 		invoke load_font, filename, 16
 		return r9
 		mov font_id, r9
@@ -1066,21 +1068,21 @@ program Breakout {
 		sub r9, 1
 		mov r11, r9
 		cmp font_id, r11
-		je CMP_TRUE_171
+		je CMP_TRUE_173
 		mov r10, 0
-		jmp CMP_END_172
-	CMP_TRUE_171:
+		jmp CMP_END_174
+	CMP_TRUE_173:
 		mov r10, 1
-	CMP_END_172:
+	CMP_END_174:
 		cmp r10, 0
-		je ELSE_169
+		je ELSE_171
 		print fmt_str, str_9
 		print fmt_str, filename
 		print newline
 		exit 1
-		jmp ENDIF_170
-	ELSE_169:
-	ENDIF_170:
+		jmp ENDIF_172
+	ELSE_171:
+	ENDIF_172:
 		mov lives, 3
 		mov score, 0
 		call PROC_reset_level
@@ -1110,69 +1112,69 @@ program Breakout {
 		add rbx, aabb_aw
 		mov rdx, rbx
 		cmp rdx, aabb_bx
-		jle CMP_TRUE_173
+		jle CMP_TRUE_175
 		mov rcx, 0
-		jmp CMP_END_174
-	CMP_TRUE_173:
+		jmp CMP_END_176
+	CMP_TRUE_175:
 		mov rcx, 1
-	CMP_END_174:
+	CMP_END_176:
 		mov rdx, aabb_bx
 		add rdx, aabb_bw
 		mov rdi, rdx
 		cmp rdi, aabb_ax
-		jle CMP_TRUE_175
+		jle CMP_TRUE_177
 		mov rsi, 0
-		jmp CMP_END_176
-	CMP_TRUE_175:
+		jmp CMP_END_178
+	CMP_TRUE_177:
 		mov rsi, 1
-	CMP_END_176:
+	CMP_END_178:
 		cmp rcx, 0
-		jne OR_ONE_177
+		jne OR_ONE_179
 		cmp rsi, 0
-		jne OR_ONE_177
+		jne OR_ONE_179
 		mov rdi, 0
-		jmp OR_END_178
-	OR_ONE_177:
+		jmp OR_END_180
+	OR_ONE_179:
 		mov rdi, 1
-	OR_END_178:
+	OR_END_180:
 		mov r8, aabb_ay
 		add r8, aabb_ah
 		mov r10, r8
 		cmp r10, aabb_by
-		jle CMP_TRUE_179
+		jle CMP_TRUE_181
 		mov r9, 0
-		jmp CMP_END_180
-	CMP_TRUE_179:
+		jmp CMP_END_182
+	CMP_TRUE_181:
 		mov r9, 1
-	CMP_END_180:
+	CMP_END_182:
 		cmp rdi, 0
-		jne OR_ONE_181
+		jne OR_ONE_183
 		cmp r9, 0
-		jne OR_ONE_181
+		jne OR_ONE_183
 		mov r10, 0
-		jmp OR_END_182
-	OR_ONE_181:
+		jmp OR_END_184
+	OR_ONE_183:
 		mov r10, 1
-	OR_END_182:
+	OR_END_184:
 		mov r9, aabb_by
 		add r9, aabb_bh
 		mov r12, r9
 		cmp r12, aabb_ay
-		jle CMP_TRUE_183
+		jle CMP_TRUE_185
 		mov r11, 0
-		jmp CMP_END_184
-	CMP_TRUE_183:
+		jmp CMP_END_186
+	CMP_TRUE_185:
 		mov r11, 1
-	CMP_END_184:
+	CMP_END_186:
 		cmp r10, 0
-		jne OR_ONE_185
+		jne OR_ONE_187
 		cmp r11, 0
-		jne OR_ONE_185
+		jne OR_ONE_187
 		mov r9, 0
-		jmp OR_END_186
-	OR_ONE_185:
+		jmp OR_END_188
+	OR_ONE_187:
 		mov r9, 1
-	OR_END_186:
+	OR_END_188:
 		not r9
 		mov rax, r9
 	FUNC_END_aabb:
