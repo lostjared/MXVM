@@ -224,12 +224,14 @@ procedure setcolor(index: integer);
 begin
 
 case index of 
-1: sdl_set_draw_color(renderer, 255, 0, 0,25);
+1: sdl_set_draw_color(renderer, 255, 0, 0,255);
 2: sdl_set_draw_color(renderer, 0, 255, 0,255);
 3: sdl_set_draw_color(renderer, 0, 0, 255,255);
 else
 sdl_set_draw_color(renderer, 255, 255, 255, 255);
 end;
+
+
 
 end;
 
