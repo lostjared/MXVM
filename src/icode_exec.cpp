@@ -295,9 +295,11 @@ namespace mxvm {
             } else if(dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_INTEGER) {
                 dest.var_value.float_value = static_cast<float>(src.var_value.int_value);
             }
+            dest.type = src.type;
         } else {
             setVariableFromConstant(dest, instr.op2.op);
         }
+       
     }
 
     void Program::exec_add(const Instruction& instr) {
@@ -1682,19 +1684,37 @@ namespace mxvm {
         if (it == external_functions.end()) {
             throw mx::Exception("INVOKE: external function not found: " + instr.op1.op);
         }
-        RuntimeFunction &fn = it->second;
-        if(!fn.func) {
-            throw mx::Exception("INVOKE: function: " + instr.op1.op + " not found");
-        }
+        
         std::vector<Operand> args;
-        if (!instr.op2.op.empty()) args.push_back(instr.op2);
-        if (!instr.op3.op.empty()) args.push_back(instr.op3);
+        
+        auto process_operand = [&](Operand op) {
+            if (op.op.empty()) return;
+            
+            if (isVariable(op.op)) {
+                Variable& v = getVariable(op.op);
+                if ((v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN)) {
+                    if (v.var_value.ptr_value == nullptr) {
+                        if (instr.op1.op == "strlen" || instr.op1.op == "strncpy" || 
+                            instr.op1.op == "strncat" || instr.op1.op == "draw_text") {
+                            op.op = "";
+                            op.type = OperandType::OP_CONSTANT;
+                        }
+                    }
+                }
+            }
+            args.push_back(op);
+        };
+
+        process_operand(instr.op2);
+        process_operand(instr.op3);
         for (const auto& vop : instr.vop) {
-            if (!vop.op.empty()) args.push_back(vop);
+            process_operand(vop);
         }
-        fn.call(this, args);
+
+        it->second.call(this, args);
         result.op = "%rax";
     }
+ 
 
     void Program::post(std::ostream &out) {
         if(stack.empty()) {
