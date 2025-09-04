@@ -1,0 +1,39 @@
+program wloop {
+	section module {
+ 
+	}
+	section data {
+		int rax = 0
+		int rbx = 0
+		int rcx = 0
+		string str_0 = "hey: "
+		string fmt_int = "%lld "
+		string fmt_str = "%s "
+		string newline = "\n"
+		int i = 0
+	}
+	section code {
+	start:
+		mov i, 0
+	WHILE_0:
+		cmp i, 10
+		jl CMP_TRUE_2
+		mov rbx, 0
+		jmp CMP_END_3
+	CMP_TRUE_2:
+		mov rbx, 1
+	CMP_END_3:
+		cmp rbx, 0
+		je ENDWHILE_1
+		print fmt_str, str_0
+		print fmt_int, i
+		print newline
+		mov rcx, i
+		add rcx, 1
+		mov i, rcx
+		jmp WHILE_0
+	ENDWHILE_1:
+		done
+	}
+}
+

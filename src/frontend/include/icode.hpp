@@ -455,20 +455,6 @@ namespace pascal {
 
             std::string leftOp = a;
             std::string rightOp = b;
-            
-            // Remove explicit to_float conversions - mov will handle it
-            // if (isFloatOp) {
-            //     if (!isFloatReg(a) && !isRealNumber(a)) {
-            //         std::string floatReg = allocFloatReg();
-            //         emit2("to_float", floatReg, a);
-            //         leftOp = floatReg;
-            //     }
-            //     if (!isFloatReg(b) && !isRealNumber(b)) {
-            //         std::string floatReg = allocFloatReg();
-            //         emit2("to_float", floatReg, b);
-            //         rightOp = floatReg;
-            //     }
-            // }
 
             bool mustCopy = isParmReg(leftOp);
             if (isReg(leftOp) && !mustCopy) {
@@ -1525,13 +1511,13 @@ namespace pascal {
                                 node.operator_ == BinaryOpNode::MULTIPLY || 
                                 node.operator_ == BinaryOpNode::DIVIDE)) {
                 
-                // Remove explicit to_float conversions - mov will handle it
+                
                 std::string dst;
                 if (isFloatReg(left) && !isParmReg(left)) {
                     dst = left;
                 } else {
                     dst = allocFloatReg();
-                    emit2("mov", dst, left);  // mov will convert to float
+                    emit2("mov", dst, left);  
                 }
                 
                 emit2(node.operator_ == BinaryOpNode::DIVIDE ? "div" : 
@@ -2007,10 +1993,10 @@ namespace pascal {
             std::string rhs = eval(node.expression.get());
             std::string idx = eval(arr->index.get());
 
-            // Remove explicit to_int conversion - mov will handle it
+            
             if (getExpressionType(arr->index.get()) == VarType::DOUBLE) {
                 std::string intIdx = allocReg();
-                emit2("mov", intIdx, idx);  // mov will convert to int
+                emit2("mov", intIdx, idx);  
                 if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
                 idx = intIdx;
             }
@@ -2050,9 +2036,6 @@ namespace pascal {
                 throw std::runtime_error("Unsupported array base in assignment");
             }
             
-            // Remove unused variable warnings by commenting out these lines
-            // VarType elemType = getTypeFromString(info->elementType);
-            // VarType rhsType  = getExpressionType(node.expression.get());
             
             emit4("store", rhs, base, elemIndex, std::to_string(info->elementSize));
             
@@ -2164,10 +2147,10 @@ namespace pascal {
         std::string value = eval(node.value.get());
         std::string index = eval(node.index.get());
 
-        // Remove explicit conversion - mov will handle it
+        
         if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
             std::string intIndex = allocReg();
-            emit2("mov", intIndex, index);  // mov will convert to int
+            emit2("mov", intIndex, index);  
             if (isReg(index) && !isParmReg(index)) freeReg(index);
             index = intIndex;
         }
@@ -2222,15 +2205,15 @@ namespace pascal {
         }
 
         std::string idx = eval(node.index.get());
-        // Remove explicit conversion - mov will handle it
+        
         if (getExpressionType(node.index.get()) == VarType::DOUBLE) {
             std::string intIdx = allocReg();
-            emit2("mov", intIdx, idx);  // mov will convert to int
+            emit2("mov", intIdx, idx); 
             if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
             idx = intIdx;
         }
 
-        // FIX: Add missing elemIndex variable declaration
+        
         std::string elemIndex = allocReg();
         emit2("mov", elemIndex, idx);
         if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
@@ -2391,7 +2374,6 @@ namespace pascal {
             }
             return "";
         }
-
 
         struct RecordField { 
             std::string name; 
@@ -2614,20 +2596,6 @@ namespace pascal {
                 if (!currentFunctionName.empty()) {
                     rt = getVarType(currentFunctionName);
                 }
-                     
-                // Remove explicit conversions - mov will handle them
-                // VarType exprType = getExpressionType(node.expr.get());
-                // if (rt == VarType::DOUBLE && exprType != VarType::DOUBLE && !isFloatReg(retVal)) {
-                //     std::string floatReg = allocFloatReg();
-                //     emit2("to_float", floatReg, retVal);
-                //     if (isReg(retVal) && !isParmReg(retVal)) freeReg(retVal);
-                //     retVal = floatReg;
-                // } else if (rt != VarType::DOUBLE && exprType == VarType::DOUBLE && isFloatReg(retVal)) {
-                //     std::string intReg = allocReg();
-                //     emit2("to_int", intReg, retVal);
-                //     if (isReg(retVal) && !isParmReg(retVal)) freeReg(retVal);
-                //     retVal = intReg;
-                // }
                
                 if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD) {
                     emit2("mov", "arg0", retVal);
