@@ -289,13 +289,16 @@ namespace mxvm {
             }
             if (dest.type == VarType::VAR_POINTER) {
                 dest.var_value.owns = false;
+                dest.type = src.type;
             }
             if(dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_FLOAT) {
                 dest.var_value.int_value = static_cast<int>(src.var_value.float_value);
+                dest.type = src.type;
             } else if(dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_INTEGER) {
                 dest.var_value.float_value = static_cast<float>(src.var_value.int_value);
+                dest.type = src.type;
             }
-            dest.type = src.type;
+            
         } else {
             setVariableFromConstant(dest, instr.op2.op);
         }
