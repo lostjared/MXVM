@@ -24,10 +24,18 @@ program Space {
 		float xmm7 = 0.0
 		float xmm8 = 0.0
 		float xmm9 = 0.0
+		float xmm10 = 0.0
+		float xmm11 = 0.0
+		float xmm12 = 0.0
+		float xmm13 = 0.0
+		float xmm14 = 0.0
+		float xmm15 = 0.0
 		ptr arg0 = null
-		float real_const_3 = 0.995
-		float real_const_2 = 0.14
-		float real_const_1 = 0.08
+		float real_const_5 = 0.995
+		float real_const_3 = 0.08
+		float real_const_2 = 180.000000
+		float real_const_1 = 320.000000
+		float real_const_4 = 0.14
 		string str_0 = "Space"
 		string str_1 = "font.ttf"
 		string str_2 = "failed to init SDL"
@@ -269,116 +277,93 @@ program Space {
 		free the_ship
 		done
 	function PROC_init_space:
-		to_float xmm0, 320
-		store xmm0, the_ship, 0, 1
-		to_float xmm1, 180
-		store xmm1, the_ship, 8, 1
-		to_float xmm2, 0
-		store xmm2, the_ship, 16, 1
-		to_float xmm3, 0
-		store xmm3, the_ship, 24, 1
-		to_float xmm4, 0
-		store xmm4, the_ship, 32, 1
+		store real_const_1, the_ship, 0, 1
+		store real_const_2, the_ship, 8, 1
+		store 0, the_ship, 16, 1
+		store 0, the_ship, 24, 1
+		store 0, the_ship, 32, 1
 		store 3, the_ship, 40, 1
 	PROC_END_init_space:
 		ret
 	function PROC_draw_ship:
-		to_float xmm0, 0
-		mov draw_ship_lx1, xmm0
+		mov draw_ship_lx1, 0
 		mov rbx, 0
 		sub rbx, 12
-		to_float xmm1, rbx
-		mov draw_ship_ly1, xmm1
+		mov draw_ship_ly1, rbx
 		mov rcx, 0
 		sub rcx, 8
-		to_float xmm2, rcx
-		mov draw_ship_lx2, xmm2
-		to_float xmm3, 8
-		mov draw_ship_ly2, xmm3
-		to_float xmm4, 8
-		mov draw_ship_lx3, xmm4
-		to_float xmm5, 8
-		mov draw_ship_ly3, xmm5
-		load xmm6, the_ship, 32, 1
-		invoke cos, xmm6
-		return xmm7
-		mov draw_ship_c, xmm7
-		load xmm6, the_ship, 32, 1
-		invoke sin, xmm6
+		mov draw_ship_lx2, rcx
+		mov draw_ship_ly2, 8
+		mov draw_ship_lx3, 8
+		mov draw_ship_ly3, 8
+		load xmm0, the_ship, 32, 1
+		invoke cos, xmm0
+		return xmm1
+		mov draw_ship_c, xmm1
+		load xmm0, the_ship, 32, 1
+		invoke sin, xmm0
+		return xmm2
+		mov draw_ship_s, xmm2
+		load xmm0, the_ship, 0, 1
+		mov xmm3, draw_ship_lx1
+		mul xmm3, draw_ship_c
+		mov xmm4, draw_ship_ly1
+		mul xmm4, draw_ship_s
+		sub xmm3, xmm4
+		add xmm0, xmm3
+		invoke trunc, xmm0
+		return xmm5
+		mov draw_ship_x1, xmm5
+		load xmm0, the_ship, 8, 1
+		mov xmm6, draw_ship_lx1
+		mul xmm6, draw_ship_s
+		mov xmm7, draw_ship_ly1
+		mul xmm7, draw_ship_c
+		add xmm6, xmm7
+		add xmm0, xmm6
+		invoke trunc, xmm0
 		return xmm8
-		mov draw_ship_s, xmm8
-		load xmm6, the_ship, 0, 1
-		to_float xmm9, draw_ship_lx1
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly1
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x1, xmm9
-		load xmm6, the_ship, 8, 1
-		to_float xmm9, draw_ship_lx1
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly1
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y1, xmm9
-		load xmm6, the_ship, 0, 1
-		to_float xmm9, draw_ship_lx2
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly2
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x2, xmm9
-		load xmm6, the_ship, 8, 1
-		to_float xmm9, draw_ship_lx2
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly2
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y2, xmm9
-		load xmm6, the_ship, 0, 1
-		to_float xmm9, draw_ship_lx3
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly3
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x3, xmm9
-		load xmm6, the_ship, 8, 1
-		to_float xmm9, draw_ship_lx3
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, draw_ship_ly3
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y3, xmm9
+		mov draw_ship_y1, xmm8
+		load xmm0, the_ship, 0, 1
+		mov xmm9, draw_ship_lx2
+		mul xmm9, draw_ship_c
+		mov xmm10, draw_ship_ly2
+		mul xmm10, draw_ship_s
+		sub xmm9, xmm10
+		add xmm0, xmm9
+		invoke trunc, xmm0
+		return xmm11
+		mov draw_ship_x2, xmm11
+		load xmm0, the_ship, 8, 1
+		mov xmm12, draw_ship_lx2
+		mul xmm12, draw_ship_s
+		mov xmm13, draw_ship_ly2
+		mul xmm13, draw_ship_c
+		add xmm12, xmm13
+		add xmm0, xmm12
+		invoke trunc, xmm0
+		return xmm14
+		mov draw_ship_y2, xmm14
+		load xmm0, the_ship, 0, 1
+		mov xmm15, draw_ship_lx3
+		mul xmm15, draw_ship_c
+		mov xmm15, draw_ship_ly3
+		mul xmm15, draw_ship_s
+		sub xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_x3, xmm15
+		load xmm0, the_ship, 8, 1
+		mov xmm15, draw_ship_lx3
+		mul xmm15, draw_ship_s
+		mov xmm15, draw_ship_ly3
+		mul xmm15, draw_ship_c
+		add xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_y3, xmm15
 		invoke set_draw_color, renderer, 255, 255, 255, 255
 		invoke draw_line, renderer, draw_ship_x1, draw_ship_y1, draw_ship_x2, draw_ship_y2
 		invoke draw_line, renderer, draw_ship_x2, draw_ship_y2, draw_ship_x3, draw_ship_y3
@@ -386,82 +371,70 @@ program Space {
 		cmp keyThrust, 0
 		je ELSE_48
 		invoke set_draw_color, renderer, 255, 160, 0, 255
-		load xmm6, the_ship, 0, 1
+		load xmm0, the_ship, 0, 1
 		mov rdx, 0
 		sub rdx, 4
-		to_float xmm9, rdx
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, 8
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x1, xmm9
-		load xmm6, the_ship, 8, 1
+		mov xmm15, rdx
+		mul xmm15, draw_ship_c
+		mov xmm15, 8
+		mul xmm15, draw_ship_s
+		sub xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_x1, xmm15
+		load xmm0, the_ship, 8, 1
 		mov rsi, 0
 		sub rsi, 4
-		to_float xmm9, rsi
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, 8
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y1, xmm9
-		load xmm6, the_ship, 0, 1
-		to_float xmm9, 0
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, 16
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x2, xmm9
-		load xmm6, the_ship, 8, 1
-		to_float xmm9, 0
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, 16
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y2, xmm9
-		load xmm6, the_ship, 0, 1
-		to_float xmm9, 4
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		to_float xmm9, 8
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		sub xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_x3, xmm9
-		load xmm6, the_ship, 8, 1
-		to_float xmm9, 4
-		to_float xmm9, draw_ship_s
-		mul xmm9, xmm9
-		to_float xmm9, 8
-		to_float xmm9, draw_ship_c
-		mul xmm9, xmm9
-		add xmm9, xmm9
-		add xmm6, xmm9
-		invoke trunc, xmm6
-		return xmm9
-		mov draw_ship_y3, xmm9
+		mov xmm15, rsi
+		mul xmm15, draw_ship_s
+		mov xmm15, 8
+		mul xmm15, draw_ship_c
+		add xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_y1, xmm15
+		load xmm0, the_ship, 0, 1
+		mov xmm15, 0
+		mul xmm15, draw_ship_c
+		mov xmm15, 16
+		mul xmm15, draw_ship_s
+		sub xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_x2, xmm15
+		load xmm0, the_ship, 8, 1
+		mov xmm15, 0
+		mul xmm15, draw_ship_s
+		mov xmm15, 16
+		mul xmm15, draw_ship_c
+		add xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_y2, xmm15
+		load xmm0, the_ship, 0, 1
+		mov xmm15, 4
+		mul xmm15, draw_ship_c
+		mov xmm15, 8
+		mul xmm15, draw_ship_s
+		sub xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_x3, xmm15
+		load xmm0, the_ship, 8, 1
+		mov xmm15, 4
+		mul xmm15, draw_ship_s
+		mov xmm15, 8
+		mul xmm15, draw_ship_c
+		add xmm15, xmm15
+		add xmm0, xmm15
+		invoke trunc, xmm0
+		return xmm15
+		mov draw_ship_y3, xmm15
 		invoke draw_line, renderer, draw_ship_x1, draw_ship_y1, draw_ship_x2, draw_ship_y2
 		invoke draw_line, renderer, draw_ship_x2, draw_ship_y2, draw_ship_x3, draw_ship_y3
 		jmp ENDIF_49
@@ -473,7 +446,7 @@ program Space {
 		cmp keyLeft, 0
 		je ELSE_50
 		load xmm0, the_ship, 32, 1
-		mov xmm1, real_const_1
+		mov xmm1, real_const_3
 		sub xmm0, xmm1
 		store xmm0, the_ship, 32, 1
 		jmp ENDIF_51
@@ -482,13 +455,13 @@ program Space {
 		cmp keyRight, 0
 		je ELSE_52
 		load xmm2, the_ship, 32, 1
-		mov xmm3, real_const_1
+		mov xmm3, real_const_3
 		add xmm2, xmm3
 		store xmm2, the_ship, 32, 1
 		jmp ENDIF_53
 	ELSE_52:
 	ENDIF_53:
-		mov xmm4, real_const_2
+		mov xmm4, real_const_4
 		mov update_ship_accel, xmm4
 		cmp keyThrust, 0
 		je ELSE_54
@@ -496,41 +469,37 @@ program Space {
 		load xmm6, the_ship, 32, 1
 		invoke sin, xmm6
 		return xmm7
-		to_float xmm6, update_ship_accel
-		mul xmm7, xmm6
+		mul xmm7, update_ship_accel
 		add xmm5, xmm7
 		store xmm5, the_ship, 16, 1
-		load xmm8, the_ship, 24, 1
-		load xmm9, the_ship, 32, 1
-		invoke cos, xmm9
+		load xmm6, the_ship, 24, 1
+		load xmm8, the_ship, 32, 1
+		invoke cos, xmm8
 		return xmm9
-		to_float xmm9, update_ship_accel
-		mul xmm9, xmm9
-		sub xmm8, xmm9
-		store xmm8, the_ship, 24, 1
+		mul xmm9, update_ship_accel
+		sub xmm6, xmm9
+		store xmm6, the_ship, 24, 1
 		jmp ENDIF_55
 	ELSE_54:
 	ENDIF_55:
-		mov xmm9, real_const_3
-		mov update_ship_drag, xmm9
-		load xmm9, the_ship, 16, 1
-		to_float xmm9, update_ship_drag
-		mul xmm9, xmm9
-		store xmm9, the_ship, 16, 1
-		load xmm9, the_ship, 24, 1
-		to_float xmm9, update_ship_drag
-		mul xmm9, xmm9
-		store xmm9, the_ship, 24, 1
-		load xmm9, the_ship, 0, 1
-		load xmm9, the_ship, 16, 1
-		add xmm9, xmm9
-		store xmm9, the_ship, 0, 1
-		load xmm9, the_ship, 8, 1
-		load xmm9, the_ship, 24, 1
-		add xmm9, xmm9
-		store xmm9, the_ship, 8, 1
-		load xmm9, the_ship, 0, 1
-		mov rcx, xmm9
+		mov xmm8, real_const_5
+		mov update_ship_drag, xmm8
+		load xmm10, the_ship, 16, 1
+		mul xmm10, update_ship_drag
+		store xmm10, the_ship, 16, 1
+		load xmm11, the_ship, 24, 1
+		mul xmm11, update_ship_drag
+		store xmm11, the_ship, 24, 1
+		load xmm12, the_ship, 0, 1
+		load xmm13, the_ship, 16, 1
+		add xmm12, xmm13
+		store xmm12, the_ship, 0, 1
+		load xmm14, the_ship, 8, 1
+		load xmm15, the_ship, 24, 1
+		add xmm14, xmm15
+		store xmm14, the_ship, 8, 1
+		load xmm15, the_ship, 0, 1
+		mov rcx, xmm15
 		cmp rcx, 0
 		jl CMP_TRUE_58
 		mov rbx, 0
@@ -540,15 +509,14 @@ program Space {
 	CMP_END_59:
 		cmp rbx, 0
 		je ELSE_56
-		load xmm9, the_ship, 0, 1
-		to_float xmm9, 640
-		add xmm9, xmm9
-		store xmm9, the_ship, 0, 1
+		load xmm15, the_ship, 0, 1
+		add xmm15, 640
+		store xmm15, the_ship, 0, 1
 		jmp ENDIF_57
 	ELSE_56:
 	ENDIF_57:
-		load xmm9, the_ship, 0, 1
-		mov rdx, xmm9
+		load xmm15, the_ship, 0, 1
+		mov rdx, xmm15
 		cmp rdx, 640
 		jge CMP_TRUE_62
 		mov rcx, 0
@@ -558,15 +526,14 @@ program Space {
 	CMP_END_63:
 		cmp rcx, 0
 		je ELSE_60
-		load xmm9, the_ship, 0, 1
-		to_float xmm9, 640
-		sub xmm9, xmm9
-		store xmm9, the_ship, 0, 1
+		load xmm15, the_ship, 0, 1
+		sub xmm15, 640
+		store xmm15, the_ship, 0, 1
 		jmp ENDIF_61
 	ELSE_60:
 	ENDIF_61:
-		load xmm9, the_ship, 8, 1
-		mov rsi, xmm9
+		load xmm15, the_ship, 8, 1
+		mov rsi, xmm15
 		cmp rsi, 0
 		jl CMP_TRUE_66
 		mov rdx, 0
@@ -576,15 +543,14 @@ program Space {
 	CMP_END_67:
 		cmp rdx, 0
 		je ELSE_64
-		load xmm9, the_ship, 8, 1
-		to_float xmm9, 360
-		add xmm9, xmm9
-		store xmm9, the_ship, 8, 1
+		load xmm15, the_ship, 8, 1
+		add xmm15, 360
+		store xmm15, the_ship, 8, 1
 		jmp ENDIF_65
 	ELSE_64:
 	ENDIF_65:
-		load xmm9, the_ship, 8, 1
-		mov rdi, xmm9
+		load xmm15, the_ship, 8, 1
+		mov rdi, xmm15
 		cmp rdi, 360
 		jge CMP_TRUE_70
 		mov rsi, 0
@@ -594,10 +560,9 @@ program Space {
 	CMP_END_71:
 		cmp rsi, 0
 		je ELSE_68
-		load xmm9, the_ship, 8, 1
-		to_float xmm9, 360
-		sub xmm9, xmm9
-		store xmm9, the_ship, 8, 1
+		load xmm15, the_ship, 8, 1
+		sub xmm15, 360
+		store xmm15, the_ship, 8, 1
 		jmp ENDIF_69
 	ELSE_68:
 	ENDIF_69:

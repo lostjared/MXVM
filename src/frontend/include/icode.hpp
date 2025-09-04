@@ -223,8 +223,8 @@ namespace pascal {
         const std::vector<std::string> ptrRegisters = {
             "arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"
         };
-        const std::vector<std::string> floatRegisters = {"xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7","xmm8","xmm9"};
-
+        const std::vector<std::string> floatRegisters = {"xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7","xmm8","xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"}; 
+        
         std::vector<bool> regInUse;
         std::vector<bool> ptrRegInUse; 
         std::vector<bool> floatRegInUse;
@@ -2115,20 +2115,6 @@ namespace pascal {
         std::string varName = varPtr->name;
         std::string rhs = eval(node.expression.get());
 
-        // Remove explicit conversions - mov will handle them
-        // VarType varType = getVarType(varName);
-        // VarType exprType = getExpressionType(node.expression.get());
-        // if (varType == VarType::DOUBLE && exprType != VarType::DOUBLE && !isFloatReg(rhs)) {
-        //     std::string floatReg = allocFloatReg();
-        //     emit2("to_float", floatReg, rhs);
-        //     if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-        //     rhs = floatReg;
-        // } else if (varType != VarType::DOUBLE && exprType == VarType::DOUBLE && isFloatReg(rhs)) {
-        //     std::string intReg = allocReg();
-        //     emit2("to_int", intReg, rhs);
-        //     if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-        //     rhs = intReg;
-        // }
 
         auto it = currentParamLocations.find(varName);
         if (it != currentParamLocations.end()) {
