@@ -4,6 +4,17 @@
 
 namespace mxvm {
 
+// Helper: release an owned pointer before overwriting it
+static inline void releaseOwnedPointer(Variable& v) {
+    if (v.type == VarType::VAR_POINTER && v.var_value.ptr_value && v.var_value.owns) {
+        std::free(v.var_value.ptr_value);
+        v.var_value.ptr_value = nullptr;
+        v.var_value.owns = false;
+        v.var_value.ptr_size = 0;
+        v.var_value.ptr_count = 0;
+    }
+}
+
     void Program::stop() {
         running = false;
     }
@@ -279,27 +290,47 @@ namespace mxvm {
             std::cerr << "Error: MOV destination: " + instr.op1.op + "  must be a variable, not a constant\n";
             return;
         }
-        Variable& dest = getVariable(instr.op1.op);       
-        dest.var_value.owns = false;
+        Variable& dest = getVariable(instr.op1.op);
+
+        // If dest currently owns a pointer, release it before overwriting
+        releaseOwnedPointer(dest);
+
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
-            dest.var_value = src.var_value; 
-            if (dest.type == VarType::VAR_POINTER) {
+
+            // Numeric conversions (keep old behavior)
+            if (dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_FLOAT) {
+                dest.var_value.int_value = static_cast<int64_t>(src.var_value.float_value);
+                dest.var_value.type = VarType::VAR_INTEGER;
+                return;
+            } else if (dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_INTEGER) {
+                dest.var_value.float_value = static_cast<double>(src.var_value.int_value);
+                dest.var_value.type = VarType::VAR_FLOAT;
+                return;
+            }
+
+            // Plain copy: never duplicate ownership
+            dest.var_value = src.var_value;
+            dest.type = src.type;
+            if (dest.type == VarType::VAR_POINTER || dest.type == VarType::VAR_EXTERN) {
                 dest.var_value.owns = false;
-                dest.type = src.type;
             }
-            if(dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_FLOAT) {
-                dest.var_value.int_value = static_cast<int>(src.var_value.float_value);
-                dest.type = VarType::VAR_INTEGER;
-            } else if(dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_INTEGER) {
-                dest.var_value.float_value = static_cast<float>(src.var_value.int_value);
-                dest.type = VarType::VAR_FLOAT;
-            }
-            
         } else {
-            setVariableFromConstant(dest, instr.op2.op);
+            // Constant -> variable assignment; support pointer nulls
+            if (dest.type == VarType::VAR_POINTER) {
+                std::string v = instr.op2.op;
+                if (v == "null" || v == "NULL" || v == "0") {
+                    dest.var_value.ptr_value = nullptr;
+                } else {
+                    uintptr_t addr = std::stoull(v, nullptr, 0);
+                    dest.var_value.ptr_value = reinterpret_cast<void*>(addr);
+                }
+                dest.var_value.type = VarType::VAR_POINTER;
+                dest.var_value.owns = false;
+            } else {
+                setVariableFromConstant(dest, instr.op2.op);
+            }
         }
-       
     }
 
     void Program::exec_add(const Instruction& instr) {
@@ -998,8 +1029,11 @@ namespace mxvm {
         }
         Variable& var = getVariable(instr.op1.op);
         if (var.type == VarType::VAR_POINTER && var.var_value.ptr_value != nullptr) {
-            free(var.var_value.ptr_value);
+            std::free(var.var_value.ptr_value);
             var.var_value.ptr_value = nullptr;
+            var.var_value.owns = false;         // prevent double free later
+            var.var_value.ptr_size = 0;
+            var.var_value.ptr_count = 0;
         }
     }
 
@@ -1633,6 +1667,15 @@ namespace mxvm {
         } else if (var.type == VarType::VAR_STRING) {
             var.var_value.str_value = value;
             var.var_value.type = VarType::VAR_STRING;
+        } else if (var.type == VarType::VAR_POINTER) {
+            if (value == "null" || value == "NULL" || value == "0") {
+                var.var_value.ptr_value = nullptr;
+            } else {
+                uintptr_t addr = std::stoull(value, nullptr, 0);
+                var.var_value.ptr_value = reinterpret_cast<void*>(addr);
+            }
+            var.var_value.type = VarType::VAR_POINTER;
+            var.var_value.owns = false;
         }
     }
 
