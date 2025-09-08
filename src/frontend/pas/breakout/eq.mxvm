@@ -1,0 +1,27 @@
+program eq {
+	section module {
+ 
+	}
+	section data {
+		int rax = 0
+		float xmm0 = 0.0
+		string fmt_float = "%.6f "
+		string newline = "\n"
+		float x = 0.0
+		float y = 0.0
+		float z = 0.0
+	}
+	section code {
+	start:
+		mov x, 1
+		mov y, 5
+		mov z, 10
+		mov xmm0, y
+		mul xmm0, z
+		mov x, xmm0
+		print fmt_float, x
+		print newline
+		done
+	}
+}
+

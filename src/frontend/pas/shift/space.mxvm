@@ -181,63 +181,63 @@ program AppSkeleton {
 	IDX_OOB_28:
 		exit 1
 	IDX_OK_27:
-		mov rdx, 0
-		store 255, color, rdx, 8
-		mov rdx, 1
-		mov rsi, rdx
-		cmp rsi, 0
+		mov rcx, 0
+		store 255, color, rcx, 8
+		mov rcx, 1
+		mov rdx, rcx
+		cmp rdx, 0
 		jl IDX_OOB_30
-		cmp rsi, 3
+		cmp rdx, 3
 		jg IDX_OOB_30
 		jmp IDX_OK_29
 	IDX_OOB_30:
 		exit 1
 	IDX_OK_29:
-		mov rdi, 1
-		store 255, color, rdi, 8
-		mov rdi, 2
-		mov r8, rdi
-		cmp r8, 0
+		mov rdx, 1
+		store 255, color, rdx, 8
+		mov rdx, 2
+		mov rsi, rdx
+		cmp rsi, 0
 		jl IDX_OOB_32
-		cmp r8, 3
+		cmp rsi, 3
 		jg IDX_OOB_32
 		jmp IDX_OK_31
 	IDX_OOB_32:
 		exit 1
 	IDX_OK_31:
-		mov r9, 2
-		store 0, color, r9, 8
+		mov rsi, 2
+		store 0, color, rsi, 8
 		jmp CASE_END_20
 	CASE_1_22:
-		mov r9, 0
-		mov r10, r9
-		cmp r10, 0
+		mov rsi, 0
+		mov rdi, rsi
+		cmp rdi, 0
 		jl IDX_OOB_34
-		cmp r10, 3
+		cmp rdi, 3
 		jg IDX_OOB_34
 		jmp IDX_OK_33
 	IDX_OOB_34:
 		exit 1
 	IDX_OK_33:
-		mov r9, 0
-		store 255, color, r9, 8
-		mov r9, 1
-		mov r11, r9
-		cmp r11, 0
+		mov rdi, 0
+		store 255, color, rdi, 8
+		mov rdi, 1
+		mov r8, rdi
+		cmp r8, 0
 		jl IDX_OOB_36
-		cmp r11, 3
+		cmp r8, 3
 		jg IDX_OOB_36
 		jmp IDX_OK_35
 	IDX_OOB_36:
 		exit 1
 	IDX_OK_35:
-		mov r9, 1
-		store 0, color, r9, 8
-		mov r9, 2
-		mov r12, r9
-		cmp r12, 0
+		mov r8, 1
+		store 0, color, r8, 8
+		mov r8, 2
+		mov r9, r8
+		cmp r9, 0
 		jl IDX_OOB_38
-		cmp r12, 3
+		cmp r9, 3
 		jg IDX_OOB_38
 		jmp IDX_OK_37
 	IDX_OOB_38:
@@ -248,281 +248,225 @@ program AppSkeleton {
 		jmp CASE_END_20
 	CASE_2_23:
 		mov r9, 0
-		mov r13, r9
-		cmp r13, 0
+		mov r10, r9
+		cmp r10, 0
 		jl IDX_OOB_40
-		cmp r13, 3
+		cmp r10, 3
 		jg IDX_OOB_40
 		jmp IDX_OK_39
 	IDX_OOB_40:
 		exit 1
 	IDX_OK_39:
-		mov r9, 0
-		store 0, color, r9, 8
-		mov r9, 1
-		mov r14, r9
-		cmp r14, 0
+		mov r10, 0
+		store 0, color, r10, 8
+		mov r10, 1
+		mov r11, r10
+		cmp r11, 0
 		jl IDX_OOB_42
-		cmp r14, 3
+		cmp r11, 3
 		jg IDX_OOB_42
 		jmp IDX_OK_41
 	IDX_OOB_42:
 		exit 1
 	IDX_OK_41:
-		mov r9, 1
-		store 255, color, r9, 8
-		mov r9, 2
-		mov r15, r9
-		cmp r15, 0
+		mov r11, 1
+		store 255, color, r11, 8
+		mov r11, 2
+		mov r12, r11
+		cmp r12, 0
 		jl IDX_OOB_44
-		cmp r15, 3
+		cmp r12, 3
 		jg IDX_OOB_44
 		jmp IDX_OK_43
 	IDX_OOB_44:
 		exit 1
 	IDX_OK_43:
-		mov r9, 2
-		store 0, color, r9, 8
+		mov r12, 2
+		store 0, color, r12, 8
 		jmp CASE_END_20
 	CASE_3_24:
-		mov r9, 0
-		mov r10, r9
-		cmp r10, 0
+		mov r12, 0
+		mov r13, r12
+		cmp r13, 0
 		jl IDX_OOB_46
-		cmp r10, 3
+		cmp r13, 3
 		jg IDX_OOB_46
 		jmp IDX_OK_45
 	IDX_OOB_46:
 		exit 1
 	IDX_OK_45:
-		mov r9, 0
-		store 0, color, r9, 8
-		mov r9, 1
-		mov r11, r9
-		cmp r11, 0
+		mov r13, 0
+		store 0, color, r13, 8
+		mov r13, 1
+		mov r14, r13
+		cmp r14, 0
 		jl IDX_OOB_48
-		cmp r11, 3
+		cmp r14, 3
 		jg IDX_OOB_48
 		jmp IDX_OK_47
 	IDX_OOB_48:
 		exit 1
 	IDX_OK_47:
-		mov r9, 1
-		store 0, color, r9, 8
-		mov r9, 2
-		mov r12, r9
-		cmp r12, 0
+		mov r14, 1
+		store 0, color, r14, 8
+		mov r14, 2
+		mov r15, r14
+		cmp r15, 0
 		jl IDX_OOB_50
-		cmp r12, 3
+		cmp r15, 3
 		jg IDX_OOB_50
 		jmp IDX_OK_49
 	IDX_OOB_50:
 		exit 1
 	IDX_OK_49:
-		mov r9, 2
-		store 255, color, r9, 8
+		mov r15, 2
+		store 255, color, r15, 8
 		jmp CASE_END_20
 	CASE_4_25:
-		mov r9, 0
-		mov r13, r9
-		cmp r13, 0
+		mov r15, 0
+		mov r10, r15
+		cmp r10, 0
 		jl IDX_OOB_52
-		cmp r13, 3
+		cmp r10, 3
 		jg IDX_OOB_52
 		jmp IDX_OK_51
 	IDX_OOB_52:
 		exit 1
 	IDX_OK_51:
-		mov r9, 0
-		store 255, color, r9, 8
-		mov r9, 1
-		mov r14, r9
-		cmp r14, 0
+		mov r10, 0
+		store 255, color, r10, 8
+		mov r10, 1
+		mov r11, r10
+		cmp r11, 0
 		jl IDX_OOB_54
-		cmp r14, 3
+		cmp r11, 3
 		jg IDX_OOB_54
 		jmp IDX_OK_53
 	IDX_OOB_54:
 		exit 1
 	IDX_OK_53:
-		mov r9, 1
-		store 255, color, r9, 8
-		mov r9, 2
-		mov r15, r9
-		cmp r15, 0
+		mov r11, 1
+		store 255, color, r11, 8
+		mov r11, 2
+		mov r12, r11
+		cmp r12, 0
 		jl IDX_OOB_56
-		cmp r15, 3
+		cmp r12, 3
 		jg IDX_OOB_56
 		jmp IDX_OK_55
 	IDX_OOB_56:
 		exit 1
 	IDX_OK_55:
-		mov r9, 2
-		store 255, color, r9, 8
+		mov r12, 2
+		store 255, color, r12, 8
 		jmp CASE_END_20
 	CASE_END_20:
 	PROC_END_setcolor:
 		ret
 	function PROC_shift_array_left_wrap:
 		mov rbx, 0
-		mov rcx, rbx
-		cmp rcx, 0
-		jl IDX_OOB_58
-		cmp rcx, 528
-		jg IDX_OOB_58
-		jmp IDX_OK_57
-	IDX_OOB_58:
-		exit 1
-	IDX_OK_57:
-		mov rdx, 0
-		load rsi, blocks, rdx, 8
-		mov shift_array_left_wrap_first, rsi
+		load rcx, blocks, rbx, 8
+		mov shift_array_left_wrap_first, rcx
 		mov shift_array_left_wrap_iq, 0
-	FOR_59:
-		mov rdx, 527
-		cmp shift_array_left_wrap_iq, rdx
-		jg ENDFOR_60
-		mov rdi, shift_array_left_wrap_iq
-		add rdi, 1
-		mov r8, rdi
+	FOR_57:
+		mov rbx, 527
+		cmp shift_array_left_wrap_iq, rbx
+		jg ENDFOR_58
+		mov rdx, shift_array_left_wrap_iq
+		add rdx, 1
+		mov rsi, rdx
+		load rdi, blocks, rsi, 8
+		mov rsi, shift_array_left_wrap_iq
+		mov r8, rsi
+		cmp r8, 0
+		jl IDX_OOB_61
+		cmp r8, 528
+		jg IDX_OOB_61
+		jmp IDX_OK_60
+	IDX_OOB_61:
+		exit 1
+	IDX_OK_60:
+		mov r8, shift_array_left_wrap_iq
+		store rdi, blocks, r8, 8
+	FOR_CONTINUE_59:
+		add shift_array_left_wrap_iq, 1
+		jmp FOR_57
+	ENDFOR_58:
+		mov r8, 528
 		mov r9, r8
 		cmp r9, 0
-		jl IDX_OOB_62
+		jl IDX_OOB_63
 		cmp r9, 528
-		jg IDX_OOB_62
-		jmp IDX_OK_61
-	IDX_OOB_62:
+		jg IDX_OOB_63
+		jmp IDX_OK_62
+	IDX_OOB_63:
 		exit 1
-	IDX_OK_61:
-		mov r10, rdi
-		load r11, blocks, r10, 8
-		mov r10, shift_array_left_wrap_iq
-		mov r12, r10
-		cmp r12, 0
-		jl IDX_OOB_64
-		cmp r12, 528
-		jg IDX_OOB_64
-		jmp IDX_OK_63
-	IDX_OOB_64:
-		exit 1
-	IDX_OK_63:
-		mov r10, shift_array_left_wrap_iq
-		store r11, blocks, r10, 8
-		add shift_array_left_wrap_iq, 1
-		jmp FOR_59
-	ENDFOR_60:
-		mov r10, 528
-		mov r11, r10
-		cmp r11, 0
-		jl IDX_OOB_66
-		cmp r11, 528
-		jg IDX_OOB_66
-		jmp IDX_OK_65
-	IDX_OOB_66:
-		exit 1
-	IDX_OK_65:
-		mov r10, 528
-		store shift_array_left_wrap_first, blocks, r10, 8
+	IDX_OK_62:
+		mov r9, 528
+		store shift_array_left_wrap_first, blocks, r9, 8
 	PROC_END_shift_array_left_wrap:
 		ret
 	function PROC_render:
 		invoke set_render_target, renderer, target_id
 		mov render_iy, 0
-	FOR_67:
+	FOR_64:
 		mov rbx, 21
 		cmp render_iy, rbx
-		jg ENDFOR_68
+		jg ENDFOR_65
 		mov render_ix, 0
-	FOR_69:
+	FOR_67:
 		mov rcx, 20
 		cmp render_ix, rcx
-		jg ENDFOR_70
+		jg ENDFOR_68
 		mov rbx, render_ix
 		mov rcx, render_iy
 		call FUNC_indexAt
 		mov rdx, rax
 		mov rsi, rdx
-		mov rdi, rsi
-		cmp rdi, 0
-		jl IDX_OOB_72
-		cmp rdi, 528
-		jg IDX_OOB_72
-		jmp IDX_OK_71
-	IDX_OOB_72:
-		exit 1
-	IDX_OK_71:
-		mov r8, rdx
-		load r9, blocks, r8, 8
-		mov render_block, r9
+		load rdi, blocks, rsi, 8
+		mov render_block, rdi
 		mov rbx, render_block
 		call PROC_setcolor
-		mov r8, 0
-		mov r9, r8
-		cmp r9, 0
-		jl IDX_OOB_74
-		cmp r9, 3
-		jg IDX_OOB_74
-		jmp IDX_OK_73
-	IDX_OOB_74:
-		exit 1
-	IDX_OK_73:
-		mov r10, 0
-		load r11, color, r10, 8
-		mov r10, 1
-		mov r12, r10
-		cmp r12, 0
-		jl IDX_OOB_76
-		cmp r12, 3
-		jg IDX_OOB_76
-		jmp IDX_OK_75
-	IDX_OOB_76:
-		exit 1
-	IDX_OK_75:
-		mov r10, 1
-		load r13, color, r10, 8
-		mov r10, 2
-		mov r14, r10
-		cmp r14, 0
-		jl IDX_OOB_78
-		cmp r14, 3
-		jg IDX_OOB_78
-		jmp IDX_OK_77
-	IDX_OOB_78:
-		exit 1
-	IDX_OK_77:
-		mov r10, 2
-		load r15, color, r10, 8
-		invoke set_draw_color, renderer, r11, r13, r15, 255
-		mov r10, render_ix
-		mul r10, 32
-		mov r11, render_iy
-		mul r11, 16
-		invoke fill_rect, renderer, r10, r11, 32, 16
+		mov rsi, 0
+		load r8, color, rsi, 8
+		mov rsi, 1
+		load r9, color, rsi, 8
+		mov rsi, 2
+		load r10, color, rsi, 8
+		invoke set_draw_color, renderer, r8, r9, r10, 255
+		mov rsi, render_ix
+		mul rsi, 32
+		mov r8, render_iy
+		mul r8, 16
+		invoke fill_rect, renderer, rsi, r8, 32, 16
+	FOR_CONTINUE_69:
 		add render_ix, 1
-		jmp FOR_69
-	ENDFOR_70:
-		add render_iy, 1
 		jmp FOR_67
 	ENDFOR_68:
+	FOR_CONTINUE_66:
+		add render_iy, 1
+		jmp FOR_64
+	ENDFOR_65:
+		invoke rand
+		return rsi
+		mov r8, rsi
+		mod r8, 255
+		invoke rand
+		return r9
+		mod r9, 255
 		invoke rand
 		return r10
 		mod r10, 255
-		invoke rand
-		return r11
-		mod r11, 255
-		invoke rand
-		return r13
-		mod r13, 255
-		invoke draw_text, renderer, font_id, str_2, 15, 15, r10, r11, r13, 255
+		invoke draw_text, renderer, font_id, str_2, 15, 15, r8, r9, r10, 255
 		call PROC_shift_array_left_wrap
 	PROC_END_render:
 		ret
 	function PROC_init_array:
 		mov init_array_index, 0
-	FOR_79:
+	FOR_70:
 		mov rbx, 527
 		cmp init_array_index, rbx
-		jg ENDFOR_80
+		jg ENDFOR_71
 		invoke rand
 		return rcx
 		mov rdx, rcx
@@ -530,18 +474,19 @@ program AppSkeleton {
 		mov rsi, init_array_index
 		mov rdi, rsi
 		cmp rdi, 0
-		jl IDX_OOB_82
+		jl IDX_OOB_74
 		cmp rdi, 528
-		jg IDX_OOB_82
-		jmp IDX_OK_81
-	IDX_OOB_82:
+		jg IDX_OOB_74
+		jmp IDX_OK_73
+	IDX_OOB_74:
 		exit 1
-	IDX_OK_81:
-		mov r8, init_array_index
-		store rdx, blocks, r8, 8
+	IDX_OK_73:
+		mov rdi, init_array_index
+		store rdx, blocks, rdi, 8
+	FOR_CONTINUE_72:
 		add init_array_index, 1
-		jmp FOR_79
-	ENDFOR_80:
+		jmp FOR_70
+	ENDFOR_71:
 	PROC_END_init_array:
 		ret
 	function PROC_init:
@@ -554,20 +499,20 @@ program AppSkeleton {
 		return rbx
 		mov init_result, rbx
 		cmp init_result, 0
-		jne CMP_TRUE_85
+		jne CMP_TRUE_77
 		mov rcx, 0
-		jmp CMP_END_86
-	CMP_TRUE_85:
+		jmp CMP_END_78
+	CMP_TRUE_77:
 		mov rcx, 1
-	CMP_END_86:
+	CMP_END_78:
 		cmp rcx, 0
-		je ELSE_83
+		je ELSE_75
 		print fmt_str, str_3
 		print newline
 		exit 1
-		jmp ENDIF_84
-	ELSE_83:
-	ENDIF_84:
+		jmp ENDIF_76
+	ELSE_75:
+	ENDIF_76:
 		invoke create_window, title, init_x, init_y, init_w, init_h, 4
 		return rdx
 		mov window_id, rdx
@@ -575,21 +520,21 @@ program AppSkeleton {
 		sub rsi, 1
 		mov r8, rsi
 		cmp window_id, r8
-		je CMP_TRUE_89
+		je CMP_TRUE_81
 		mov rdi, 0
-		jmp CMP_END_90
-	CMP_TRUE_89:
+		jmp CMP_END_82
+	CMP_TRUE_81:
 		mov rdi, 1
-	CMP_END_90:
+	CMP_END_82:
 		cmp rdi, 0
-		je ELSE_87
+		je ELSE_79
 		print fmt_str, str_4
 		print newline
 		invoke quit
 		exit 1
-		jmp ENDIF_88
-	ELSE_87:
-	ENDIF_88:
+		jmp ENDIF_80
+	ELSE_79:
+	ENDIF_80:
 		mov r8, 0
 		sub r8, 1
 		invoke create_renderer, window_id, r8, 2
@@ -599,22 +544,22 @@ program AppSkeleton {
 		sub r8, 1
 		mov r10, r8
 		cmp renderer, r10
-		je CMP_TRUE_93
+		je CMP_TRUE_85
 		mov r9, 0
-		jmp CMP_END_94
-	CMP_TRUE_93:
+		jmp CMP_END_86
+	CMP_TRUE_85:
 		mov r9, 1
-	CMP_END_94:
+	CMP_END_86:
 		cmp r9, 0
-		je ELSE_91
+		je ELSE_83
 		print fmt_str, str_5
 		print newline
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_92
-	ELSE_91:
-	ENDIF_92:
+		jmp ENDIF_84
+	ELSE_83:
+	ENDIF_84:
 		invoke create_render_target, renderer, 640, 360
 		return r9
 		mov target_id, r9
@@ -622,6 +567,51 @@ program AppSkeleton {
 		sub r9, 1
 		mov r11, r9
 		cmp target_id, r11
+		je CMP_TRUE_89
+		mov r10, 0
+		jmp CMP_END_90
+	CMP_TRUE_89:
+		mov r10, 1
+	CMP_END_90:
+		cmp r10, 0
+		je ELSE_87
+		print fmt_str, str_6
+		print newline
+		invoke destroy_window, window_id
+		invoke destroy_renderer, renderer
+		exit 1
+		invoke quit
+		jmp ENDIF_88
+	ELSE_87:
+	ENDIF_88:
+		invoke get_ticks
+		return r9
+		invoke srand, r9
+		invoke init_text
+		return r9
+		mov r11, r9
+		cmp r11, 1
+		jne CMP_TRUE_93
+		mov r10, 0
+		jmp CMP_END_94
+	CMP_TRUE_93:
+		mov r10, 1
+	CMP_END_94:
+		cmp r10, 0
+		je ELSE_91
+		print fmt_str, str_7
+		print newline
+		exit 1
+		jmp ENDIF_92
+	ELSE_91:
+	ENDIF_92:
+		invoke load_font, filename, 32
+		return r9
+		mov font_id, r9
+		mov r9, 0
+		sub r9, 1
+		mov r11, r9
+		cmp font_id, r11
 		je CMP_TRUE_97
 		mov r10, 0
 		jmp CMP_END_98
@@ -630,58 +620,13 @@ program AppSkeleton {
 	CMP_END_98:
 		cmp r10, 0
 		je ELSE_95
-		print fmt_str, str_6
-		print newline
-		invoke destroy_window, window_id
-		invoke destroy_renderer, renderer
-		exit 1
-		invoke quit
-		jmp ENDIF_96
-	ELSE_95:
-	ENDIF_96:
-		invoke get_ticks
-		return r9
-		invoke srand, r9
-		invoke init_text
-		return r9
-		mov r11, r9
-		cmp r11, 1
-		jne CMP_TRUE_101
-		mov r10, 0
-		jmp CMP_END_102
-	CMP_TRUE_101:
-		mov r10, 1
-	CMP_END_102:
-		cmp r10, 0
-		je ELSE_99
-		print fmt_str, str_7
-		print newline
-		exit 1
-		jmp ENDIF_100
-	ELSE_99:
-	ENDIF_100:
-		invoke load_font, filename, 32
-		return r9
-		mov font_id, r9
-		mov r9, 0
-		sub r9, 1
-		mov r11, r9
-		cmp font_id, r11
-		je CMP_TRUE_105
-		mov r10, 0
-		jmp CMP_END_106
-	CMP_TRUE_105:
-		mov r10, 1
-	CMP_END_106:
-		cmp r10, 0
-		je ELSE_103
 		print fmt_str, str_8
 		print fmt_str, filename
 		print newline
 		exit 1
-		jmp ENDIF_104
-	ELSE_103:
-	ENDIF_104:
+		jmp ENDIF_96
+	ELSE_95:
+	ENDIF_96:
 		call PROC_init_array
 	PROC_END_init:
 		ret
