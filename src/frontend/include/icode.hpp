@@ -223,11 +223,17 @@ namespace pascal {
         const std::vector<std::string> ptrRegisters = {
             "arg0","arg1","arg2","arg3","arg4","arg5","arg6","arg7","arg8","arg9"
         };
-        const std::vector<std::string> floatRegisters = {"xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7","xmm8","xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"}; 
+        std::vector<std::string> floatRegisters;
+        std::vector<bool> floatRegInUse;
+        int nextFloatRegIndex = 0;
         
+        void initializeFloatRegisters() {
+            floatRegisters = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"};
+            floatRegInUse.resize(floatRegisters.size(), false);
+        }
+
         std::vector<bool> regInUse;
         std::vector<bool> ptrRegInUse; 
-        std::vector<bool> floatRegInUse;
 
         std::vector<std::pair<FuncDeclNode*, std::vector<std::string>>> deferredFuncs;
         std::string currentFunctionName;
@@ -291,6 +297,23 @@ namespace pascal {
             ptrRegInUse[i] = true;
             return ptrRegisters[i];
         }
+        std::string allocFloatReg() {
+            for (size_t i = 0; i < floatRegInUse.size(); ++i) {
+                if (!floatRegInUse[i]) {
+                    floatRegInUse[i] = true;
+                    return floatRegisters[i];
+                }
+            }
+            expandFloatRegisters();
+            size_t newIndex = floatRegisters.size() - 1;
+            floatRegInUse[newIndex] = true;
+            return floatRegisters[newIndex];
+        }
+
+        void expandFloatRegisters() {
+            int currentSize = floatRegisters.size();
+            floatRegisters.push_back("xmm" + std::to_string(currentSize));
+        }
         
         void freePtrReg(const std::string& reg) {
             for (size_t i = 0; i < ptrRegisters.size(); ++i)
@@ -301,13 +324,6 @@ namespace pascal {
             for (size_t i = 0; i < registers.size(); ++i)
             if (registers[i] == reg) { regInUse[i] = false; return; }
             freePtrReg(reg);
-        }
-        std::string allocFloatReg() {
-            for (size_t i = 0; i < floatRegInUse.size(); ++i)
-                if (!floatRegInUse[i]) { floatRegInUse[i] = true; return floatRegisters[i]; }
-            size_t i = floatRegisters.size()-1;
-            floatRegInUse[i] = true;
-            return floatRegisters[i];
         }
         void freeFloatReg(const std::string& reg) {
             for (size_t i = 0; i < floatRegisters.size(); ++i)
@@ -645,12 +661,7 @@ namespace pascal {
         
         BuiltinFunctionRegistry builtinRegistry;
         
-        CodeGenVisitor()
-        : regInUse(registers.size(), false),
-        ptrRegInUse(ptrRegisters.size(), false), 
-        floatRegInUse(floatRegisters.size(), false) {
-            initializeBuiltins();
-        }
+        CodeGenVisitor();
         virtual ~CodeGenVisitor() = default;
         
         void initializeBuiltins() {
@@ -778,9 +789,10 @@ namespace pascal {
                         }
                     }
                 }
-                for (size_t r=0;r<regInUse.size();++r) regInUse[r]=false;
-                for (size_t r=0;r<ptrRegInUse.size();++r) ptrRegInUse[r]=false;
-                for (size_t r=0;r<floatRegInUse.size();++r) floatRegInUse[r]=false;
+
+                for (size_t r = 0; r < regInUse.size(); ++r) regInUse[r] = false;
+                for (size_t r = 0; r < ptrRegInUse.size(); ++r) ptrRegInUse[r] = false;
+                for (size_t r = 0; r < floatRegInUse.size(); ++r) floatRegInUse[r] = false;
                 for(const auto& pair : currentParamLocations) {
                     for(size_t reg_idx = 0; reg_idx < registers.size(); ++reg_idx) {
                         if (registers[reg_idx] == pair.second) { regInUse[reg_idx] = true; break; }
@@ -923,11 +935,21 @@ namespace pascal {
             out << "program " << name << " {\n";
             out << "\tsection module {\n ";
             bool first = true;
-            for (const auto& mod : usedModules) { if (!first) out << ",\n"; out << "\t\t" << mod; first = false; }
+            for (const auto& mod : usedModules) { 
+                if (!first) out << ",\n"; 
+                out << "\t\t" << mod; 
+                first = false; 
+            }
             out << "\n\t}\n";
             out << "\tsection data {\n";
-            for (const auto& reg : registers) out << "\t\tint " << reg << " = 0\n";
-            for (const auto& floatReg : floatRegisters) out << "\t\tfloat " << floatReg << " = 0.0\n";
+    
+            for (const auto& reg : registers) 
+                out << "\t\tint " << reg << " = 0\n";
+            
+            for (size_t i = 0; i < floatRegisters.size(); ++i) {
+                out << "\t\tfloat " << floatRegisters[i] << " = 0.0\n";
+            }
+    
             {
                 std::set<std::string> temps;
                 for (const auto& p : ptrRegisters) temps.insert(p);
@@ -1577,4 +1599,3 @@ namespace pascal {
 } 
 #endif
 
-      
