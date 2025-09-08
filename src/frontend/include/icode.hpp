@@ -1,3 +1,4 @@
+
 #ifndef __CODEGEN_H_
 #define __CODEGEN_H_
 #include "ast.hpp"
@@ -1598,4 +1599,3 @@ namespace pascal {
 
 } 
 #endif
-

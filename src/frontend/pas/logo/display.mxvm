@@ -87,8 +87,7 @@ program AppSkeleton {
 	CMP_TRUE_10:
 		mov r9, 1
 	CMP_END_11:
-		mov r10, r9
-		cmp r10, 0
+		cmp r9, 0
 		je ELSE_8
 		mov r9, 0
 		mov running, r9
@@ -121,8 +120,7 @@ program AppSkeleton {
 	AND_ZERO_18:
 		mov r10, 0
 	AND_END_19:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_12
 		mov r9, 0
 		mov running, r9
@@ -150,6 +148,7 @@ program AppSkeleton {
 		mov rsi, 0
 		sub rsi, 1
 		invoke render_texture, renderer, logo_id, rbx, rcx, rdx, rsi, 0, 0, 640, 480
+	PROC_END_render:
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -167,8 +166,7 @@ program AppSkeleton {
 	CMP_TRUE_22:
 		mov rcx, 1
 	CMP_END_23:
-		mov rdx, rcx
-		cmp rdx, 0
+		cmp rcx, 0
 		je ELSE_20
 		print fmt_str, str_2
 		print newline
@@ -177,20 +175,19 @@ program AppSkeleton {
 	ELSE_20:
 	ENDIF_21:
 		invoke create_window, title, init_x, init_y, init_w, init_h, 4
-		return rsi
-		mov window_id, rsi
-		mov rdi, 0
-		sub rdi, 1
-		mov r9, rdi
-		cmp window_id, r9
+		return rdx
+		mov window_id, rdx
+		mov rsi, 0
+		sub rsi, 1
+		mov r8, rsi
+		cmp window_id, r8
 		je CMP_TRUE_26
-		mov r8, 0
+		mov rdi, 0
 		jmp CMP_END_27
 	CMP_TRUE_26:
-		mov r8, 1
+		mov rdi, 1
 	CMP_END_27:
-		mov r9, r8
-		cmp r9, 0
+		cmp rdi, 0
 		je ELSE_24
 		print fmt_str, str_3
 		print newline
@@ -199,22 +196,21 @@ program AppSkeleton {
 		jmp ENDIF_25
 	ELSE_24:
 	ENDIF_25:
-		mov r9, 0
-		sub r9, 1
-		invoke create_renderer, window_id, r9, 2
-		return r10
-		mov renderer, r10
-		mov r9, 0
-		sub r9, 1
-		mov r11, r9
-		cmp renderer, r11
+		mov r8, 0
+		sub r8, 1
+		invoke create_renderer, window_id, r8, 2
+		return r9
+		mov renderer, r9
+		mov r8, 0
+		sub r8, 1
+		mov r10, r8
+		cmp renderer, r10
 		je CMP_TRUE_30
-		mov r10, 0
+		mov r9, 0
 		jmp CMP_END_31
 	CMP_TRUE_30:
-		mov r10, 1
+		mov r9, 1
 	CMP_END_31:
-		mov r9, r10
 		cmp r9, 0
 		je ELSE_28
 		print fmt_str, str_4
@@ -238,8 +234,7 @@ program AppSkeleton {
 	CMP_TRUE_34:
 		mov r10, 1
 	CMP_END_35:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_32
 		print fmt_str, str_5
 		print newline
@@ -266,8 +261,7 @@ program AppSkeleton {
 	CMP_TRUE_38:
 		mov r10, 1
 	CMP_END_39:
-		mov r9, r10
-		cmp r9, 0
+		cmp r10, 0
 		je ELSE_36
 		print fmt_str, str_6
 		print fmt_str, filename
@@ -276,6 +270,7 @@ program AppSkeleton {
 		jmp ENDIF_37
 	ELSE_36:
 	ENDIF_37:
+	PROC_END_init:
 		ret
 	function PROC_cleanup:
 		invoke destroy_texture, logo_id
@@ -283,6 +278,7 @@ program AppSkeleton {
 		invoke destroy_renderer, renderer
 		invoke destroy_window, window_id
 		invoke quit
+	PROC_END_cleanup:
 		ret
 	}
 }
