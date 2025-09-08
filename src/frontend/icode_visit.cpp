@@ -2,6 +2,14 @@
 
 namespace pascal {
 
+    CodeGenVisitor::CodeGenVisitor()
+        : regInUse(registers.size(), false),
+          ptrRegInUse(ptrRegisters.size(), false) {
+        initializeFloatRegisters();
+        initializeBuiltins();
+    }
+
+
     void CodeGenVisitor::visit(ProgramNode& node) {
         name = node.name;
         if (node.block) {
@@ -1198,4 +1206,5 @@ namespace pascal {
             emit1("jmp", loopContinueLabels.back());
         }
     }
+
 }
