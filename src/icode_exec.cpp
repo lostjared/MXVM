@@ -4,7 +4,7 @@
 
 namespace mxvm {
 
-// Helper: release an owned pointer before overwriting it
+
 static inline void releaseOwnedPointer(Variable& v) {
     if (v.type == VarType::VAR_POINTER && v.var_value.ptr_value && v.var_value.owns) {
         std::free(v.var_value.ptr_value);
@@ -292,13 +292,13 @@ static inline void releaseOwnedPointer(Variable& v) {
         }
         Variable& dest = getVariable(instr.op1.op);
 
-        // If dest currently owns a pointer, release it before overwriting
+        
         releaseOwnedPointer(dest);
 
         if (isVariable(instr.op2.op)) {
             Variable& src = getVariable(instr.op2.op);
 
-            // Numeric conversions (keep old behavior)
+            
             if (dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_FLOAT) {
                 dest.var_value.int_value = static_cast<int64_t>(src.var_value.float_value);
                 dest.var_value.type = VarType::VAR_INTEGER;
@@ -309,14 +309,14 @@ static inline void releaseOwnedPointer(Variable& v) {
                 return;
             }
 
-            // Plain copy: never duplicate ownership
+            
             dest.var_value = src.var_value;
             dest.type = src.type;
             if (dest.type == VarType::VAR_POINTER || dest.type == VarType::VAR_EXTERN) {
                 dest.var_value.owns = false;
             }
         } else {
-            // Constant -> variable assignment; support pointer nulls
+            
             if (dest.type == VarType::VAR_POINTER) {
                 std::string v = instr.op2.op;
                 if (v == "null" || v == "NULL" || v == "0") {
@@ -782,108 +782,51 @@ static inline void releaseOwnedPointer(Variable& v) {
         }
         Variable& dest = getVariable(instr.op1.op);
         void* ptr = nullptr;
-        size_t index = 0;
-        size_t stride = 8; 
+        size_t allocated_size = 0;
+        
+        bool is_string_source = false;
 
         if (isVariable(instr.op2.op)) {
             Variable& ptrVar = getVariable(instr.op2.op);
             if (ptrVar.type != VarType::VAR_POINTER && ptrVar.type != VarType::VAR_STRING) {
                 throw mx::Exception("LOAD source must be a valid pointer/string buffer");
             }
-            if(ptrVar.type == VarType::VAR_POINTER)
+            if(ptrVar.type == VarType::VAR_POINTER) {
                 ptr = ptrVar.var_value.ptr_value;
-            else
+                allocated_size = ptrVar.var_value.ptr_size * ptrVar.var_value.ptr_count;
+            } else {
+                
                 ptr = (void*)ptrVar.var_value.str_value.data();
+                allocated_size = ptrVar.var_value.str_value.size() + 1;
+                is_string_source = true;
+            }
         } else {
             throw mx::Exception("LOAD source must be a pointer variable");
         }
 
-        if (!instr.op3.op.empty()) {
-            if (isVariable(instr.op3.op)) {
-                index = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
-            } else {
-                index = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
-            }
-        }
-
-        if (!instr.vop.empty() && !instr.vop[0].op.empty()) {
-            const auto& sizeOp = instr.vop[0];
-            if (isVariable(sizeOp.op)) {
-                stride = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
-            } else {
-                stride = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
-            }
-        } 
-
-        char* base = static_cast<char*>(ptr) + index * stride;
-        switch (dest.type) {
-            case VarType::VAR_INTEGER:
-            case VarType::VAR_BYTE:
-                dest.var_value.int_value = *reinterpret_cast<int64_t*>(base);
-                dest.var_value.type = dest.type;
-                break;
-            case VarType::VAR_FLOAT:
-                dest.var_value.float_value = *reinterpret_cast<double*>(base);
-                dest.var_value.type = VarType::VAR_FLOAT;
-                break;
-            case VarType::VAR_POINTER:
-                dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
-                dest.var_value.type = VarType::VAR_POINTER;
-                break;
-            case VarType::VAR_STRING:  {
-                if (base == nullptr) {
-                    dest.var_value.str_value = "";
-                    dest.var_value.type = VarType::VAR_STRING;
+        
+        if (ptr == nullptr) {
+        
+            switch (dest.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_BYTE:
+                    dest.var_value.int_value = 0;
                     break;
-                }
-
-                const char* str_ptr = nullptr;
-                try {
-                    str_ptr = *reinterpret_cast<const char**>(base);
-                } catch (...) {
-                    dest.var_value.str_value = "";
-                    dest.var_value.type = VarType::VAR_STRING;
+                case VarType::VAR_FLOAT:
+                    dest.var_value.float_value = 0.0;
                     break;
-                }
-
-                if (str_ptr != nullptr) {
-                    try {
-                        dest.var_value.str_value = str_ptr; 
-                    } catch (...) {
-                        dest.var_value.str_value = "";
-                    }
-                } else {
+                case VarType::VAR_POINTER:
+                    dest.var_value.ptr_value = nullptr;
+                    break;
+                case VarType::VAR_STRING:
                     dest.var_value.str_value = "";
-                }
-                dest.var_value.type = VarType::VAR_STRING;
-                break;
-}           default:
-                throw mx::Exception("LOAD: unsupported destination type");
-        }
-    }
-
-    
-    void Program::exec_store(const Instruction& instr) {
-        void* ptr = nullptr;
-        
-        if (!isVariable(instr.op2.op)) {
-            throw mx::Exception("STORE destination must be a variable or register");
-        }
-        
-        Variable& ptrVar = getVariable(instr.op2.op);
-        
-        if (ptrVar.type == VarType::VAR_POINTER) {
-            if (ptrVar.var_value.ptr_value == nullptr) {
-                throw mx::Exception("STORE destination pointer is null: " + ptrVar.var_name);
+                    break;
+                default:
+                    
+                    break;
             }
-            ptr = ptrVar.var_value.ptr_value;
-        } else if (ptrVar.type == VarType::VAR_INTEGER) {
-            if (ptrVar.var_value.int_value == 0) {
-                throw mx::Exception("STORE destination contains null pointer: " + ptrVar.var_name);
-            }
-            ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptrVar.var_value.int_value));
-        } else {
-            throw mx::Exception("STORE destination must be a pointer or integer containing a pointer address: " + ptrVar.var_name + " (type: " + std::to_string(static_cast<int>(ptrVar.type)) + ")");
+            dest.var_value.type = dest.type;
+            return;
         }
 
         size_t index = 0;
@@ -903,9 +846,120 @@ static inline void releaseOwnedPointer(Variable& v) {
             } else {
                 stride = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
             }
+        } 
+
+        
+        size_t offset = index * stride;
+        if (allocated_size > 0 && offset + stride > allocated_size) {
+            throw mx::Exception("LOAD: index out of bounds, offset " + std::to_string(offset) + 
+                               " + stride " + std::to_string(stride) + 
+                               " exceeds allocated size " + std::to_string(allocated_size));
         }
 
-        char* base = static_cast<char*>(ptr) + index * stride;
+        try {
+            char* base = static_cast<char*>(ptr) + offset;
+            
+            switch (dest.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_BYTE:
+                    dest.var_value.int_value = *reinterpret_cast<int64_t*>(base);
+                    dest.var_value.type = dest.type;
+                    break;
+                case VarType::VAR_FLOAT:
+                    dest.var_value.float_value = *reinterpret_cast<double*>(base);
+                    dest.var_value.type = VarType::VAR_FLOAT;
+                    break;
+                case VarType::VAR_POINTER:
+                    dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
+                    dest.var_value.type = VarType::VAR_POINTER;
+                    dest.var_value.owns = false; 
+                    break;
+                case VarType::VAR_STRING:
+                    if (is_string_source && index < allocated_size) {
+                        
+                        dest.var_value.str_value = std::string(1, *(base));
+                    } else {
+                        
+                        const char* str_ptr = *reinterpret_cast<const char**>(base);
+                        if (str_ptr != nullptr) {
+                        
+                            dest.var_value.str_value = str_ptr;
+                        } else {
+                            dest.var_value.str_value = "";
+                        }
+                    }
+                    dest.var_value.type = VarType::VAR_STRING;
+                    break;
+                default:
+                    throw mx::Exception("LOAD: unsupported destination type");
+            }
+        } catch (const std::exception& e) {
+            throw mx::Exception(std::string("LOAD: memory access error: ") + e.what());
+        } catch (...) {
+            throw mx::Exception("LOAD: unknown memory access error");
+        }
+    }
+
+    
+    void Program::exec_store(const Instruction& instr) {
+        void* ptr = nullptr;
+        size_t allocated_size = 0;
+        bool is_owned = false;
+        
+        if (!isVariable(instr.op2.op)) {
+            throw mx::Exception("STORE destination must be a variable or register");
+        }
+        
+        Variable& ptrVar = getVariable(instr.op2.op);
+        
+        
+        if (ptrVar.type == VarType::VAR_POINTER) {
+            if (ptrVar.var_value.ptr_value == nullptr) {
+                throw mx::Exception("STORE destination pointer is null: " + ptrVar.var_name);
+            }
+            ptr = ptrVar.var_value.ptr_value;
+            allocated_size = ptrVar.var_value.ptr_size * ptrVar.var_value.ptr_count;
+            is_owned = ptrVar.var_value.owns;
+        } else if (ptrVar.type == VarType::VAR_INTEGER) {
+            if (ptrVar.var_value.int_value == 0) {
+                throw mx::Exception("STORE destination contains null pointer: " + ptrVar.var_name);
+            }
+            ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptrVar.var_value.int_value));
+            
+        } else {
+            throw mx::Exception("STORE destination must be a pointer or integer containing a pointer address");
+        }
+
+        
+        size_t index = 0;
+        if (!instr.op3.op.empty()) {
+            if (isVariable(instr.op3.op)) {
+                index = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
+            } else {
+                index = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
+            }
+        }
+
+        size_t stride = 8;
+        if (!instr.vop.empty() && !instr.vop[0].op.empty()) {
+            const auto& sizeOp = instr.vop[0];
+            if (isVariable(sizeOp.op)) {
+                stride = static_cast<size_t>(getVariable(sizeOp.op).var_value.int_value);
+            } else {
+                stride = static_cast<size_t>(std::stoll(sizeOp.op, nullptr, 0));
+            }
+        }
+
+        
+        size_t offset = index * stride;
+        if (is_owned && allocated_size > 0 && offset + stride > allocated_size) {
+            throw mx::Exception("STORE: index out of bounds, offset " + std::to_string(offset) + 
+                          " + stride " + std::to_string(stride) + 
+                          " exceeds allocated size " + std::to_string(allocated_size));
+        }
+
+        char* base = static_cast<char*>(ptr) + offset;
+        
         
         if (instr.op1.type == OperandType::OP_CONSTANT) {
             *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
@@ -922,13 +976,31 @@ static inline void releaseOwnedPointer(Variable& v) {
                 case VarType::VAR_POINTER:
                     *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
                     break;
-              case VarType::VAR_STRING:
-                    if (src.var_value.str_value.empty()) {
-                        *reinterpret_cast<const char**>(base) = "";
+                case VarType::VAR_STRING: {
+                    
+                    if (is_owned && stride >= sizeof(char*)) {
+                        char** str_dest = reinterpret_cast<char**>(base);
+                        size_t str_len = src.var_value.str_value.size() + 1;
+                        
+                    
+                        if (*str_dest != nullptr) {
+                            try {
+                                std::free(*str_dest);
+                            } catch (...) {
+                            }
+                        }
+                        
+                        *str_dest = static_cast<char*>(std::malloc(str_len));
+                        if (*str_dest == nullptr) {
+                            throw mx::Exception("STORE: failed to allocate memory for string copy");
+                        }
+                        std::strncpy(*str_dest, src.var_value.str_value.c_str(), str_len);
+                        (*str_dest)[str_len-1] = '\0'; 
                     } else {
                         *reinterpret_cast<const char**>(base) = src.var_value.str_value.c_str();
                     }
                     break;
+                }
                 default:
                     throw mx::Exception("STORE: unsupported source type");
             }
@@ -1028,10 +1100,10 @@ static inline void releaseOwnedPointer(Variable& v) {
             return;
         }
         Variable& var = getVariable(instr.op1.op);
-        if (var.type == VarType::VAR_POINTER && var.var_value.ptr_value != nullptr) {
+        if (var.type == VarType::VAR_POINTER && var.var_value.owns && var.var_value.ptr_value != nullptr) {
             std::free(var.var_value.ptr_value);
             var.var_value.ptr_value = nullptr;
-            var.var_value.owns = false;         // prevent double free later
+            var.var_value.owns = false;         
             var.var_value.ptr_size = 0;
             var.var_value.ptr_count = 0;
         }
