@@ -10,6 +10,9 @@ if(NOT SDL2_FOUND)
 endif()
 find_package(SDL2_ttf REQUIRED)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+
 target_include_directories(mxvm_sdl
     PRIVATE ${SDL2_INCLUDE_DIRS}
     ${SDL2_TTF_INCLUDE_DIRS}

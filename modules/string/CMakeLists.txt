@@ -10,6 +10,7 @@ target_link_libraries(mxvm_string
     PUBLIC
         mxvm
 )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 add_library(mxvm_string_static STATIC cstring.c)
 
 include(CheckFunctionExists)

@@ -3,8 +3,9 @@ project(mxvm_std)
 set(SOURCES std.cpp)
 add_library(mxvm_std SHARED ${SOURCES})
 add_library(mxvm_std_static STATIC std.c)
+set_target_properties(mxvm_std_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 include(CheckFunctionExists)
-
 target_include_directories(mxvm_std
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -40,4 +41,4 @@ if(WIN32)
         RUNTIME DESTINATION lib/modules/std
     )
 endif()
-    
+

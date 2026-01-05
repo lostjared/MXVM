@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(mxvm_io)
 set(SOURCES io.cpp)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 add_library(mxvm_io SHARED ${SOURCES})
 target_include_directories(mxvm_io
     PUBLIC
