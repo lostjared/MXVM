@@ -51,6 +51,8 @@ running := true;
     sdl_set_draw_color(renderer, 0, 0, 0, 255);
     sdl_clear(renderer);
     render();
+    sdl_present(renderer);
+    sdl_delay(16);
  end;
 cleanup;
 end.
