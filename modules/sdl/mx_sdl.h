@@ -2,8 +2,8 @@
 #define __SDL2__H_
 
 #define SDL_MAIN_HANDLED
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include "SDL.h"
+#include "SDL_ttf.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
