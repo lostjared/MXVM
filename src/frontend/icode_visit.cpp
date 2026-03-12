@@ -395,11 +395,11 @@ namespace pascal {
         loopContinueLabels.push_back(continueLabel);
         loopEndLabels.push_back(loopEndLabel);
 
+        std::string endCmp = endVal;
+
         emitLabel(loopStartLabel);
 
-        std::string endReg = allocReg();
-        emit2("mov", endReg, endVal);
-        emit2("cmp", slotVar(slot), endReg);
+        emit2("cmp", slotVar(slot), endCmp);
         if (node.isDownto) emit1("jl", loopEndLabel); else emit1("jg", loopEndLabel);
 
         if (node.statement) node.statement->accept(*this);
@@ -411,8 +411,7 @@ namespace pascal {
         loopContinueLabels.pop_back();
         loopEndLabels.pop_back();
 
-        if (isReg(endReg) && !isParmReg(endReg)) freeReg(endReg);
-        if (isReg(endVal) && !isParmReg(endVal)) freeReg(endVal);
+        if (isReg(endCmp) && !isParmReg(endCmp)) freeReg(endCmp);
     }
 
     void CodeGenVisitor::visit(BinaryOpNode& node) {
