@@ -987,6 +987,8 @@ out << R"(</div>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <title>MXVM Debug Report - )" << html_escape(program->name) << R"(</title>
+                </head>
+                <body>
                     <style>
                         * {
                             margin: 0;
@@ -1205,9 +1207,7 @@ out << R"(</div>
                             }
                         }
                     </style>
-
-                </head>
-                <body>)";
+                )";
             
                 bool mainHasContent = !program->vars.empty() || !program->inc.empty() || !program->labels.empty();
                 bool hasObjects = !program->objects.empty();

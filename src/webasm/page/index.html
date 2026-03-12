@@ -1,11 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MXVM Language & Usage Guide</title>
-  <meta name="description" content="Guide to MXVM: custom virtual machine language, instruction reference, examples, and getting started."/>
+  <title>MXVM Debug Compiler</title>
   <style>
         * {
             margin: 0;
@@ -22,7 +20,8 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 100vw;
+            width: 100%;
             margin: 0 auto;
             padding: 20px;
         }
@@ -47,238 +46,468 @@
         
         .header p {
             color: #e57373;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
         }
         
-        .section-block {
+        .input-section {
             background: #181818;
             border-radius: 15px;
             margin-bottom: 30px;
             box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
             border: 1px solid #b71c1c;
-            padding: 25px 30px;
+            overflow: hidden;
         }
-        .section-block h2 {
-            font-size: 1.9rem;
-            margin-bottom: 10px;
-            color: #ff5252;
-            border-bottom: 2px solid #b71c1c;
-            padding-bottom: 6px;
-        }
-        .section-block h3 {
-            margin-top: 1rem;
+        
+        .input-header {
+            background: #b71c1c;
+            color: #fff;
+            padding: 20px 30px;
             font-size: 1.4rem;
-            color: #ff8a80;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        pre { 
-            background: #222; 
-            border:1px solid #b71c1c; 
-            padding: 15px; 
+        
+        .input-content {
+            padding: 30px;
+        }
+        
+        #codeInput {
+            width: 100%;
+            height: 300px;
+            background: #222;
+            border: 1px solid #b71c1c;
             border-radius: 10px;
-            overflow:auto;
-            font-size: 0.9rem;
-            margin: 12px 0;
+            padding: 15px;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
         }
-        code { font-family: 'Courier New', monospace; }
-        table { width:100%; border-collapse:collapse; margin:14px 0; }
-        th, td { padding:10px 8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08); }
-        th { background:#1f1f1f; position:sticky; top:0; }
-        a { color:#ff5252; text-decoration:none; }
-        a:hover { text-decoration:underline; }
-        .inline-code { background:#111; padding:2px 6px; border-radius:4px; }
-        .quick-ref { background:#1f1f1f; padding:10px; border-radius:8px; margin-top:10px; }
-        .footer { text-align:center; padding:30px 10px; font-size:.75rem; color:#888; }
-        @media (max-width: 900px) {
-            .header h1 { font-size:2rem; }
+        
+        #codeInput:focus {
+            border-color: #ff5252;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.3);
         }
-  </style>
+        
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: #b71c1c;
+            color: #fff;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(183, 28, 28, 0.3);
+        }
+        
+        .btn:hover {
+            background: #d32f2f;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(183, 28, 28, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .output-section {
+            background: #181818;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(183, 28, 28, 0.1);
+            border: 1px solid #b71c1c;
+            overflow: hidden;
+        }
+        
+        .output-header {
+            background: #b71c1c;
+            color: #fff;
+            padding: 20px 30px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #output {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0;
+            background: #000;
+            color: #e0e0e0;
+            min-height: 200px;
+            overflow: auto;
+        }
+        
+        #output pre,
+        #output code,
+        #output textarea {
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #e57373;
+            font-style: italic;
+        }
+        
+        .error {
+            background: #2c1810;
+            border: 1px solid #d32f2f;
+            color: #ff8a80;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .example-link {
+            color: #ff5252;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .example-link:hover {
+            color: #ff8a80;
+            text-decoration: underline;
+        }
+        
+        .input-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .platform-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .platform-selector label {
+            color: #e57373;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        #platformSelect {
+            background: #222;
+            border: 1px solid #b71c1c;
+            border-radius: 8px;
+            padding: 10px 15px;
+            color: #e0e0e0;
+            font-size: 14px;
+            min-width: 150px;
+            outline: none;
+        }
+        
+        #platformSelect:focus {
+            border-color: #ff5252;
+            box-shadow: 0 0 10px rgba(255, 82, 82, 0.3);
+        }
+        
+        #platformSelect option {
+            background: #222;
+            color: #e0e0e0;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                justify-content: center;
+            }
+            
+            #codeInput {
+                height: 250px;
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>📝 MXVM Language &amp; Usage Guide</h1>
-      <p>Custom VM &amp; compiler sandbox – language reference, examples, and how-to. Updated: 2025-08-04</p>
+      <h1>🔧 MXVM Debug Compiler</h1>
+      <p>Paste your MXVM source code below to generate debug HTML & assembly</p>
+    </div>
+    <div class="input-section">
+      <div class="input-header">
+        <span>📝 MXVM Source Code</span>
+        <a href="#" class="example-link" onclick="loadExample()">Load Example</a>
+      </div>
+      <div class="input-content">
+        <div class="input-controls">
+          <div class="platform-selector">
+            <label for="platformSelect">🖥️ Target Platform:</label>
+            <select id="platformSelect">
+              <option value="0">Linux</option>
+              <option value="1">macOS</option>
+              <option value="2">Windows</option>
+            </select>
+          </div>
+        </div>
+        <textarea id="codeInput" placeholder="Enter your MXVM source code…"></textarea>
+        <div class="button-group">
+          <button class="btn" id="parseBtn" onclick="parseCode()" disabled>
+            🚀 Parse & Generate Debug HTML
+          </button>
+          <button class="btn" onclick="clearAll()">
+            🗑️ Clear All
+          </button>
+          <button class="btn" onclick="copyOutput()">
+            📋 Copy Output
+          </button>
+          <button class="btn" id="downloadZipBtn" disabled>
+            💾 Download Assembly ZIP
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="section-block" id="overview">
-      <h2>Overview</h2>
-      <p>MXVM is a custom virtual machine, interpreter, and compiler project designed as a learning sandbox. It is not intended for production; instead it helps users explore and experiment with:</p>
-      <ul>
-        <li>Virtual machine design and instruction execution.</li>
-        <li>Custom language parsing and abstract syntax tree generation.</li>
-        <li>Modular system architecture with external and runtime externs.</li>
-        <li>Code generation (including x86_64 translation) and execution.</li>
-        <li>Memory &amp; stack manipulation, control flow, and debugging.</li>
-        <li>C++ integration, build systems (CMake), and cross-platform thinking.</li>
-      </ul>
-      <p>The language combines assembly-like instructions with higher-level constructs like functions, modules, and formatted I/O to create an accessible pedagogical VM environment.</p>
+    <div class="output-section">
+      <div class="output-header">
+        <span>📊</span> Debug HTML Output
+      </div>
+      <div id="output">
+        <div class="loading">
+          Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="section-block" id="getting-started">
-      <h2>Getting Started</h2>
-      <h3>Prerequisites</h3>
-      <ul>
-        <li>C++20 compatible compiler (gcc, clang, MSVC)  or <a href="/MXVM/compiler">MXVM Online</a></li>
-        <li><code class="inline-code">cmake</code> (version 3.15+ recommended)</li>
-        <li>Make or ninja for building</li>
-        <li>Git (for cloning if not already local)</li>
-      </ul>
-      <h3>Typical Build</h3>
-      <pre><code># Clone or go into your copy of the repo
-cd MXVM-main/MXVM-main
-mkdir build
-cd build
-cmake ..
-make</code></pre>
-      <p>This produces the compiler/interpreter binary (e.g., <code class="inline-code">src/vm/mxvmc</code>) and supporting modules.</p>
-      <h3>Running a Sample Program</h3>
-      <pre><code># from inside the build directory, run an example like demo.mxvm
-./src/vm/mxvmc ../mxvm_src/demo.mxvm</code></pre>
-      <p>Replace <code class="inline-code">demo.mxvm</code> with other examples such as <code class="inline-code">fibonacci.mxvm</code>, <code class="inline-code">Comments.mxvm</code>, or your own programs.</p>
-    </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.7/purify.min.js"></script>
+  <script src="mxvm.js?v=1.13f"></script>
+  <script>
+    let mxvmModule = null;
+    let debuggerInstance = null;
 
-    <div class="section-block" id="language-basics">
-      <h2>Language Basics</h2>
-      <h3>Program and Object</h3>
-      <p>The entry point is a <code class="inline-code">program</code> block. Objects are reusable units that encapsulate code, data, and expose functions. Syntax:</p>
-      <pre><code>program Name { ... }</code></pre>
-      <pre><code>object Name { ... }</code></pre>
-      <p>Objects are referenced via <code class="inline-code">section object</code>.</p>
-      <h3>Sections</h3>
-      <ul>
-        <li><strong>module</strong>: Include external functionality (e.g., <code class="inline-code">io</code>, <code class="inline-code">string</code>).</li>
-        <li><strong>data</strong>: Declare variables, pointers, strings, constants, and exports.</li>
-        <li><strong>object</strong>: Declare dependencies on other objects.</li>
-        <li><strong>code</strong>: Control flow, functions, labels, and instructions.</li>
-      </ul>
-      <h3>Variables and Types</h3>
-      <p>Supported types include:</p>
-      <table>
-        <thead>
-          <tr><th>Type</th><th>Description</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code class="inline-code">int</code></td><td>Integer value (typically 64-bit)</td></tr>
-          <tr><td><code class="inline-code">float</code></td><td>Floating point value</td></tr>
-          <tr><td><code class="inline-code">string</code></td><td>Null-terminated character sequences. Can specify size, e.g., <code class="inline-code">string name, 256</code>.</td></tr>
-          <tr><td><code class="inline-code">ptr</code></td><td>Pointer to buffer or memory region</td></tr>
-          <tr><td><code class="inline-code">byte</code></td><td>8-bit value</td></tr>
-          <tr><td><code class="inline-code">export</code> prefix</td><td>Marks data as externally visible from an object.</td></tr>
-        </tbody>
-      </table>
-      <p>Example:</p>
-      <pre><code>section data { 
-    int x = 0
-    string message = "Hello, MXVM!\n"
-}</code></pre>
-      <h3>Functions and Labels</h3>
-      <p>Define functions with the <code class="inline-code">function name:</code> syntax. Use <code class="inline-code">call</code> to invoke and <code class="inline-code">ret</code> to return. Labels serve as jump targets.</p>
-      <pre><code>section code {
-    start:
-        call some_function
-        done
-
-    function some_function:
-        ; work
-        ret
-}</code></pre>
-    </div>
-
-    <div class="section-block" id="instructions">
-      <h2>Instruction Reference</h2>
-      <p>Detailed description of available instructions:</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Instruction</th><th>Operands</th><th>Description</th><th>Example</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><code class="inline-code">mov</code></td><td><code class="inline-code">dest, src</code></td><td>Copy <code class="inline-code">src</code> into <code class="inline-code">dest</code>.</td><td><code class="inline-code">mov x, 1</code></td>
-          </tr>
-          <tr>
-            <td><code class="inline-code">load</code></td><td><code class="inline-code">dest, base, index, size</code></td><td>Load memory at base+index size bytes into dest.</td><td><code class="inline-code">load character, buffer, loop_index, 1</code></td>
-          </tr>
-          <tr>
-            <td><code class="inline-code">store</code></td><td><code class="inline-code">value, base, index, size</code></td><td>Store value into memory at base+index.</td><td><code class="inline-code">store zero_byte, buffer, file_size, 1</code></td>
-          </tr>
-          <tr><td><code class="inline-code">add</code></td><td><code class="inline-code">dest, value</code></td><td>Add value to dest.</td><td><code class="inline-code">add x, 1</code></td></tr>
-          <tr><td><code class="inline-code">sub</code></td><td><code class="inline-code">dest, value</code></td><td>Subtract value from dest.</td><td><code class="inline-code">sub x, 1</code></td></tr>
-          <tr><td><code class="inline-code">mul</code></td><td><code class="inline-code">dest, value</code></td><td>Multiply dest by value.</td><td><code class="inline-code">mul x, 2</code></td></tr>
-          <tr><td><code class="inline-code">div</code></td><td><code class="inline-code">dest, value</code></td><td>Divide dest by value.</td><td><code class="inline-code">div x, 2</code></td></tr>
-          <tr><td><code class="inline-code">mod</code></td><td><code class="inline-code">dest, value</code></td><td>Compute dest %= value.</td><td><code class="inline-code">mod accum, 2</code></td></tr>
-          <tr><td><code class="inline-code">or</code></td><td><code class="inline-code">dest, value</code></td><td>Bitwise OR.</td><td><code class="inline-code">or a, b</code></td></tr>
-          <tr><td><code class="inline-code">and</code></td><td><code class="inline-code">dest, value</code></td><td>Bitwise AND.</td><td><code class="inline-code">and a, mask</code></td></tr>
-          <tr><td><code class="inline-code">xor</code></td><td><code class="inline-code">dest, value</code></td><td>Bitwise XOR.</td><td><code class="inline-code">xor a, b</code></td></tr>
-          <tr><td><code class="inline-code">not</code></td><td><code class="inline-code">dest</code></td><td>Bitwise NOT.</td><td><code class="inline-code">not flag</code></td></tr>
-          <tr><td><code class="inline-code">neg</code></td><td><code class="inline-code">dest</code></td><td>Arithmetic negation.</td><td><code class="inline-code">neg x</code></td></tr>
-          <tr><td><code class="inline-code">cmp</code></td><td><code class="inline-code">a, b</code></td><td>Compare a and b; sets flags for conditionals.</td><td><code class="inline-code">cmp x, 10</code></td></tr>
-          <tr><td><code class="inline-code">jmp</code></td><td><code class="inline-code">label</code></td><td>Unconditional jump.</td><td><code class="inline-code">jmp loop</code></td></tr>
-          <tr><td><code class="inline-code">je</code></td><td><code class="inline-code">label</code></td><td>Jump if equal.</td><td><code class="inline-code">je done</code></td></tr>
-          <tr><td><code class="inline-code">jne</code></td><td><code class="inline-code">label</code></td><td>Jump if not equal.</td><td><code class="inline-code">jne start</code></td></tr>
-          <tr><td><code class="inline-code">jl</code></td><td><code class="inline-code">label</code></td><td>Jump if less than.</td><td><code class="inline-code">jl smaller</code></td></tr>
-          <tr><td><code class="inline-code">jle</code></td><td><code class="inline-code">label</code></td><td>Jump if less or equal.</td><td><code class="inline-code">jle end</code></td></tr>
-          <tr><td><code class="inline-code">jg</code></td><td><code class="inline-code">label</code></td><td>Jump if greater than.</td><td><code class="inline-code">jg bigger</code></td></tr>
-          <tr><td><code class="inline-code">jge</code></td><td><code class="inline-code">label</code></td><td>Jump if greater or equal.</td><td><code class="inline-code">jge ok</code></td></tr>
-          <tr><td><code class="inline-code">jz</code></td><td><code class="inline-code">label</code></td><td>Jump if zero.</td><td><code class="inline-code">jz zero_case</code></td></tr>
-          <tr><td><code class="inline-code">jnz</code></td><td><code class="inline-code">label</code></td><td>Jump if not zero.</td><td><code class="inline-code">jnz nonzero</code></td></tr>
-          <tr><td><code class="inline-code">print</code></td><td><code class="inline-code">format, args...</code></td><td>Formatted output.</td><td><code class="inline-code">print fmt, x</code></td></tr>
-          <tr><td><code class="inline-code">getline</code></td><td><code class="inline-code">dest</code></td><td>Read line into buffer.</td><td><code class="inline-code">getline input</code></td></tr>
-          <tr><td><code class="inline-code">alloc</code></td><td><code class="inline-code">ptr_var, count, size</code></td><td>Allocate memory.</td><td><code class="inline-code">alloc buffer,1,256</code></td></tr>
-          <tr><td><code class="inline-code">free</code></td><td><code class="inline-code">ptr</code></td><td>Free memory.</td><td><code class="inline-code">free buffer</code></td></tr>
-          <tr><td><code class="inline-code">call</code></td><td><code class="inline-code">function</code></td><td>Invoke function.</td><td><code class="inline-code">call foo.init</code></td></tr>
-          <tr><td><code class="inline-code">ret</code></td><td>none</td><td>Return from function.</td><td><code class="inline-code">ret</code></td></tr>
-          <tr><td><code class="inline-code">invoke</code></td><td><code class="inline-code">external, args...</code></td><td>Call external runtime API.</td><td><code class="inline-code">invoke fopen, name, mode</code></td></tr>
-          <tr><td><code class="inline-code">return</code></td><td><code class="inline-code">value</code></td><td>Set return value from invoke.</td><td><code class="inline-code">return size</code></td></tr>
-          <tr><td><code class="inline-code">done</code></td><td>none</td><td>Program exit normally.</td><td><code class="inline-code">done</code></td></tr>
-          <tr><td><code class="inline-code">exit</code></td><td><code class="inline-code">code</code></td><td>Exit with code.</td><td><code class="inline-code">exit 1</code></td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section-block" id="examples">
-      <h2>Example Walkthroughs</h2>
-      <h3>Demo</h3>
-      <p>A simple program that increments a variable from 0 to 10, then decrements it back to 0, demonstrating loops, comparison, and conditional jumps.</p>
-      <pre><code>program Demo {
-    section data {
-        int x = 0;
-        string fmt_str = "Hello World! Value of x is: %d\n";
-        string fmt_end = "Goodbye!\n";
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>"']/g, function(ch) {
+        switch (ch) {
+          case '&': return '&amp;';
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '"': return '&quot;';
+          case "'": return '&#39;';
+          default: return ch;
+        }
+      });
     }
-    section code {
-        mov x, 1
-    start:
-        add x, 1
-        print fmt_str, x
-        cmp x, 10
-        jne start
-        print fmt_end
-    loop:
-        sub x, 1
-        print fmt_str, x
-        cmp x, 0
-        jg loop
-        print fmt_end
-    stop:
-        done
+
+    function safeFilename(name, fallback = 'output') {
+      const cleaned = String(name)
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^[_\.]+|[_\.]+$/g, '')
+        .slice(0, 128);
+      return cleaned || fallback;
     }
-}</code></pre>
-      <h3>Fibonacci</h3>
-      <p>Computes Fibonacci numbers up to <code class="inline-code">n</code> safely with range checking.</p>
-      <pre><code>program Fibonacci {
+
+    function sanitizeCompilerHTML(html) {
+      return DOMPurify.sanitize(String(html), {
+        USE_PROFILES: { html: true },
+        ADD_TAGS: ['style'],
+        FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'link', 'meta'],
+        FORBID_ATTR: [
+          'onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onmouseenter',
+          'onmouseleave', 'onmousedown', 'onmouseup', 'onkeydown', 'onkeyup',
+          'onkeypress'
+        ],
+        ALLOW_DATA_ATTR: false,
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+\.\-]+(?:[^a-z+\.\-:]|$))/i
+      });
+    }
+
+    function setSafeOutputHTML(html) {
+      document.getElementById('output').innerHTML = sanitizeCompilerHTML(html);
+    }
+
+    function setSafeOutputText(text, className = 'loading') {
+      const output = document.getElementById('output');
+      output.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = className;
+      div.textContent = text;
+      output.appendChild(div);
+    }
+
+    Module.onRuntimeInitialized = () => {
+      mxvmModule = Module;
+      debuggerInstance = new mxvmModule.MXVM_Debug();
+
+      document.getElementById('parseBtn').disabled = false;
+      document.getElementById('downloadZipBtn').disabled = true;
+      document.getElementById('parseBtn').textContent = "🚀 Parse & Generate Debug HTML";
+    };
+
+    function parseCode() {
+      const code = document.getElementById('codeInput').value.trim();
+      const platform = parseInt(document.getElementById('platformSelect').value, 10);
+      const parseBtn = document.getElementById('parseBtn');
+      const zipBtn = document.getElementById('downloadZipBtn');
+
+      if (!debuggerInstance) {
+        return showError("WebAssembly module not loaded yet. Please wait...");
+      }
+      if (!code) {
+        return showError("Please enter some MXVM code to parse.");
+      }
+
+      parseBtn.disabled = true;
+      zipBtn.disabled = true;
+      parseBtn.textContent = "🔄 Parsing...";
+      setSafeOutputText("Parsing MXVM code…");
+
+      try {
+        const rawHtml = debuggerInstance.parseToHTML(platform, code);
+        setSafeOutputHTML(rawHtml);
+        zipBtn.disabled = false;
+        connectAssemblyButtons();
+      } catch (err) {
+        showError("Parsing failed: " + (err && err.message ? err.message : String(err)));
+      } finally {
+        parseBtn.disabled = false;
+        parseBtn.textContent = "🚀 Parse & Generate Debug HTML";
+      }
+    }
+
+    function showError(msg) {
+      const output = document.getElementById('output');
+      output.innerHTML = `<div class="error">❌ ${escapeHTML(msg)}</div>`;
+    }
+
+    function clearAll() {
+      document.getElementById('codeInput').value = '';
+      setSafeOutputText('Enter MXVM code above and click "Parse & Generate Debug HTML" to see the output here.');
+      document.getElementById('downloadZipBtn').disabled = true;
+    }
+
+    function copyOutput() {
+      const out = document.getElementById('output');
+      const areas = out.querySelectorAll('textarea[id^="asm-"]');
+
+      if (areas.length === 0) {
+        const plainText = out.innerText || out.textContent || '';
+        navigator.clipboard.writeText(plainText).then(() => {
+          showSuccess("Output copied to clipboard!");
+        }).catch(() => {
+          const tempTextArea = document.createElement('textarea');
+          tempTextArea.value = plainText;
+          document.body.appendChild(tempTextArea);
+          tempTextArea.select();
+          try {
+            document.execCommand('copy');
+            showSuccess("Output copied to clipboard!");
+          } catch {
+            showError("Failed to copy to clipboard");
+          }
+          document.body.removeChild(tempTextArea);
+        });
+        return;
+      }
+
+      let allAssembly = '';
+      areas.forEach((ta, index) => {
+        const id = ta.id;
+        let filename;
+        if (id === 'asm-main') {
+          filename = 'main.s';
+        } else {
+          filename = `${safeFilename(id.slice(4), 'module')}.s`;
+        }
+
+        if (index > 0) allAssembly += '\n\n';
+        allAssembly += `// ===== ${filename} =====\n`;
+        allAssembly += ta.value;
+      });
+
+      navigator.clipboard.writeText(allAssembly).then(() => {
+        showSuccess("Assembly code copied to clipboard!");
+      }).catch(() => {
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = allAssembly;
+        document.body.appendChild(tempTextArea);
+        tempTextArea.select();
+        try {
+          document.execCommand('copy');
+          showSuccess("Assembly code copied to clipboard!");
+        } catch {
+          showError("Failed to copy to clipboard");
+        }
+        document.body.removeChild(tempTextArea);
+      });
+    }
+
+    function showSuccess(msg) {
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #2e7d32; color: white; padding: 15px; border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+      successDiv.textContent = '✅ ' + String(msg);
+      document.body.appendChild(successDiv);
+      setTimeout(() => {
+        if (successDiv.parentNode) {
+          successDiv.parentNode.removeChild(successDiv);
+        }
+      }, 3000);
+    }
+
+    function loadExample() {
+      const exampleCode = `program Fibonacci {
     section data {
         int n = 30
         int a = 0
         int b = 1
+        int temp = 0
         int i = 2
         string format = "%lld "
-        string newline = "\n"
+        string newline = "\\n"
+        string ask = "How many numbers do you wish to output? "
+        string range_error = "Number is out of range or negative for 64 bit integer\\n"
+        string input, 256
     }
     section code {
+    start:
+        print ask
+        getline input
+        to_int n, input
         cmp n, 0
-        jl out_of_range
+        jle out_of_range
+        cmp n, 92
+        jg out_of_range
         print format, a
         print format, b
     loop:
@@ -293,58 +522,142 @@ make</code></pre>
     done_fib:
         print newline
         done
+    out_of_range:
+        print range_error
+        done
     }
-}</code></pre>
-      <h3><a href="https://github.com/lostjared/MXVM/tree/main/mxvm_src/print_hex">ReadFile &amp; Hex Printer</a></h3>
-      <p>Demonstrates external module usage, file I/O, buffer manipulation, and formatting with <code class="inline-code">invoke</code>, <code class="inline-code">load</code>, and <code class="inline-code">store</code>.</p>
-      <p>Key pattern: allocate a buffer, read file contents, and print bytes in hex.</p>
-      <h3><a href="https://github.com/lostjared/MXVM/tree/main/mxvm_src/comments">Comments Example</a></h3>
-      <p>Shows looping, formatted printing, and decrementing counters.</p>
-    </div>
-
-    <div class="section-block" id="quick-ref">
-      <h2>Quick Reference</h2>
-      <p>Minimal cheat sheet for writing MXVM programs:</p>
-      <div class="quick-ref">
-<pre><code>// Program skeleton
-program Name {
-    section module { io, string }
-    section object { other_object }
-    section data {
-        int counter = 0
-        string msg = "Hi\n"
+}`;
+      document.getElementById('codeInput').value = exampleCode;
     }
-    section code {
-        mov counter, 5
-        start:
-            print msg, counter
-            done
+
+    document.getElementById('downloadZipBtn').addEventListener('click', async () => {
+      const out = document.getElementById('output');
+      const areas = out.querySelectorAll('textarea[id^="asm-"]');
+      if (areas.length === 0) {
+        return showError("No assembly snippets found to zip.");
+      }
+
+      const titleElem = out.querySelector('.subtitle strong');
+      const rawProgName = titleElem ? titleElem.textContent : 'program';
+      const progName = safeFilename(rawProgName, 'program');
+      const zip = new JSZip();
+
+      let asmFiles = [];
+      areas.forEach(ta => {
+        const id = ta.id;
+        let filename;
+        if (id === 'asm-main') {
+          filename = `${progName}.s`;
+        } else {
+          filename = `${safeFilename(id.slice(4), 'module')}.s`;
+        }
+        asmFiles.push(filename);
+        zip.file(filename, ta.value);
+      });
+
+      const makefileContent =
+`all:
+\tgcc ${asmFiles.join(' ')} -o ${progName} -L/usr/local/lib/modules/io -lmxvm_io_static -L/usr/local/lib/modules/string -lmxvm_string_static
+
+clean:
+\trm -f ${progName} *.o
+`;
+      zip.file('Makefile', makefileContent);
+
+      try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${progName}_assembly.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showSuccess("Assembly ZIP downloaded successfully!");
+      } catch (err) {
+        showError("Failed to create ZIP file: " + (err && err.message ? err.message : String(err)));
+      }
+    });
+
+    document.getElementById('codeInput').addEventListener('keydown', function(e) {
+      if (e.ctrlKey && e.key === 'Enter') {
+        parseCode();
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const textarea = this;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        textarea.value = textarea.value.substring(0, start) + '\t' + textarea.value.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+      }
+    });
+
+    document.getElementById('parseBtn').disabled = true;
+    document.getElementById('parseBtn').textContent = "⏳ Loading WebAssembly...";
+
+    function connectAssemblyButtons() {
+      const allButtons = document.querySelectorAll('#output button:not([data-connected])');
+
+      allButtons.forEach(btn => {
+        btn.setAttribute('data-connected', 'true');
+
+        if (btn.textContent.includes('Copy')) {
+          btn.addEventListener('click', function() {
+            const container = this.parentElement;
+            const codeElement = container ? container.previousElementSibling : null;
+
+            if (codeElement && (codeElement.tagName === 'TEXTAREA' || codeElement.tagName === 'PRE')) {
+              navigator.clipboard.writeText(codeElement.value || codeElement.textContent).then(() => {
+                showSuccess("Assembly copied to clipboard!");
+              }).catch(err => {
+                showError("Failed to copy: " + (err && err.message ? err.message : String(err)));
+              });
+            } else {
+              showError("Could not find the assembly code to copy.");
+            }
+          });
+        } else if (btn.textContent.includes('Download')) {
+          btn.addEventListener('click', function() {
+            const container = this.parentElement;
+            const codeElement = container ? container.previousElementSibling : null;
+
+            if (codeElement && (codeElement.tagName === 'TEXTAREA' || codeElement.tagName === 'PRE')) {
+              const code = codeElement.value || codeElement.textContent;
+              const blob = new Blob([code], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'assembly.s';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              showSuccess("Assembly file downloaded!");
+            } else {
+              showError("Could not find the assembly code to download.");
+            }
+          });
+        }
+      });
     }
-}</code></pre>
-      </div>
-      <p>Use labels and conditional jumps (<code class="inline-code">jmp</code>, <code class="inline-code">je</code>, etc.), <code class="inline-code">call</code> / <code class="inline-code">ret</code> for functions, and <code class="inline-code">invoke</code> to call external APIs.</p>
-    </div>
 
-    <div class="section-block" id="appendix">
-      <h2>Appendix</h2>
-      <h3>Module Inclusion</h3>
-      <p>Include built-in functionality by adding it to the <code class="inline-code">module</code> section. Example:</p>
-      <pre><code>section module { io }</code></pre>
-      <p>This enables functions like <code class="inline-code">fopen</code>, <code class="inline-code">fread</code>, <code class="inline-code">fprintf</code>, and formatted I/O.</p>
-      <h3>Common Patterns</h3>
-      <ul>
-        <li><strong>Looping:</strong> Use <code class="inline-code">cmp</code> + conditional jumps with labels.</li>
-        <li><strong>Function calls:</strong> Define reusable routines with <code class="inline-code">function name:</code> and invoke via <code class="inline-code">call</code>.</li>
-        <li><strong>External Interop:</strong> <code class="inline-code">invoke</code> + <code class="inline-code">return</code> to communicate with C-style APIs.</li>
-      </ul>
-      <h3>Debug Tips</h3>
-      <p>Watch comparisons feeding conditional jumps. Maintain stack discipline when using <code class="inline-code">push</code> / <code class="inline-code">pop</code> / <code class="inline-code">stack_load</code> / <code class="inline-code">stack_store</code>. Use clear format strings to trace state.</p>
-    </div>
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length) {
+          connectAssemblyButtons();
+        }
+      }
+    });
 
-    <div class="footer">
-      <p>MXVM reference guide. Adapt and expand examples for teaching and experimentation.</p>
-      <p>Jared Bruni / LostSideDead &copy; 2025</p>
-    </div>
-  </div>
+    observer.observe(document.getElementById('output'), {
+      childList: true,
+      subtree: true
+    });
+
+    document.addEventListener('DOMContentLoaded', connectAssemblyButtons);
+  </script>
 </body>
 </html>
