@@ -1,5 +1,7 @@
 # MXVM
 
+* project updated
+
 **Still Under Development.**
 
 MXVM is a custom virtual machine and compiler/interpreter project written in C++. It provides a small, RISC-style bytecode language, a parser/AST frontend, an interpreter, and an x86_64 code generator — all designed as a sandbox for learning and experimentation.
