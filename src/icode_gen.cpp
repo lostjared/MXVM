@@ -652,15 +652,15 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-                    out << "\tmovq (%rax,%rcx,1), %rdx\n";
+                    out << "\tmovq (%rax,%rcx,8), %rdx\n";
                     out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                 case VarType::VAR_FLOAT:
-                    out << "\tmovsd (%rax,%rcx,1), %xmm0\n";
+                    out << "\tmovsd (%rax,%rcx,8), %xmm0\n";
                     out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                 case VarType::VAR_BYTE:
-                    out << "\tmovzbq (%rax,%rcx,1), %rdx\n";
+                    out << "\tmovzbq (%rax,%rcx,8), %rdx\n";
                     out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                 default:
@@ -773,14 +773,14 @@ namespace mxvm {
             if (isVariable(i.op1.op)) {
                 Variable &src = getVariable(i.op1.op);
                 if (src.type == VarType::VAR_FLOAT) {
-                    out << "\tmovsd %xmm0, (%rax,%rcx,1)\n";
+                    out << "\tmovsd %xmm0, (%rax,%rcx,8)\n";
                 } else if (src.type == VarType::VAR_BYTE) {
-                    out << "\tmovb %dl, (%rax,%rcx,1)\n";
+                    out << "\tmovb %dl, (%rax,%rcx,8)\n";
                 } else {
-                    out << "\tmovq %rdx, (%rax,%rcx,1)\n";
+                    out << "\tmovq %rdx, (%rax,%rcx,8)\n";
                 }
             } else {
-                out << "\tmovq %rdx, (%rax,%rcx,1)\n";
+                out << "\tmovq %rdx, (%rax,%rcx,8)\n";
             }
         }
     }

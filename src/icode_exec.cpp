@@ -1002,10 +1002,7 @@ static inline void releaseOwnedPointer(Variable& v) {
                         
                     
                         if (*str_dest != nullptr) {
-                            try {
-                                std::free(*str_dest);
-                            } catch (...) {
-                            }
+                            std::free(*str_dest);
                         }
                         
                         *str_dest = static_cast<char*>(std::malloc(str_len));
@@ -1097,14 +1094,18 @@ static inline void releaseOwnedPointer(Variable& v) {
 
         if (!instr.op3.op.empty()) {
             if (isVariable(instr.op3.op)) {
-                count = static_cast<size_t>(getVariable(instr.op3.op).var_value.int_value);
+                count = getVariable(instr.op3.op).var_value.int_value;
             } else {
-                count = static_cast<size_t>(std::stoll(instr.op3.op, nullptr, 0));
+                count = std::stoll(instr.op3.op, nullptr, 0);
             }
         }
+        if (size <= 0 || count <= 0) {
+            throw mx::Exception("ALLOC: size and count must be positive");
+        }
+        releaseOwnedPointer(dest);
         dest.type = VarType::VAR_POINTER;
         dest.var_value.type = VarType::VAR_POINTER;
-        dest.var_value.ptr_value = calloc(count, size);
+        dest.var_value.ptr_value = calloc(static_cast<size_t>(count), static_cast<size_t>(size));
         if (dest.var_value.ptr_value == nullptr) {
             throw mx::Exception("ALLOC failed: calloc returned nullptr");
         }
@@ -1626,7 +1627,7 @@ static inline void releaseOwnedPointer(Variable& v) {
                             v.var_value.int_value = 0;
                         }
                     } else if(s.type == VarType::VAR_FLOAT) {
-                        v.var_value.int_value = static_cast<int>(s.var_value.float_value);
+                        v.var_value.int_value = static_cast<int64_t>(s.var_value.float_value);
                     }
                 } else {
                     throw mx::Exception("to_int second argument must be a variable");
@@ -1718,13 +1719,14 @@ static inline void releaseOwnedPointer(Variable& v) {
             Variable &v = getVariable(instr.op1.op);
             switch(v.type) {
                 case VarType::VAR_INTEGER:
+                case VarType::VAR_BYTE:
                     v.var_value.int_value = -v.var_value.int_value;
                 break;
                 case VarType::VAR_FLOAT:
                     v.var_value.float_value = -v.var_value.float_value;
                 break;
             default:
-                    v.var_value.int_value = -v.var_value.int_value;
+                    throw mx::Exception("NEG: unsupported variable type");
             }
         }
     }

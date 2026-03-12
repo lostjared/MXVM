@@ -110,6 +110,7 @@ namespace mxvm {
             zero_flag(other.zero_flag),
             less_flag(other.less_flag),
             greater_flag(other.greater_flag),
+            carry_flag(other.carry_flag),
             xmm_offset(other.xmm_offset),
             args(std::move(other.args)),
             main_function(other.main_function),
@@ -139,6 +140,7 @@ namespace mxvm {
                 zero_flag = other.zero_flag;
                 less_flag = other.less_flag;
                 greater_flag = other.greater_flag;
+                carry_flag = other.carry_flag;
                 xmm_offset = other.xmm_offset;
                 args = std::move(other.args);
                 main_function = other.main_function;
@@ -190,7 +192,7 @@ namespace mxvm {
         bool zero_flag = false;
         bool less_flag = false;
         bool greater_flag = false;
-        bool carry_flag;  
+        bool carry_flag = false;  
         int xmm_offset = 0;
         std::vector<std::string> args;
         bool main_function;

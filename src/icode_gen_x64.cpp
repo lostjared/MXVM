@@ -651,10 +651,8 @@ namespace mxvm {
         }
 
         
-        out << "\taddq %rcx, %rax\n";
-
-        
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            out << "\taddq %rcx, %rax\n";
             if (isVariable(i.vop[0].op)) {
                 out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
             } else {
@@ -674,6 +672,9 @@ namespace mxvm {
             
             
             out << "\taddq %r8, %rax\n";
+        } else {
+            out << "\tshlq $3, %rcx\n";
+            out << "\taddq %rcx, %rax\n";
         }
 
         
@@ -742,10 +743,8 @@ namespace mxvm {
         }
 
      
-        out << "\taddq %rdx, %rcx\n";
-
-     
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            out << "\taddq %rdx, %rcx\n";
             if (isVariable(i.vop[0].op)) {
                 out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
             } else {
@@ -765,6 +764,9 @@ namespace mxvm {
             
      
             out << "\taddq %r8, %rcx\n";
+        } else {
+            out << "\tshlq $3, %rdx\n";
+            out << "\taddq %rdx, %rcx\n";
         }
 
      

@@ -166,6 +166,7 @@ Args proc_args(int argc, char **argv) {
                 case 'm':
                 case 140:
                     args.Makefile = true;
+                    break;
                 case 'I':
                 case 137:
                     args.include_path = arg.arg_value;
