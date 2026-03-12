@@ -52,16 +52,6 @@ program Test {
 		print fmt_int, rdi
 		print newline
 		mov r8, 0
-		mov r9, r8
-		cmp r9, 0
-		jl IDX_OOB_3
-		cmp r9, 10
-		jg IDX_OOB_3
-		jmp IDX_OK_2
-	IDX_OOB_3:
-		exit 1
-	IDX_OK_2:
-		mov r8, 0
 		mov _tmpptr1, px
 		add _tmpptr1, 16
 		load r9, _tmpptr1, r8, 8
