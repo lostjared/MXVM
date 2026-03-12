@@ -108,7 +108,7 @@ char* delete_str(const char* s, int64_t index, int64_t count) {
 char* inttostr(int64_t value) {
     char* buf = (char*)malloc(21); 
     if (!buf) return NULL;
-    snprintf(buf, 21, "%ld", value);
+    snprintf(buf, 21, "%lld", value);
     return buf;
 }
 
