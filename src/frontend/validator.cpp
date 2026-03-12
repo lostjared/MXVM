@@ -192,10 +192,12 @@ namespace mxx {
 
     void TPValidator::parseBlock() {
         if (isKW("label")) parseLabelSection();
-        if (isKW("const")) parseConstSection();
-        if (isKW("type")) parseTypeSection();
-        if (isKW("var")) parseVarSection();
-        while (isKW("procedure") || isKW("function")) parseSubprogram();
+        while (isKW("const") || isKW("type") || isKW("var") || isKW("procedure") || isKW("function")) {
+            if (isKW("const")) parseConstSection();
+            else if (isKW("type")) parseTypeSection();
+            else if (isKW("var")) parseVarSection();
+            else parseSubprogram();
+        }
         parseCompoundStatement();
     }
 

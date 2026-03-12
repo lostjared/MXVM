@@ -74,6 +74,208 @@ namespace pascal {
         for (auto idx : erase) if (idx < lines.size()) lines.erase(lines.begin() + idx);
     }
 
+    static std::vector<std::pair<size_t, std::string>> nextNonEmpty(
+            const std::vector<std::string>& code, size_t start, size_t n) {
+        std::vector<std::pair<size_t, std::string>> out;
+        for (size_t i = start; i < code.size() && out.size() < n; ++i) {
+            std::string t = trim(rtrim_comment(code[i]));
+            if (!t.empty()) out.push_back({i, t});
+        }
+        return out;
+    }
+
+    static std::string invertJump(const std::string& j) {
+        if      (j == "jg")  return "jle";
+        else if (j == "jle") return "jg";
+        else if (j == "jl")  return "jge";
+        else if (j == "jge") return "jl";
+        else if (j == "je")  return "jne";
+        else if (j == "jne") return "je";
+        else if (j == "ja")  return "jbe";
+        else if (j == "jbe") return "ja";
+        else if (j == "jb")  return "jae";
+        else if (j == "jae") return "jb";
+        return "";
+    }
+
+    static bool parse2(const std::string& line, const std::string& op,
+                       std::string& a, std::string& b) {
+        if (line.size() <= op.size() || line.compare(0, op.size(), op) != 0 ||
+            line[op.size()] != ' ') return false;
+        std::string rest = line.substr(op.size() + 1);
+        auto c = rest.find(',');
+        if (c == std::string::npos) return false;
+        a = trim(rest.substr(0, c));
+        b = trim(rest.substr(c + 1));
+        return !a.empty() && !b.empty();
+    }
+    static bool parse1(const std::string& line, const std::string& op, std::string& a) {
+        if (line.size() <= op.size() || line.compare(0, op.size(), op) != 0 ||
+            line[op.size()] != ' ') return false;
+        a = trim(line.substr(op.size() + 1));
+        return !a.empty();
+    }
+    static bool parseJump(const std::string& line, std::string& jop, std::string& label) {
+        if (line.size() < 3 || line[0] != 'j') return false;
+        auto sp = line.find(' ');
+        if (sp == std::string::npos) return false;
+        jop = line.substr(0, sp);
+        label = trim(line.substr(sp + 1));
+        return !label.empty() && jop != "jmp";
+    }
+    static bool isLabelDef(const std::string& line, const std::string& label) {
+        return line == label + ":";
+    }
+
+    static void foldCmpTest(std::vector<std::string>& code) {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i < code.size(); ++i) {
+                auto mat = nextNonEmpty(code, i, 7);
+                if (mat.size() < 7) break;
+
+                std::string cmpA, cmpB;
+                bool isFcmp = parse2(mat[0].second, "fcmp", cmpA, cmpB);
+                if (!isFcmp && !parse2(mat[0].second, "cmp", cmpA, cmpB)) continue;
+                std::string cmpOp = isFcmp ? "fcmp" : "cmp";
+
+                std::string jCC, trueLabel;
+                if (!parseJump(mat[1].second, jCC, trueLabel)) continue;
+
+                std::string reg, zero;
+                if (!parse2(mat[2].second, "mov", reg, zero) || zero != "0") continue;
+
+                std::string endLabel;
+                if (!parse1(mat[3].second, "jmp", endLabel)) continue;
+
+                if (!isLabelDef(mat[4].second, trueLabel)) continue;
+
+                std::string r5, one;
+                if (!parse2(mat[5].second, "mov", r5, one) || r5 != reg || one != "1") continue;
+
+                if (!isLabelDef(mat[6].second, endLabel)) continue;
+
+                auto rest = nextNonEmpty(code, mat[6].first + 1, 30);
+                bool found = false;
+                for (size_t j = 0; j + 1 < rest.size(); ++j) {
+                    if (rest[j].second.back() == ':') break;
+                    std::string wdst, wsrc;
+                    if (parse2(rest[j].second, "mov", wdst, wsrc) && wdst == reg) break;
+
+                    std::string rt, zt;
+                    if (parse2(rest[j].second, "cmp", rt, zt) && rt == reg && zt == "0") {
+                        std::string jTest, target;
+                        if (j + 1 < rest.size() && parseJump(rest[j+1].second, jTest, target) &&
+                            (jTest == "je" || jTest == "jne")) {
+                            std::string newJ = (jTest == "je") ? invertJump(jCC) : jCC;
+                            if (newJ.empty()) break;
+
+                            code[mat[0].first] = "\t\t" + cmpOp + " " + cmpA + ", " + cmpB;
+                            code[mat[1].first] = "\t\t" + newJ + " " + target;
+                            for (int k = 2; k <= 6; ++k) code[mat[k].first] = "";
+                            code[rest[j].first] = "";
+                            code[rest[j+1].first] = "";
+
+                            found = true;
+                            changed = true;
+                        }
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+        }
+    }
+
+    static void foldAndTest(std::vector<std::string>& code) {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i < code.size(); ++i) {
+                auto seq = nextNonEmpty(code, i, 11);
+                if (seq.size() < 11) break;
+
+                std::string r1, z0;
+                if (!parse2(seq[0].second, "cmp", r1, z0) || z0 != "0") continue;
+                std::string j1, zeroLabel;
+                if (!parse1(seq[1].second, "je", zeroLabel)) continue;
+                std::string r2, z2;
+                if (!parse2(seq[2].second, "cmp", r2, z2) || z2 != "0") continue;
+                std::string j3, zl3;
+                if (!parse1(seq[3].second, "je", zl3) || zl3 != zeroLabel) continue;
+                std::string r3, one;
+                if (!parse2(seq[4].second, "mov", r3, one) || one != "1") continue;
+                std::string endLabel;
+                if (!parse1(seq[5].second, "jmp", endLabel)) continue;
+                if (!isLabelDef(seq[6].second, zeroLabel)) continue;
+                std::string r7, z7;
+                if (!parse2(seq[7].second, "mov", r7, z7) || r7 != r3 || z7 != "0") continue;
+                if (!isLabelDef(seq[8].second, endLabel)) continue;
+                std::string r9, z9;
+                if (!parse2(seq[9].second, "cmp", r9, z9) || r9 != r3 || z9 != "0") continue;
+                std::string target;
+                if (!parse1(seq[10].second, "je", target)) continue;
+
+                code[seq[0].first] = "\t\tcmp " + r1 + ", 0";
+                code[seq[1].first] = "\t\tje " + target;
+                code[seq[2].first] = "\t\tcmp " + r2 + ", 0";
+                code[seq[3].first] = "\t\tje " + target;
+                for (int k = 4; k <= 10; ++k) code[seq[k].first] = "";
+                changed = true;
+                break;
+            }
+        }
+    }
+
+    static void foldOrTest(std::vector<std::string>& code) {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i < code.size(); ++i) {
+                auto seq = nextNonEmpty(code, i, 11);
+                if (seq.size() < 11) break;
+
+                std::string r1, z0;
+                if (!parse2(seq[0].second, "cmp", r1, z0) || z0 != "0") continue;
+                std::string oneLabel;
+                if (!parse1(seq[1].second, "jne", oneLabel)) continue;
+                std::string r2, z2;
+                if (!parse2(seq[2].second, "cmp", r2, z2) || z2 != "0") continue;
+                std::string ol3;
+                if (!parse1(seq[3].second, "jne", ol3) || ol3 != oneLabel) continue;
+                std::string r3, z4;
+                if (!parse2(seq[4].second, "mov", r3, z4) || z4 != "0") continue;
+                std::string endLabel;
+                if (!parse1(seq[5].second, "jmp", endLabel)) continue;
+                if (!isLabelDef(seq[6].second, oneLabel)) continue;
+                std::string r7, o7;
+                if (!parse2(seq[7].second, "mov", r7, o7) || r7 != r3 || o7 != "1") continue;
+                if (!isLabelDef(seq[8].second, endLabel)) continue;
+                std::string r9, z9;
+                if (!parse2(seq[9].second, "cmp", r9, z9) || r9 != r3 || z9 != "0") continue;
+                std::string target;
+                if (!parse1(seq[10].second, "je", target)) continue;
+
+                code[seq[0].first]  = "\t\tcmp " + r1 + ", 0";
+                code[seq[1].first]  = "\t\tjne " + oneLabel;
+                code[seq[2].first]  = "\t\tcmp " + r2 + ", 0";
+                code[seq[3].first]  = "\t\tje " + target;
+                code[seq[4].first]  = "\t" + oneLabel + ":";
+                for (int k = 5; k <= 10; ++k) code[seq[k].first] = "";
+                changed = true;
+                break;
+            }
+        }
+    }
+
+    static void peepholeOpt(std::vector<std::string>& code) {
+        foldAndTest(code);
+        foldOrTest(code);
+        foldCmpTest(code);
+        foldCmpTest(code);
+    }
+
     std::string mxvmOpt(const std::string &text) {
         std::vector<std::string> lines;
         {
@@ -161,9 +363,15 @@ namespace pascal {
             pass2.push_back(raw);
         }
 
+        peepholeOpt(pass2);
+
+        std::vector<std::string> pass3;
+        pass3.reserve(pass2.size());
+        for (auto &ln : pass2) if (!ln.empty()) pass3.push_back(ln);
+
         std::vector<std::string> finalLines;
         finalLines.insert(finalLines.end(), lines.begin(), lines.begin() + cStart);
-        finalLines.insert(finalLines.end(), pass2.begin(), pass2.end());
+        finalLines.insert(finalLines.end(), pass3.begin(), pass3.end());
         if (cEnd + 1 < lines.size())
             finalLines.insert(finalLines.end(), lines.begin() + cEnd + 1, lines.end());
 
