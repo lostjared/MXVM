@@ -1,4 +1,4 @@
-w#include "validator.hpp"
+#include "validator.hpp"
 #include <cctype>
 #include <unordered_set>
 
@@ -196,11 +196,7 @@ namespace mxx {
             if (isKW("const")) parseConstSection();
             else if (isKW("type")) parseTypeSection();
             else if (isKW("var")) parseVarSection();
-//<<<<<<< HEAD
-//            else if (isKW("procedure") || isKW("function")) parseSubprogram();
-//=======
-            else parseSubprogram();
-//>>>>>>> work
+            else if (isKW("procedure") || isKW("function")) parseSubprogram();
         }
         parseCompoundStatement();
     }
