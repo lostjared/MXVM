@@ -10,6 +10,36 @@
 #include<iomanip>
 #include<filesystem>
 
+namespace {
+    std::string html_escape(const std::string &s) {
+        std::string out;
+        out.reserve(s.size() * 12 / 10 + 8);
+        for (char c : s) {
+            switch (c) {
+                case '&':  out += "&amp;";  break;
+                case '<':  out += "&lt;";   break;
+                case '>':  out += "&gt;";   break;
+                case '"': out += "&quot;"; break;
+                case '\'': out += "&#39;";  break;
+                default:   out.push_back(c); break;
+            }
+        }
+        return out;
+    }
+    std::string js_escape(const std::string &s) {
+        std::string out;
+        for (char c : s) {
+            switch (c) {
+                case '\\': out += "\\\\"; break;
+                case '\'': out += "\\'"; break;
+                case '"':  out += "\\\""; break;
+                default:    out.push_back(c); break;
+            }
+        }
+        return html_escape(out);
+    }
+}
+
 namespace mxvm {
 
     bool debug_mode = false;
@@ -777,7 +807,7 @@ namespace mxvm {
 
     void Parser::printObjectHTML(std::ostream &out, const std::unique_ptr<Program> &objPtr) {
             out << R"(<div class="object-section">
-                <div class="object-title">Object: <span style="color: lime;"><strong>)" << objPtr->name << R"(</span></strong></div>)";
+                <div class="object-title">Object: <span style="color: lime;"><strong>)" << html_escape(objPtr->name) << R"(</span></strong></div>)";
                 out << R"(
                     <div class="stats" style="margin-bottom:30px;">
                         <div class="stat-card">
@@ -808,7 +838,7 @@ namespace mxvm {
                 out << R"(<div class="variables-grid">)";
                 for (const auto& var : objPtr->vars) {
                     out << R"(<div class="variable-card">
-                                <div class="variable-name">)" << var.first << R"(</div>
+                                <div class="variable-name">)" << html_escape(var.first) << R"(</div>
                                 <div class="variable-type">)";
                     switch (var.second.type) {
                         case VarType::VAR_INTEGER: out << "Integer"; break;
@@ -832,7 +862,7 @@ namespace mxvm {
                             out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
                             break;
                         case VarType::VAR_STRING:
-                            out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
+                            out << "\"" << html_escape(Program::escapeNewLines(var.second.var_value.str_value)) << "\"";
                             break;
                         case VarType::VAR_POINTER:
                         case VarType::VAR_EXTERN:
@@ -872,7 +902,7 @@ namespace mxvm {
                         <tbody>)";
                     for (const auto& label : objPtr->labels) {
                         out << R"(<tr>
-                            <td>)" << label.first << R"(</td>
+                            <td>)" << html_escape(label.first) << R"(</td>
                             <td>)" << "0x" << std::hex << label.second.first << std::dec << R"(</td>
                             <td>)" << (label.second.second ? "true" : "false") << R"(</td>
                         </tr>)";
@@ -907,14 +937,14 @@ namespace mxvm {
                     out << "<tr>"
                     << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
                     << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
-                    << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
-                    << "<td class=\"operand\">" << instr.op1.op << "</td>"
-                    << "<td class=\"operand\">" << instr.op2.op << "</td>"
-                    << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                    << "<td class=\"opcode-name\">" << html_escape(IncType[static_cast<int>(instr.instruction)]) << "</td>"
+                    << "<td class=\"operand\">" << html_escape(instr.op1.op) << "</td>"
+                    << "<td class=\"operand\">" << html_escape(instr.op2.op) << "</td>"
+                    << "<td class=\"operand\">" << html_escape(instr.op3.op) << "</td>"
                     << "<td class=\"operand\">";
                     for (size_t j = 0; j < instr.vop.size(); ++j) {
                         if (j > 0) out << ", ";
-                        out << instr.vop[j].op;
+                        out << html_escape(instr.vop[j].op);
                     }
                     out << "</td></tr>";
                 }
@@ -938,12 +968,12 @@ namespace mxvm {
                     out << R"(<div class="section">
     <div class="section-header"><span class="icon">&#x1F4DC;</span> Compiled Assembly</div>
     <div class="section-content">
-        <textarea id="asm-)" << objPtr->name << R"(" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
-out << objPtr->assembly_code;
+        <textarea id="asm-)" << html_escape(objPtr->name) << R"(" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
+out << html_escape(objPtr->assembly_code);
 out << R"(</textarea>
         <div style="margin-top:10px;">)";
-out << "<button class=\"btn\" onclick=\"copyAsm('asm-" << objPtr->name << "')\">Copy</button>";
-out << "<button class=\"btn\" onclick=\"downloadAsm('asm-" << objPtr->name << "', '" << objPtr->name << ".s')\">Download</button>";
+out << "<button class=\"btn\" onclick=\"copyAsm('asm-" << js_escape(objPtr->name) << "')\">Copy</button>";
+out << "<button class=\"btn\" onclick=\"downloadAsm('asm-" << js_escape(objPtr->name) << "', '" << js_escape(objPtr->name) << ".s')\">Download</button>";
 out << R"(</div>
     </div>
 </div>
@@ -956,7 +986,7 @@ out << R"(</div>
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>MXVM Debug Report - )" << program->name << R"(</title>
+                    <title>MXVM Debug Report - )" << html_escape(program->name) << R"(</title>
                     <style>
                         * {
                             margin: 0;
@@ -1186,7 +1216,7 @@ out << R"(</div>
                     <div class="container">
                         <div class="header">
                             <h1>MXVM Debug Report</h1>
-                            <div class="subtitle">Program: <span style="color: blue;"><strong>)" << program->name << R"(</span></strong></div>
+                            <div class="subtitle">Program: <span style="color: blue;"><strong>)" << html_escape(program->name) << R"(</span></strong></div>
                             <div class="stats">
                                 <div class="stat-card">
                                     <span class="number">)" << program->vars.size() << R"(</span>
@@ -1222,7 +1252,7 @@ out << R"(</div>
                         out << R"(<div class="variables-grid">)";
                         for (const auto& var : program->vars) {
                             out << R"(<div class="variable-card">
-                                <div class="variable-name">)" << var.first << R"(</div>
+                                <div class="variable-name">)" << html_escape(var.first) << R"(</div>
                                 <div class="variable-type">)";
                             
                             switch (var.second.type) {
@@ -1249,7 +1279,7 @@ out << R"(</div>
                                     out << std::fixed << std::setprecision(6) << var.second.var_value.float_value;
                                     break;
                                 case VarType::VAR_STRING:
-                                    out << "\"" << Program::escapeNewLines(var.second.var_value.str_value) << "\"";
+                                    out << "\"" << html_escape(Program::escapeNewLines(var.second.var_value.str_value)) << "\"";
                                     break;
                                 case VarType::VAR_POINTER:
                                 case VarType::VAR_EXTERN:
@@ -1290,7 +1320,7 @@ out << R"(</div>
                             </thead>
                             <tbody>)";
                         for (const auto& label : program->labels) {
-                            out << "<tr><td>" << label.first << "</td><td>0x" << std::hex << label.second.first << std::dec << R"(</td>
+                            out << "<tr><td>" << html_escape(label.first) << "</td><td>0x" << std::hex << label.second.first << std::dec << R"(</td>
                                 <td>)" << (label.second.second ? "true" : "false") << R"(</td>
                             </tr>)";
                         }
@@ -1329,14 +1359,14 @@ out << R"(</div>
                             out << "<tr>"
                             << "<td>0x" << std::hex << std::uppercase << i << std::dec << "</td>"
                             << "<td class=\"opcode\">0x" << std::hex << std::uppercase << static_cast<int>(instr.instruction) << std::dec << "</td>"
-                            << "<td class=\"opcode-name\">" << IncType[static_cast<int>(instr.instruction)] << "</td>"
-                            << "<td class=\"operand\">" << instr.op1.op << "</td>"
-                            << "<td class=\"operand\">" << instr.op2.op << "</td>"
-                            << "<td class=\"operand\">" << instr.op3.op << "</td>"
+                            << "<td class=\"opcode-name\">" << html_escape(IncType[static_cast<int>(instr.instruction)]) << "</td>"
+                            << "<td class=\"operand\">" << html_escape(instr.op1.op) << "</td>"
+                            << "<td class=\"operand\">" << html_escape(instr.op2.op) << "</td>"
+                            << "<td class=\"operand\">" << html_escape(instr.op3.op) << "</td>"
                             << "<td class=\"operand\">";
                             for (size_t j = 0; j < instr.vop.size(); ++j) {
                                 if (j > 0) out << ", ";
-                                out << instr.vop[j].op;
+                                out << html_escape(instr.vop[j].op);
                             }
                             out << "</td></tr>";
 
@@ -1349,11 +1379,11 @@ out << R"(</div>
                         <div class="section-header"><span class="icon">&#x1F4DC;</span> Compiled Assembly</div>
                         <div class="section-content">
                             <textarea id="asm-main" readonly style="width:100%;height:300px;background:#222;color:#e0e0e0;border-radius:8px;padding:16px;font-family:'Fira Mono', 'Consolas', 'Courier New', monospace;font-size:1rem;">)";
-                    out << program->assembly_code;
+                    out << html_escape(program->assembly_code);
                     out << R"(</textarea>
                             <div style="margin-top:10px;">)";
                     out << "<button class=\"btn\" onclick=\"copyAsm('asm-main')\">Copy</button>";
-                    out << "<button class=\"btn\" onclick=\"downloadAsm('asm-main', '" << program->name << ".s')\">Download</button>";
+                    out << "<button class=\"btn\" onclick=\"downloadAsm('asm-main', '" << js_escape(program->name) << ".s')\">Download</button>";
                     out << R"(</div>
                         </div>
                     </div>
