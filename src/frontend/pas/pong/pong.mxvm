@@ -92,65 +92,30 @@ program Pong {
 		mov rcx, 1
 		mov rsi, rcx
 		cmp running, rsi
-		je CMP_TRUE_2
-		mov rdx, 0
-		jmp CMP_END_3
-	CMP_TRUE_2:
-		mov rdx, 1
-	CMP_END_3:
-		cmp rdx, 0
-		je ENDWHILE_1
+		jne ENDWHILE_1
 	WHILE_4:
 		invoke poll_event
 		return rsi
 		mov r8, rsi
 		cmp r8, 0
-		jne CMP_TRUE_6
-		mov rdi, 0
-		jmp CMP_END_7
-	CMP_TRUE_6:
-		mov rdi, 1
-	CMP_END_7:
-		cmp rdi, 0
 		je ENDWHILE_5
 		invoke get_event_type
 		return r8
 		mov event_type_result, r8
 		cmp event_type_result, 256
-		je CMP_TRUE_10
-		mov r9, 0
-		jmp CMP_END_11
-	CMP_TRUE_10:
-		mov r9, 1
-	CMP_END_11:
-		cmp r9, 0
-		je ELSE_8
+		jne ELSE_8
 		mov r9, 0
 		mov running, r9
 		jmp ENDIF_9
 	ELSE_8:
 	ENDIF_9:
 		cmp event_type_result, 768
-		je CMP_TRUE_14
-		mov r9, 0
-		jmp CMP_END_15
-	CMP_TRUE_14:
-		mov r9, 1
-	CMP_END_15:
-		cmp r9, 0
-		je ELSE_12
+		jne ELSE_12
 		invoke get_key_code
 		return r9
 		mov key, r9
 		cmp key, 27
-		je CMP_TRUE_18
-		mov r9, 0
-		jmp CMP_END_19
-	CMP_TRUE_18:
-		mov r9, 1
-	CMP_END_19:
-		cmp r9, 0
-		je ELSE_16
+		jne ELSE_16
 		mov r9, 0
 		mov running, r9
 		jmp ENDIF_17
@@ -189,14 +154,7 @@ program Pong {
 		mov rbx, 1
 		mov rdx, rbx
 		cmp reset_ball_to_right, rdx
-		je CMP_TRUE_22
-		mov rcx, 0
-		jmp CMP_END_23
-	CMP_TRUE_22:
-		mov rcx, 1
-	CMP_END_23:
-		cmp rcx, 0
-		je ELSE_20
+		jne ELSE_20
 		mov ball_dx, 4
 		jmp ENDIF_21
 	ELSE_20:
@@ -210,14 +168,7 @@ program Pong {
 		mod rdi, 2
 		mov r9, rdi
 		cmp r9, 0
-		je CMP_TRUE_26
-		mov r8, 0
-		jmp CMP_END_27
-	CMP_TRUE_26:
-		mov r8, 1
-	CMP_END_27:
-		cmp r8, 0
-		je ELSE_24
+		jne ELSE_24
 		mov ball_dy, 4
 		jmp ENDIF_25
 	ELSE_24:
@@ -232,14 +183,7 @@ program Pong {
 		load rbx, clamp_paddle_p, 8, 1
 		mov rdx, rbx
 		cmp rdx, 0
-		jl CMP_TRUE_30
-		mov rcx, 0
-		jmp CMP_END_31
-	CMP_TRUE_30:
-		mov rcx, 1
-	CMP_END_31:
-		cmp rcx, 0
-		je ELSE_28
+		jge ELSE_28
 		store 0, clamp_paddle_p, 8, 1
 		jmp ENDIF_29
 	ELSE_28:
@@ -249,14 +193,7 @@ program Pong {
 		add rsi, 56
 		mov r8, rsi
 		cmp r8, 360
-		jg CMP_TRUE_34
-		mov rdi, 0
-		jmp CMP_END_35
-	CMP_TRUE_34:
-		mov rdi, 1
-	CMP_END_35:
-		cmp rdi, 0
-		je ELSE_32
+		jle ELSE_32
 		store 304, clamp_paddle_p, 8, 1
 		jmp ENDIF_33
 	ELSE_32:
@@ -268,13 +205,6 @@ program Pong {
 		return rbx
 		mov rdx, rbx
 		cmp rdx, 0
-		jne CMP_TRUE_38
-		mov rcx, 0
-		jmp CMP_END_39
-	CMP_TRUE_38:
-		mov rcx, 1
-	CMP_END_39:
-		cmp rcx, 0
 		je ELSE_36
 		load rdx, paddle1, 8, 1
 		mov rsi, rdx
@@ -287,13 +217,6 @@ program Pong {
 		return rdi
 		mov r9, rdi
 		cmp r9, 0
-		jne CMP_TRUE_42
-		mov r8, 0
-		jmp CMP_END_43
-	CMP_TRUE_42:
-		mov r8, 1
-	CMP_END_43:
-		cmp r8, 0
 		je ELSE_40
 		load r9, paddle1, 8, 1
 		add r9, 4
@@ -318,14 +241,7 @@ program Pong {
 		sub rdi, 4
 		mov r9, rdi
 		cmp update_ai_center_ball, r9
-		jl CMP_TRUE_46
-		mov r8, 0
-		jmp CMP_END_47
-	CMP_TRUE_46:
-		mov r8, 1
-	CMP_END_47:
-		cmp r8, 0
-		je ELSE_44
+		jge ELSE_44
 		load r9, paddle2, 8, 1
 		sub r9, 4
 		store r9, paddle2, 8, 1
@@ -335,14 +251,7 @@ program Pong {
 		add r9, 4
 		mov r11, r9
 		cmp update_ai_center_ball, r11
-		jg CMP_TRUE_50
-		mov r10, 0
-		jmp CMP_END_51
-	CMP_TRUE_50:
-		mov r10, 1
-	CMP_END_51:
-		cmp r10, 0
-		je ELSE_48
+		jle ELSE_48
 		load r9, paddle2, 8, 1
 		add r9, 4
 		store r9, paddle2, 8, 1
@@ -366,14 +275,7 @@ program Pong {
 		load rdi, ball, 8, 1
 		mov r9, rdi
 		cmp r9, 0
-		jle CMP_TRUE_54
-		mov r8, 0
-		jmp CMP_END_55
-	CMP_TRUE_54:
-		mov r8, 1
-	CMP_END_55:
-		cmp r8, 0
-		je ELSE_52
+		jg ELSE_52
 		store 0, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
@@ -385,14 +287,7 @@ program Pong {
 		add r9, 6
 		mov r11, r9
 		cmp r11, 360
-		jge CMP_TRUE_58
-		mov r10, 0
-		jmp CMP_END_59
-	CMP_TRUE_58:
-		mov r10, 1
-	CMP_END_59:
-		cmp r10, 0
-		je ELSE_56
+		jl ELSE_56
 		store 354, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
@@ -454,14 +349,7 @@ program Pong {
 		add r9, 6
 		mov r11, r9
 		cmp r11, 0
-		jl CMP_TRUE_66
-		mov r10, 0
-		jmp CMP_END_67
-	CMP_TRUE_66:
-		mov r10, 1
-	CMP_END_67:
-		cmp r10, 0
-		je ELSE_64
+		jge ELSE_64
 		mov r9, score_r
 		add r9, 1
 		mov score_r, r9
@@ -474,14 +362,7 @@ program Pong {
 		load r9, ball, 0, 1
 		mov r11, r9
 		cmp r11, 640
-		jg CMP_TRUE_70
-		mov r10, 0
-		jmp CMP_END_71
-	CMP_TRUE_70:
-		mov r10, 1
-	CMP_END_71:
-		cmp r10, 0
-		je ELSE_68
+		jle ELSE_68
 		mov r9, score_l
 		add r9, 1
 		mov score_l, r9
@@ -497,14 +378,7 @@ program Pong {
 		mov render_center_line_yy, 0
 	WHILE_72:
 		cmp render_center_line_yy, 360
-		jl CMP_TRUE_74
-		mov rbx, 0
-		jmp CMP_END_75
-	CMP_TRUE_74:
-		mov rbx, 1
-	CMP_END_75:
-		cmp rbx, 0
-		je ENDWHILE_73
+		jge ENDWHILE_73
 		mov rbx, 319
 		mov rcx, render_center_line_yy
 		mov rdx, 2
@@ -584,13 +458,6 @@ program Pong {
 		return rbx
 		mov init_result, rbx
 		cmp init_result, 0
-		jne CMP_TRUE_78
-		mov rcx, 0
-		jmp CMP_END_79
-	CMP_TRUE_78:
-		mov rcx, 1
-	CMP_END_79:
-		cmp rcx, 0
 		je ELSE_76
 		print fmt_str, str_3
 		print newline
@@ -605,14 +472,7 @@ program Pong {
 		sub rsi, 1
 		mov r8, rsi
 		cmp window_id, r8
-		je CMP_TRUE_82
-		mov rdi, 0
-		jmp CMP_END_83
-	CMP_TRUE_82:
-		mov rdi, 1
-	CMP_END_83:
-		cmp rdi, 0
-		je ELSE_80
+		jne ELSE_80
 		print fmt_str, str_4
 		print newline
 		invoke quit
@@ -629,14 +489,7 @@ program Pong {
 		sub r8, 1
 		mov r10, r8
 		cmp renderer, r10
-		je CMP_TRUE_86
-		mov r9, 0
-		jmp CMP_END_87
-	CMP_TRUE_86:
-		mov r9, 1
-	CMP_END_87:
-		cmp r9, 0
-		je ELSE_84
+		jne ELSE_84
 		print fmt_str, str_5
 		print newline
 		invoke destroy_window, window_id
@@ -652,14 +505,7 @@ program Pong {
 		sub r9, 1
 		mov r11, r9
 		cmp target_id, r11
-		je CMP_TRUE_90
-		mov r10, 0
-		jmp CMP_END_91
-	CMP_TRUE_90:
-		mov r10, 1
-	CMP_END_91:
-		cmp r10, 0
-		je ELSE_88
+		jne ELSE_88
 		print fmt_str, str_6
 		print newline
 		invoke destroy_renderer, renderer
@@ -673,13 +519,6 @@ program Pong {
 		return r9
 		mov r11, r9
 		cmp r11, 1
-		jne CMP_TRUE_94
-		mov r10, 0
-		jmp CMP_END_95
-	CMP_TRUE_94:
-		mov r10, 1
-	CMP_END_95:
-		cmp r10, 0
 		je ELSE_92
 		print fmt_str, str_7
 		print newline
@@ -694,14 +533,7 @@ program Pong {
 		sub r9, 1
 		mov r11, r9
 		cmp font_id, r11
-		je CMP_TRUE_98
-		mov r10, 0
-		jmp CMP_END_99
-	CMP_TRUE_98:
-		mov r10, 1
-	CMP_END_99:
-		cmp r10, 0
-		je ELSE_96
+		jne ELSE_96
 		print fmt_str, str_8
 		print fmt_str, filename
 		print newline
@@ -741,26 +573,12 @@ program Pong {
 		add rbx, aabb_aw
 		mov rdx, rbx
 		cmp rdx, aabb_bx
-		jle CMP_TRUE_100
-		mov rcx, 0
-		jmp CMP_END_101
-	CMP_TRUE_100:
-		mov rcx, 1
-	CMP_END_101:
+		jle OR_ONE_104
 		mov rdx, aabb_bx
 		add rdx, aabb_bw
 		mov rdi, rdx
 		cmp rdi, aabb_ax
-		jle CMP_TRUE_102
-		mov rsi, 0
-		jmp CMP_END_103
-	CMP_TRUE_102:
-		mov rsi, 1
-	CMP_END_103:
-		cmp rcx, 0
-		jne OR_ONE_104
-		cmp rsi, 0
-		jne OR_ONE_104
+		jle OR_ONE_104
 		mov rdi, 0
 		jmp OR_END_105
 	OR_ONE_104:
@@ -770,15 +588,8 @@ program Pong {
 		add r8, aabb_ah
 		mov r10, r8
 		cmp r10, aabb_by
-		jle CMP_TRUE_106
-		mov r9, 0
-		jmp CMP_END_107
-	CMP_TRUE_106:
-		mov r9, 1
-	CMP_END_107:
+		jle OR_ONE_108
 		cmp rdi, 0
-		jne OR_ONE_108
-		cmp r9, 0
 		jne OR_ONE_108
 		mov r10, 0
 		jmp OR_END_109
@@ -789,15 +600,8 @@ program Pong {
 		add r9, aabb_bh
 		mov r12, r9
 		cmp r12, aabb_ay
-		jle CMP_TRUE_110
-		mov r11, 0
-		jmp CMP_END_111
-	CMP_TRUE_110:
-		mov r11, 1
-	CMP_END_111:
+		jle OR_ONE_112
 		cmp r10, 0
-		jne OR_ONE_112
-		cmp r11, 0
 		jne OR_ONE_112
 		mov r9, 0
 		jmp OR_END_113
