@@ -314,6 +314,7 @@ namespace pascal {
         void expandFloatRegisters() {
             int currentSize = floatRegisters.size();
             floatRegisters.push_back("xmm" + std::to_string(currentSize));
+            floatRegInUse.push_back(false);
         }
         
         void freePtrReg(const std::string& reg) {
