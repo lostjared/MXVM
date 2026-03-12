@@ -12,12 +12,15 @@ find_package(SDL2_ttf REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
-
 target_include_directories(mxvm_sdl
     PRIVATE ${SDL2_INCLUDE_DIRS}
     ${SDL2_TTF_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_PREFIX_PATH}/include
+    ${CMAKE_PREFIX_PATH}/include/SDL2
+    ${CMAKE_PREFIX_PATH}
 )
+
 target_link_libraries(mxvm_sdl
     PRIVATE ${SDL2_LIBRARIES}
     ${SDL2_TTF_LIBRARIES}
