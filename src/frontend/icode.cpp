@@ -171,7 +171,6 @@ namespace pascal {
                             std::string newJ = (jTest == "je") ? invertJump(jCC) : jCC;
                             if (newJ.empty()) break;
 
-                            // Check that trueLabel is not referenced by other jumps
                             bool labelUsedElsewhere = false;
                             for (size_t k = 0; k < code.size(); ++k) {
                                 if (k == mat[1].first || k == rest[j+1].first) continue;
