@@ -342,26 +342,29 @@ static inline void releaseOwnedPointer(Variable& v) {
         Variable *src1 = nullptr, *src2 = nullptr;
         Variable temp1, temp2;
 
-        if (instr.op3.op.empty()) {
-            src1 = &dest;
-            if (isVariable(instr.op2.op)) {
-                src2 = &getVariable(instr.op2.op);
+        {
+            VarType constType = (dest.type == VarType::VAR_POINTER) ? VarType::VAR_INTEGER : dest.type;
+            if (instr.op3.op.empty()) {
+                src1 = &dest;
+                if (isVariable(instr.op2.op)) {
+                    src2 = &getVariable(instr.op2.op);
+                } else {
+                    temp2 = createTempVariable(constType, instr.op2.op);
+                    src2 = &temp2;
+                }
             } else {
-                temp2 = createTempVariable(dest.type, instr.op2.op);
-                src2 = &temp2;
-            }
-        } else {
-            if (isVariable(instr.op2.op)) {
-                src1 = &getVariable(instr.op2.op);
-            } else {
-                temp1 = createTempVariable(dest.type, instr.op2.op);
-                src1 = &temp1;
-            }
-            if (isVariable(instr.op3.op)) {
-                src2 = &getVariable(instr.op3.op);
-            } else {
-                temp2 = createTempVariable(dest.type, instr.op3.op);
-                src2 = &temp2;
+                if (isVariable(instr.op2.op)) {
+                    src1 = &getVariable(instr.op2.op);
+                } else {
+                    temp1 = createTempVariable(constType, instr.op2.op);
+                    src1 = &temp1;
+                }
+                if (isVariable(instr.op3.op)) {
+                    src2 = &getVariable(instr.op3.op);
+                } else {
+                    temp2 = createTempVariable(constType, instr.op3.op);
+                    src2 = &temp2;
+                }
             }
         }
 
@@ -378,26 +381,29 @@ static inline void releaseOwnedPointer(Variable& v) {
         Variable *src1 = nullptr, *src2 = nullptr;
         Variable temp1, temp2;
 
-        if (instr.op3.op.empty()) {
-            src1 = &dest;
-            if (isVariable(instr.op2.op)) {
-                src2 = &getVariable(instr.op2.op);
+        {
+            VarType constType = (dest.type == VarType::VAR_POINTER) ? VarType::VAR_INTEGER : dest.type;
+            if (instr.op3.op.empty()) {
+                src1 = &dest;
+                if (isVariable(instr.op2.op)) {
+                    src2 = &getVariable(instr.op2.op);
+                } else {
+                    temp2 = createTempVariable(constType, instr.op2.op);
+                    src2 = &temp2;
+                }
             } else {
-                temp2 = createTempVariable(dest.type, instr.op2.op);
-                src2 = &temp2;
-            }
-        } else {
-            if (isVariable(instr.op2.op)) {
-                src1 = &getVariable(instr.op2.op);
-            } else {
-                temp1 = createTempVariable(dest.type, instr.op2.op);
-                src1 = &temp1;
-            }
-            if (isVariable(instr.op3.op)) {
-                src2 = &getVariable(instr.op3.op);
-            } else {
-                temp2 = createTempVariable(dest.type, instr.op3.op);
-                src2 = &temp2;
+                if (isVariable(instr.op2.op)) {
+                    src1 = &getVariable(instr.op2.op);
+                } else {
+                    temp1 = createTempVariable(constType, instr.op2.op);
+                    src1 = &temp1;
+                }
+                if (isVariable(instr.op3.op)) {
+                    src2 = &getVariable(instr.op3.op);
+                } else {
+                    temp2 = createTempVariable(constType, instr.op3.op);
+                    src2 = &temp2;
+                }
             }
         }
 
@@ -712,7 +718,13 @@ static inline void releaseOwnedPointer(Variable& v) {
         }
     }
     void Program::addVariables(Variable& dest, Variable& src1, Variable& src2) {
-        if (dest.type == VarType::VAR_INTEGER) {
+        if (dest.type == VarType::VAR_POINTER) {
+            char* base = static_cast<char*>(src1.var_value.ptr_value);
+            int64_t offset = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
+            dest.var_value.ptr_value = base + offset;
+            dest.var_value.type = VarType::VAR_POINTER;
+            dest.var_value.owns = false;
+        } else if (dest.type == VarType::VAR_INTEGER) {
             int64_t v1 = (src1.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1.var_value.float_value) : src1.var_value.int_value;
             int64_t v2 = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
             dest.var_value.int_value = v1 + v2;
@@ -726,7 +738,13 @@ static inline void releaseOwnedPointer(Variable& v) {
     }
 
     void Program::subVariables(Variable& dest, Variable& src1, Variable& src2) {
-        if (dest.type == VarType::VAR_INTEGER) {
+        if (dest.type == VarType::VAR_POINTER) {
+            char* base = static_cast<char*>(src1.var_value.ptr_value);
+            int64_t offset = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
+            dest.var_value.ptr_value = base - offset;
+            dest.var_value.type = VarType::VAR_POINTER;
+            dest.var_value.owns = false;
+        } else if (dest.type == VarType::VAR_INTEGER) {
             int64_t v1 = (src1.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1.var_value.float_value) : src1.var_value.int_value;
             int64_t v2 = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
             dest.var_value.int_value = v1 - v2;
