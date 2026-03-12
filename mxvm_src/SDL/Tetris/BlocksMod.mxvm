@@ -32,8 +32,9 @@ object GameState {
         export int piece_x       = 3
         export int piece_y       = 0
 
-        export int speed         = 50
+        export int speed         = 800
         export int tick          = 0
+        export int last_drop     = 0
         export int game_over     = 0
         export int rand_seed     = 12345
 
@@ -829,6 +830,9 @@ object Game {
         invoke rand_number, 5020281
         return GameState.rand_seed
         call Engine.init
+        call SDLCore.get_ticks_now
+        mov GameState.eax, SDLCore.ret_i
+        mov GameState.last_drop, GameState.eax
         cmp GameState.show_start, 1
         jne skip_start
         call Render.start_screen
@@ -868,10 +872,11 @@ object Game {
         ret
 
     function update:
-        add GameState.tick, 1
+        mov GameState.tick, GameState.frame_start
+        sub GameState.tick, GameState.last_drop
         cmp GameState.tick, GameState.speed
         jl end_upd
-        mov GameState.tick, 0
+        mov GameState.last_drop, GameState.frame_start
         call move_down
     end_upd:
         mov GameState.rax, 0
@@ -901,6 +906,9 @@ object Game {
         mov GameState.piece_y, 0
         mov GameState.rotation, 0
         mov GameState.tick, 0
+        call SDLCore.get_ticks_now
+        mov GameState.eax, SDLCore.ret_i
+        mov GameState.last_drop, GameState.eax
         invoke rand_number, 12345
         return GameState.rand_seed
         call Board.alloc_clear

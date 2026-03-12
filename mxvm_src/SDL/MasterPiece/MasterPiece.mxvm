@@ -816,7 +816,7 @@ db_zero_loop:
         mov rax, t_row
         mov rcx, t_col
         call indexOf
-        store 0, data, rax, 1
+        store 0, data, rax, 8
         sub t_row, 1
         jmp db_zero_loop
 db_next_col:
