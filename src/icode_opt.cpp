@@ -18,12 +18,12 @@ namespace mxvm {
         return os.str();
     }
 
-    static inline std::string trim(std::string s) {
+    /*static inline std::string trim(std::string s) {
         auto issp = [](int c){ return std::isspace(c); };
         while (!s.empty() && issp(s.front())) s.erase(s.begin());
         while (!s.empty() && issp(s.back())) s.pop_back();
         return s;
-    }
+    }*/
 
     static bool is_label(const std::string& line) {
         static const std::regex re_label(R"(^\s*(?:[A-Za-z_.$][\w.$]*|\d+)\s*:)"); 
