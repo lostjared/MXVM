@@ -8,6 +8,22 @@
 
 namespace {
 
+    std::string html_escape(const std::string &s) {
+        std::string out;
+        out.reserve(s.size() * 12 / 10 + 8);
+        for (char c : s) {
+            switch (c) {
+                case '&':  out += "&amp;";  break;
+                case '<':  out += "&lt;";   break;
+                case '>':  out += "&gt;";   break;
+                case '"': out += "&quot;"; break;
+                case '\'': out += "&#39;";  break;
+                default:   out.push_back(c); break;
+            }
+        }
+        return out;
+    }
+
     struct BaseGuard {
         mxvm::Base* prev;                          
         explicit BaseGuard(mxvm::Base* p)          
@@ -84,11 +100,11 @@ public:
                 html << "Parse Error";
             }
         } catch (mx::Exception &e) {
-            html << "Error: " << e.what() << "<br>\n";
+            html << "Error: " << html_escape(e.what()) << "<br>\n";
         } catch (std::exception &e) {
-            html << "Exception: " << e.what() << "<br>\n";
+            html << "Exception: " << html_escape(e.what()) << "<br>\n";
         } catch (scan::ScanExcept &e) {
-            html << e.why() << "\n";
+            html << html_escape(e.why()) << "\n";
         } catch (...) {
             html << "Unknown Error: <br>";
         }
@@ -104,7 +120,7 @@ public:
                     </div>
                     <div class="section-content" style="padding:30px;">
                         <div class="error" style="background:#2c1810;border:1px solid #d32f2f;color:#ff8a80;padding:20px;margin:20px;border-radius:8px;font-family:'Courier New',monospace;">
-                            )" + html_err.str() + R"(
+                            )" + html_escape(html_err.str()) + R"(
                         </div>
                     </div>
                 </div>
