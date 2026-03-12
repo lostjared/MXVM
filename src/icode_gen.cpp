@@ -2,6 +2,8 @@
 
 namespace mxvm {
 
+    static int error_label_count = 0;
+
     std::string Program::getPlatformSymbolName(const std::string &name) {
         if(platform == Platform::DARWIN) {
             if(!name.empty() && name[0] != '_')
@@ -154,12 +156,19 @@ namespace mxvm {
             out << "main" << ":\n";
             out << "\tpush %rbp\n";
             out << "\tmov %rsp, %rbp\n";
-            
+            out << "\tpush %rbx\n";
             if(uses_std_module) {
-                out << "\t# Set up program arguments for std module\n";
-                out << "\tmov %rdi, %r12\n";  
-                out << "\tmov %rsi, %r13\n";  
+                out << "\tpush %r12\n";
+                out << "\tpush %r13\n";
+                out << "\tsub $8, %rsp\n";
+                out << "\tmov %rdi, %r12\n";
+                out << "\tmov %rsi, %r13\n";
+                out << "\tmovq %rsp, %rbx\n";
+                out << "\tandq $-16, %rsp\n";
                 out << "\tcall " << getPlatformSymbolName("set_program_args") << "\n";
+                out << "\tmovq %rbx, %rsp\n";
+            } else {
+                out << "\tsub $8, %rsp\n";
             }
         }
 
@@ -173,6 +182,8 @@ namespace mxvm {
                     out << getPlatformSymbolName(name + "_" + l.first) << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
+                    out << "\tpush %rbx\n";
+                    out << "\tsub $8, %rsp\n";
                     break;
                 }
             }            
@@ -358,16 +369,24 @@ namespace mxvm {
         }
 
         if(uses_std_module && !this->object) {
-            out << "\t# Clean up program arguments\n";
+            out << "\tmovq %rsp, %rbx\n";
+            out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
+            out << "\tmovq %rbx, %rsp\n";
         }
 
         out << "\txor %eax, %eax\n";
+        if(!this->object && uses_std_module) {
+            out << "\tmovq -24(%rbp), %r13\n";
+            out << "\tmovq -16(%rbp), %r12\n";
+        }
+        out << "\tmovq -8(%rbp), %rbx\n";
         out << "\tleave\n";
         out << "\tret\n";
     }
 
     void Program::gen_ret(std::ostream &out, const Instruction &i) {
+        out << "\tmovq -8(%rbp), %rbx\n";
         out << "\tleave\n";
         out << "\tret\n";
     }
@@ -445,15 +464,19 @@ namespace mxvm {
 
     void Program::generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op) {
         const std::vector<Operand> &args = op;
-       xmm_offset = 0;
+        xmm_offset = 0;
         size_t stack_args = (args.size() > 6) ? (args.size() - 6) : 0;
-        bool needs_dummy = (stack_args % 2) != 0; 
 
-        if (needs_dummy) out << "\tsub $8, %rsp\n";
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
+
         if (stack_args) {
-            for (size_t idx = args.size(); idx-- > 6; ) {
+            size_t stack_bytes = stack_args * 8;
+            size_t aligned = (stack_bytes + 15) & ~(size_t)15;
+            out << "\tsubq $" << aligned << ", %rsp\n";
+            for (size_t idx = 6, slot = 0; idx < args.size(); ++idx, ++slot) {
                 generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
-                out << "\tpushq %rax\n";
+                out << "\tmovq %rax, " << (slot * 8) << "(%rsp)\n";
             }
         }
 
@@ -464,15 +487,15 @@ namespace mxvm {
 
         out << "\txor %eax, %eax\n";
         out << "\tcall " << getPlatformSymbolName(name) << "\n";
-
-        if (stack_args || needs_dummy) {
-            out << "\tadd $" << ((stack_args + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
-        }
+        out << "\tmovq %rbx, %rsp\n";
     }
     
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
+            out << "\tmovq %rsp, %rbx\n";
+            out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName(getMangledName(i.op1)) << "\n";
+            out << "\tmovq %rbx, %rsp\n";
         } else {
             throw mx::Exception("Function " + i.op1.op + " not found!");
         }
@@ -510,8 +533,18 @@ namespace mxvm {
             out << "\tmovq $1, %rdi\n";
         
         }
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
         out << "\tcall " << getPlatformSymbolName("calloc") << "\n";
+        out << "\tmovq %rbx, %rsp\n";
+        out << "\ttest %rax, %rax\n";
+        out << "\tjz .alloc_failed_" << error_label_count << "\n";
         out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        out << "\tjmp .alloc_done_" << error_label_count << "\n";
+        out << ".alloc_failed_" << error_label_count << ":\n";
+        out << "\tmovq $0, " << getMangledName(i.op1) << "(%rip)\n";
+        out << ".alloc_done_" << error_label_count << ":\n";
+        error_label_count++;
         v.var_value.owns = true;
     }
 
@@ -765,7 +798,15 @@ namespace mxvm {
         }
 
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdi\n";
+        out << "\ttest %rdi, %rdi\n";
+        out << "\tjz 1f\n";
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
         out << "\tcall " << getPlatformSymbolName("free") << "\n";
+        out << "\tmovq %rbx, %rsp\n";
+        out << "\tmovq $0, " << getMangledName(i.op1) << "(%rip)\n";
+        out << "1:\n";
+        v.var_value.owns = false;
     }
  
     void Program::gen_to_int(std::ostream &out, const Instruction &i) {
@@ -804,7 +845,10 @@ namespace mxvm {
 
                 case VarType::VAR_STRING:
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rdi\n";
+                    out << "\tmovq %rsp, %rbx\n";
+                    out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atol") << "\n";
+                    out << "\tmovq %rbx, %rsp\n";
                     out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
                     break;
 
@@ -857,7 +901,10 @@ namespace mxvm {
 
                 case VarType::VAR_STRING:
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rdi\n";
+                    out << "\tmovq %rsp, %rbx\n";
+                    out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atof") << "\n";
+                    out << "\tmovq %rbx, %rsp\n";
                     out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
                     break;
 
@@ -1003,9 +1050,15 @@ namespace mxvm {
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\tmovq $" << dest.var_value.buffer_size << ", %rsi\n";
         out << "\tmovq "<<  getPlatformSymbolName("stdin") << "(%rip), %rdx\n";
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
         out << "\tcall " << getPlatformSymbolName("fgets") << "\n";
+        out << "\tmovq %rbx, %rsp\n";
         out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
         out << "\tcall " << getPlatformSymbolName("strlen") << "\n";
+        out << "\tmovq %rbx, %rsp\n";
         out << "\tmovq %rax, %rcx\n";
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
@@ -1207,7 +1260,10 @@ namespace mxvm {
                     count = 1;
                 } else if (v.type == VarType::VAR_STRING) {
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rdi\n";
+                    out << "\tmovq %rsp, %rbx\n";
+                    out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atof") << "\n";
+                    out << "\tmovq %rbx, %rsp\n";
                     out << "\tmovsd %xmm0, " << reg << "\n";
                     count = 1;
                 } else {
@@ -1226,7 +1282,10 @@ namespace mxvm {
                     out << "\tcvttsd2si %xmm0, " << reg << "\n";
                 } else if (v.type == VarType::VAR_STRING) {
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rdi\n";
+                    out << "\tmovq %rsp, %rbx\n";
+                    out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atol") << "\n";
+                    out << "\tmovq %rbx, %rsp\n";
                     out << "\tmovq %rax, " << reg << "\n";
                 } else {
                     throw mx::Exception("LoadVar: unsupported source type for integer");
@@ -1305,47 +1364,33 @@ namespace mxvm {
 
         int total = 0;
         const size_t stack_args = (args.size() > 5) ? (args.size() - 5) : 0;
-        const bool needs_dummy = (stack_args % 2) != 0; 
 
-        if (needs_dummy) {
-            out << "\tsub $8, %rsp\n";
-        }
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
 
-        if (args.size() > 5) {
-            for (size_t idx = args.size(); idx-- > 5; ) {
-                if (isVariable(args[idx].op)) {
-                    Variable &v = getVariable(args[idx].op);
-                    switch (v.type) {
-                        case VarType::VAR_INTEGER:
-                        case VarType::VAR_POINTER:
-                        case VarType::VAR_EXTERN:  {
-                            generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[idx]);
-                            out << "\tpushq %rax\n";
-                            break;
-                        }
-                        case VarType::VAR_BYTE: {
-                            generateLoadVar(out, VarType::VAR_BYTE, "%rax", args[idx]);
-                            out << "\tpushq %rax\n";
-                            break;
-                        }
-                        case VarType::VAR_FLOAT: {
-                            generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[idx]);
-                            out << "\tsub $8, %rsp\n";
-                            out << "\tmovsd %xmm0, (%rsp)\n";
-                            break;
-                        case VarType::VAR_STRING:
-                            std::cout << " STRING HERE \n";
-                        break;
-                        }
-                        default:
-                            throw mx::Exception("print: unsupported stack arg type");
+        if (stack_args) {
+            size_t stack_bytes = stack_args * 8;
+            size_t aligned = (stack_bytes + 15) & ~(size_t)15;
+            out << "\tsubq $" << aligned << ", %rsp\n";
+            size_t slot = 0;
+            for (size_t idx = 6; idx <= args.size(); ++idx, ++slot) {
+                size_t aidx = idx - 1;
+                if (isVariable(args[aidx].op)) {
+                    Variable &v = getVariable(args[aidx].op);
+                    if (v.type == VarType::VAR_FLOAT) {
+                        generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", args[aidx]);
+                        out << "\tmovsd %xmm0, " << (slot * 8) << "(%rsp)\n";
+                    } else {
+                        generateLoadVar(out, v.type, "%rax", args[aidx]);
+                        out << "\tmovq %rax, " << (slot * 8) << "(%rsp)\n";
                     }
                 } else {
-                    out << "\tpushq $" << args[idx].op << "\n";
+                    out << "\tmovq $" << args[aidx].op << ", " << (slot * 8) << "(%rsp)\n";
                 }
             }
         }
-        int reg_count = 1; 
+
+        int reg_count = 1;
         for (size_t z = 0; z < args.size() && reg_count < 6; ++z, ++reg_count) {
             total += generateLoadVar(out, reg_count, args[z]);
         }
@@ -1355,9 +1400,7 @@ namespace mxvm {
             out << "\tmovb $" << total << ", %al\n";
         }
         out << "\tcall " << getPlatformSymbolName("printf") << "\n";
-        if (stack_args || needs_dummy) {
-            out << "\tadd $" << ((stack_args + (needs_dummy ? 1 : 0)) * 8) << ", %rsp\n";
-        }
+        out << "\tmovq %rbx, %rsp\n";
     }
 
 
@@ -1484,16 +1527,6 @@ namespace mxvm {
 
         if (isVariable(i.op2.op)) {
             Variable &src = getVariable(i.op2.op);
-             if(dest.type == VarType::VAR_INTEGER  && src.type == VarType::VAR_FLOAT) {
-                out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
-                out << "\tcvttsd2si %xmm0, %rax\n";
-                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-            }
-            if(dest.type == VarType::VAR_FLOAT  && src.type == VarType::VAR_INTEGER) {
-                out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-                out << "\tcvtsi2sd %rax, %xmm0\n";
-                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-            }
             if (dest.type == VarType::VAR_FLOAT && src.type == VarType::VAR_FLOAT) {
                 out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
@@ -1503,7 +1536,10 @@ namespace mxvm {
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                 } else if (src.type == VarType::VAR_STRING) {
                     out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
+                    out << "\tmovq %rsp, %rbx\n";
+                    out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atof") << "\n";
+                    out << "\tmovq %rbx, %rsp\n";
                 } else {
                     out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
                     out << "\tcvtsi2sd %rax, %xmm0\n";
@@ -1522,7 +1558,10 @@ namespace mxvm {
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type == VarType::VAR_INTEGER && src.type == VarType::VAR_STRING) {
                 out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rdi\n";
+                out << "\tmovq %rsp, %rbx\n";
+                out << "\tandq $-16, %rsp\n";
                 out << "\tcall " << getPlatformSymbolName("atol") << "\n";
+                out << "\tmovq %rbx, %rsp\n";
                 out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
             } else if (dest.type == VarType::VAR_BYTE && src.type != VarType::VAR_BYTE) {
                 if (src.type == VarType::VAR_FLOAT) {
@@ -1633,7 +1672,10 @@ namespace mxvm {
             }
         }
         if(uses_std_module) {
+            out << "\tmovq %rsp, %rbx\n";
+            out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
+            out << "\tmovq %rbx, %rsp\n";
         }
 
         if(!i.op1.op.empty()) {

@@ -140,43 +140,31 @@ namespace mxvm {
         size_t frame = x64_reserve_call_area(out, spill_bytes);
 
         static const char* GPR[4] = {"%rcx", "%rdx", "%r8", "%r9"};
-        unsigned xmm_count = 0;
-        unsigned int_count = 0;
 
         for (size_t i = 0; i < args.size(); ++i) {
             VarType t = VarType::VAR_INTEGER;
             if (isVariable(args[i].op)) t = getVariable(args[i].op).type;
 
-            if (t == VarType::VAR_FLOAT) {
-                if (xmm_count < 4) {
-                    std::string xr = "%xmm" + std::to_string(xmm_count);
+            if (i < 4) {
+                if (t == VarType::VAR_FLOAT) {
+                    std::string xr = "%xmm" + std::to_string(i);
                     x64_generateLoadVar(out, VarType::VAR_FLOAT, xr, args[i]);
-                    ++xmm_count;
                 } else {
-                    const size_t off = 32 + 8 * (int_count - 4);
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm7", args[i]);
-                    out << "\tmovsd %xmm7, " << off << "(%rsp)\n";
-                    int_count++; 
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[i], args[i]);
                 }
             } else {
-                if (int_count < 4) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, GPR[int_count], args[i]);
-                    ++int_count;
+                const size_t off = 32 + 8 * (i - 4);
+                if (t == VarType::VAR_FLOAT) {
+                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm7", args[i]);
+                    out << "\tmovsd %xmm7, " << off << "(%rsp)\n";
                 } else {
-                    const size_t off = 32 + 8 * (int_count - 4);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", args[i]);
                     out << "\tmovq %rax, " << off << "(%rsp)\n";
-                    int_count++;
                 }
             }
         }
 
-        if (name == "printf") {
-            out << "\tmov $" << std::min<unsigned>(xmm_count, 4) << ", %al\n";
-        } else {
-            out << "\txor %eax, %eax\n";
-        }
-
+        out << "\txor %eax, %eax\n";
         out << "\tcall " << name << "\n";
         x64_release_call_area(out, frame);
     }
@@ -285,9 +273,10 @@ namespace mxvm {
             out << "main:\n";
             out << "\tpush %rbp\n";
             out << "\tmov %rsp, %rbp\n";
-            x64_sp_mod16 = 8;
+            x64_sp_mod16 = 0;
             if(uses_std_module) {
-                out << "\t# Set up program arguments for std module\n";
+                out << "\tpush %r12\n";
+                out << "\tpush %r13\n";
                 out << "\tmov %rcx, %r12\n";
                 out << "\tmov %rdx, %r13\n";
                 size_t total = x64_reserve_call_area(out, 0);
@@ -306,7 +295,7 @@ namespace mxvm {
                     out << name + "_" + l.first << ":\n";
                     out << "\tpush %rbp\n";
                     out << "\tmov %rsp, %rbp\n";
-                     x64_sp_mod16 = 8 ; 
+                    x64_sp_mod16 = 0;
                     break;
                 }
             }
@@ -345,6 +334,10 @@ namespace mxvm {
         }
 
         out << "\txor %eax, %eax\n";
+        if(!this->object && uses_std_module) {
+            out << "\tmovq -8(%rbp), %r12\n";
+            out << "\tmovq -16(%rbp), %r13\n";
+        }
         out << "\tleave\n";
         out << "\tret\n";
     }
@@ -353,6 +346,7 @@ namespace mxvm {
         out << "\tleave\n";
         out << "\tret\n";
     }
+
     void Program::x64_gen_return(std::ostream &out, const Instruction &i) {
             if (isVariable(i.op1.op)) {
                 if (this->last_call_returns_owned_ptr) {
@@ -846,8 +840,8 @@ namespace mxvm {
             if (isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if (v.type == VarType::VAR_INTEGER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     out << "\tcmpq $0, %rcx\n";
                     out << "\tje 1f\n";
                     out << "\tcqto\n";
@@ -875,8 +869,8 @@ namespace mxvm {
             if (isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if (v.type == VarType::VAR_INTEGER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     out << "\tcmpq $0, %rcx\n";
                     out << "\tje 1f\n";
                     out << "\tcqto\n";
@@ -908,8 +902,8 @@ namespace mxvm {
             if (isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if (v.type == VarType::VAR_INTEGER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     out << "\tcmpq $0, %rcx\n";
                     out << "\tje 1f\n";
                     out << "\tcqto\n";
@@ -925,8 +919,8 @@ namespace mxvm {
             if (isVariable(i.op1.op)) {
                 Variable &v = getVariable(i.op1.op);
                 if (v.type == VarType::VAR_INTEGER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
+                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     out << "\tcmpq $0, %rcx\n";
                     out << "\tje 1f\n";
                     out << "\tcqto\n";
@@ -976,8 +970,8 @@ namespace mxvm {
         out << "\tcmp $0, %rax\n";
         out << "\tje .over" << over_count << "\n";
         out << "\tsub $1, %rcx\n";
-        out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdi\n";
-        out << "\tmovb $0, (%rdi, %rcx, 1)\n";
+        out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rax\n";
+        out << "\tmovb $0, (%rax, %rcx, 1)\n";
         out << ".over" << over_count++ << ":\n";
     }
 
