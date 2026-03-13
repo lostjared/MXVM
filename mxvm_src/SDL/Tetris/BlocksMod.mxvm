@@ -827,6 +827,7 @@ object Game {
 
     section code {
     function start_game:
+        invoke seed_random
         invoke rand_number, 5020281
         return GameState.rand_seed
         call Engine.init
