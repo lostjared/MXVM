@@ -1710,8 +1710,12 @@ static inline void releaseOwnedPointer(Variable& v) {
             if(v.type != r.type) {
                 throw mx::Exception("Invalid return type: " + instr.op1.op + ":" + v_type_str + " != "  + result.op + ":" + r_type_str + " type mismatch.\n");
             }
+            releaseOwnedPointer(v);
             v = r;
             v.var_name = name;
+            if (r.type == VarType::VAR_POINTER) {
+                r.var_value.owns = false;
+            }
         }
     }
     void Program::exec_neg(const Instruction &instr) {

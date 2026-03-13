@@ -380,6 +380,9 @@ extern "C" void mxvm_string_copy(mxvm::Program *program, std::vector<mxvm::Opera
     strcpy(new_buf, result_str.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
+    program->vars["%rax"].var_value.ptr_size = 1;
+    program->vars["%rax"].var_value.ptr_count = static_cast<int64_t>(result_str.length() + 1);
+    program->vars["%rax"].var_value.owns = true;
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
@@ -399,6 +402,9 @@ extern "C" void mxvm_string_insert(mxvm::Program *program, std::vector<mxvm::Ope
     strcpy(new_buf, dest.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
+    program->vars["%rax"].var_value.ptr_size = 1;
+    program->vars["%rax"].var_value.ptr_count = static_cast<int64_t>(dest.length() + 1);
+    program->vars["%rax"].var_value.owns = true;
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
@@ -418,6 +424,9 @@ extern "C" void mxvm_string_delete(mxvm::Program *program, std::vector<mxvm::Ope
     strcpy(new_buf, s.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
+    program->vars["%rax"].var_value.ptr_size = 1;
+    program->vars["%rax"].var_value.ptr_count = static_cast<int64_t>(s.length() + 1);
+    program->vars["%rax"].var_value.owns = true;
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
@@ -433,6 +442,9 @@ extern "C" void mxvm_string_inttostr(mxvm::Program *program, std::vector<mxvm::O
     strcpy(new_buf, result_str.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
+    program->vars["%rax"].var_value.ptr_size = 1;
+    program->vars["%rax"].var_value.ptr_count = static_cast<int64_t>(result_str.length() + 1);
+    program->vars["%rax"].var_value.owns = true;
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
