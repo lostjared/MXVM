@@ -1,44 +1,42 @@
 cmake_minimum_required(VERSION 3.10)
 project(mxvm_sdl)
-set(SOURCES sdl.cpp)
-add_library(mxvm_sdl SHARED ${SOURCES})
-add_library(mxvm_sdl_static STATIC sdl.c)
-include(CheckFunctionExists)
-find_package(SDL2 REQUIRED)
-if(NOT SDL2_FOUND)
-    message(FATAL_ERROR "SDL2 library not found. Please install SDL2.")
+
+if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/usr/local")
 endif()
-find_package(SDL2_ttf REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-target_include_directories(mxvm_sdl
-    PRIVATE ${SDL2_INCLUDE_DIRS}
-    ${SDL2_TTF_INCLUDE_DIRS}
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+pkg_check_modules(SDL2_TTF REQUIRED IMPORTED_TARGET SDL2_ttf)
+
+add_library(mxvm_sdl_static STATIC sdl.c)
+add_library(mxvm_sdl SHARED sdl.cpp)
+
+target_include_directories(mxvm_sdl_static PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_PREFIX_PATH}/include
-    ${CMAKE_PREFIX_PATH}/include/SDL2
-    ${CMAKE_PREFIX_PATH}
 )
 
-target_link_libraries(mxvm_sdl
-    PRIVATE ${SDL2_LIBRARIES}
-    ${SDL2_TTF_LIBRARIES}
+target_include_directories(mxvm_sdl PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(mxvm_sdl_static PRIVATE 
+    PkgConfig::SDL2 
+    PkgConfig::SDL2_TTF 
     mxvm
-    mxvm_sdl_static
+)
 
-)
-target_include_directories(mxvm_sdl_static
-    PRIVATE ${SDL2_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(mxvm_sdl_static
-    PRIVATE ${SDL2_LIBRARIES}
-    SDL2_ttf
+target_link_libraries(mxvm_sdl PRIVATE 
+    mxvm_sdl_static
+    PkgConfig::SDL2 
+    PkgConfig::SDL2_TTF 
     mxvm
 )
 
 set_target_properties(mxvm_sdl PROPERTIES
+    PREFIX ""
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/sdl"
 )
 
@@ -50,10 +48,5 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/sdl.mxvm
 install(TARGETS mxvm_sdl mxvm_sdl_static
     LIBRARY DESTINATION lib/modules/sdl
     ARCHIVE DESTINATION lib/modules/sdl
+    RUNTIME DESTINATION lib/modules/sdl
 )
-
-if(WIN32)
-    install(TARGETS mxvm_sdl
-        RUNTIME DESTINATION lib/modules/sdl
-    )
-endif()
