@@ -27,9 +27,6 @@ int64_t init(void) {
 }
 
 void quit(void) {
-    if (g_windows) free(g_windows);
-    if (g_renderers) free(g_renderers);
-    if (g_textures) free(g_textures);
     if (g_fonts) {
         for (int64_t i = 0; i < g_font_count; ++i) {
             if (g_fonts[i]) TTF_CloseFont(g_fonts[i]);
@@ -45,6 +42,24 @@ void quit(void) {
     }
     if (g_target_widths) free(g_target_widths);
     if (g_target_heights) free(g_target_heights);
+    if (g_textures) {
+        for (int64_t i = 0; i < g_texture_count; ++i) {
+            if (g_textures[i]) SDL_DestroyTexture(g_textures[i]);
+        }
+        free(g_textures);
+    }
+    if (g_renderers) {
+        for (int64_t i = 0; i < g_renderer_count; ++i) {
+            if (g_renderers[i]) SDL_DestroyRenderer(g_renderers[i]);
+        }
+        free(g_renderers);
+    }
+    if (g_windows) {
+        for (int64_t i = 0; i < g_window_count; ++i) {
+            if (g_windows[i]) SDL_DestroyWindow(g_windows[i]);
+        }
+        free(g_windows);
+    }
     SDL_Quit();
 }
 
@@ -52,7 +67,9 @@ int64_t create_window(const char* title, int64_t x, int64_t y, int64_t w, int64_
     SDL_Window* window = SDL_CreateWindow(title, (int)x, (int)y, (int)w, (int)h, (Uint32)flags);
     if (!window) return -1;
     
-    g_windows = realloc(g_windows, sizeof(SDL_Window*) * (g_window_count + 1));
+    void *tmp = realloc(g_windows, sizeof(SDL_Window*) * (g_window_count + 1));
+    if (!tmp) { SDL_DestroyWindow(window); return -1; }
+    g_windows = tmp;
     g_windows[g_window_count] = window;
     SDL_Surface *surf = SDL_LoadBMP("icon.bmp");
     if(surf != NULL) { // if it is there
@@ -82,7 +99,9 @@ int64_t create_renderer(int64_t window_id, int64_t index, int64_t flags) {
     SDL_Renderer* renderer = SDL_CreateRenderer(g_windows[window_id], (int)index, (Uint32)flags);
     if (!renderer) return -1;
     
-    g_renderers = realloc(g_renderers, sizeof(SDL_Renderer*) * (g_renderer_count + 1));
+    void *tmp = realloc(g_renderers, sizeof(SDL_Renderer*) * (g_renderer_count + 1));
+    if (!tmp) { SDL_DestroyRenderer(renderer); return -1; }
+    g_renderers = tmp;
     g_renderers[g_renderer_count] = renderer;
     return g_renderer_count++;
 }
@@ -105,9 +124,19 @@ int64_t create_render_target(int64_t renderer_id, int64_t width, int64_t height)
     if (!target) return -1;
     
 
-    g_render_targets = realloc(g_render_targets, sizeof(SDL_Texture*) * (g_render_target_count + 1));
-    g_target_widths = realloc(g_target_widths, sizeof(int64_t) * (g_render_target_count + 1));
-    g_target_heights = realloc(g_target_heights, sizeof(int64_t) * (g_render_target_count + 1));
+    void *tmp1 = realloc(g_render_targets, sizeof(SDL_Texture*) * (g_render_target_count + 1));
+    void *tmp2 = realloc(g_target_widths, sizeof(int64_t) * (g_render_target_count + 1));
+    void *tmp3 = realloc(g_target_heights, sizeof(int64_t) * (g_render_target_count + 1));
+    if (!tmp1 || !tmp2 || !tmp3) {
+        if (tmp1) g_render_targets = tmp1;
+        if (tmp2) g_target_widths = tmp2;
+        if (tmp3) g_target_heights = tmp3;
+        SDL_DestroyTexture(target);
+        return -1;
+    }
+    g_render_targets = tmp1;
+    g_target_widths = tmp2;
+    g_target_heights = tmp3;
     
     g_render_targets[g_render_target_count] = target;
     g_target_widths[g_render_target_count] = width;
@@ -294,7 +323,9 @@ int64_t create_texture(int64_t renderer_id, int64_t format, int64_t access, int6
     SDL_Texture* texture = SDL_CreateTexture(g_renderers[renderer_id], (Uint32)format, (int)access, (int)w, (int)h);
     if (!texture) return -1;
     
-    g_textures = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    if (!tmp) { SDL_DestroyTexture(texture); return -1; }
+    g_textures = tmp;
     g_textures[g_texture_count] = texture;
     return g_texture_count++;
 }
@@ -316,7 +347,9 @@ int64_t load_texture(int64_t renderer_id, const char* file_path) {
     SDL_FreeSurface(surface);
     if (!texture) return -3;
     
-    g_textures = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
+    if (!tmp) { SDL_DestroyTexture(texture); return -1; }
+    g_textures = tmp;
     g_textures[g_texture_count] = texture;
     
     return g_texture_count++;
@@ -331,7 +364,7 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
         
         SDL_Rect *rc1 = &src_rect;
 
-        if(src_x == -1 || src_y == -1 && src_w == -1 && src_h == -1) {
+        if((src_x == -1 || src_y == -1) && src_w == -1 && src_h == -1) {
             rc1 = NULL;
         }
 
@@ -398,17 +431,19 @@ void pause_audio(int64_t pause_on) {
 }
 
 int64_t load_wav(const char* file_path, int64_t* audio_buf, int64_t* audio_len, int64_t* audio_spec) {
-    SDL_AudioSpec spec;
+    SDL_AudioSpec* spec = (SDL_AudioSpec*)malloc(sizeof(SDL_AudioSpec));
+    if (!spec) return 0;
     Uint8* buf;
     Uint32 len;
     
-    if (SDL_LoadWAV(file_path, &spec, &buf, &len) == NULL) {
+    if (SDL_LoadWAV(file_path, spec, &buf, &len) == NULL) {
+        free(spec);
         return 0;
     }
     
     *audio_buf = (int64_t)buf;
     *audio_len = len;
-    *audio_spec = (int64_t)&spec;
+    *audio_spec = (int64_t)spec;
     return 1;
 }
 
@@ -480,7 +515,10 @@ void set_clipboard_text(const char* text) {
 }
 
 const char* get_clipboard_text(void) {
-    return SDL_GetClipboardText();
+    static char* last_clipboard = NULL;
+    if (last_clipboard) SDL_free(last_clipboard);
+    last_clipboard = SDL_GetClipboardText();
+    return last_clipboard;
 }
 
 
@@ -543,7 +581,9 @@ void quit_text(void) {
 int64_t load_font(const char* file, int64_t ptsize) {
     TTF_Font* font = TTF_OpenFont(file, (int)ptsize);
     if (!font) return -1;
-    g_fonts = realloc(g_fonts, sizeof(TTF_Font*) * (g_font_count + 1));
+    void *tmp = realloc(g_fonts, sizeof(TTF_Font*) * (g_font_count + 1));
+    if (!tmp) { TTF_CloseFont(font); return -1; }
+    g_fonts = tmp;
     g_fonts[g_font_count] = font;
     return g_font_count++;
 }
