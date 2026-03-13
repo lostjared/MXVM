@@ -40,7 +40,7 @@ begin
   font_id := sdl_load_font('./font.ttf', 24);
   if font_id = -1 then
   begin
-	  writeln('Eror loading font');
+	  writeln('Error loading font');
 	  halt(-1);
   end;
 
