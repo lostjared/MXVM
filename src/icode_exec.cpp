@@ -1,6 +1,7 @@
 #include"mxvm/icode.hpp"
 #include<iostream>
 #include<iomanip>
+#include<cstring>
 
 namespace mxvm {
 
@@ -868,7 +869,7 @@ static inline void releaseOwnedPointer(Variable& v) {
 
         
         size_t offset = index * stride;
-        if (allocated_size > 0 && offset + stride > allocated_size) {
+        if (allocated_size > 0 && (stride == 0 || index > (allocated_size - stride) / stride || offset + stride > allocated_size)) {
             throw mx::Exception("LOAD: index out of bounds, offset " + std::to_string(offset) + 
                                " + stride " + std::to_string(stride) + 
                                " exceeds allocated size " + std::to_string(allocated_size));
@@ -880,15 +881,15 @@ static inline void releaseOwnedPointer(Variable& v) {
             switch (dest.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_BYTE:
-                    dest.var_value.int_value = *reinterpret_cast<int64_t*>(base);
+                    std::memcpy(&dest.var_value.int_value, base, sizeof(int64_t));
                     dest.var_value.type = dest.type;
                     break;
                 case VarType::VAR_FLOAT:
-                    dest.var_value.float_value = *reinterpret_cast<double*>(base);
+                    std::memcpy(&dest.var_value.float_value, base, sizeof(double));
                     dest.var_value.type = VarType::VAR_FLOAT;
                     break;
                 case VarType::VAR_POINTER:
-                    dest.var_value.ptr_value = *reinterpret_cast<void**>(base);
+                    std::memcpy(&dest.var_value.ptr_value, base, sizeof(void*));
                     dest.var_value.type = VarType::VAR_POINTER;
                     dest.var_value.owns = false; 
                     break;
@@ -898,7 +899,8 @@ static inline void releaseOwnedPointer(Variable& v) {
                         dest.var_value.str_value = std::string(1, *(base));
                     } else {
                         
-                        const char* str_ptr = *reinterpret_cast<const char**>(base);
+                        const char* str_ptr = nullptr;
+                        std::memcpy(&str_ptr, base, sizeof(const char*));
                         if (str_ptr != nullptr) {
                         
                             dest.var_value.str_value = str_ptr;
@@ -970,7 +972,7 @@ static inline void releaseOwnedPointer(Variable& v) {
 
         
         size_t offset = index * stride;
-        if (is_owned && allocated_size > 0 && offset + stride > allocated_size) {
+        if (is_owned && allocated_size > 0 && (stride == 0 || index > (allocated_size - stride) / stride || offset + stride > allocated_size)) {
             throw mx::Exception("STORE: index out of bounds, offset " + std::to_string(offset) + 
                           " + stride " + std::to_string(stride) + 
                           " exceeds allocated size " + std::to_string(allocated_size));
@@ -980,39 +982,43 @@ static inline void releaseOwnedPointer(Variable& v) {
         
         
         if (instr.op1.type == OperandType::OP_CONSTANT) {
-            *reinterpret_cast<int64_t*>(base) = std::stoll(instr.op1.op, nullptr, 0);
+            int64_t cval = std::stoll(instr.op1.op, nullptr, 0);
+            std::memcpy(base, &cval, sizeof(int64_t));
         } else {
             Variable& src = getVariable(instr.op1.op);
             switch (src.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_BYTE:
-                    *reinterpret_cast<int64_t*>(base) = src.var_value.int_value;
+                    std::memcpy(base, &src.var_value.int_value, sizeof(int64_t));
                     break;
                 case VarType::VAR_FLOAT:
-                    *reinterpret_cast<double*>(base) = src.var_value.float_value;
+                    std::memcpy(base, &src.var_value.float_value, sizeof(double));
                     break;
                 case VarType::VAR_POINTER:
-                    *reinterpret_cast<void**>(base) = src.var_value.ptr_value;
+                    std::memcpy(base, &src.var_value.ptr_value, sizeof(void*));
                     break;
                 case VarType::VAR_STRING: {
                     
                     if (is_owned && stride >= sizeof(char*)) {
-                        char** str_dest = reinterpret_cast<char**>(base);
+                        char* old_str = nullptr;
+                        std::memcpy(&old_str, base, sizeof(char*));
                         size_t str_len = src.var_value.str_value.size() + 1;
                         
                     
-                        if (*str_dest != nullptr) {
-                            std::free(*str_dest);
+                        if (old_str != nullptr) {
+                            std::free(old_str);
                         }
                         
-                        *str_dest = static_cast<char*>(std::malloc(str_len));
-                        if (*str_dest == nullptr) {
+                        char* new_str = static_cast<char*>(std::malloc(str_len));
+                        if (new_str == nullptr) {
                             throw mx::Exception("STORE: failed to allocate memory for string copy");
                         }
-                        std::strncpy(*str_dest, src.var_value.str_value.c_str(), str_len);
-                        (*str_dest)[str_len-1] = '\0'; 
+                        std::strncpy(new_str, src.var_value.str_value.c_str(), str_len);
+                        new_str[str_len-1] = '\0'; 
+                        std::memcpy(base, &new_str, sizeof(char*));
                     } else {
-                        *reinterpret_cast<const char**>(base) = src.var_value.str_value.c_str();
+                        const char* cstr = src.var_value.str_value.c_str();
+                        std::memcpy(base, &cstr, sizeof(const char*));
                     }
                     break;
                 }

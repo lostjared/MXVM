@@ -27,6 +27,9 @@ int64_t substr(char *dest, int64_t size, const char *src, int64_t pos, int64_t l
 }
 
 int64_t strat(const char *src, int64_t pos) {
+    if (!src || pos < 0) return 0;
+    size_t len = strlen(src);
+    if ((size_t)pos >= len) return 0;
     char c = *(src + pos);
     return (int64_t)c;
 }

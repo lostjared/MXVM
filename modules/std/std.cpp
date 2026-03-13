@@ -217,6 +217,9 @@ extern "C" void mxvm_std_malloc(mxvm::Program *program, std::vector<mxvm::Operan
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.ptr_value = result;
+    program->vars["%rax"].var_value.owns = true;
+    program->vars["%rax"].var_value.ptr_size = static_cast<uint64_t>(size);
+    program->vars["%rax"].var_value.ptr_count = 1;
 }
 
 extern "C" void mxvm_std_calloc(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
@@ -233,6 +236,9 @@ extern "C" void mxvm_std_calloc(mxvm::Program *program, std::vector<mxvm::Operan
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.ptr_value = result;
+    program->vars["%rax"].var_value.owns = true;
+    program->vars["%rax"].var_value.ptr_size = static_cast<uint64_t>(size);
+    program->vars["%rax"].var_value.ptr_count = static_cast<uint64_t>(count);
 }
 
 extern "C" void mxvm_std_release(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {

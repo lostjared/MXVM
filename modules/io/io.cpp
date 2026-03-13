@@ -218,10 +218,11 @@ extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Op
     }
     int64_t rsize = 1;
     if(program->isVariable(operand[0].op)) {
-        mxvm::Variable vsize = program->getVariable(operand[0].op);
+        mxvm::Variable &vsize = program->getVariable(operand[0].op);
         if (vsize.type != mxvm::VarType::VAR_INTEGER) {
             throw mx::Exception("rand_number argument must be integer (size).");
         }
+        rsize = vsize.var_value.int_value;
     } else {
 
         if(operand[0].type == mxvm::OperandType::OP_CONSTANT)
@@ -229,6 +230,9 @@ extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Op
         else 
              throw mx::Exception ("rand_number expected variable or constant: " + operand[0].op);
 
+    }
+    if (rsize <= 0) {
+        throw mx::Exception("rand_number: size must be positive, got " + std::to_string(rsize));
     }
     int result = std::rand()%rsize;
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
