@@ -40,8 +40,6 @@ void quit(void) {
     if (g_target_heights) { free(g_target_heights); g_target_heights = NULL; }
     g_render_target_count = 0;
 
-    /* Null out texture pointers before destroying the renderer, since
-       SDL_DestroyRenderer may also destroy associated textures internally. */
     if (g_textures) {
         for (int64_t i = 0; i < g_texture_count; ++i) {
             g_textures[i] = NULL;
@@ -283,15 +281,10 @@ int64_t load_texture(int64_t renderer_id, const char* file_path) {
 void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int64_t src_y, int64_t src_w, int64_t src_h, int64_t dst_x, int64_t dst_y, int64_t dst_w, int64_t dst_h) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id] &&
         texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
-
         SDL_Renderer *renderer = g_renderers[renderer_id];
         SDL_Texture  *texture  = g_textures[texture_id];
-
-        /* Query texture dimensions for UV calculation */
         int tex_w, tex_h;
         SDL_QueryTexture(texture, NULL, NULL, &tex_w, &tex_h);
-
-        /* Source rect: full texture if sentinel values */
         float su0 = 0.0f, sv0 = 0.0f, su1 = 1.0f, sv1 = 1.0f;
         if (!((src_x == -1 || src_y == -1) && src_w == -1 && src_h == -1)) {
             su0 = (float)src_x / tex_w;
@@ -300,7 +293,6 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
             sv1 = (float)(src_y + src_h) / tex_h;
         }
 
-        /* Destination rect: full renderer output if sentinel values */
         float dx, dy, dw, dh;
         if (dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
             int ow, oh;
@@ -311,8 +303,6 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
             dw = (float)dst_w; dh = (float)dst_h;
         }
 
-        /* Use SDL_RenderGeometry (vertex-based) to avoid SDL3-compat
-           crash in SDL_RenderCopy. Two triangles form a quad. */
         SDL_Color white = {255, 255, 255, 255};
         SDL_Vertex verts[4] = {
             { {dx,      dy     }, white, {su0, sv0} },

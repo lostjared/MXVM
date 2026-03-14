@@ -623,16 +623,7 @@ namespace mxvm {
                 Operand rax_op; rax_op.op = "rax";
                 out << "\tmovq %rax, " << getMangledName(rax_op) << "(%rip)\n";
             }
-            if (i.op1.op.find('.') == std::string::npos) {
-                // Internal call: callee-saved regs preserved by push/pop.
-                // Only update rax register with the return value.
-                auto it = sysv_reg_vars.find("rax");
-                if (it != sysv_reg_vars.end()) {
-                    out << "\tmovq %rax, " << it->second << "\n";
-                }
-            } else {
-                sysv_emitReloadRegs(out);
-            }
+            sysv_emitReloadRegs(out);
         } else {
             throw mx::Exception("Function " + i.op1.op + " not found!");
         }

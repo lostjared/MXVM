@@ -612,16 +612,7 @@ namespace mxvm {
                 Operand rax_op; rax_op.op = "rax";
                 out << "\tmovq %rax, " << getMangledName(rax_op) << "(%rip)\n";
             }
-            if (i.op1.op.find('.') == std::string::npos) {
-                // Internal call: callee-saved regs preserved by push/pop.
-                // Only update rax register with the return value.
-                auto it = x64_reg_vars.find("rax");
-                if (it != x64_reg_vars.end()) {
-                    out << "\tmovq %rax, " << it->second << "\n";
-                }
-            } else {
-                x64_emitReloadRegs(out);
-            }
+            x64_emitReloadRegs(out);
         }
         void Program::x64_gen_alloc(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) throw mx::Exception("ALLOC destination must be a variable");
