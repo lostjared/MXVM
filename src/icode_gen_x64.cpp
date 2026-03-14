@@ -412,6 +412,10 @@ namespace mxvm {
                     x64_sp_mod16 = 0;
                     x64_emitSaveRegs(out);
                     x64_emitReloadRegs(out);
+                    if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                        Operand rax_op; rax_op.op = "rax";
+                        x64_emitStoreVar(out, "%rax", rax_op);
+                    }
                     break;
                 }
             }
@@ -462,6 +466,10 @@ namespace mxvm {
 
     void Program::x64_gen_ret(std::ostream &out, const Instruction&) {
         x64_emitFlushRegs(out);
+        if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+            Operand rax_op; rax_op.op = "rax";
+            x64_emitLoadVar(out, "%rax", rax_op);
+        }
         x64_emitRestoreRegs(out);
         out << "\tleave\n";
         out << "\tret\n";
@@ -593,10 +601,27 @@ namespace mxvm {
     void Program::x64_gen_call(std::ostream &out, const Instruction &i) {
             if (!isFunctionValid(i.op1.op)) throw mx::Exception("Function not found");
             x64_emitFlushRegs(out);
+            if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                Operand rax_op; rax_op.op = "rax";
+                x64_emitLoadVar(out, "%rax", rax_op);
+            }
             size_t total = x64_reserve_call_area(out, 0);
             out << "\tcall " << getMangledName(i.op1) << "\n";
             x64_release_call_area(out, total);
-            x64_emitReloadRegs(out);
+            if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                Operand rax_op; rax_op.op = "rax";
+                out << "\tmovq %rax, " << getMangledName(rax_op) << "(%rip)\n";
+            }
+            if (i.op1.op.find('.') == std::string::npos) {
+                // Internal call: callee-saved regs preserved by push/pop.
+                // Only update rax register with the return value.
+                auto it = x64_reg_vars.find("rax");
+                if (it != x64_reg_vars.end()) {
+                    out << "\tmovq %rax, " << it->second << "\n";
+                }
+            } else {
+                x64_emitReloadRegs(out);
+            }
         }
         void Program::x64_gen_alloc(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) throw mx::Exception("ALLOC destination must be a variable");

@@ -11,12 +11,12 @@ static int64_t g_texture_count = 0;
 static TTF_Font** g_fonts = NULL;
 static int64_t g_font_count = 0;
 
-/* --- NEW: Render target management --- */
-static SDL_Texture** g_render_targets = NULL;    /* Render target textures */
-static int64_t* g_target_widths = NULL;          /* Logical width of render targets */
-static int64_t* g_target_heights = NULL;         /* Logical height of render targets */
+
+static SDL_Texture** g_render_targets = NULL;    
+static int64_t* g_target_widths = NULL;          
+static int64_t* g_target_heights = NULL;         
 static int64_t g_render_target_count = 0;
-/* --- END NEW --- */
+
 
 int64_t init(void) {
     SDL_SetMainReady();
@@ -32,33 +32,39 @@ void quit(void) {
             if (g_fonts[i]) TTF_CloseFont(g_fonts[i]);
         }
         free(g_fonts);
+        g_fonts = NULL;
+        g_font_count = 0;
     }
-    /* Clean up render targets */
-    if (g_render_targets) {
-        for (int64_t i = 0; i < g_render_target_count; ++i) {
-            if (g_render_targets[i]) SDL_DestroyTexture(g_render_targets[i]);
-        }
-        free(g_render_targets);
-    }
-    if (g_target_widths) free(g_target_widths);
-    if (g_target_heights) free(g_target_heights);
+
+    if (g_target_widths) { free(g_target_widths); g_target_widths = NULL; }
+    if (g_target_heights) { free(g_target_heights); g_target_heights = NULL; }
+    g_render_target_count = 0;
+
+    /* Null out texture pointers before destroying the renderer, since
+       SDL_DestroyRenderer may also destroy associated textures internally. */
     if (g_textures) {
         for (int64_t i = 0; i < g_texture_count; ++i) {
-            if (g_textures[i]) SDL_DestroyTexture(g_textures[i]);
+            g_textures[i] = NULL;
         }
         free(g_textures);
+        g_textures = NULL;
+        g_texture_count = 0;
     }
     if (g_renderers) {
         for (int64_t i = 0; i < g_renderer_count; ++i) {
             if (g_renderers[i]) SDL_DestroyRenderer(g_renderers[i]);
         }
         free(g_renderers);
+        g_renderers = NULL;
+        g_renderer_count = 0;
     }
     if (g_windows) {
         for (int64_t i = 0; i < g_window_count; ++i) {
             if (g_windows[i]) SDL_DestroyWindow(g_windows[i]);
         }
         free(g_windows);
+        g_windows = NULL;
+        g_window_count = 0;
     }
     SDL_Quit();
 }
@@ -72,7 +78,7 @@ int64_t create_window(const char* title, int64_t x, int64_t y, int64_t w, int64_
     g_windows = tmp;
     g_windows[g_window_count] = window;
     SDL_Surface *surf = SDL_LoadBMP("icon.bmp");
-    if(surf != NULL) { // if it is there
+    if(surf != NULL) { 
         SDL_SetWindowIcon(window, surf);
         SDL_FreeSurface(surf);
     }
@@ -116,58 +122,37 @@ void destroy_renderer(int64_t renderer_id) {
 
 int64_t create_render_target(int64_t renderer_id, int64_t width, int64_t height) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
-    
-    SDL_Texture* target = SDL_CreateTexture(g_renderers[renderer_id], 
-                                          SDL_PIXELFORMAT_RGBA8888, 
-                                          SDL_TEXTUREACCESS_TARGET, 
-                                          (int)width, (int)height);
-    if (!target) return -1;
-    
 
-    void *tmp1 = realloc(g_render_targets, sizeof(SDL_Texture*) * (g_render_target_count + 1));
+    SDL_RenderSetLogicalSize(g_renderers[renderer_id], (int)width, (int)height);
+
     void *tmp2 = realloc(g_target_widths, sizeof(int64_t) * (g_render_target_count + 1));
     void *tmp3 = realloc(g_target_heights, sizeof(int64_t) * (g_render_target_count + 1));
-    if (!tmp1 || !tmp2 || !tmp3) {
-        if (tmp1) g_render_targets = tmp1;
+    if (!tmp2 || !tmp3) {
         if (tmp2) g_target_widths = tmp2;
         if (tmp3) g_target_heights = tmp3;
-        SDL_DestroyTexture(target);
         return -1;
     }
-    g_render_targets = tmp1;
     g_target_widths = tmp2;
     g_target_heights = tmp3;
-    
-    g_render_targets[g_render_target_count] = target;
+
     g_target_widths[g_render_target_count] = width;
     g_target_heights[g_render_target_count] = height;
-    SDL_SetRenderTarget(g_renderers[renderer_id], target);
+
     SDL_SetRenderDrawColor(g_renderers[renderer_id], 0, 0, 0, 255);
     SDL_RenderClear(g_renderers[renderer_id]);
-    
+
     return g_render_target_count++;
 }
 
-/* Set an existing render target as active */
+
 void set_render_target(int64_t renderer_id, int64_t target_id) {
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
-    
-    if (target_id == -1) {
-        // Set to default (window) render target
-        SDL_SetRenderTarget(g_renderers[renderer_id], NULL);
-    } else if (target_id >= 0 && target_id < g_render_target_count && g_render_targets[target_id]) {
-        SDL_SetRenderTarget(g_renderers[renderer_id], g_render_targets[target_id]);
-    }
+    (void)renderer_id;
+    (void)target_id;
 }
 
-/* Destroy a render target */
 void destroy_render_target(int64_t target_id) {
-    if (target_id >= 0 && target_id < g_render_target_count && g_render_targets[target_id]) {
-        SDL_DestroyTexture(g_render_targets[target_id]);
-        g_render_targets[target_id] = NULL;
-    }
+    (void)target_id;
 }
-/* --- END NEW --- */
 
 int64_t poll_event(void) {
     return SDL_PollEvent(&g_event);
@@ -213,80 +198,20 @@ void present(int64_t renderer_id) {
 }
 
 void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width, int64_t scale_height) {
+    (void)target_id;
+    (void)scale_width;
+    (void)scale_height;
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
-    if (target_id < 0 || target_id >= g_render_target_count || !g_render_targets[target_id]) return;
-    
-    SDL_Renderer* renderer = g_renderers[renderer_id];
-    SDL_Texture* target = g_render_targets[target_id];
-    
-
-    SDL_SetRenderTarget(renderer, NULL);
-    
-
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-    
-
-    SDL_Window* window = NULL;
-    for (int i = 0; i < g_window_count; i++) {
-        if (g_windows[i] && SDL_GetRenderer(g_windows[i]) == renderer) {
-            window = g_windows[i];
-            break;
-        }
-    }
-    
-    int window_w, window_h;
-    if (window) {
-        SDL_GetWindowSize(window, &window_w, &window_h);
-    } else {
-        window_w = (int)scale_width;
-        window_h = (int)scale_height;
-    }
-    
-
-    int target_w = (int)scale_width;
-    int target_h = (int)scale_height;
-    
-    float scale_x = (float)window_w / target_w;
-    float scale_y = (float)window_h / target_h;
-    float scale = (scale_x < scale_y) ? scale_x : scale_y; 
-    
-    int scaled_w = (int)(target_w * scale);
-    int scaled_h = (int)(target_h * scale);
-    
-    int x = (window_w - scaled_w) / 2;
-    int y = (window_h - scaled_h) / 2;
-    
-    SDL_Rect dst = { x, y, scaled_w, scaled_h };
-    SDL_RenderCopy(renderer, target, NULL, &dst);
-    SDL_RenderPresent(renderer);
-    SDL_SetRenderTarget(renderer, target);
+    SDL_RenderPresent(g_renderers[renderer_id]);
 }
 
 
 void present_stretched(int64_t renderer_id, int64_t target_id, int64_t dst_width, int64_t dst_height) {
+    (void)target_id;
+    (void)dst_width;
+    (void)dst_height;
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
-    if (target_id < 0 || target_id >= g_render_target_count || !g_render_targets[target_id]) return;
-    
-    SDL_Renderer* renderer = g_renderers[renderer_id];
-    SDL_Texture* target = g_render_targets[target_id];
-    
-
-    SDL_SetRenderTarget(renderer, NULL);
-    
-
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-    
-
-    SDL_Rect dst = { 0, 0, (int)dst_width, (int)dst_height };
-    SDL_RenderCopy(renderer, target, NULL, &dst);
-    
-
-    SDL_RenderPresent(renderer);
-    
-
-    SDL_SetRenderTarget(renderer, target);
+    SDL_RenderPresent(g_renderers[renderer_id]);
 }
 
 
@@ -358,22 +283,45 @@ int64_t load_texture(int64_t renderer_id, const char* file_path) {
 void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int64_t src_y, int64_t src_w, int64_t src_h, int64_t dst_x, int64_t dst_y, int64_t dst_w, int64_t dst_h) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id] &&
         texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
-        
-        SDL_Rect src_rect = { (int)src_x, (int)src_y, (int)src_w, (int)src_h };
-        SDL_Rect dst_rect = { (int)dst_x, (int)dst_y, (int)dst_w, (int)dst_h };
-        
-        SDL_Rect *rc1 = &src_rect;
 
-        if((src_x == -1 || src_y == -1) && src_w == -1 && src_h == -1) {
-            rc1 = NULL;
+        SDL_Renderer *renderer = g_renderers[renderer_id];
+        SDL_Texture  *texture  = g_textures[texture_id];
+
+        /* Query texture dimensions for UV calculation */
+        int tex_w, tex_h;
+        SDL_QueryTexture(texture, NULL, NULL, &tex_w, &tex_h);
+
+        /* Source rect: full texture if sentinel values */
+        float su0 = 0.0f, sv0 = 0.0f, su1 = 1.0f, sv1 = 1.0f;
+        if (!((src_x == -1 || src_y == -1) && src_w == -1 && src_h == -1)) {
+            su0 = (float)src_x / tex_w;
+            sv0 = (float)src_y / tex_h;
+            su1 = (float)(src_x + src_w) / tex_w;
+            sv1 = (float)(src_y + src_h) / tex_h;
         }
 
-        SDL_Rect *dst_rc =    &dst_rect;
-        if(dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
-            dst_rc = NULL;
+        /* Destination rect: full renderer output if sentinel values */
+        float dx, dy, dw, dh;
+        if (dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
+            int ow, oh;
+            SDL_GetRendererOutputSize(renderer, &ow, &oh);
+            dx = 0; dy = 0; dw = (float)ow; dh = (float)oh;
+        } else {
+            dx = (float)dst_x; dy = (float)dst_y;
+            dw = (float)dst_w; dh = (float)dst_h;
         }
 
-        SDL_RenderCopy(g_renderers[renderer_id], g_textures[texture_id],rc1,dst_rc);
+        /* Use SDL_RenderGeometry (vertex-based) to avoid SDL3-compat
+           crash in SDL_RenderCopy. Two triangles form a quad. */
+        SDL_Color white = {255, 255, 255, 255};
+        SDL_Vertex verts[4] = {
+            { {dx,      dy     }, white, {su0, sv0} },
+            { {dx + dw, dy     }, white, {su1, sv0} },
+            { {dx + dw, dy + dh}, white, {su1, sv1} },
+            { {dx,      dy + dh}, white, {su0, sv1} },
+        };
+        int indices[6] = {0, 1, 2, 0, 2, 3};
+        SDL_RenderGeometry(renderer, texture, verts, 4, indices, 6);
     }
 }
 
@@ -603,7 +551,19 @@ void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x
     }
 
     SDL_Rect dst = { (int)x, (int)y, surface->w, surface->h };
-    SDL_RenderCopy(g_renderers[renderer_id], texture, NULL, &dst);
+
+    /* Use SDL_RenderGeometry to avoid SDL3-compat crash */
+    float fx = (float)x, fy = (float)y;
+    float fw = (float)surface->w, fh = (float)surface->h;
+    SDL_Color white = {255, 255, 255, 255};
+    SDL_Vertex verts[4] = {
+        { {fx,      fy     }, white, {0.0f, 0.0f} },
+        { {fx + fw, fy     }, white, {1.0f, 0.0f} },
+        { {fx + fw, fy + fh}, white, {1.0f, 1.0f} },
+        { {fx,      fy + fh}, white, {0.0f, 1.0f} },
+    };
+    int indices[6] = {0, 1, 2, 0, 2, 3};
+    SDL_RenderGeometry(g_renderers[renderer_id], texture, verts, 4, indices, 6);
 
     SDL_DestroyTexture(texture);
     SDL_FreeSurface(surface);

@@ -288,6 +288,10 @@ namespace mxvm {
                     out << "\tsub $8, %rsp\n";
                     sysv_emitSaveRegs(out);
                     sysv_emitReloadRegs(out);
+                    if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                        Operand rax_op; rax_op.op = "rax";
+                        sysv_emitStoreVar(out, "%rax", rax_op);
+                    }
                     break;
                 }
             }            
@@ -495,6 +499,10 @@ namespace mxvm {
 
     void Program::gen_ret(std::ostream &out, const Instruction &i) {
         sysv_emitFlushRegs(out);
+        if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+            Operand rax_op; rax_op.op = "rax";
+            sysv_emitLoadVar(out, "%rax", rax_op);
+        }
         sysv_emitRestoreRegs(out);
         out << "\tmovq -8(%rbp), %rbx\n";
         out << "\tleave\n";
@@ -603,11 +611,28 @@ namespace mxvm {
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
             sysv_emitFlushRegs(out);
+            if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                Operand rax_op; rax_op.op = "rax";
+                sysv_emitLoadVar(out, "%rax", rax_op);
+            }
             out << "\tmovq %rsp, %rbx\n";
             out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName(getMangledName(i.op1)) << "\n";
             out << "\tmovq %rbx, %rsp\n";
-            sysv_emitReloadRegs(out);
+            if (isVariable("rax") && getVariable("rax").type == VarType::VAR_INTEGER) {
+                Operand rax_op; rax_op.op = "rax";
+                out << "\tmovq %rax, " << getMangledName(rax_op) << "(%rip)\n";
+            }
+            if (i.op1.op.find('.') == std::string::npos) {
+                // Internal call: callee-saved regs preserved by push/pop.
+                // Only update rax register with the return value.
+                auto it = sysv_reg_vars.find("rax");
+                if (it != sysv_reg_vars.end()) {
+                    out << "\tmovq %rax, " << it->second << "\n";
+                }
+            } else {
+                sysv_emitReloadRegs(out);
+            }
         } else {
             throw mx::Exception("Function " + i.op1.op + " not found!");
         }
@@ -625,7 +650,7 @@ namespace mxvm {
 
         if (!i.op2.op.empty()) {
             if (isVariable(i.op2.op)) {
-                out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rsi\n";
+                sysv_emitLoadVar(out, "%rsi", i.op2);
             } else {
                 out << "\tmovq $" << i.op2.op << ", %rsi\n";
             }
@@ -635,7 +660,7 @@ namespace mxvm {
         
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
-                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rdi\n";
+                sysv_emitLoadVar(out, "%rdi", i.op3);
             } else if (i.op3.type == OperandType::OP_CONSTANT) {
                 out << "\tmovq $" << i.op3.op << ", %rdi\n";
             } else {
