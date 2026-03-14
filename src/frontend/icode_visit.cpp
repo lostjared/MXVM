@@ -849,6 +849,23 @@ namespace pascal {
             }
             if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
+            VarType elemType = VarType::INT;
+            if (info->elementType == "real") elemType = VarType::DOUBLE;
+            else if (info->elementType == "string" || info->elementType == "ptr") elemType = VarType::PTR;
+
+            VarType rhsType = getExpressionType(node.expression.get());
+            if (elemType == VarType::DOUBLE && rhsType != VarType::DOUBLE && !isFloatReg(rhs)) {
+                std::string f = allocFloatReg();
+                emit2("mov", f, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = f;
+            } else if (elemType != VarType::DOUBLE && rhsType == VarType::DOUBLE && isFloatReg(rhs)) {
+                std::string ir = allocReg();
+                emit2("mov", ir, rhs);
+                if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
+                rhs = ir;
+            }
+
             std::string base;
             if (auto var = dynamic_cast<VariableNode*>(arr->base.get())) {
                 std::string mangled = findMangledArrayName(var->name);
