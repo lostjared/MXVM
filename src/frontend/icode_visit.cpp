@@ -351,12 +351,14 @@ namespace pascal {
         if (node.thenStatement) {
             node.thenStatement->accept(*this);
         }
-        emit1("jmp", endL);
-        emitLabel(elseL);
         if (node.elseStatement) {
+            emit1("jmp", endL);
+            emitLabel(elseL);
             node.elseStatement->accept(*this);
+            emitLabel(endL);
+        } else {
+            emitLabel(elseL);
         }
-        emitLabel(endL);
     }
 
     void CodeGenVisitor::visit(WhileStmtNode& node) {
@@ -584,9 +586,7 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(BooleanNode& node) {
-        std::string reg = allocReg();
-        emit2("mov", reg, node.value ? "1" : "0");
-        pushValue(reg);
+        pushValue(node.value ? "1" : "0");
     }
 
     void CodeGenVisitor::visit(EmptyStmtNode& node) {
@@ -662,6 +662,7 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(CaseStmtNode& node) {
+        VarType exprType = getExpressionType(node.expression.get());
         std::string switchExpr = eval(node.expression.get());
         std::string endLabel = newLabel("CASE_END");
         std::vector<std::string> branchLabels;
@@ -670,7 +671,18 @@ namespace pascal {
         for (size_t i = 0; i < node.branches.size(); i++) {
             auto& branch = node.branches[i];
             for (auto& value : branch->values) {
-                std::string caseValue = eval(value.get());
+                std::string caseValue;
+                if ((exprType == VarType::CHAR || exprType == VarType::INT) &&
+                    dynamic_cast<StringNode*>(value.get())) {
+                    auto* strNode = static_cast<StringNode*>(value.get());
+                    if (strNode->value.size() == 1) {
+                        caseValue = std::to_string((int)(unsigned char)strNode->value[0]);
+                    } else {
+                        caseValue = eval(value.get());
+                    }
+                } else {
+                    caseValue = eval(value.get());
+                }
                 emit2("cmp", switchExpr, caseValue);
                 emit1("je", branchLabels[i]);
                 if (isReg(caseValue) && !isParmReg(caseValue)) freeReg(caseValue);
@@ -824,14 +836,17 @@ namespace pascal {
 
         #ifdef MXVM_BOUNDS_CHECK
             {
-                std::string idxCopy = allocReg();
-                emit2("mov", idxCopy, idx);
-                emitArrayBoundsCheck(idxCopy, info->lowerBound, info->upperBound);
+                emitArrayBoundsCheck(idx, info->lowerBound, info->upperBound);
             }
         #endif
 
-            std::string elemIndex = allocReg();
-            emit2("mov", elemIndex, idx);
+            std::string elemIndex;
+            if (isReg(idx) && !isParmReg(idx)) {
+                elemIndex = idx;
+            } else {
+                elemIndex = allocReg();
+                emit2("mov", elemIndex, idx);
+            }
             if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
             std::string base;
@@ -860,7 +875,7 @@ namespace pascal {
             emit4("store", rhs, base, elemIndex, std::to_string(info->elementSize));
 
             if (isReg(rhs) && !isParmReg(rhs)) freeReg(rhs);
-            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            if (elemIndex != idx && isReg(idx) && !isParmReg(idx)) freeReg(idx);
             freeReg(elemIndex);
             return;
         }
@@ -916,7 +931,21 @@ namespace pascal {
         if (!varPtr) return;
 
         std::string varName = varPtr->name;
-        std::string rhs = eval(node.expression.get());
+        std::string rhs;
+        VarType varType = getVarType(varName);
+        if ((varType == VarType::CHAR || varType == VarType::INT)) {
+            if (auto* strNode = dynamic_cast<StringNode*>(node.expression.get())) {
+                if (strNode->value.size() == 1) {
+                    rhs = std::to_string((int)(unsigned char)strNode->value[0]);
+                } else {
+                    rhs = eval(node.expression.get());
+                }
+            } else {
+                rhs = eval(node.expression.get());
+            }
+        } else {
+            rhs = eval(node.expression.get());
+        }
 
         auto it = currentParamLocations.find(varName);
         if (it != currentParamLocations.end()) {
@@ -966,15 +995,17 @@ namespace pascal {
 
     #ifdef MXVM_BOUNDS_CHECK
         {
-            std::string idxCopy = allocReg();
-            emit2("mov", idxCopy, index);
-            emitArrayBoundsCheck(idxCopy, info.lowerBound, info.upperBound);
-            if (isReg(idxCopy)) freeReg(idxCopy);
+            emitArrayBoundsCheck(index, info.lowerBound, info.upperBound);
         }
     #endif
 
-        std::string elementIndex = allocReg();
-        emit2("mov", elementIndex, index);
+        std::string elementIndex;
+        if (isReg(index) && !isParmReg(index)) {
+            elementIndex = index;
+        } else {
+            elementIndex = allocReg();
+            emit2("mov", elementIndex, index);
+        }
         if (info.lowerBound != 0) emit2("sub", elementIndex, std::to_string(info.lowerBound));
 
         std::string base = storageSymbolFor(node.arrayName);
@@ -1001,7 +1032,7 @@ namespace pascal {
         emit4("store", value, base, elementIndex, std::to_string(info.elementSize));
 
         if (isReg(value) && !isParmReg(value)) freeReg(value);
-        if (isReg(index) && !isParmReg(index)) freeReg(index);
+        if (elementIndex != index && isReg(index) && !isParmReg(index)) freeReg(index);
         freeReg(elementIndex);
     }
 
@@ -1021,8 +1052,13 @@ namespace pascal {
             idx = intIdx;
         }
 
-        std::string elemIndex = allocReg();
-        emit2("mov", elemIndex, idx);
+        std::string elemIndex;
+        if (isReg(idx) && !isParmReg(idx)) {
+            elemIndex = idx;
+        } else {
+            elemIndex = allocReg();
+            emit2("mov", elemIndex, idx);
+        }
         if (info->lowerBound != 0) emit2("sub", elemIndex, std::to_string(info->lowerBound));
 
         std::string base;
@@ -1057,7 +1093,7 @@ namespace pascal {
             emit2("add", elemPtr, offsetBytes);
             pushValue(elemPtr);
 
-            if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+            if (elemIndex != idx && isReg(idx) && !isParmReg(idx)) freeReg(idx);
             freeReg(elemIndex);
             freeReg(offsetBytes);
             return;
@@ -1073,7 +1109,7 @@ namespace pascal {
         emit4("load", dst, base, elemIndex, std::to_string(info->elementSize));
         pushValue(dst);
 
-        if (isReg(idx) && !isParmReg(idx)) freeReg(idx);
+        if (elemIndex != idx && isReg(idx) && !isParmReg(idx)) freeReg(idx);
         freeReg(elemIndex);
     }
 

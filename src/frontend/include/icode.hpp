@@ -495,11 +495,7 @@ namespace pascal {
             std::string t = allocReg();
             std::string L1 = newLabel("CMP_TRUE");
             std::string L2 = newLabel("CMP_END");
-            std::string opA = a, opB = b;
-            if (isReg(a)) { std::string tempA = allocReg(); emit2("mov", tempA, a); opA = tempA; }
-            if (isReg(b)) { std::string tempB = allocReg(); emit2("mov", tempB, b); opB = tempB; }
-            if (opA == opB) { std::string dup = allocReg(); emit2("mov", dup, opB); opB = dup; }
-            emit2("cmp", opA, opB);
+            emit2("cmp", a, b);
             emit1(jop, L1);
             emit2("mov", t, "0");
             emit1("jmp", L2);
@@ -507,8 +503,6 @@ namespace pascal {
             emit2("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
-            if (isReg(a) && opA != a) freeReg(opA);
-            if (isReg(b) && opB != b) freeReg(opB);
             if (a == b) {
                 if (isReg(a) && !isParmReg(a)) freeReg(a);
             } else {
@@ -524,7 +518,6 @@ namespace pascal {
             std::string t = allocReg();
             std::string L1 = newLabel("CMP_TRUE");
             std::string L2 = newLabel("CMP_END");
-            if (a == b) { std::string dup = allocReg(); emit2("mov", dup, b); b = dup; }
             emit2("fcmp", a, b);
             emit1(jop, L1);
             emit2("mov", t, "0");
@@ -533,8 +526,8 @@ namespace pascal {
             emit2("mov", t, "1");
             emitLabel(L2);
             pushValue(t);
-            if (isReg(a) && a != aIn && !isParmReg(aIn)) freeReg(a);
-            if (isReg(b) && b != bIn && !isParmReg(bIn)) freeReg(b);
+            if (isFloatReg(a) && a != aIn && !isParmReg(aIn)) freeFloatReg(a);
+            if (isFloatReg(b) && b != bIn && !isParmReg(bIn)) freeFloatReg(b);
         }
 
         void pushLogicalAnd(const std::string& a, const std::string& b) {
@@ -1085,17 +1078,14 @@ namespace pascal {
 #ifdef MXVM_BOUNDS_CHECK
             std::string L_ok = newLabel("IDX_OK");
             std::string L_fail = newLabel("IDX_OOB");
-            std::string t = allocReg();
-            emit2("mov", t, idxReg);
-            emit2("cmp", t, std::to_string(lower));
+            emit2("cmp", idxReg, std::to_string(lower));
             emit1("jl", L_fail);
-            emit2("cmp", t, std::to_string(upper));
+            emit2("cmp", idxReg, std::to_string(upper));
             emit1("jg", L_fail);
             emit1("jmp", L_ok);
             emitLabel(L_fail);
             emit1("exit", "1");
             emitLabel(L_ok);
-            if (isReg(t)) freeReg(t);
 #endif
         }
 

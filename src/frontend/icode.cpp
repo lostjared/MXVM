@@ -280,11 +280,91 @@ namespace pascal {
         }
     }
 
+    static void copyPropagation(std::vector<std::string>& code) {
+        static const std::unordered_set<std::string> twoOpInstructions = {
+            "add", "sub", "mul", "div", "mod", "cmp", "fcmp", "mov", "and", "or", "xor"
+        };
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i < code.size(); ++i) {
+                std::string t0 = trim(rtrim_comment(code[i]));
+                if (t0.empty()) continue;
+                
+                std::string movDst, movSrc;
+                if (!parse2(t0, "mov", movDst, movSrc)) continue;
+                if (movDst == movSrc) { code[i] = ""; changed = true; break; }
+                
+                size_t j = i + 1;
+                while (j < code.size() && trim(rtrim_comment(code[j])).empty()) ++j;
+                if (j >= code.size()) continue;
+                
+                std::string t1 = trim(rtrim_comment(code[j]));
+                if (!t1.empty() && t1.back() == ':') continue;
+                
+                auto sp = t1.find(' ');
+                if (sp == std::string::npos) continue;
+                std::string op = t1.substr(0, sp);
+                
+                if (twoOpInstructions.find(op) == twoOpInstructions.end()) continue;
+                
+                std::string arg1, arg2;
+                if (!parse2(t1, op, arg1, arg2)) continue;
+                if (arg1 != movDst) continue;
+                if (arg2 == movDst) continue;
+                
+                bool usedLater = false;
+                std::string pattern = "\\b" + movDst + "\\b";
+                std::regex wordPat(pattern);
+                for (size_t k = j + 1; k < code.size(); ++k) {
+                    std::string tk = rtrim_comment(code[k]);
+                    if (tk.empty()) continue;
+                    if (std::regex_search(tk, wordPat)) { usedLater = true; break; }
+                    if (!tk.empty() && tk.find("function ") != std::string::npos) break;
+                }
+                
+                if (usedLater) continue;
+                
+                if (op == "cmp" || op == "fcmp") {
+                    code[j] = "\t\t" + op + " " + movSrc + ", " + arg2;
+                    code[i] = "";
+                    changed = true;
+                    break;
+                }
+                
+                if (op == "mov") {
+                    code[i] = "";
+                    changed = true;
+                    break;
+                }
+                
+                bool srcUsedLater = false;
+                std::string srcPattern = "\\b" + movSrc + "\\b";
+                std::regex srcPat(srcPattern);
+                for (size_t k = j + 1; k < code.size(); ++k) {
+                    std::string tk = rtrim_comment(code[k]);
+                    if (tk.empty()) continue;
+                    if (std::regex_search(tk, srcPat)) { srcUsedLater = true; break; }
+                    if (!tk.empty() && tk.find("function ") != std::string::npos) break;
+                }
+                
+                if (!srcUsedLater) {
+                    code[j] = "\t\t" + op + " " + movSrc + ", " + arg2;
+                    code[i] = "";
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
+
     static void peepholeOpt(std::vector<std::string>& code) {
+        copyPropagation(code);
         foldAndTest(code);
         foldOrTest(code);
         foldCmpTest(code);
         foldCmpTest(code);
+        copyPropagation(code);
     }
 
     std::string mxvmOpt(const std::string &text) {
