@@ -8,6 +8,7 @@ program MasterPiece {
     start:
         call SDLCore.init
         call Assets.load_data
+        invoke seed_random
         call Board.init
         mov Screen.screen, 0
         call UI.init
@@ -341,6 +342,7 @@ object Board {
     }
     section code {
     function init:
+        
         mov size, cols
         mul size, rows
         mov rax, size
@@ -348,6 +350,15 @@ object Board {
         mov rax, size
         alloc marks, rax, 8
         mov score, 0
+        invoke rand_number, 7
+        return next_color1
+        add next_color1, 1
+        invoke rand_number, 7
+        return next_color2
+        add next_color2, 1
+        invoke rand_number, 7
+        return next_color3
+        add next_color3, 1
         call clearBoard
         call spawnPiece
         ret
