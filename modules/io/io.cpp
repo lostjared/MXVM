@@ -4,6 +4,8 @@
 #include<string>
 #include<cstdlib>
 #include<ctime>
+#include<chrono>
+#include<cstdint>
 
 extern "C" void mxvm_io_fopen(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if(operand.size() == 2) {
@@ -241,7 +243,15 @@ extern "C" void mxvm_io_rand_number(mxvm::Program *program, std::vector<mxvm::Op
 }
 
 extern "C" void mxvm_io_seed_random(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    std::srand(std::time(0));
+    auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    uint64_t mixed = static_cast<uint64_t>(now);
+    mixed ^= static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(program));
+    mixed ^= (mixed >> 33);
+    mixed *= 0xff51afd7ed558ccdULL;
+    mixed ^= (mixed >> 33);
+    mixed *= 0xc4ceb9fe1a85ec53ULL;
+    mixed ^= (mixed >> 33);
+    std::srand(static_cast<unsigned int>(mixed));
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = 0;

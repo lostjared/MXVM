@@ -362,11 +362,8 @@ object Pieces {
         ret
 
     function spawn_piece:
-        call Pieces.rand_next
-        mov GameState.v, GameState.rand_seed
-        div GameState.v, 65536
-        mod GameState.v, 7
-        mov GameState.piece_id, GameState.v
+        invoke rand_number, 7
+        return GameState.piece_id
         cmp GameState.piece_id, 0
         jge pid_ok
         add GameState.piece_id, 7

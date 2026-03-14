@@ -1,4 +1,3 @@
-    // any helper functions that can be linked into the final app in compile mode
 #include<stdio.h>
 #include<stdint.h>
 #include<stdlib.h>
@@ -12,7 +11,10 @@ int64_t fsize(FILE *fptr) {
 }
 
 int64_t seed_random() {
-	srand(time(0));
+	struct timespec ts;
+	timespec_get(&ts, TIME_UTC);
+	unsigned int seed = (unsigned int)(ts.tv_sec ^ ts.tv_nsec ^ (uintptr_t)&ts);
+	srand(seed);
 	return 0;
 }
 
