@@ -1,5 +1,8 @@
 #include"mxvm/icode.hpp"
 
+#include <algorithm>
+#include <unordered_set>
+
 namespace mxvm {
 
     static int error_label_count = 0;
@@ -12,6 +15,101 @@ namespace mxvm {
                 return name;
         }
         return name;        
+    }
+
+    void Program::sysv_analyzeRegAlloc(bool uses_std_module) {
+        sysv_reg_vars.clear();
+        sysv_reg_save_order.clear();
+
+        // %rbx is reserved for stack alignment scratch
+        // %rsi, %rdi are caller-saved on System V (not available)
+        std::vector<std::string> available_regs = {"%r14", "%r15"};
+        if (!uses_std_module) {
+            available_regs.push_back("%r12");
+            available_regs.push_back("%r13");
+        }
+
+        std::unordered_map<std::string, int> usage_count;
+        auto countOp = [&](const Operand &op) {
+            if (!op.op.empty() && isVariable(op.op)) {
+                Variable &v = getVariable(op.op);
+                if (v.type == VarType::VAR_INTEGER && !v.is_global) {
+                    usage_count[op.op]++;
+                }
+            }
+        };
+
+        for (const auto &instr : inc) {
+            countOp(instr.op1);
+            countOp(instr.op2);
+            countOp(instr.op3);
+            for (const auto &vop : instr.vop) countOp(vop);
+        }
+
+        std::vector<std::pair<std::string, int>> sorted_vars(usage_count.begin(), usage_count.end());
+        std::sort(sorted_vars.begin(), sorted_vars.end(),
+            [](const auto &a, const auto &b) { return a.second > b.second; });
+
+        size_t n = std::min(available_regs.size(), sorted_vars.size());
+        for (size_t i = 0; i < n; ++i) {
+            if (sorted_vars[i].second >= 2) {
+                sysv_reg_vars[sorted_vars[i].first] = available_regs[i];
+                sysv_reg_save_order.push_back(available_regs[i]);
+            }
+        }
+    }
+
+    void Program::sysv_emitFlushRegs(std::ostream &out) {
+        for (const auto &[var, reg] : sysv_reg_vars) {
+            out << "\tmovq " << reg << ", " << getMangledName(var) << "(%rip)\n";
+        }
+    }
+
+    void Program::sysv_emitReloadRegs(std::ostream &out) {
+        for (const auto &[var, reg] : sysv_reg_vars) {
+            out << "\tmovq " << getMangledName(var) << "(%rip), " << reg << "\n";
+        }
+    }
+
+    void Program::sysv_emitSaveRegs(std::ostream &out) {
+        for (const auto &reg : sysv_reg_save_order) {
+            out << "\tpushq " << reg << "\n";
+        }
+    }
+
+    void Program::sysv_emitRestoreRegs(std::ostream &out) {
+        for (auto it = sysv_reg_save_order.rbegin(); it != sysv_reg_save_order.rend(); ++it) {
+            out << "\tpopq " << *it << "\n";
+        }
+    }
+
+    void Program::sysv_emitStoreVar(std::ostream &out, const std::string &srcReg, const Operand &dest) {
+        auto it = sysv_reg_vars.find(dest.op);
+        if (it != sysv_reg_vars.end()) {
+            if (srcReg != it->second)
+                out << "\tmovq " << srcReg << ", " << it->second << "\n";
+        } else {
+            out << "\tmovq " << srcReg << ", " << getMangledName(dest) << "(%rip)\n";
+        }
+    }
+
+    void Program::sysv_emitStoreVarImm(std::ostream &out, const std::string &imm, const Operand &dest) {
+        auto it = sysv_reg_vars.find(dest.op);
+        if (it != sysv_reg_vars.end()) {
+            out << "\tmovq $" << imm << ", " << it->second << "\n";
+        } else {
+            out << "\tmovq $" << imm << ", " << getMangledName(dest) << "(%rip)\n";
+        }
+    }
+
+    void Program::sysv_emitLoadVar(std::ostream &out, const std::string &dstReg, const Operand &src) {
+        auto it = sysv_reg_vars.find(src.op);
+        if (it != sysv_reg_vars.end()) {
+            if (dstReg != it->second)
+                out << "\tmovq " << it->second << ", " << dstReg << "\n";
+        } else {
+            out << "\tmovq " << getMangledName(src) << "(%rip), " << dstReg << "\n";
+        }
     }
 
 
@@ -150,6 +248,8 @@ namespace mxvm {
                 out << "\t.extern " << getPlatformSymbolName(e.mod + "_" + e.name) << "\n";
         }
     
+        sysv_analyzeRegAlloc(uses_std_module);
+
         if(!this->object)  {
             out << "\t.p2align 4, 0x90\n";
             out << ".global " << "main" << "\n";
@@ -170,6 +270,8 @@ namespace mxvm {
             } else {
                 out << "\tsub $8, %rsp\n";
             }
+            sysv_emitSaveRegs(out);
+            sysv_emitReloadRegs(out);
         }
 
         bool done_found = false;
@@ -184,6 +286,8 @@ namespace mxvm {
                     out << "\tmov %rsp, %rbp\n";
                     out << "\tpush %rbx\n";
                     out << "\tsub $8, %rsp\n";
+                    sysv_emitSaveRegs(out);
+                    sysv_emitReloadRegs(out);
                     break;
                 }
             }            
@@ -369,13 +473,17 @@ namespace mxvm {
         }
 
         if(uses_std_module && !this->object) {
+            sysv_emitFlushRegs(out);
             out << "\tmovq %rsp, %rbx\n";
             out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName("free_program_args") << "\n";
             out << "\tmovq %rbx, %rsp\n";
+        } else {
+            sysv_emitFlushRegs(out);
         }
 
         out << "\txor %eax, %eax\n";
+        sysv_emitRestoreRegs(out);
         if(!this->object && uses_std_module) {
             out << "\tmovq -24(%rbp), %r13\n";
             out << "\tmovq -16(%rbp), %r12\n";
@@ -386,6 +494,8 @@ namespace mxvm {
     }
 
     void Program::gen_ret(std::ostream &out, const Instruction &i) {
+        sysv_emitFlushRegs(out);
+        sysv_emitRestoreRegs(out);
         out << "\tmovq -8(%rbp), %rbx\n";
         out << "\tleave\n";
         out << "\tret\n";
@@ -402,7 +512,7 @@ namespace mxvm {
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                 break;
                 default:
-                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                sysv_emitStoreVar(out, "%rax", i.op1);
             }
             
         } else {
@@ -416,7 +526,7 @@ namespace mxvm {
             if(v.type == VarType::VAR_INTEGER) {
                 generateLoadVar(out, v.type, "%rcx", i.op1);
                 out << "\tnegq %rcx\n";
-                out << "\tmovq %rcx, " << getMangledName(i.op1) << "(%rip)\n";
+                sysv_emitStoreVar(out, "%rcx", i.op1);
             } else if(v.type == VarType::VAR_FLOAT) {
                 generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                 out << "\txorpd %xmm1, %xmm1\n";
@@ -492,10 +602,12 @@ namespace mxvm {
     
     void Program::gen_call(std::ostream &out, const Instruction &i) {
         if(isFunctionValid(i.op1.op)) {
+            sysv_emitFlushRegs(out);
             out << "\tmovq %rsp, %rbx\n";
             out << "\tandq $-16, %rsp\n";
             out << "\tcall " << getPlatformSymbolName(getMangledName(i.op1)) << "\n";
             out << "\tmovq %rbx, %rsp\n";
+            sysv_emitReloadRegs(out);
         } else {
             throw mx::Exception("Function " + i.op1.op + " not found!");
         }
@@ -569,7 +681,7 @@ namespace mxvm {
 
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
-                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
+                sysv_emitLoadVar(out, "%rcx", i.op3);
             } else {
                 out << "\tmovq $" << i.op3.op << ", %rcx\n";
             }
@@ -579,7 +691,7 @@ namespace mxvm {
 
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
-                out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %rdx\n";
+                sysv_emitLoadVar(out, "%rdx", i.vop[0]);
                 out << "\timulq %rdx, %rcx\n";  
                 out << "\taddq %rcx, %rax\n";   
                 
@@ -588,7 +700,7 @@ namespace mxvm {
                     case VarType::VAR_POINTER:
                     case VarType::VAR_EXTERN:
                         out << "\tmovq (%rax), %rdx\n";
-                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                        sysv_emitStoreVar(out, "%rdx", i.op1);
                         break;
                     case VarType::VAR_FLOAT:
                         out << "\tmovsd (%rax), %xmm0\n";
@@ -610,7 +722,7 @@ namespace mxvm {
                         case VarType::VAR_POINTER:
                         case VarType::VAR_EXTERN:
                             out << "\tmovq (%rax,%rcx," << stride << "), %rdx\n";
-                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            sysv_emitStoreVar(out, "%rdx", i.op1);
                             break;
                         case VarType::VAR_FLOAT:
                             out << "\tmovsd (%rax,%rcx," << stride << "), %xmm0\n";
@@ -632,7 +744,7 @@ namespace mxvm {
                         case VarType::VAR_POINTER:
                         case VarType::VAR_EXTERN:
                             out << "\tmovq (%rax), %rdx\n";
-                            out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                            sysv_emitStoreVar(out, "%rdx", i.op1);
                             break;
                         case VarType::VAR_FLOAT:
                             out << "\tmovsd (%rax), %xmm0\n";
@@ -653,7 +765,7 @@ namespace mxvm {
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
                     out << "\tmovq (%rax,%rcx,8), %rdx\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rdx", i.op1);
                     break;
                 case VarType::VAR_FLOAT:
                     out << "\tmovsd (%rax,%rcx,8), %xmm0\n";
@@ -685,7 +797,7 @@ namespace mxvm {
 
         if (!i.op3.op.empty()) {
             if (isVariable(i.op3.op)) {
-                out << "\tmovq " << getMangledName(i.op3) << "(%rip), %rcx\n";
+                sysv_emitLoadVar(out, "%rcx", i.op3);
             } else {
                 out << "\tmovq $" << i.op3.op << ", %rcx\n";
             }
@@ -699,7 +811,7 @@ namespace mxvm {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
                 case VarType::VAR_EXTERN:
-                    out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdx\n";
+                    sysv_emitLoadVar(out, "%rdx", i.op1);
                     break;
                 case VarType::VAR_STRING:
                     out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rdx\n";
@@ -719,7 +831,7 @@ namespace mxvm {
 
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
             if (isVariable(i.vop[0].op)) {
-                out << "\tmovq " << getMangledName(i.vop[0]) << "(%rip), %r8\n";
+                sysv_emitLoadVar(out, "%r8", i.vop[0]);
                 out << "\timulq %r8, %rcx\n";   
                 out << "\taddq %rcx, %rax\n";   
                 
@@ -827,20 +939,26 @@ namespace mxvm {
             switch (src.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
-                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                case VarType::VAR_EXTERN: {
+                    auto ra_src = sysv_reg_vars.find(i.op2.op);
+                    if (ra_src != sysv_reg_vars.end()) {
+                        out << "\tmovq " << ra_src->second << ", %rax\n";
+                    } else {
+                        out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    }
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                     break;
+                }
 
                 case VarType::VAR_BYTE:
                     out << "\tmovzbq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
-                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                     break;
 
                 case VarType::VAR_FLOAT:
                     out << "\tmovsd " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %xmm0\n";
                     out << "\tcvttsd2si %xmm0, %rax\n";
-                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                     break;
 
                 case VarType::VAR_STRING:
@@ -849,7 +967,7 @@ namespace mxvm {
                     out << "\tandq $-16, %rsp\n";
                     out << "\tcall " << getPlatformSymbolName("atol") << "\n";
                     out << "\tmovq %rbx, %rsp\n";
-                    out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                     break;
 
                 default:
@@ -858,7 +976,7 @@ namespace mxvm {
         }
         else if (i.op2.type == OperandType::OP_CONSTANT) {
             out << "\tmovq $" << i.op2.op << ", %rax\n";
-            out << "\tmovq %rax, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
+            sysv_emitStoreVar(out, "%rax", i.op1);
         }
         else {
             throw mx::Exception("to_int: unsupported source operand");
@@ -887,11 +1005,17 @@ namespace mxvm {
 
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                case VarType::VAR_EXTERN: {
+                    auto ra_src = sysv_reg_vars.find(i.op2.op);
+                    if (ra_src != sysv_reg_vars.end()) {
+                        out << "\tmovq " << ra_src->second << ", %rax\n";
+                    } else {
+                        out << "\tmovq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
+                    }
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                     out << "\tmovsd %xmm0, " << getPlatformSymbolName(getMangledName(i.op1)) << "(%rip)\n";
                     break;
+                }
 
                 case VarType::VAR_BYTE:
                     out << "\tmovzbq " << getPlatformSymbolName(getMangledName(i.op2)) << "(%rip), %rax\n";
@@ -937,7 +1061,7 @@ namespace mxvm {
                     out << "1:\n";
                     out << "\txor %eax, %eax\n";
                     out << "2:\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
@@ -970,7 +1094,7 @@ namespace mxvm {
                     out << "1:\n";
                     out << "\txor %eax, %eax\n";
                     out << "2:\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 } else if (v.type == VarType::VAR_FLOAT) {
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
                     generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
@@ -1007,7 +1131,7 @@ namespace mxvm {
                     out << "1:\n";
                     out << "\txor %edx, %edx\n";
                     out << "2:\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n"; 
+                    sysv_emitStoreVar(out, "%rdx", i.op1);
                 } else {
                     throw mx::Exception("MOD only supports integer variables");
                 }
@@ -1028,7 +1152,7 @@ namespace mxvm {
                     out << "1:\n";
                     out << "\txor %edx, %edx\n";
                     out << "2:\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rdx", i.op1);
                 } else {
                     throw mx::Exception("MOD only supports integer variables");
                 }
@@ -1077,7 +1201,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
                     out << "\t" << opc << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 } else {
                     throw mx::Exception("Bitwise operations only supported for integer variables");
                 }
@@ -1091,7 +1215,7 @@ namespace mxvm {
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
                     generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
                     out << "\t" << opc << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 } else {
                     throw mx::Exception("Bitwise operations only supported for integer variables");
                 }
@@ -1112,7 +1236,7 @@ namespace mxvm {
                 out << "\ttestq %rax, %rax\n";
                 out << "\tsete %al\n";
                 out << "\tmovzbq %al, %rax\n";
-                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                sysv_emitStoreVar(out, "%rax", i.op1);
             } else {
                 throw mx::Exception("NOT instruction requires variable");
             }
@@ -1125,7 +1249,7 @@ namespace mxvm {
         if (isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
             if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
-                out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rax\n";
+                sysv_emitLoadVar(out, "%rax", i.op1);
                 out << "\tpushq %rax\n";
             } else if (v.type == VarType::VAR_STRING) {
                 out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rax\n";
@@ -1148,7 +1272,7 @@ namespace mxvm {
         Variable &v = getVariable(i.op1.op);
         if (v.type == VarType::VAR_INTEGER) {
             out << "\tpopq %rax\n";
-            out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+            sysv_emitStoreVar(out, "%rax", i.op1);
         } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
             out << "\tpopq %rax\n";
             out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
@@ -1167,7 +1291,7 @@ namespace mxvm {
         }
         generateLoadVar(out, dest.type, "%rax", i.op2);
         out << "\tmovq (%rsp, %rax, 8), " << "%rcx\n";
-        out << "\tmovq %rcx, " << getMangledName(i.op1) << "(%rip)\n";
+        sysv_emitStoreVar(out, "%rcx", i.op1);
     }
 
     void Program::gen_stack_store(std::ostream &out, const Instruction &i) {
@@ -1179,14 +1303,14 @@ namespace mxvm {
             throw mx::Exception("stack_store, requires second argument");
         }
         generateLoadVar(out, dest.type, "%rax", i.op2);
-        out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
+        sysv_emitLoadVar(out, "%rcx", i.op1);
         out << "\tmovq %rcx, (%rsp, %rax, 8)\n";
     }
 
     void Program::gen_stack_sub(std::ostream &out, const Instruction &i) {
         if (!i.op1.op.empty()) {
             if (isVariable(i.op1.op)) {
-                out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
+                sysv_emitLoadVar(out, "%rcx", i.op1);
             } else {
                 out << "\tmovq $" << i.op1.op << ", %rcx\n";
             }
@@ -1211,10 +1335,17 @@ namespace mxvm {
             switch(v.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq " <<  getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                case VarType::VAR_EXTERN: {
+                    auto ra = sysv_reg_vars.find(op.op);
+                    if (ra != sysv_reg_vars.end()) {
+                        if (ra->second != reg)
+                            out << "\tmovq " << ra->second << ", " << reg << "\n";
+                    } else {
+                        out << "\tmovq " <<  getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    }
                     count = 0;
                     break;
+                }
                 case VarType::VAR_FLOAT:
                     out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 1;
@@ -1251,7 +1382,12 @@ namespace mxvm {
                     out << "\tmovsd " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     count = 1;
                 } else if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
-                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rax\n";
+                    auto ra = sysv_reg_vars.find(op.op);
+                    if (ra != sysv_reg_vars.end()) {
+                        out << "\tmovq " << ra->second << ", %rax\n";
+                    } else {
+                        out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), %rax\n";
+                    }
                     out << "\tcvtsi2sd %rax, " << reg << "\n";
                     count = 1;
                 } else if (v.type == VarType::VAR_BYTE) {
@@ -1274,7 +1410,13 @@ namespace mxvm {
 
             if (reqType == VarType::VAR_INTEGER || reqType == VarType::VAR_POINTER || reqType == VarType::VAR_EXTERN) {
                 if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
-                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    auto ra = sysv_reg_vars.find(op.op);
+                    if (ra != sysv_reg_vars.end()) {
+                        if (ra->second != reg)
+                            out << "\tmovq " << ra->second << ", " << reg << "\n";
+                    } else {
+                        out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    }
                 } else if (v.type == VarType::VAR_BYTE) {
                     out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                 } else if (v.type == VarType::VAR_FLOAT) {
@@ -1297,7 +1439,13 @@ namespace mxvm {
                 if (v.type == VarType::VAR_STRING) {
                     out << "\tleaq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                 } else if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
-                    out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    auto ra = sysv_reg_vars.find(op.op);
+                    if (ra != sysv_reg_vars.end()) {
+                        if (ra->second != reg)
+                            out << "\tmovq " << ra->second << ", " << reg << "\n";
+                    } else {
+                        out << "\tmovq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    }
                 } else {
                     throw mx::Exception("LoadVar: unsupported source type for string");
                 }
@@ -1307,10 +1455,17 @@ namespace mxvm {
             switch(v.type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_POINTER:
-                case VarType::VAR_EXTERN:
-                    out << "\tmovq "  << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                case VarType::VAR_EXTERN: {
+                    auto ra = sysv_reg_vars.find(op.op);
+                    if (ra != sysv_reg_vars.end()) {
+                        if (ra->second != reg)
+                            out << "\tmovq " << ra->second << ", " << reg << "\n";
+                    } else {
+                        out << "\tmovq "  << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
+                    }
                     count = 0;
                     break;
+                }
                 case VarType::VAR_BYTE:
                     out << "\tmovzbq " << getPlatformSymbolName(getMangledName(op)) << "(%rip), " << reg << "\n";
                     break;
@@ -1461,7 +1616,12 @@ namespace mxvm {
             last_cmp_type = CMP_INTEGER; 
         }
         else if (!isVariable(i.op2.op) && i.op2.type == OperandType::OP_CONSTANT && isVariable(i.op1.op)) {
-            out << "\tcmpq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+            auto ra = sysv_reg_vars.find(i.op1.op);
+            if (ra != sysv_reg_vars.end()) {
+                out << "\tcmpq $" << i.op2.op << ", " << ra->second << "\n";
+            } else {
+                out << "\tcmpq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+            }
             last_cmp_type = CMP_INTEGER;
         }
         else {
@@ -1545,7 +1705,7 @@ namespace mxvm {
                     out << "\tcall " << getPlatformSymbolName("atof") << "\n";
                     out << "\tmovq %rbx, %rsp\n";
                 } else {
-                    out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+                    sysv_emitLoadVar(out, "%rax", i.op2);
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                 }
                 out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
@@ -1555,7 +1715,7 @@ namespace mxvm {
                 if (dest.type == VarType::VAR_BYTE) {
                     out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 }
             } else if (dest.type == VarType::VAR_POINTER && src.type == VarType::VAR_STRING) {
                 out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
@@ -1566,14 +1726,14 @@ namespace mxvm {
                 out << "\tandq $-16, %rsp\n";
                 out << "\tcall " << getPlatformSymbolName("atol") << "\n";
                 out << "\tmovq %rbx, %rsp\n";
-                out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                sysv_emitStoreVar(out, "%rax", i.op1);
             } else if (dest.type == VarType::VAR_BYTE && src.type != VarType::VAR_BYTE) {
                 if (src.type == VarType::VAR_FLOAT) {
                     out << "\tmovsd " << getMangledName(i.op2) << "(%rip), %xmm0\n";
                     out << "\tcvttsd2si %xmm0, %rax\n";
                     out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
-                    out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
+                    sysv_emitLoadVar(out, "%rax", i.op2);
                     out << "\tmovb %al, " << getMangledName(i.op1) << "(%rip)\n";
                 }
             } else if (dest.type != VarType::VAR_BYTE && src.type == VarType::VAR_BYTE) {
@@ -1582,15 +1742,15 @@ namespace mxvm {
                     out << "\tcvtsi2sd %rax, %xmm0\n";
                     out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVar(out, "%rax", i.op1);
                 }
             } else {
                 switch (dest.type) {
                     case VarType::VAR_INTEGER:
                     case VarType::VAR_POINTER:
                     case VarType::VAR_EXTERN:
-                        out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
-                        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+                        sysv_emitLoadVar(out, "%rax", i.op2);
+                        sysv_emitStoreVar(out, "%rax", i.op1);
                         break;
                     case VarType::VAR_BYTE:
                         out << "\tmovb " << getMangledName(i.op2) << "(%rip), %al\n";
@@ -1615,7 +1775,7 @@ namespace mxvm {
                 } else if (dest.type == VarType::VAR_BYTE) {
                     out << "\tmovb $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
                 } else {
-                    out << "\tmovq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+                    sysv_emitStoreVarImm(out, i.op2.op, i.op1);
                 }
             } else {
                 throw mx::Exception("MOV: unsupported source operand type");
@@ -1628,7 +1788,12 @@ namespace mxvm {
             if (arth == "mul") arth = "imul";
             if (!isVariable(rhs.op) && rhs.type == OperandType::OP_CONSTANT
                 && arth != "imul" && lhs.op == dest.op && isVariable(lhs.op)) {
-                out << "\t" << arth << "q $" << rhs.op << ", " << getMangledName(lhs) << "(%rip)\n";
+                auto ra = sysv_reg_vars.find(lhs.op);
+                if (ra != sysv_reg_vars.end()) {
+                    out << "\t" << arth << "q $" << rhs.op << ", " << ra->second << "\n";
+                } else {
+                    out << "\t" << arth << "q $" << rhs.op << ", " << getMangledName(lhs) << "(%rip)\n";
+                }
                 return;
             }
             generateLoadVar(out, VarType::VAR_INTEGER, "%r10", lhs);
@@ -1638,7 +1803,7 @@ namespace mxvm {
                 generateLoadVar(out, VarType::VAR_INTEGER, "%r11", rhs);
                 out << "\t" << arth << "q %r11, %r10\n";
             }
-            out << "\tmovq %r10, " << getMangledName(dest) << "(%rip)\n";
+            sysv_emitStoreVar(out, "%r10", dest);
         };
 
         if (i.op3.op.empty()) {

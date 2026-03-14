@@ -302,7 +302,32 @@ namespace mxvm {
         void x64_gen_jno(std::ostream &out, const Instruction &i);
         void x64_gen_js(std::ostream &out, const Instruction &i);
         void x64_gen_jns(std::ostream &out, const Instruction &i);
-        // code interpretation
+
+        std::unordered_map<std::string, std::string> x64_reg_vars;
+        std::vector<std::string> x64_reg_save_order;
+
+        void x64_analyzeRegAlloc(bool uses_std_module);
+        void x64_emitFlushRegs(std::ostream &out);
+        void x64_emitReloadRegs(std::ostream &out);
+        void x64_emitSaveRegs(std::ostream &out);
+        void x64_emitRestoreRegs(std::ostream &out);
+        void x64_emitStoreVar(std::ostream &out, const std::string &srcReg, const Operand &dest);
+        void x64_emitStoreVarImm(std::ostream &out, const std::string &imm, const Operand &dest);
+        void x64_emitLoadVar(std::ostream &out, const std::string &dstReg, const Operand &src);
+
+        // System V ABI (Linux/macOS) register allocation
+        std::unordered_map<std::string, std::string> sysv_reg_vars;
+        std::vector<std::string> sysv_reg_save_order;
+
+        void sysv_analyzeRegAlloc(bool uses_std_module);
+        void sysv_emitFlushRegs(std::ostream &out);
+        void sysv_emitReloadRegs(std::ostream &out);
+        void sysv_emitSaveRegs(std::ostream &out);
+        void sysv_emitRestoreRegs(std::ostream &out);
+        void sysv_emitStoreVar(std::ostream &out, const std::string &srcReg, const Operand &dest);
+        void sysv_emitStoreVarImm(std::ostream &out, const std::string &imm, const Operand &dest);
+        void sysv_emitLoadVar(std::ostream &out, const std::string &dstReg, const Operand &src);
+
         void exec_mov(const Instruction& instr);
         void exec_add(const Instruction& instr);
         void exec_sub(const Instruction& instr);
