@@ -16,11 +16,8 @@ program Pong {
 		int r10 = 0
 		int r11 = 0
 		int r12 = 0
-		int r13 = 0
 		ptr _tmpptr0 = null
 		ptr _tmpptr1 = null
-		ptr _tmpptr2 = null
-		ptr _tmpptr3 = null
 		ptr arg0 = null
 		string str_0 = "Pong"
 		string str_1 = "font.ttf"
@@ -41,7 +38,6 @@ program Pong {
 		int renderer = 0
 		int target_id = 0
 		int font_id = 0
-		int key = 0
 		ptr paddle1 = null
 		ptr paddle2 = null
 		ptr ball = null
@@ -63,7 +59,6 @@ program Pong {
 		int init_yval = 0
 		int init_wval = 0
 		int init_hval = 0
-		int init_result = 0
 		int aabb_ax = 0
 		int aabb_ay = 0
 		int aabb_aw = 0
@@ -86,44 +81,31 @@ program Pong {
 		mov rdx, 1280
 		mov rsi, 720
 		call PROC_init
-		mov rbx, 1
-		mov running, rbx
+		mov running, 1
 	WHILE_0:
-		mov rcx, 1
-		mov rsi, rcx
-		cmp running, rsi
+		cmp running, 1
 		jne ENDWHILE_1
 	WHILE_4:
 		invoke poll_event
-		return rsi
-		mov r8, rsi
-		cmp r8, 0
+		return rcx
+		cmp rcx, 0
 		je ENDWHILE_5
 		invoke get_event_type
-		return r8
-		mov event_type_result, r8
+		return rsi
+		mov event_type_result, rsi
 		cmp event_type_result, 256
 		jne ELSE_8
-		mov r9, 0
-		mov running, r9
-		jmp ENDIF_9
+		mov running, 0
 	ELSE_8:
-	ENDIF_9:
 		cmp event_type_result, 768
 		jne ELSE_12
 		invoke get_key_code
 		return r9
-		mov key, r9
-		cmp key, 27
+		cmp r9, 27
 		jne ELSE_16
-		mov r9, 0
-		mov running, r9
-		jmp ENDIF_17
+		mov running, 0
 	ELSE_16:
-	ENDIF_17:
-		jmp ENDIF_13
 	ELSE_12:
-	ENDIF_13:
 		jmp WHILE_4
 	ENDWHILE_5:
 		call PROC_update_input
@@ -151,96 +133,76 @@ program Pong {
 		mov reset_ball_to_right, rbx
 		store 317, ball, 0, 1
 		store 177, ball, 8, 1
-		mov rbx, 1
-		mov rdx, rbx
-		cmp reset_ball_to_right, rdx
+		cmp reset_ball_to_right, 1
 		jne ELSE_20
 		mov ball_dx, 4
 		jmp ENDIF_21
 	ELSE_20:
-		mov rdx, 0
-		sub rdx, 4
-		mov ball_dx, rdx
+		mov ball_dx, 0
+		sub ball_dx, 4
 	ENDIF_21:
 		invoke get_ticks
-		return rsi
-		mov rdi, rsi
-		mod rdi, 2
-		mov r9, rdi
-		cmp r9, 0
+		return rdx
+		mov rsi, rdx
+		mod rsi, 2
+		cmp rsi, 0
 		jne ELSE_24
 		mov ball_dy, 4
 		jmp ENDIF_25
 	ELSE_24:
-		mov r9, 0
-		sub r9, 4
-		mov ball_dy, r9
+		mov ball_dy, 0
+		sub ball_dy, 4
 	ENDIF_25:
 	PROC_END_reset_ball:
 		ret
 	function PROC_clamp_paddle:
 		mov clamp_paddle_p, arg0
 		load rbx, clamp_paddle_p, 8, 1
-		mov rdx, rbx
-		cmp rdx, 0
+		cmp rbx, 0
 		jge ELSE_28
 		store 0, clamp_paddle_p, 8, 1
-		jmp ENDIF_29
 	ELSE_28:
-	ENDIF_29:
 		load rdx, clamp_paddle_p, 8, 1
 		mov rsi, rdx
 		add rsi, 56
-		mov r8, rsi
-		cmp r8, 360
+		cmp rsi, 360
 		jle ELSE_32
 		store 304, clamp_paddle_p, 8, 1
-		jmp ENDIF_33
 	ELSE_32:
-	ENDIF_33:
 	PROC_END_clamp_paddle:
 		ret
 	function PROC_update_input:
 		invoke is_key_pressed, 82
 		return rbx
-		mov rdx, rbx
-		cmp rdx, 0
+		cmp rbx, 0
 		je ELSE_36
 		load rdx, paddle1, 8, 1
 		mov rsi, rdx
 		sub rsi, 4
 		store rsi, paddle1, 8, 1
-		jmp ENDIF_37
 	ELSE_36:
-	ENDIF_37:
 		invoke is_key_pressed, 81
 		return rdi
-		mov r9, rdi
-		cmp r9, 0
+		cmp rdi, 0
 		je ELSE_40
 		load r9, paddle1, 8, 1
 		add r9, 4
 		store r9, paddle1, 8, 1
-		jmp ENDIF_41
 	ELSE_40:
-	ENDIF_41:
 		mov arg0, paddle1
 		call PROC_clamp_paddle
 	PROC_END_update_input:
 		ret
 	function PROC_update_ai:
 		load rbx, ball, 8, 1
-		mov rcx, rbx
-		add rcx, 3
-		mov update_ai_center_ball, rcx
+		mov update_ai_center_ball, rbx
+		add update_ai_center_ball, 3
 		load rdx, paddle2, 8, 1
-		mov rsi, rdx
-		add rsi, 28
-		mov update_ai_center_p2, rsi
+		mov update_ai_center_p2, rdx
+		add update_ai_center_p2, 28
 		mov rdi, update_ai_center_p2
 		sub rdi, 4
-		mov r9, rdi
-		cmp update_ai_center_ball, r9
+		cmp update_ai_center_ball, rdi
 		jge ELSE_44
 		load r9, paddle2, 8, 1
 		sub r9, 4
@@ -249,15 +211,12 @@ program Pong {
 	ELSE_44:
 		mov r9, update_ai_center_p2
 		add r9, 4
-		mov r11, r9
-		cmp update_ai_center_ball, r11
+		cmp update_ai_center_ball, r9
 		jle ELSE_48
 		load r9, paddle2, 8, 1
 		add r9, 4
 		store r9, paddle2, 8, 1
-		jmp ENDIF_49
 	ELSE_48:
-	ENDIF_49:
 	ENDIF_45:
 		mov arg0, paddle2
 		call PROC_clamp_paddle
@@ -273,28 +232,22 @@ program Pong {
 		add rsi, ball_dy
 		store rsi, ball, 8, 1
 		load rdi, ball, 8, 1
-		mov r9, rdi
-		cmp r9, 0
+		cmp rdi, 0
 		jg ELSE_52
 		store 0, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
-		jmp ENDIF_53
 	ELSE_52:
-	ENDIF_53:
 		load r9, ball, 8, 1
 		add r9, 6
-		mov r11, r9
-		cmp r11, 360
+		cmp r9, 360
 		jl ELSE_56
 		store 354, ball, 8, 1
 		mov r9, 0
 		sub r9, ball_dy
 		mov ball_dy, r9
-		jmp ENDIF_57
 	ELSE_56:
-	ENDIF_57:
 		load r9, ball, 0, 1
 		mov rbx, r9
 		load r10, ball, 8, 1
@@ -308,8 +261,7 @@ program Pong {
 		mov r9, 6
 		mov r10, 56
 		call FUNC_aabb
-		mov r13, rax
-		cmp r13, 0
+		cmp rax, 0
 		je ELSE_60
 		load r9, paddle1, 0, 1
 		add r9, 6
@@ -317,9 +269,7 @@ program Pong {
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
-		jmp ENDIF_61
 	ELSE_60:
-	ENDIF_61:
 		load r9, ball, 0, 1
 		mov rbx, r9
 		load r10, ball, 8, 1
@@ -333,8 +283,7 @@ program Pong {
 		mov r9, 6
 		mov r10, 56
 		call FUNC_aabb
-		mov r13, rax
-		cmp r13, 0
+		cmp rax, 0
 		je ELSE_62
 		load r9, paddle2, 0, 1
 		sub r9, 6
@@ -342,36 +291,24 @@ program Pong {
 		mov r9, 0
 		sub r9, ball_dx
 		mov ball_dx, r9
-		jmp ENDIF_63
 	ELSE_62:
-	ENDIF_63:
 		load r9, ball, 0, 1
 		add r9, 6
-		mov r11, r9
-		cmp r11, 0
+		cmp r9, 0
 		jge ELSE_64
 		mov r9, score_r
 		add r9, 1
 		mov score_r, r9
-		mov r9, 1
-		mov rbx, r9
+		mov rbx, 1
 		call PROC_reset_ball
-		jmp ENDIF_65
 	ELSE_64:
-	ENDIF_65:
 		load r9, ball, 0, 1
-		mov r11, r9
-		cmp r11, 640
+		cmp r9, 640
 		jle ELSE_68
-		mov r9, score_l
-		add r9, 1
-		mov score_l, r9
-		mov r9, 0
-		mov rbx, r9
+		add score_l, 1
+		mov rbx, 0
 		call PROC_reset_ball
-		jmp ENDIF_69
 	ELSE_68:
-	ENDIF_69:
 	PROC_END_update_ball:
 		ret
 	function PROC_render_center_line:
@@ -384,9 +321,7 @@ program Pong {
 		mov rdx, 2
 		mov rsi, 8
 		call PROC_draw_box
-		mov rcx, render_center_line_yy
-		add rcx, 16
-		mov render_center_line_yy, rcx
+		add render_center_line_yy, 16
 		jmp WHILE_72
 	ENDWHILE_73:
 	PROC_END_render_center_line:
@@ -430,23 +365,21 @@ program Pong {
 		invoke strncat, _tmpptr1, _tmpptr0, r10
 		invoke draw_text, renderer, font_id, _tmpptr1, 220, 8, 255, 255, 255, 255
 		invoke inttostr, score_r
-		return _tmpptr2
+		return _tmpptr0
 		invoke strlen, str_2
 		return r9
-		invoke strlen, _tmpptr2
+		invoke strlen, _tmpptr0
 		return r10
 		mov r11, r9
 		add r11, r10
 		add r11, 1
-		alloc _tmpptr3, 1, r11
-		invoke strncpy, _tmpptr3, str_2, r9
-		invoke strncat, _tmpptr3, _tmpptr2, r10
-		invoke draw_text, renderer, font_id, _tmpptr3, 340, 8, 255, 255, 255, 255
+		alloc _tmpptr1, 1, r11
+		invoke strncpy, _tmpptr1, str_2, r9
+		invoke strncat, _tmpptr1, _tmpptr0, r10
+		invoke draw_text, renderer, font_id, _tmpptr1, 340, 8, 255, 255, 255, 255
 	PROC_END_render:
 		free _tmpptr0
 		free _tmpptr1
-		free _tmpptr2
-		free _tmpptr3
 		ret
 	function PROC_init:
 		mov init_title, arg0
@@ -456,30 +389,24 @@ program Pong {
 		mov init_hval, rsi
 		invoke init
 		return rbx
-		mov init_result, rbx
-		cmp init_result, 0
+		cmp rbx, 0
 		je ELSE_76
 		print fmt_str, str_3
 		print newline
 		exit 1
-		jmp ENDIF_77
 	ELSE_76:
-	ENDIF_77:
 		invoke create_window, title, init_xval, init_yval, init_wval, init_hval, 4
 		return rdx
 		mov window_id, rdx
 		mov rsi, 0
 		sub rsi, 1
-		mov r8, rsi
-		cmp window_id, r8
+		cmp window_id, rsi
 		jne ELSE_80
 		print fmt_str, str_4
 		print newline
 		invoke quit
 		exit 1
-		jmp ENDIF_81
 	ELSE_80:
-	ENDIF_81:
 		mov r8, 0
 		sub r8, 1
 		invoke create_renderer, window_id, r8, 2
@@ -487,24 +414,20 @@ program Pong {
 		mov renderer, r9
 		mov r8, 0
 		sub r8, 1
-		mov r10, r8
-		cmp renderer, r10
+		cmp renderer, r8
 		jne ELSE_84
 		print fmt_str, str_5
 		print newline
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_85
 	ELSE_84:
-	ENDIF_85:
 		invoke create_render_target, renderer, 640, 360
 		return r9
 		mov target_id, r9
 		mov r9, 0
 		sub r9, 1
-		mov r11, r9
-		cmp target_id, r11
+		cmp target_id, r9
 		jne ELSE_88
 		print fmt_str, str_6
 		print newline
@@ -512,41 +435,32 @@ program Pong {
 		invoke destroy_window, window_id
 		invoke quit
 		exit 1
-		jmp ENDIF_89
 	ELSE_88:
-	ENDIF_89:
 		invoke init_text
 		return r9
-		mov r11, r9
-		cmp r11, 1
+		cmp r9, 1
 		je ELSE_92
 		print fmt_str, str_7
 		print newline
 		exit 1
-		jmp ENDIF_93
 	ELSE_92:
-	ENDIF_93:
 		invoke load_font, filename, 16
 		return r9
 		mov font_id, r9
 		mov r9, 0
 		sub r9, 1
-		mov r11, r9
-		cmp font_id, r11
+		cmp font_id, r9
 		jne ELSE_96
 		print fmt_str, str_8
 		print fmt_str, filename
 		print newline
 		exit 1
-		jmp ENDIF_97
 	ELSE_96:
-	ENDIF_97:
 		store 16, paddle1, 0, 1
 		store 152, paddle1, 8, 1
 		store 618, paddle2, 0, 1
 		store 152, paddle2, 8, 1
-		mov r9, 1
-		mov rbx, r9
+		mov rbx, 1
 		call PROC_reset_ball
 		mov score_l, 0
 		mov score_r, 0
@@ -571,13 +485,11 @@ program Pong {
 		mov aabb_bh, r10
 		mov rbx, aabb_ax
 		add rbx, aabb_aw
-		mov rdx, rbx
-		cmp rdx, aabb_bx
+		cmp rbx, aabb_bx
 		jle OR_ONE_104
 		mov rdx, aabb_bx
 		add rdx, aabb_bw
-		mov rdi, rdx
-		cmp rdi, aabb_ax
+		cmp rdx, aabb_ax
 		jle OR_ONE_104
 		mov rdi, 0
 		jmp OR_END_105
@@ -586,8 +498,7 @@ program Pong {
 	OR_END_105:
 		mov r8, aabb_ay
 		add r8, aabb_ah
-		mov r10, r8
-		cmp r10, aabb_by
+		cmp r8, aabb_by
 		jle OR_ONE_108
 		cmp rdi, 0
 		jne OR_ONE_108
@@ -598,8 +509,7 @@ program Pong {
 	OR_END_109:
 		mov r9, aabb_by
 		add r9, aabb_bh
-		mov r12, r9
-		cmp r12, aabb_ay
+		cmp r9, aabb_ay
 		jle OR_ONE_112
 		cmp r10, 0
 		jne OR_ONE_112

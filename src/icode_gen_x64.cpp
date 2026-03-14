@@ -1143,6 +1143,9 @@ namespace mxvm {
             x64_generateLoadVar(out, t2, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
             last_cmp_type = CMP_INTEGER;
+        } else if (!isVariable(i.op2.op) && i.op2.type == OperandType::OP_CONSTANT && isVariable(i.op1.op)) {
+            out << "\tcmpq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+            last_cmp_type = CMP_INTEGER;
         } else {
             x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
             x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
@@ -1151,38 +1154,45 @@ namespace mxvm {
         }
     }
     void Program::x64_gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
+        auto emitIntegerOp = [&](const Operand &lhs, const Operand &rhs, const Operand &dest) {
+            if (arth == "mul") arth = "imul";
+            if (!isVariable(rhs.op) && rhs.type == OperandType::OP_CONSTANT
+                && arth != "imul" && lhs.op == dest.op && isVariable(lhs.op)) {
+                out << "\t" << arth << "q $" << rhs.op << ", " << getMangledName(lhs) << "(%rip)\n";
+                return;
+            }
+            x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", lhs);
+            if (!isVariable(rhs.op) && rhs.type == OperandType::OP_CONSTANT) {
+                out << "\t" << arth << "q $" << rhs.op << ", %rax\n";
+            } else {
+                x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", rhs);
+                out << "\t" << arth << "q %rcx, %rax\n";
+            }
+            out << "\tmovq %rax, " << getMangledName(dest) << "(%rip)\n";
+        };
+
         if (i.op3.op.empty()) {
-            if (isVariable(i.op1.op)) {
-                Variable &v = getVariable(i.op1.op);
-                if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
-                    if (arth == "mul") arth = "imul";
-                    out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-                } else if (v.type == VarType::VAR_FLOAT) {
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
-                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                } else throw mx::Exception("arth unsupported type");
-            } else throw mx::Exception("arth first must be variable");
+            if (!isVariable(i.op1.op)) throw mx::Exception("arth first must be variable");
+            Variable &v = getVariable(i.op1.op);
+            if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
+                emitIntegerOp(i.op1, i.op2, i.op1);
+            } else if (v.type == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op1);
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op2);
+                out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+            } else throw mx::Exception("arth unsupported type");
         } else {
-            if (isVariable(i.op1.op)) {
-                Variable &v = getVariable(i.op1.op);
-                if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op2);
-                    x64_generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op3);
-                    if (arth == "mul") arth = "imul";
-                    out << "\t" << arth << "q %rcx, %rax\n";
-                    out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
-                } else if (v.type == VarType::VAR_FLOAT) {
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
-                    x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
-                    out << "\t" << arth << "sd %xmm1, %xmm0\n";
-                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-                } else throw mx::Exception("arth unsupported type");
-            } else throw mx::Exception("arth first must be variable");
+            if (!isVariable(i.op1.op)) throw mx::Exception("arth first must be variable");
+            Variable &v = getVariable(i.op1.op);
+            if (v.type == VarType::VAR_INTEGER || v.type == VarType::VAR_POINTER) {
+                emitIntegerOp(i.op2, i.op3, i.op1);
+            } else if (v.type == VarType::VAR_FLOAT) {
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm0", i.op2);
+                x64_generateLoadVar(out, VarType::VAR_FLOAT, "%xmm1", i.op3);
+                out << "\t" << arth << "sd %xmm1, %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+            } else throw mx::Exception("arth unsupported type");
         }
     }
 

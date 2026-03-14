@@ -1460,6 +1460,10 @@ namespace mxvm {
             out << "\tcmpq %rcx, %rax\n";
             last_cmp_type = CMP_INTEGER; 
         }
+        else if (!isVariable(i.op2.op) && i.op2.type == OperandType::OP_CONSTANT && isVariable(i.op1.op)) {
+            out << "\tcmpq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
+            last_cmp_type = CMP_INTEGER;
+        }
         else {
             generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
             generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
@@ -1621,10 +1625,19 @@ namespace mxvm {
 
     void Program::gen_arth(std::ostream &out, std::string arth, const Instruction &i) {
         auto emitIntegerOp = [&](const Operand &lhs, const Operand &rhs, const Operand &dest) {
-            generateLoadVar(out, VarType::VAR_INTEGER, "%r10", lhs);
-            generateLoadVar(out, VarType::VAR_INTEGER, "%r11", rhs);
             if (arth == "mul") arth = "imul";
-            out << "\t" << arth << "q %r11, %r10\n";
+            if (!isVariable(rhs.op) && rhs.type == OperandType::OP_CONSTANT
+                && arth != "imul" && lhs.op == dest.op && isVariable(lhs.op)) {
+                out << "\t" << arth << "q $" << rhs.op << ", " << getMangledName(lhs) << "(%rip)\n";
+                return;
+            }
+            generateLoadVar(out, VarType::VAR_INTEGER, "%r10", lhs);
+            if (!isVariable(rhs.op) && rhs.type == OperandType::OP_CONSTANT) {
+                out << "\t" << arth << "q $" << rhs.op << ", %r10\n";
+            } else {
+                generateLoadVar(out, VarType::VAR_INTEGER, "%r11", rhs);
+                out << "\t" << arth << "q %r11, %r10\n";
+            }
             out << "\tmovq %r10, " << getMangledName(dest) << "(%rip)\n";
         };
 

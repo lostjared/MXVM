@@ -337,6 +337,12 @@ namespace pascal {
                     changed = true;
                     break;
                 }
+
+                // Arithmetic ops require a variable as operand 1 (it's the destination).
+                // Don't propagate constants into that position.
+                if (!movSrc.empty() && (std::isdigit((unsigned char)movSrc[0])
+                    || movSrc[0] == '-' || movSrc[0] == '"' || movSrc[0] == '\''))
+                    continue;
                 
                 bool srcUsedLater = false;
                 std::string srcPattern = "\\b" + movSrc + "\\b";
@@ -358,8 +364,75 @@ namespace pascal {
         }
     }
 
+    static bool isRegisterName(const std::string& s) {
+        static const std::unordered_set<std::string> regs = {
+            "rax","rbx","rcx","rdx","rsi","rdi","r8","r9","r10","r11","r12","r13","r14","r15"
+        };
+        if (regs.count(s)) return true;
+        if (s.size() >= 4 && s.compare(0,3,"xmm") == 0) return true;
+        return false;
+    }
+
+    static void foldMovArithMov(std::vector<std::string>& code) {
+        static const std::unordered_set<std::string> arithOps = {
+            "add", "sub", "mul", "div", "mod", "and", "or", "xor"
+        };
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (size_t i = 0; i + 2 < code.size(); ++i) {
+                std::string t0 = trim(rtrim_comment(code[i]));
+                if (t0.empty()) continue;
+                std::string mDst, mSrc;
+                if (!parse2(t0, "mov", mDst, mSrc)) continue;
+                if (!isRegisterName(mDst)) continue;
+
+                size_t j = i + 1;
+                while (j < code.size() && trim(rtrim_comment(code[j])).empty()) ++j;
+                if (j >= code.size()) continue;
+                std::string t1 = trim(rtrim_comment(code[j]));
+                if (t1.empty() || t1.back() == ':') continue;
+                auto sp = t1.find(' ');
+                if (sp == std::string::npos) continue;
+                std::string op = t1.substr(0, sp);
+                if (arithOps.find(op) == arithOps.end()) continue;
+                std::string a1, a2;
+                if (!parse2(t1, op, a1, a2)) continue;
+                if (a1 != mDst) continue;
+                if (a2 == mDst) continue;
+
+                size_t k = j + 1;
+                while (k < code.size() && trim(rtrim_comment(code[k])).empty()) ++k;
+                if (k >= code.size()) continue;
+                std::string t2 = trim(rtrim_comment(code[k]));
+                std::string m2Dst, m2Src;
+                if (!parse2(t2, "mov", m2Dst, m2Src)) continue;
+                if (m2Src != mDst) continue;
+                if (isRegisterName(m2Dst)) continue;
+
+                bool usedAfter = false;
+                std::string pattern = "\\b" + mDst + "\\b";
+                std::regex wordPat(pattern);
+                for (size_t w = k + 1; w < code.size(); ++w) {
+                    std::string tw = rtrim_comment(code[w]);
+                    if (tw.empty()) continue;
+                    if (std::regex_search(tw, wordPat)) { usedAfter = true; break; }
+                    if (tw.find("function ") != std::string::npos) break;
+                }
+                if (usedAfter) continue;
+
+                code[i] = "\t\tmov " + m2Dst + ", " + mSrc;
+                code[j] = "\t\t" + op + " " + m2Dst + ", " + a2;
+                code[k] = "";
+                changed = true;
+                break;
+            }
+        }
+    }
+
     static void peepholeOpt(std::vector<std::string>& code) {
         copyPropagation(code);
+        foldMovArithMov(code);
         foldAndTest(code);
         foldOrTest(code);
         foldCmpTest(code);

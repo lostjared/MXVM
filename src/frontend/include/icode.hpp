@@ -326,6 +326,7 @@ namespace pascal {
             for (size_t i = 0; i < registers.size(); ++i)
             if (registers[i] == reg) { regInUse[i] = false; return; }
             freePtrReg(reg);
+            releaseTempPtr(reg);
         }
         void freeFloatReg(const std::string& reg) {
             for (size_t i = 0; i < floatRegisters.size(); ++i)
@@ -336,7 +337,8 @@ namespace pascal {
         bool isReg(const std::string& name) const {
             return std::find(registers.begin(), registers.end(), name) != registers.end()
             || std::find(floatRegisters.begin(), floatRegisters.end(), name) != floatRegisters.end()
-            || isPtrReg(name); 
+            || isPtrReg(name)
+            || isTempPtr(name); 
         }
 
         int newSlotFor(const std::string& name) {
@@ -363,6 +365,19 @@ namespace pascal {
                     return;
                 }
             }
+        }
+
+        void releaseTempPtr(const std::string& ptrName) {
+            for (size_t i = 0; i < allTempPtrs.size(); ++i) {
+                if (allTempPtrs[i] == ptrName) {
+                    tempPtrInUse[i] = false;
+                    return;
+                }
+            }
+        }
+
+        bool isTempPtr(const std::string& name) const {
+            return std::find(allTempPtrs.begin(), allTempPtrs.end(), name) != allTempPtrs.end();
         }
 
         std::string allocTempPtr(const std::string& forScope = "") {
