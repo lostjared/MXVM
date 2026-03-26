@@ -1,10 +1,8 @@
 #include <emscripten/bind.h>
-#include <string>
+#include <mxvm/mxvm.hpp>
+#include <scanner/exception.hpp>
 #include <sstream>
-#include<mxvm/mxvm.hpp>
-#include<scanner/exception.hpp>
-
-
+#include <string>
 
 namespace {
 
@@ -13,33 +11,45 @@ namespace {
         out.reserve(s.size() * 12 / 10 + 8);
         for (char c : s) {
             switch (c) {
-                case '&':  out += "&amp;";  break;
-                case '<':  out += "&lt;";   break;
-                case '>':  out += "&gt;";   break;
-                case '"': out += "&quot;"; break;
-                case '\'': out += "&#39;";  break;
-                default:   out.push_back(c); break;
+            case '&':
+                out += "&amp;";
+                break;
+            case '<':
+                out += "&lt;";
+                break;
+            case '>':
+                out += "&gt;";
+                break;
+            case '"':
+                out += "&quot;";
+                break;
+            case '\'':
+                out += "&#39;";
+                break;
+            default:
+                out.push_back(c);
+                break;
             }
         }
         return out;
     }
 
     struct BaseGuard {
-        mxvm::Base* prev;                          
-        explicit BaseGuard(mxvm::Base* p)          
-            : prev(mxvm::Program::base) {          
-            if (p) mxvm::Program::base = p;        
+        mxvm::Base *prev;
+        explicit BaseGuard(mxvm::Base *p)
+            : prev(mxvm::Program::base) {
+            if (p)
+                mxvm::Program::base = p;
         }
         ~BaseGuard() {
-            mxvm::Program::base = prev;            
+            mxvm::Program::base = prev;
         }
     };
-}
+} // namespace
 
-
-static void collectAndRegisterAllExterns(mxvm::Program& program) {
-    for (const auto& obj : program.objects) {
-        for (auto& lbl : obj->labels) {
+static void collectAndRegisterAllExterns(mxvm::Program &program) {
+    for (const auto &obj : program.objects) {
+        for (auto &lbl : obj->labels) {
             if (lbl.second.second) {
                 program.add_extern(obj->name, lbl.first, false);
             }
@@ -47,12 +57,11 @@ static void collectAndRegisterAllExterns(mxvm::Program& program) {
     }
 }
 
-
 class MXVM_Debug {
-public:
-    MXVM_Debug () {}
-            
-    std::string parseToHTML(int output_type, const std::string& code) {
+  public:
+    MXVM_Debug() {}
+
+    std::string parseToHTML(int output_type, const std::string &code) {
         std::unique_ptr<mxvm::Program> program(new mxvm::Program());
         BaseGuard guard(program.get());
         mxvm::Base::object_map.clear();
@@ -61,23 +70,22 @@ public:
 
         std::ostringstream html;
         std::ostringstream html_err;
-        std::streambuf* old_cerr = std::cerr.rdbuf();
+        std::streambuf *old_cerr = std::cerr.rdbuf();
         std::cerr.rdbuf(html_err.rdbuf());
 
         mxvm::Platform platform;
-        
-        switch(output_type) {
-            case 0:
+
+        switch (output_type) {
+        case 0:
             platform = mxvm::Platform::LINUX;
             break;
-            case 1:
+        case 1:
             platform = mxvm::Platform::DARWIN;
             break;
-            case 2:
+        case 2:
             platform = mxvm::Platform::WINX64;
             break;
         }
-        
 
         try {
             mxvm::Parser parser(code);
@@ -93,7 +101,7 @@ public:
 
                 program->object = (program->root_name != program->name);
                 program->generateCode(platform, program->object, code_v);
-                program->assembly_code = program->gen_optimize(code_v.str(),  platform);
+                program->assembly_code = program->gen_optimize(code_v.str(), platform);
 
                 parser.generateDebugHTML(html, program);
             } else {
@@ -110,7 +118,7 @@ public:
         }
 
         std::cerr.rdbuf(old_cerr);
-        mxvm::html_mode = html_mode_prev; 
+        mxvm::html_mode = html_mode_prev;
 
         if (!html_err.str().empty()) {
             return R"(
@@ -120,7 +128,8 @@ public:
                     </div>
                     <div class="section-content" style="padding:30px;">
                         <div class="error" style="background:#2c1810;border:1px solid #d32f2f;color:#ff8a80;padding:20px;margin:20px;border-radius:8px;font-family:'Courier New',monospace;">
-                            )" + html_escape(html_err.str()) + R"(
+                            )" +
+                   html_escape(html_err.str()) + R"(
                         </div>
                     </div>
                 </div>
@@ -134,5 +143,5 @@ public:
 EMSCRIPTEN_BINDINGS(MXVM_Debug_bindings) {
     emscripten::class_<MXVM_Debug>("MXVM_Debug")
         .constructor<>()
-        .function("parseToHTML", &MXVM_Debug::parseToHTML); 
+        .function("parseToHTML", &MXVM_Debug::parseToHTML);
 }

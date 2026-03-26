@@ -1,20 +1,18 @@
 #ifndef __HTML__GEN___H_
 #define __HTML__GEN___H_
 
-#include"mxvm/instruct.hpp"
-
+#include "mxvm/instruct.hpp"
 
 namespace mxvm {
 
     class HTMLGen {
-    public:
+      public:
         HTMLGen(const std::string &src);
         void output(std::ostream &out, std::string filename);
-    private:
+
+      private:
         std::string source;
-
     };
-}
-
+} // namespace mxvm
 
 #endif

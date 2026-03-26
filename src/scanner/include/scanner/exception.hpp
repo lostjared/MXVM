@@ -1,17 +1,17 @@
-/*  
+/*
     coded by Jared Bruni (jaredbruni@protonmail.com)
     https://lostsidedead.biz
 */
 #ifndef _EXCEPTION_H_1
 #define _EXCEPTION_H_1
 
-#include<stdexcept>
-#include<string>
-#include<errno.h>
-#include<cstring>
-#include<cstdint>
-#include<unistd.h>
-#include<sstream>
+#include <cstdint>
+#include <cstring>
+#include <errno.h>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <unistd.h>
 
 namespace mx {
 
@@ -22,15 +22,15 @@ namespace mx {
     std::string format_signal(uint32_t sig);
     std::string format_hex_no_prefix(uint64_t value);
 
-    class Exception: public std::runtime_error {
-    public:
-        explicit Exception(const std::string& message)
+    class Exception : public std::runtime_error {
+      public:
+        explicit Exception(const std::string &message)
             : std::runtime_error(message) {}
 
-        explicit Exception(const char* message)
+        explicit Exception(const char *message)
             : std::runtime_error(message) {}
 
-        static Exception error(const std::string& context) {
+        static Exception error(const std::string &context) {
             return Exception(context + ": " + std::strerror(errno));
         }
     };
@@ -52,23 +52,23 @@ namespace mx {
         const std::string BRIGHT_YELLOW = "\033[93m";
         const std::string BRIGHT_BLUE = "\033[94m";
         const std::string BRIGHT_MAGENTA = "\033[95m";
-        const std::string BRIGHT_CYAN = "\033[96m";        
+        const std::string BRIGHT_CYAN = "\033[96m";
         const std::string BG_RED = "\033[41m";
         const std::string BG_GREEN = "\033[42m";
         const std::string BG_YELLOW = "\033[43m";
-    }   
+    } // namespace Color
     inline bool terminal_supports_color() {
         return isatty(STDOUT_FILENO) && getenv("TERM") != nullptr;
     }
     inline bool color_ = terminal_supports_color();
-}
+} // namespace mx
 
 inline std::string Col(const std::string &col, std::string color) {
     std::ostringstream o;
-    if(mx::color_)
+    if (mx::color_)
         o << color;
     o << col;
-    if(mx::color_)
+    if (mx::color_)
         o << mx::Color::RESET;
     return o.str();
 }

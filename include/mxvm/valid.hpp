@@ -1,29 +1,42 @@
 #ifndef _VALID_H_X
 #define _VALID_H_X
 
-#include<iostream>
-#include<string>
-#include<vector>
-#include<unordered_map>
-#include<unordered_set>
-#include"scanner/scanner.hpp"
-#include"mxvm/instruct.hpp"
+#include "mxvm/instruct.hpp"
+#include "scanner/scanner.hpp"
+#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace mxvm {
 
-
-    enum class OpKind { Num, Hex, Str, Id, Member, Label, Any };
+    enum class OpKind { Num,
+                        Hex,
+                        Str,
+                        Id,
+                        Member,
+                        Label,
+                        Any };
 
     struct ParsedOp {
         OpKind kind;
         std::string text;
-        const scan::TToken* at;
+        const scan::TToken *at;
     };
 
-    struct UseVar   { std::string name; const scan::TToken* at; };
-    struct UseLabel { std::string name; const scan::TToken* at; };
+    struct UseVar {
+        std::string name;
+        const scan::TToken *at;
+    };
+    struct UseLabel {
+        std::string name;
+        const scan::TToken *at;
+    };
 
-    enum class VArity { None, AnyTail, ArgsTail };
+    enum class VArity { None,
+                        AnyTail,
+                        ArgsTail };
 
     struct OpSpec {
         std::string name;
@@ -34,29 +47,30 @@ namespace mxvm {
     };
 
     class Validator {
-    private:
+      private:
         std::string filename;
         scan::Scanner scanner;
         std::string source;
         size_t index = 0;
-        const scan::TToken* token = nullptr;
+        const scan::TToken *token = nullptr;
         std::string current_function;
         std::unordered_map<std::string, std::unordered_set<std::string>> function_vars;
-    public:
+
+      public:
         Validator(const std::string &source);
         struct VarNamePair {
-            std::string first;           
-            const scan::TToken* second;  
+            std::string first;
+            const scan::TToken *second;
         };
         std::vector<VarNamePair> var_names;
         void validateAgainstSpec(
-            const std::string& op,
-            const std::vector<ParsedOp>& ops,
-            const std::unordered_map<std::string, Variable>& vars,
-            const std::unordered_map<std::string, std::string>& labels,
-            const std::unordered_set<std::string>& objects,
-            std::vector<UseVar>& usedVarsRef,
-            std::vector<UseLabel>& usedLabelsRef);
+            const std::string &op,
+            const std::vector<ParsedOp> &ops,
+            const std::unordered_map<std::string, Variable> &vars,
+            const std::unordered_map<std::string, std::string> &labels,
+            const std::unordered_set<std::string> &objects,
+            std::vector<UseVar> &usedVarsRef,
+            std::vector<UseLabel> &usedLabelsRef);
 
         bool validate(const std::string &name);
         bool match(const std::string &m);
@@ -72,6 +86,6 @@ namespace mxvm {
         ParsedOp parseOperand();
         std::vector<ParsedOp> parseOperandList();
     };
-}
+} // namespace mxvm
 
 #endif

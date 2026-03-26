@@ -1,66 +1,69 @@
-#include "parser.hpp"
 #include "icode.hpp"
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "parser.hpp"
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 std::string removeComments(const std::string &text) {
     std::ostringstream stream;
-    enum State { CODE, BRACE_COMMENT, PAREN_COMMENT, STRING };
+    enum State { CODE,
+                 BRACE_COMMENT,
+                 PAREN_COMMENT,
+                 STRING };
     State state = CODE;
-    
+
     for (size_t i = 0; i < text.length(); ++i) {
         char c = text[i];
         char next = (i + 1 < text.length()) ? text[i + 1] : '\0';
-        
+
         switch (state) {
-            case CODE:
-                if (c == '{') {
-                    state = BRACE_COMMENT;
-                } else if (c == '(' && next == '*') {
-                    state = PAREN_COMMENT;
-                    i++; 
-                } else if (c == '\'') {
-                    stream << c;
-                    state = STRING;
-                } else if (c == '/' && next == '/') {
-                    
-                    while (i < text.length() && text[i] != '\n') {
-                        i++;
-                    }
-                    if (i < text.length()) {
-                        stream << '\n';
-                    }
-                } else {
-                    stream << c;
-                }
-                break;
-                
-            case BRACE_COMMENT:
-                if (c == '}') {
-                    state = CODE;
-                }
-                break;
-                
-            case PAREN_COMMENT:
-                if (c == '*' && next == ')') {
-                    state = CODE;
-                    i++; 
-                }
-                break;
-                
-            case STRING:
+        case CODE:
+            if (c == '{') {
+                state = BRACE_COMMENT;
+            } else if (c == '(' && next == '*') {
+                state = PAREN_COMMENT;
+                i++;
+            } else if (c == '\'') {
                 stream << c;
-                if (c == '\'') {
-                    if (next == '\'') {
-                        stream << next;
-                        i++; 
-                    } else {
-                        state = CODE;
-                    }
+                state = STRING;
+            } else if (c == '/' && next == '/') {
+
+                while (i < text.length() && text[i] != '\n') {
+                    i++;
                 }
-                break;
+                if (i < text.length()) {
+                    stream << '\n';
+                }
+            } else {
+                stream << c;
+            }
+            break;
+
+        case BRACE_COMMENT:
+            if (c == '}') {
+                state = CODE;
+            }
+            break;
+
+        case PAREN_COMMENT:
+            if (c == '*' && next == ')') {
+                state = CODE;
+                i++;
+            }
+            break;
+
+        case STRING:
+            stream << c;
+            if (c == '\'') {
+                if (next == '\'') {
+                    stream << next;
+                    i++;
+                } else {
+                    state = CODE;
+                }
+            }
+            break;
         }
     }
 
@@ -70,11 +73,11 @@ std::string removeComments(const std::string &text) {
 int main(int argc, char **argv) {
     try {
         std::string source;
-        if(argc != 3) {
+        if (argc != 3) {
             std::cerr << "Error: requires two arguments input/output.\n";
             return EXIT_FAILURE;
         }
-         std::ifstream file(argv[1]);
+        std::ifstream file(argv[1]);
         if (!file.is_open()) {
             std::cerr << "Error: Cannot open file " << argv[1] << std::endl;
             return 1;
@@ -82,24 +85,24 @@ int main(int argc, char **argv) {
         std::ostringstream buffer;
         buffer << file.rdbuf();
 
-        if(buffer.str().empty()) {
+        if (buffer.str().empty()) {
             std::cerr << "mxx: file is empty\n";
             return EXIT_FAILURE;
         }
 
-        source = buffer.str();       
+        source = buffer.str();
         pascal::PascalParser parser(removeComments(source));
-        if(!parser.validator.validate(argv[1])) {
+        if (!parser.validator.validate(argv[1])) {
             std::cerr << "mxx: validation failed.\n";
             return EXIT_FAILURE;
         }
         auto ast = parser.parseProgram();
-        if (ast) {      
+        if (ast) {
             pascal::CodeGenVisitor emiter;
             emiter.generate(ast.get());
             std::fstream file;
             file.open(argv[2], std::ios::out);
-            if(!file.is_open()) {
+            if (!file.is_open()) {
                 std::cerr << "Error could not open file: " << argv[2] << "\n";
             }
             std::ostringstream output;
@@ -108,13 +111,13 @@ int main(int argc, char **argv) {
             file << opt << "\n";
             file.close();
         }
-    } catch (const pascal::ParseException& e) {
+    } catch (const pascal::ParseException &e) {
         std::cerr << "Parse Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
-    } catch(const scan::ScanExcept &e) {
+    } catch (const scan::ScanExcept &e) {
         std::cerr << "Syntax Error: " << e.why() << std::endl;
         return EXIT_FAILURE;
     }

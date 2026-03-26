@@ -1,7 +1,7 @@
 #ifndef __TYPES__H_HPP
 #define __TYPES__H_HPP
 
-#include<iostream>
+#include <iostream>
 
 namespace mxx {
 
@@ -78,14 +78,8 @@ namespace mxx {
         "until",
         "var",
         "while",
-        "with"
-    };
+        "with"};
 
-
-
-}
-
-
-
+} // namespace mxx
 
 #endif

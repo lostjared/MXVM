@@ -1,30 +1,28 @@
 #ifndef ICODE_HPP_
 #define ICODE_HPP_
 
-#include"mxvm/instruct.hpp"
-#include"scanner/exception.hpp"
-#include<unordered_map>
-#include<vector>
-#include<variant>
-#include"mxvm/function.hpp"
-#include"mxvm/parser.hpp"
-#include<functional>
+#include "mxvm/function.hpp"
+#include "mxvm/instruct.hpp"
+#include "mxvm/parser.hpp"
+#include "scanner/exception.hpp"
+#include <functional>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 
 namespace mxvm {
 
-    
-    
-
-    using StackValue = std::variant<int64_t, void*>;
+    using StackValue = std::variant<int64_t, void *>;
 
     class Stack {
-    public:
+      public:
         Stack() = default;
-        void push(const StackValue& value) {
+        void push(const StackValue &value) {
             data.push_back(value);
         }
         StackValue pop() {
-            if (data.empty()) throw mx::Exception("Stack underflow");
+            if (data.empty())
+                throw mx::Exception("Stack underflow");
             StackValue val = data.back();
             data.pop_back();
             return val;
@@ -32,7 +30,8 @@ namespace mxvm {
         bool empty() const { return data.empty(); }
         size_t size() const { return data.size(); }
         StackValue &operator[](size_t index) { return data[index]; }
-    private:
+
+      private:
         std::vector<StackValue> data;
     };
 
@@ -41,7 +40,7 @@ namespace mxvm {
     using runtime_call = std::function<void(Program *program, std::vector<Operand> &operands)>;
 
     class RuntimeFunction {
-    public:
+      public:
         RuntimeFunction() : func(nullptr), handle(nullptr) {}
         RuntimeFunction(const RuntimeFunction &r) : func(r.func), handle(r.handle), mod_name(r.mod_name), fname(r.fname) {}
         RuntimeFunction &operator=(const RuntimeFunction &r) {
@@ -62,7 +61,7 @@ namespace mxvm {
     };
 
     class Base {
-    public:
+      public:
         Base() = default;
         Base(Base &&other) noexcept;
         ~Base() = default;
@@ -89,46 +88,43 @@ namespace mxvm {
         static std::unordered_map<std::string, Variable> allocated;
         static std::unordered_map<std::string, Program *> object_map;
         std::string assembly_code;
-        
     };
 
     class Program : public Base {
-    public:
+      public:
         friend class Parser;
         Program();
         ~Program();
-    
-  
-        Program(Program&& other) noexcept
-        : Base(std::move(other)),
-            filename(std::move(other.filename)),
-            objects(std::move(other.objects)),
-            object(other.object),
-            pc(other.pc),
-            running(other.running),
-            exitCode(other.exitCode),
-            zero_flag(other.zero_flag),
-            less_flag(other.less_flag),
-            greater_flag(other.greater_flag),
-            carry_flag(other.carry_flag),
-            xmm_offset(other.xmm_offset),
-            args(std::move(other.args)),
-            main_function(other.main_function),
-            object_external(other.object_external),
-            stack(std::move(other.stack)),
-            result(std::move(other.result)),
-            parent(other.parent),
-            platform(other.platform)
-        {
+
+        Program(Program &&other) noexcept
+            : Base(std::move(other)),
+              filename(std::move(other.filename)),
+              objects(std::move(other.objects)),
+              object(other.object),
+              pc(other.pc),
+              running(other.running),
+              exitCode(other.exitCode),
+              zero_flag(other.zero_flag),
+              less_flag(other.less_flag),
+              greater_flag(other.greater_flag),
+              carry_flag(other.carry_flag),
+              xmm_offset(other.xmm_offset),
+              args(std::move(other.args)),
+              main_function(other.main_function),
+              object_external(other.object_external),
+              stack(std::move(other.stack)),
+              result(std::move(other.result)),
+              parent(other.parent),
+              platform(other.platform) {
             other.pc = 0;
             other.running = false;
             other.exitCode = 0;
-            for (auto& var_pair : vars) {
-               var_pair.second.obj_name = name;
+            for (auto &var_pair : vars) {
+                var_pair.second.obj_name = name;
             }
         }
 
-        Program& operator=(Program&& other) noexcept {
+        Program &operator=(Program &&other) noexcept {
             if (this != &other) {
                 Base::operator=(std::move(other));
                 filename = std::move(other.filename);
@@ -151,13 +147,13 @@ namespace mxvm {
                 other.pc = 0;
                 other.running = false;
                 other.exitCode = 0;
-                for (auto& var_pair : vars) {
-                   var_pair.second.obj_name = name;
+                for (auto &var_pair : vars) {
+                    var_pair.second.obj_name = name;
                 }
                 platform = other.platform;
             }
             return *this;
-        }     
+        }
 
         void add_standard();
         void stop();
@@ -168,7 +164,7 @@ namespace mxvm {
         std::string name;
         std::string filename;
         std::string getPlatformSymbolName(const std::string &name);
-        void generateCode(const Platform  &platform, bool obj, std::ostream &out);
+        void generateCode(const Platform &platform, bool obj, std::ostream &out);
         static std::string escapeNewLines(const std::string &text);
         void memoryDump(std::ostream &out);
         void setArgs(const std::vector<std::string> &argv);
@@ -180,31 +176,34 @@ namespace mxvm {
         void flatten_inc(Program *root, Instruction &i);
         void flatten_label(Program *root, int64_t offset, const std::string &label, bool func);
         void flatten_external(Program *root, const std::string &e, RuntimeFunction &r);
-        std::string getMangledName(const std::string& var);
+        std::string getMangledName(const std::string &var);
         std::string getMangledName(const Operand &op);
         Program *getObjectByName(const std::string &name);
-        bool isFunctionValid(const std::string& label);
-        //std::string resolveFunctionSymbol(const std::string& label);
-    private:
-        size_t pc;  
+        bool isFunctionValid(const std::string &label);
+        // std::string resolveFunctionSymbol(const std::string& label);
+      private:
+        size_t pc;
         bool running;
         int exitCode = 0;
         bool zero_flag = false;
         bool less_flag = false;
         bool greater_flag = false;
-        bool carry_flag = false;  
+        bool carry_flag = false;
         int xmm_offset = 0;
         std::vector<std::string> args;
         bool main_function;
         bool object_external = false;
-        enum LastCmpType { CMP_NONE, CMP_INTEGER, CMP_FLOAT };
+        enum LastCmpType { CMP_NONE,
+                           CMP_INTEGER,
+                           CMP_FLOAT };
         LastCmpType last_cmp_type = CMP_NONE;
         bool last_call_returns_owned_ptr = false;
-    public:    
+
+      public:
         // x86_64 System V ABI Linux code generation
         void generateFunctionCall(std::ostream &out, const std::string &name, std::vector<Operand> &op);
         void generateInvokeCall(std::ostream &out, std::vector<Operand> &op);
-        void generateInstruction(std::ostream &out, const Instruction  &i);
+        void generateInstruction(std::ostream &out, const Instruction &i);
         int generateLoadVar(std::ostream &out, int reg, const Operand &op);
         int generateLoadVar(std::ostream &out, VarType type, std::string reg, const Operand &op);
         std::string getRegisterByIndex(int index, VarType type);
@@ -230,7 +229,7 @@ namespace mxvm {
         void gen_stack_sub(std::ostream &out, const Instruction &i);
         void gen_getline(std::ostream &out, const Instruction &i);
         void gen_to_int(std::ostream &out, const Instruction &i);
-        void gen_to_float(std::ostream &out, const Instruction  &i);
+        void gen_to_float(std::ostream &out, const Instruction &i);
         void gen_invoke(std::ostream &out, const Instruction &i);
         void gen_return(std::ostream &out, const Instruction &i);
         void gen_neg(std::ostream &out, const Instruction &i);
@@ -251,7 +250,7 @@ namespace mxvm {
         void gen_div(std::ostream &out, const Instruction &i);
         void gen_mod(std::ostream &out, const Instruction &i);
 
-        std::string gen_optimize(const std::string  &code, const Platform &platform);
+        std::string gen_optimize(const std::string &code, const Platform &platform);
         std::string optimize_darwin(const std::string &code);
         std::string optimize_core(const std::string &code);
 
@@ -328,35 +327,35 @@ namespace mxvm {
         void sysv_emitStoreVarImm(std::ostream &out, const std::string &imm, const Operand &dest);
         void sysv_emitLoadVar(std::ostream &out, const std::string &dstReg, const Operand &src);
 
-        void exec_mov(const Instruction& instr);
-        void exec_add(const Instruction& instr);
-        void exec_sub(const Instruction& instr);
-        void exec_mul(const Instruction& instr);
-        void exec_div(const Instruction& instr);
-        void exec_cmp(const Instruction& instr);
-        void exec_jmp(const Instruction& instr);
-        void exec_load(const Instruction& instr);
-        void exec_store(const Instruction& instr);
-        void exec_or(const Instruction& instr);
-        void exec_and(const Instruction& instr);
-        void exec_xor(const Instruction& instr);
-        void exec_not(const Instruction& instr);
-        void exec_mod(const Instruction& instr);
-        void exec_je(const Instruction& instr);
-        void exec_jne(const Instruction& instr);
-        void exec_jl(const Instruction& instr);
-        void exec_jle(const Instruction& instr);
-        void exec_jg(const Instruction& instr);
-        void exec_jge(const Instruction& instr);
-        void exec_jz(const Instruction& instr);
-        void exec_jnz(const Instruction& instr);
-        void exec_ja(const Instruction& instr);
-        void exec_jb(const Instruction& instr);
-        void exec_print(const Instruction& instr);
+        void exec_mov(const Instruction &instr);
+        void exec_add(const Instruction &instr);
+        void exec_sub(const Instruction &instr);
+        void exec_mul(const Instruction &instr);
+        void exec_div(const Instruction &instr);
+        void exec_cmp(const Instruction &instr);
+        void exec_jmp(const Instruction &instr);
+        void exec_load(const Instruction &instr);
+        void exec_store(const Instruction &instr);
+        void exec_or(const Instruction &instr);
+        void exec_and(const Instruction &instr);
+        void exec_xor(const Instruction &instr);
+        void exec_not(const Instruction &instr);
+        void exec_mod(const Instruction &instr);
+        void exec_je(const Instruction &instr);
+        void exec_jne(const Instruction &instr);
+        void exec_jl(const Instruction &instr);
+        void exec_jle(const Instruction &instr);
+        void exec_jg(const Instruction &instr);
+        void exec_jge(const Instruction &instr);
+        void exec_jz(const Instruction &instr);
+        void exec_jnz(const Instruction &instr);
+        void exec_ja(const Instruction &instr);
+        void exec_jb(const Instruction &instr);
+        void exec_print(const Instruction &instr);
         void exec_string_print(const Instruction &instr);
-        void exec_exit(const Instruction& instr);
-        void exec_alloc(const Instruction& instr);
-        void exec_free(const Instruction& instr);
+        void exec_exit(const Instruction &instr);
+        void exec_alloc(const Instruction &instr);
+        void exec_free(const Instruction &instr);
         void exec_getline(const Instruction &instr);
         void exec_push(const Instruction &instr);
         void exec_pop(const Instruction &instr);
@@ -364,36 +363,36 @@ namespace mxvm {
         void exec_stack_store(const Instruction &instr);
         void exec_stack_sub(const Instruction &instr);
         void exec_call(const Instruction &instr);
-        void exec_ret(const Instruction &instr); 
-        void exec_done(const Instruction &instr); 
+        void exec_ret(const Instruction &instr);
+        void exec_done(const Instruction &instr);
         void exec_to_int(const Instruction &instr);
         void exec_to_float(const Instruction &instr);
-        void exec_invoke(const Instruction  &instr);
+        void exec_invoke(const Instruction &instr);
         void exec_return(const Instruction &instr);
         void exec_neg(const Instruction &instr);
-        void exec_fcmp(const Instruction& instr);
-        void exec_jae(const Instruction& instr);
-        void exec_jbe(const Instruction& instr);
-        void exec_jc(const Instruction& instr);
-        void exec_jnc(const Instruction& instr);
-        void exec_jp(const Instruction& instr);
-        void exec_jnp(const Instruction& instr);
-        void exec_jo(const Instruction& instr);
-        void exec_jno(const Instruction& instr);
-        void exec_js(const Instruction& instr);
-        void exec_jns(const Instruction& instr);
+        void exec_fcmp(const Instruction &instr);
+        void exec_jae(const Instruction &instr);
+        void exec_jbe(const Instruction &instr);
+        void exec_jc(const Instruction &instr);
+        void exec_jnc(const Instruction &instr);
+        void exec_jp(const Instruction &instr);
+        void exec_jnp(const Instruction &instr);
+        void exec_jo(const Instruction &instr);
+        void exec_jno(const Instruction &instr);
+        void exec_js(const Instruction &instr);
+        void exec_jns(const Instruction &instr);
 
-        Variable& getVariable(const std::string& name);
-        bool isVariable(const std::string& name);
-        void setVariableFromString(Variable& var, const std::string& value);
-        void addVariables(Variable& dest, Variable& src1, Variable& src2);
-        void subVariables(Variable& dest, Variable& src1, Variable& src2);
-        void mulVariables(Variable& dest, Variable& src1, Variable& src2);
-        void divVariables(Variable& dest, Variable& src1, Variable& src2);
-        std::string printFormatted(const std::string& format, const std::vector<Variable*>& args, bool output = true);
-        void setVariableFromConstant(Variable& var, const std::string& value);
-        Variable createTempVariable(VarType type, const std::string& value);
-        bool isConstant(const std::string& value);
+        Variable &getVariable(const std::string &name);
+        bool isVariable(const std::string &name);
+        void setVariableFromString(Variable &var, const std::string &value);
+        void addVariables(Variable &dest, Variable &src1, Variable &src2);
+        void subVariables(Variable &dest, Variable &src1, Variable &src2);
+        void mulVariables(Variable &dest, Variable &src1, Variable &src2);
+        void divVariables(Variable &dest, Variable &src1, Variable &src2);
+        std::string printFormatted(const std::string &format, const std::vector<Variable *> &args, bool output = true);
+        void setVariableFromConstant(Variable &var, const std::string &value);
+        Variable createTempVariable(VarType type, const std::string &value);
+        bool isConstant(const std::string &value);
         Variable variableFromOperand(const Operand &op);
         Stack stack;
         Operand result;
@@ -407,8 +406,8 @@ namespace mxvm {
     };
 
     void except_assert(std::string reason, bool value);
-    bool isFunctionReturningOwnedPtr(const std::string& funcName);
-    
-}
+    bool isFunctionReturningOwnedPtr(const std::string &funcName);
+
+} // namespace mxvm
 
 #endif

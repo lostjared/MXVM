@@ -1,23 +1,22 @@
-#include<mxvm/instruct.hpp>
-#include<mxvm/icode.hpp>
-#include<cstring>
-#include<cstdarg>
-#include<cstdio>
-#include<string>
-#include<cstdlib>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <mxvm/icode.hpp>
+#include <mxvm/instruct.hpp>
+#include <string>
 
-
-static std::string getStringFromVar(mxvm::Program* program, const std::string& varName) {
+static std::string getStringFromVar(mxvm::Program *program, const std::string &varName) {
     if (!program->isVariable(varName)) {
         throw mx::Exception("Argument must be a variable, got: " + varName);
     }
-    mxvm::Variable& var = program->getVariable(varName);
+    mxvm::Variable &var = program->getVariable(varName);
     if (var.type == mxvm::VarType::VAR_STRING) {
         return var.var_value.str_value;
     }
     if (var.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("Pointer argument '" + varName + "' is null", var.var_value.ptr_value != nullptr);
-        return std::string(reinterpret_cast<const char*>(var.var_value.ptr_value));
+        return std::string(reinterpret_cast<const char *>(var.var_value.ptr_value));
     }
     throw mx::Exception("Argument '" + varName + "' must be a string or pointer variable.");
 }
@@ -25,17 +24,17 @@ static std::string getStringFromVar(mxvm::Program* program, const std::string& v
 static inline bool isStringLike(mxvm::Variable &v) {
     return v.type == mxvm::VarType::VAR_STRING || v.type == mxvm::VarType::VAR_POINTER;
 }
-static inline const char* asReadPtr(mxvm::Variable &v) {
+static inline const char *asReadPtr(mxvm::Variable &v) {
     if (v.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("null pointer", v.var_value.ptr_value != nullptr);
-        return reinterpret_cast<const char*>(v.var_value.ptr_value);
+        return reinterpret_cast<const char *>(v.var_value.ptr_value);
     }
     return v.var_value.str_value.c_str();
 }
-static inline char* asWritePtr(mxvm::Variable &v) {
+static inline char *asWritePtr(mxvm::Variable &v) {
     if (v.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("null pointer", v.var_value.ptr_value != nullptr);
-        return reinterpret_cast<char*>(v.var_value.ptr_value);
+        return reinterpret_cast<char *>(v.var_value.ptr_value);
     }
     return nullptr;
 }
@@ -52,16 +51,16 @@ extern "C" void mxvm_string_strlen(mxvm::Program *program, std::vector<mxvm::Ope
 
     const char *src = nullptr;
     switch (v.type) {
-        case mxvm::VarType::VAR_STRING:
-            src = v.var_value.str_value.c_str();
-            break;
-        case mxvm::VarType::VAR_POINTER:
-        case mxvm::VarType::VAR_EXTERN:
-            mxvm::except_assert("strlen: null pointer in variable '" + v.var_name + "'", v.var_value.ptr_value != nullptr);
-            src = reinterpret_cast<const char*>(v.var_value.ptr_value);
-            break;
-        default:
-            throw mx::Exception("strlen argument '" + v.var_name + "' must be string or pointer variable (got different type).");
+    case mxvm::VarType::VAR_STRING:
+        src = v.var_value.str_value.c_str();
+        break;
+    case mxvm::VarType::VAR_POINTER:
+    case mxvm::VarType::VAR_EXTERN:
+        mxvm::except_assert("strlen: null pointer in variable '" + v.var_name + "'", v.var_value.ptr_value != nullptr);
+        src = reinterpret_cast<const char *>(v.var_value.ptr_value);
+        break;
+    default:
+        throw mx::Exception("strlen argument '" + v.var_name + "' must be string or pointer variable (got different type).");
     }
 
     int64_t length = static_cast<int64_t>(std::strlen(src));
@@ -89,7 +88,7 @@ extern "C" void mxvm_string_strcmp(mxvm::Program *program, std::vector<mxvm::Ope
 
     if (v1.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("strcmp: pointer: " + v1.var_name + " is null", (v1.var_value.ptr_value != nullptr));
-        s1 = reinterpret_cast<const char*>(v1.var_value.ptr_value);
+        s1 = reinterpret_cast<const char *>(v1.var_value.ptr_value);
     } else if (v1.type == mxvm::VarType::VAR_STRING) {
         s1 = v1.var_value.str_value.c_str();
     } else {
@@ -98,7 +97,7 @@ extern "C" void mxvm_string_strcmp(mxvm::Program *program, std::vector<mxvm::Ope
 
     if (v2.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("strcmp: pointer: " + v2.var_name + " is null", (v2.var_value.ptr_value != nullptr));
-        s2 = reinterpret_cast<const char*>(v2.var_value.ptr_value);
+        s2 = reinterpret_cast<const char *>(v2.var_value.ptr_value);
     } else if (v2.type == mxvm::VarType::VAR_STRING) {
         s2 = v2.var_value.str_value.c_str();
     } else {
@@ -112,11 +111,12 @@ extern "C" void mxvm_string_strcmp(mxvm::Program *program, std::vector<mxvm::Ope
 }
 
 extern "C" void mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("strncpy requires (dest, src, len)");
+    if (operand.size() != 3)
+        throw mx::Exception("strncpy requires (dest, src, len)");
     if (!program->isVariable(operand[0].op) || !program->isVariable(operand[1].op))
         throw mx::Exception("strncpy arguments must be variables");
     mxvm::Variable &dest = program->getVariable(operand[0].op);
-    mxvm::Variable &src  = program->getVariable(operand[1].op);
+    mxvm::Variable &src = program->getVariable(operand[1].op);
 
     int64_t n = operand[2].op_value;
     if (program->isVariable(operand[2].op)) {
@@ -124,8 +124,10 @@ extern "C" void mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Op
         n = iv.var_value.int_value;
     }
 
-    if (!isStringLike(dest)) throw mx::Exception("strncpy dest must be pointer or string");
-    if (!isStringLike(src))  throw mx::Exception("strncpy src must be pointer or string");
+    if (!isStringLike(dest))
+        throw mx::Exception("strncpy dest must be pointer or string");
+    if (!isStringLike(src))
+        throw mx::Exception("strncpy src must be pointer or string");
 
     const char *sptr = asReadPtr(src);
     if (dest.type == mxvm::VarType::VAR_POINTER) {
@@ -134,7 +136,7 @@ extern "C" void mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Op
         char *dptr = asWritePtr(dest);
         std::strncpy(dptr, sptr, n);
         dptr[n] = '\0';
-    } else { 
+    } else {
         dest.var_value.str_value.assign(sptr, (size_t)n);
     }
 
@@ -143,11 +145,12 @@ extern "C" void mxvm_string_strncpy(mxvm::Program *program, std::vector<mxvm::Op
 }
 
 extern "C" void mxvm_string_strncat(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("strncat requires (dest, src, len)");
+    if (operand.size() != 3)
+        throw mx::Exception("strncat requires (dest, src, len)");
     if (!program->isVariable(operand[0].op) || !program->isVariable(operand[1].op))
         throw mx::Exception("strncat arguments must be variables");
     mxvm::Variable &dest = program->getVariable(operand[0].op);
-    mxvm::Variable &src  = program->getVariable(operand[1].op);
+    mxvm::Variable &src = program->getVariable(operand[1].op);
 
     int64_t n = operand[2].op_value;
     if (program->isVariable(operand[2].op)) {
@@ -155,18 +158,20 @@ extern "C" void mxvm_string_strncat(mxvm::Program *program, std::vector<mxvm::Op
         n = iv.var_value.int_value;
     }
 
-    if (!isStringLike(dest)) throw mx::Exception("strncat dest must be pointer or string");
-    if (!isStringLike(src))  throw mx::Exception("strncat src must be pointer or string");
+    if (!isStringLike(dest))
+        throw mx::Exception("strncat dest must be pointer or string");
+    if (!isStringLike(src))
+        throw mx::Exception("strncat src must be pointer or string");
 
     const char *sptr = asReadPtr(src);
     if (dest.type == mxvm::VarType::VAR_POINTER) {
         if (dest.var_value.buffer_size) {
-            size_t have = std::strlen(reinterpret_cast<const char*>(dest.var_value.ptr_value));
+            size_t have = std::strlen(reinterpret_cast<const char *>(dest.var_value.ptr_value));
             if (have + (size_t)n + 1 > dest.var_value.buffer_size)
                 throw mx::Exception("strncat dest buffer too small");
         }
-        std::strncat(reinterpret_cast<char*>(dest.var_value.ptr_value), sptr, n);
-    } else { 
+        std::strncat(reinterpret_cast<char *>(dest.var_value.ptr_value), sptr, n);
+    } else {
         dest.var_value.str_value.append(sptr, (size_t)n);
     }
 
@@ -183,7 +188,7 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
     std::string &fmt_var = operand[2].op;
 
     if (!program->isVariable(dest_var) || !program->isVariable(fmt_var)) {
-        throw mx::Exception("snprintf destination: " + dest_var + " and format: "+ fmt_var+ " must be variables.");
+        throw mx::Exception("snprintf destination: " + dest_var + " and format: " + fmt_var + " must be variables.");
     }
 
     if (program->isVariable(operand[1].op)) {
@@ -201,7 +206,7 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
 
     std::ostringstream oss;
     size_t argIndex = 3;
-    const char* format = fmt.var_value.str_value.c_str();
+    const char *format = fmt.var_value.str_value.c_str();
     char buffer[4096];
 
     for (size_t i = 0; i < fmt.var_value.str_value.length(); ++i) {
@@ -209,9 +214,9 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
             size_t start = i;
             size_t j = i + 1;
             while (j < fmt.var_value.str_value.length() &&
-                (format[j] == '-' || format[j] == '+' || format[j] == ' ' || format[j] == '#' || format[j] == '0' ||
-                 (format[j] >= '0' && format[j] <= '9') || format[j] == '.' ||
-                 format[j] == 'l' || format[j] == 'h' || format[j] == 'z' || format[j] == 'j' || format[j] == 't')) {
+                   (format[j] == '-' || format[j] == '+' || format[j] == ' ' || format[j] == '#' || format[j] == '0' ||
+                    (format[j] >= '0' && format[j] <= '9') || format[j] == '.' ||
+                    format[j] == 'l' || format[j] == 'h' || format[j] == 'z' || format[j] == 'j' || format[j] == 't')) {
                 ++j;
             }
             if (j < fmt.var_value.str_value.length() && format[j] == '%') {
@@ -219,7 +224,8 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
                 i = j;
                 continue;
             }
-            if (j >= fmt.var_value.str_value.length()) break;
+            if (j >= fmt.var_value.str_value.length())
+                break;
             if (!std::isalpha(format[j])) {
                 oss << format[i];
                 continue;
@@ -254,12 +260,11 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
         }
     }
 
-    
     if (dest.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("snprintf dest pointer is null", dest.var_value.ptr_value != nullptr);
-        std::strncpy(reinterpret_cast<char*>(dest.var_value.ptr_value), oss.str().c_str(), n);
+        std::strncpy(reinterpret_cast<char *>(dest.var_value.ptr_value), oss.str().c_str(), n);
         if (n > 0) {
-            reinterpret_cast<char*>(dest.var_value.ptr_value)[n - 1] = '\0';
+            reinterpret_cast<char *>(dest.var_value.ptr_value)[n - 1] = '\0';
         }
     } else if (dest.type == mxvm::VarType::VAR_STRING) {
         dest.var_value.str_value = oss.str().substr(0, n);
@@ -273,7 +278,8 @@ extern "C" void mxvm_string_snprintf(mxvm::Program *program, std::vector<mxvm::O
 }
 
 extern "C" void mxvm_string_strfind(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("strfind requires (haystack, needle, start)");
+    if (operand.size() != 3)
+        throw mx::Exception("strfind requires (haystack, needle, start)");
     if (!program->isVariable(operand[0].op) || !program->isVariable(operand[1].op))
         throw mx::Exception("strfind arguments must be variables");
     mxvm::Variable &hay = program->getVariable(operand[0].op);
@@ -298,33 +304,38 @@ extern "C" void mxvm_string_strfind(mxvm::Program *program, std::vector<mxvm::Op
 }
 
 extern "C" void mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 5) throw mx::Exception("substr requires 5 args");
+    if (operand.size() != 5)
+        throw mx::Exception("substr requires 5 args");
     if (!program->isVariable(operand[0].op) || !program->isVariable(operand[2].op))
         throw mx::Exception("substr dest/src must be variables");
     mxvm::Variable &dest = program->getVariable(operand[0].op);
-    mxvm::Variable &src  = program->getVariable(operand[2].op);
+    mxvm::Variable &src = program->getVariable(operand[2].op);
 
     if (!isStringLike(dest) || !isStringLike(src))
         throw mx::Exception("substr dest/src must be pointer or string");
 
     int64_t size = operand[1].op_value;
-    int64_t pos  = operand[3].op_value;
-    int64_t len  = operand[4].op_value;
-    if (program->isVariable(operand[1].op)) size = program->getVariable(operand[1].op).var_value.int_value;
-    if (program->isVariable(operand[3].op)) pos  = program->getVariable(operand[3].op).var_value.int_value;
-    if (program->isVariable(operand[4].op)) len  = program->getVariable(operand[4].op).var_value.int_value;
+    int64_t pos = operand[3].op_value;
+    int64_t len = operand[4].op_value;
+    if (program->isVariable(operand[1].op))
+        size = program->getVariable(operand[1].op).var_value.int_value;
+    if (program->isVariable(operand[3].op))
+        pos = program->getVariable(operand[3].op).var_value.int_value;
+    if (program->isVariable(operand[4].op))
+        len = program->getVariable(operand[4].op).var_value.int_value;
 
     std::string S = asReadPtr(src);
-    if (pos < 0) pos = 0;
+    if (pos < 0)
+        pos = 0;
     std::string out = (pos > (int64_t)S.size()) ? "" : S.substr((size_t)pos, (size_t)len);
 
     if (dest.type == mxvm::VarType::VAR_POINTER) {
         mxvm::except_assert("substr dest ptr null", dest.var_value.ptr_value != nullptr);
         if (size <= 0 || (dest.var_value.buffer_size && (size_t)size > dest.var_value.buffer_size))
             size = (int64_t)dest.var_value.buffer_size;
-        std::strncpy(reinterpret_cast<char*>(dest.var_value.ptr_value), out.c_str(), (size_t)size);
+        std::strncpy(reinterpret_cast<char *>(dest.var_value.ptr_value), out.c_str(), (size_t)size);
         if (size > 0)
-            reinterpret_cast<char*>(dest.var_value.ptr_value)[size - 1] = '\0';
+            reinterpret_cast<char *>(dest.var_value.ptr_value)[size - 1] = '\0';
     } else {
         dest.var_value.str_value = out.substr(0, (size_t)size);
     }
@@ -334,26 +345,26 @@ extern "C" void mxvm_string_substr(mxvm::Program *program, std::vector<mxvm::Ope
 }
 
 extern "C" void mxvm_string_strat(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if(operand.size () == 2 && program->isVariable(operand[0].op)) {
-    
+    if (operand.size() == 2 && program->isVariable(operand[0].op)) {
+
         int64_t pos = 0;
-        if(operand[1].type == mxvm::OperandType::OP_CONSTANT) {
+        if (operand[1].type == mxvm::OperandType::OP_CONSTANT) {
             pos = operand[1].op_value;
         } else {
             mxvm::Variable &v = program->getVariable(operand[1].op);
             pos = v.var_value.int_value;
         }
-       mxvm::Variable &var = program->getVariable(operand[0].op);
-       program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
-       program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
-       program->vars["%rax"].var_value.int_value = static_cast<int64_t>(var.var_value.str_value[pos]); 
+        mxvm::Variable &var = program->getVariable(operand[0].op);
+        program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+        program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+        program->vars["%rax"].var_value.int_value = static_cast<int64_t>(var.var_value.str_value[pos]);
     }
 }
 
-
 extern "C" void mxvm_string_pos(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 2) throw mx::Exception("pos requires 2 arguments: (substr, s)");
-    
+    if (operand.size() != 2)
+        throw mx::Exception("pos requires 2 arguments: (substr, s)");
+
     std::string sub = getStringFromVar(program, operand[0].op);
     std::string s = getStringFromVar(program, operand[1].op);
 
@@ -364,19 +375,19 @@ extern "C" void mxvm_string_pos(mxvm::Program *program, std::vector<mxvm::Operan
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
 }
 
-
 extern "C" void mxvm_string_copy(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("copy requires 3 arguments: (s, index, count)");
+    if (operand.size() != 3)
+        throw mx::Exception("copy requires 3 arguments: (s, index, count)");
 
     std::string s = getStringFromVar(program, operand[0].op);
     int64_t index = program->getVariable(operand[1].op).var_value.int_value;
     int64_t count = program->getVariable(operand[2].op).var_value.int_value;
 
-    
     std::string result_str = s.substr(index - 1, count);
-    
-    char* new_buf = static_cast<char*>(malloc(result_str.length() + 1));
-    if (!new_buf) throw mx::Exception("malloc failed in copy()");
+
+    char *new_buf = static_cast<char *>(malloc(result_str.length() + 1));
+    if (!new_buf)
+        throw mx::Exception("malloc failed in copy()");
     strcpy(new_buf, result_str.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
@@ -386,19 +397,19 @@ extern "C" void mxvm_string_copy(mxvm::Program *program, std::vector<mxvm::Opera
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
-
 extern "C" void mxvm_string_insert(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("insert requires 3 arguments: (source, dest, index)");
+    if (operand.size() != 3)
+        throw mx::Exception("insert requires 3 arguments: (source, dest, index)");
 
     std::string source = getStringFromVar(program, operand[0].op);
     std::string dest = getStringFromVar(program, operand[1].op);
     int64_t index = program->getVariable(operand[2].op).var_value.int_value;
 
-
     dest.insert(index - 1, source);
 
-    char* new_buf = static_cast<char*>(malloc(dest.length() + 1));
-    if (!new_buf) throw mx::Exception("malloc failed in insert()");
+    char *new_buf = static_cast<char *>(malloc(dest.length() + 1));
+    if (!new_buf)
+        throw mx::Exception("malloc failed in insert()");
     strcpy(new_buf, dest.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
@@ -408,19 +419,19 @@ extern "C" void mxvm_string_insert(mxvm::Program *program, std::vector<mxvm::Ope
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
-
 extern "C" void mxvm_string_delete(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 3) throw mx::Exception("delete requires 3 arguments: (s, index, count)");
+    if (operand.size() != 3)
+        throw mx::Exception("delete requires 3 arguments: (s, index, count)");
 
     std::string s = getStringFromVar(program, operand[0].op);
     int64_t index = program->getVariable(operand[1].op).var_value.int_value;
     int64_t count = program->getVariable(operand[2].op).var_value.int_value;
 
-
     s.erase(index - 1, count);
 
-    char* new_buf = static_cast<char*>(malloc(s.length() + 1));
-    if (!new_buf) throw mx::Exception("malloc failed in delete()");
+    char *new_buf = static_cast<char *>(malloc(s.length() + 1));
+    if (!new_buf)
+        throw mx::Exception("malloc failed in delete()");
     strcpy(new_buf, s.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
@@ -430,15 +441,16 @@ extern "C" void mxvm_string_delete(mxvm::Program *program, std::vector<mxvm::Ope
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
-
 extern "C" void mxvm_string_inttostr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 1) throw mx::Exception("inttostr requires 1 argument: (integer)");
+    if (operand.size() != 1)
+        throw mx::Exception("inttostr requires 1 argument: (integer)");
 
     int64_t val = program->getVariable(operand[0].op).var_value.int_value;
     std::string result_str = std::to_string(val);
 
-    char* new_buf = static_cast<char*>(malloc(result_str.length() + 1));
-    if (!new_buf) throw mx::Exception("malloc failed in inttostr()");
+    char *new_buf = static_cast<char *>(malloc(result_str.length() + 1));
+    if (!new_buf)
+        throw mx::Exception("malloc failed in inttostr()");
     strcpy(new_buf, result_str.c_str());
 
     program->vars["%rax"].var_value.ptr_value = new_buf;
@@ -448,15 +460,15 @@ extern "C" void mxvm_string_inttostr(mxvm::Program *program, std::vector<mxvm::O
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
-
 extern "C" void mxvm_string_strtoint(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
-    if (operand.size() != 1) throw mx::Exception("strtoint requires 1 argument: (string)");
+    if (operand.size() != 1)
+        throw mx::Exception("strtoint requires 1 argument: (string)");
 
     std::string s = getStringFromVar(program, operand[0].op);
     int64_t result = 0;
     try {
         result = std::stoll(s);
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         result = 0;
     }
 

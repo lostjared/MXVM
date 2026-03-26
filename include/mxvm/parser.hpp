@@ -1,16 +1,16 @@
 #ifndef _PARSER_H_X
 #define _PARSER_H_X
 
-#include<iostream>
-#include<string>
-#include<cstdint>
-#include<memory>
-#include<unordered_map>
-#include"scanner/scanner.hpp"
-#include"scanner/exception.hpp"
-#include"mxvm/instruct.hpp"
-#include"mxvm/valid.hpp"
-#include<algorithm>
+#include "mxvm/instruct.hpp"
+#include "mxvm/valid.hpp"
+#include "scanner/exception.hpp"
+#include "scanner/scanner.hpp"
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace mxvm {
     class ProgramNode;
@@ -25,35 +25,36 @@ namespace mxvm {
     struct Variable;
     struct Operand;
 
-
     extern bool debug_mode;
     extern bool instruct_mode;
     extern bool html_mode;
 
-    enum class Mode { MODE_INTERPRET, MODE_COMPILE };
-    enum class Platform { LINUX, DARWIN, WINX64 };
-      
+    enum class Mode { MODE_INTERPRET,
+                      MODE_COMPILE };
+    enum class Platform { LINUX,
+                          DARWIN,
+                          WINX64 };
+
     class ModuleParser;
 
     class Parser {
 
-    public:
+      public:
         friend class ModuleParser;
         explicit Parser(const std::string &source);
-        Parser(const Parser& other)
-        : source_file(other.source_file),
-            scanner(other.scanner),
-            validator(other.validator),
-            parser_mode(other.parser_mode),
-            module_path(other.module_path),
-            object_path(other.object_path),
-            include_path(other.include_path),
-            object_mode(other.object_mode),
-            object_name(other.object_name),
-            platform{other.platform}
-        {}
+        Parser(const Parser &other)
+            : source_file(other.source_file),
+              scanner(other.scanner),
+              validator(other.validator),
+              parser_mode(other.parser_mode),
+              module_path(other.module_path),
+              object_path(other.object_path),
+              include_path(other.include_path),
+              object_mode(other.object_mode),
+              object_name(other.object_name),
+              platform{other.platform} {}
 
-        Parser& operator=(const Parser& other) {
+        Parser &operator=(const Parser &other) {
             if (this != &other) {
                 source_file = other.source_file;
                 scanner = other.scanner;
@@ -72,13 +73,13 @@ namespace mxvm {
         uint64_t scan();
         void parse();
         auto operator[](size_t pos);
-        
-        std::unique_ptr<ProgramNode> parseProgramOrObject(uint64_t& index);
+
+        std::unique_ptr<ProgramNode> parseProgramOrObject(uint64_t &index);
         std::unique_ptr<ProgramNode> parseAST();
         bool generateProgramCode(const Mode &m, std::unique_ptr<Program> &program);
         bool generateDebugHTML(std::ostream &out, std::unique_ptr<Program> &program);
-        void generateObjectAssemblyFile(std::unique_ptr<Program>& objProgram);
-        void registerObjectExterns(std::unique_ptr<Program>& mainProgram, const std::unique_ptr<Program>& objProgram);
+        void generateObjectAssemblyFile(std::unique_ptr<Program> &objProgram);
+        void registerObjectExterns(std::unique_ptr<Program> &mainProgram, const std::unique_ptr<Program> &objProgram);
         std::string source_file;
         scan::Scanner scanner;
         Validator validator;
@@ -89,24 +90,25 @@ namespace mxvm {
         bool object_mode = false;
         std::string object_name;
         Platform platform;
-    private:     
-        std::unique_ptr<SectionNode> parseSection(uint64_t& index);
-        std::unique_ptr<VariableNode> parseDataVariable(uint64_t& index);
-        std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t& index);
-        std::unique_ptr<CommentNode> parseComment(uint64_t& index);
-        std::unique_ptr<LabelNode> parseLabel(uint64_t& index);
-        std::unique_ptr<ModuleNode> parseModule(uint64_t& index);
+
+      private:
+        std::unique_ptr<SectionNode> parseSection(uint64_t &index);
+        std::unique_ptr<VariableNode> parseDataVariable(uint64_t &index);
+        std::unique_ptr<InstructionNode> parseCodeInstruction(uint64_t &index);
+        std::unique_ptr<CommentNode> parseComment(uint64_t &index);
+        std::unique_ptr<LabelNode> parseLabel(uint64_t &index);
+        std::unique_ptr<ModuleNode> parseModule(uint64_t &index);
         std::unique_ptr<ObjectNode> parseObject(uint64_t &index);
-    
-        void processDataSection(SectionNode* sectionNode, std::unique_ptr<Program>& program);
-        void processCodeSection(SectionNode* sectionNode, std::unique_ptr<Program>& program);
-        void processModuleSection(SectionNode* sectionNode, std::unique_ptr<Program>& program);
-        void processObjectSection(SectionNode *sectionNode, std::unique_ptr<Program>& program);
+
+        void processDataSection(SectionNode *sectionNode, std::unique_ptr<Program> &program);
+        void processCodeSection(SectionNode *sectionNode, std::unique_ptr<Program> &program);
+        void processModuleSection(SectionNode *sectionNode, std::unique_ptr<Program> &program);
+        void processObjectSection(SectionNode *sectionNode, std::unique_ptr<Program> &program);
         void processModuleFile(const std::string &src, std::unique_ptr<Program> &program);
         void processObjectFile(const std::string &src, std::unique_ptr<Program> &program);
-        void setVariableValue(Variable& var, VarType type, const std::string& value, size_t buf_size = 0);
-        void setDefaultVariableValue(Variable& var, VarType type);
-        void resolveLabelReference(Operand& operand, const std::unordered_map<std::string, size_t>& labelMap);
+        void setVariableValue(Variable &var, VarType type, const std::string &value, size_t buf_size = 0);
+        void setDefaultVariableValue(Variable &var, VarType type);
+        void resolveLabelReference(Operand &operand, const std::unordered_map<std::string, size_t> &labelMap);
         void collectObjectNames(std::vector<std::pair<std::string, std::string>> &names, const std::unique_ptr<Program> &program);
         void printObjectHTML(std::ostream &out, const std::unique_ptr<Program> &objPtr);
     };
@@ -118,30 +120,30 @@ namespace mxvm {
         bool operator==(const ExternalFunction &f) {
             return (name == f.name && mod == f.mod);
         }
-        
+
         VarType ret_type = VarType::VAR_INTEGER;
-        bool ret_owned = false; 
+        bool ret_owned = false;
     };
 
     class ModuleParser {
-    public:
+      public:
         ModuleParser(const Mode &m, const std::string &mod_name, const std::string &source);
-        
-        ModuleParser(const ModuleParser& other)
-            : functions(other.functions),
-            mod_name(other.mod_name),
-            scanner(other.scanner),
-            index(other.index),
-            token(other.token ? new scan::TToken(*other.token) : nullptr)
-        {}
 
-        ModuleParser& operator=(const ModuleParser& other) {
+        ModuleParser(const ModuleParser &other)
+            : functions(other.functions),
+              mod_name(other.mod_name),
+              scanner(other.scanner),
+              index(other.index),
+              token(other.token ? new scan::TToken(*other.token) : nullptr) {}
+
+        ModuleParser &operator=(const ModuleParser &other) {
             if (this != &other) {
                 functions = other.functions;
                 mod_name = other.mod_name;
                 scanner = other.scanner;
                 index = other.index;
-                if (token) delete token;
+                if (token)
+                    delete token;
                 token = other.token ? new scan::TToken(*other.token) : nullptr;
             }
             return *this;
@@ -157,7 +159,8 @@ namespace mxvm {
         bool match(const types::TokenType &t);
         void require(const std::string &s);
         void require(const types::TokenType &t);
-    protected:
+
+      protected:
         std::vector<ExternalFunction> functions;
         std::string mod_name;
         scan::Scanner scanner;
@@ -165,6 +168,6 @@ namespace mxvm {
         scan::TToken *token = nullptr;
         Mode parser_mode;
     };
-}
+} // namespace mxvm
 
 #endif

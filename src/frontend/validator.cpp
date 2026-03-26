@@ -4,9 +4,9 @@
 
 namespace mxx {
 
-    TPValidator::TPValidator(const std::string& source_) : scanner(source_), source(source_) {}
+    TPValidator::TPValidator(const std::string &source_) : scanner(source_), source(source_) {}
 
-    bool TPValidator::validate(const std::string& name) {
+    bool TPValidator::validate(const std::string &name) {
         filename = name;
         scanner.scan();
         index = 0;
@@ -14,15 +14,16 @@ namespace mxx {
         scopeStack.clear();
         declaredProcs.clear();
         declaredFuncs.clear();
-        pushScope(); 
+        pushScope();
         next();
         parseProgram();
-        if (token) failHere("Unexpected tokens after end of program");
-        popScope(); 
+        if (token)
+            failHere("Unexpected tokens after end of program");
+        popScope();
         return true;
     }
 
-    bool TPValidator::match(const std::string& s) const {
+    bool TPValidator::match(const std::string &s) const {
         return token && token->getTokenValue() == s;
     }
 
@@ -32,8 +33,8 @@ namespace mxx {
 
     bool TPValidator::next() {
         while (index < scanner.size() &&
-            scanner[index].getTokenType() == types::TokenType::TT_SYM &&
-            scanner[index].getTokenValue() == "\n") {
+               scanner[index].getTokenType() == types::TokenType::TT_SYM &&
+               scanner[index].getTokenValue() == "\n") {
             ++index;
         }
         if (index < scanner.size()) {
@@ -44,68 +45,82 @@ namespace mxx {
         return false;
     }
 
-    bool TPValidator::peekIs(const std::string& s) {
+    bool TPValidator::peekIs(const std::string &s) {
         return index < scanner.size() && scanner[index].getTokenValue() == s;
     }
 
-    void TPValidator::require(const std::string& s) {
+    void TPValidator::require(const std::string &s) {
         if (!match(s)) {
-            if (token) failAt(token, "Required: " + s + " Found: " + found());
+            if (token)
+                failAt(token, "Required: " + s + " Found: " + found());
             fail("Required: " + s + " Found: EOF");
         }
     }
 
     void TPValidator::require(types::TokenType t) {
         if (!match(t)) {
-            if (token) failAt(token, "Required: " + tokenTypeToString(t) + " Found: " + found());
+            if (token)
+                failAt(token, "Required: " + tokenTypeToString(t) + " Found: " + found());
             fail("Required: " + tokenTypeToString(t) + " Found: EOF");
         }
     }
 
-    void TPValidator::requireKW(const std::string& k) {
+    void TPValidator::requireKW(const std::string &k) {
         if (!isKW(k)) {
-            if (token) failAt(token, "Required: " + k + " Found: " + found());
+            if (token)
+                failAt(token, "Required: " + k + " Found: " + found());
             fail("Required: " + k + " Found: EOF");
         }
     }
 
-    void TPValidator::fail(const std::string& msg) {
+    void TPValidator::fail(const std::string &msg) {
         throw mx::Exception("Syntax Error in '" + filename + "': " + msg);
     }
 
-    void TPValidator::failHere(const std::string& msg) {
-        if (token) throw mx::Exception("Syntax Error in '" + filename + "': " + msg + " at line " + std::to_string(token->getLine()));
+    void TPValidator::failHere(const std::string &msg) {
+        if (token)
+            throw mx::Exception("Syntax Error in '" + filename + "': " + msg + " at line " + std::to_string(token->getLine()));
         throw mx::Exception("Syntax Error in '" + filename + "': " + msg);
     }
 
-    void TPValidator::failAt(const scan::TToken* at, const std::string& msg) {
-        if (at) throw mx::Exception("Syntax Error in '" + filename + "': " + msg + " at line " + std::to_string(at->getLine()));
+    void TPValidator::failAt(const scan::TToken *at, const std::string &msg) {
+        if (at)
+            throw mx::Exception("Syntax Error in '" + filename + "': " + msg + " at line " + std::to_string(at->getLine()));
         throw mx::Exception("Syntax Error in '" + filename + "': " + msg);
     }
 
     std::string TPValidator::tokenTypeToString(types::TokenType t) {
         switch (t) {
-            case types::TokenType::TT_ID: return "Identifier";
-            case types::TokenType::TT_NUM: return "Number";
-            case types::TokenType::TT_HEX: return "Hex";
-            case types::TokenType::TT_STR: return "String";
-            case types::TokenType::TT_SYM: return "Symbol";
-            default: return "Unknown";
+        case types::TokenType::TT_ID:
+            return "Identifier";
+        case types::TokenType::TT_NUM:
+            return "Number";
+        case types::TokenType::TT_HEX:
+            return "Hex";
+        case types::TokenType::TT_STR:
+            return "String";
+        case types::TokenType::TT_SYM:
+            return "Symbol";
+        default:
+            return "Unknown";
         }
     }
 
     std::string TPValidator::lower(std::string s) {
-        for (auto& c : s) c = (char)std::tolower((unsigned char)c);
+        for (auto &c : s)
+            c = (char)std::tolower((unsigned char)c);
         return s;
     }
 
     std::string TPValidator::found() const {
-        if (!token) return "EOF";
+        if (!token)
+            return "EOF";
         return token->getTokenValue() + ":" + tokenTypeToString(token->getTokenType());
     }
 
-    bool TPValidator::isKW(const std::string& k) const {
-        if (!token || !isPascalKeyword(k) || token->getTokenType()!=types::TokenType::TT_ID) return false;
+    bool TPValidator::isKW(const std::string &k) const {
+        if (!token || !isPascalKeyword(k) || token->getTokenType() != types::TokenType::TT_ID)
+            return false;
         return lower(token->getTokenValue()) == k;
     }
 
@@ -119,23 +134,24 @@ namespace mxx {
         }
     }
 
-    void TPValidator::declareConst(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareConst(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         if (scopeStack.back().consts.count(key)) {
             failAt(at, "Redeclaration of constant '" + name + "' in the same scope");
         }
         scopeStack.back().consts.insert(key);
     }
-    
-    bool TPValidator::isBuiltinConst(const std::string& name) const {
+
+    bool TPValidator::isBuiltinConst(const std::string &name) const {
         std::string key = lower(name);
         return key == "true" || key == "false" || key == "nil";
     }
 
-    void TPValidator::checkVar(const std::string& name, const scan::TToken* at) {
+    void TPValidator::checkVar(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-            if (it->vars.count(key)) return;
+            if (it->vars.count(key))
+                return;
         }
 
         if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
@@ -143,21 +159,23 @@ namespace mxx {
         }
     }
 
-    void TPValidator::checkVarOrConst(const std::string& name, const scan::TToken* at) {
+    void TPValidator::checkVarOrConst(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-            if (it->vars.count(key) || it->consts.count(key)) return;
+            if (it->vars.count(key) || it->consts.count(key))
+                return;
         }
-        
+
         if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
     }
 
-    void TPValidator::checkConstOnly(const std::string& name, const scan::TToken* at) {
+    void TPValidator::checkConstOnly(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-            if (it->consts.count(key)) return;
+            if (it->consts.count(key))
+                return;
         }
         if (!isBuiltinConst(name)) {
             failAt(at, "Constant expression requires constant '" + name + "'");
@@ -171,7 +189,8 @@ namespace mxx {
         next();
         require(";");
         next();
-        if (isKW("uses")) parseUses();
+        if (isKW("uses"))
+            parseUses();
         parseBlock();
         require(".");
         next();
@@ -183,20 +202,27 @@ namespace mxx {
             next();
             require(types::TokenType::TT_ID);
             next();
-            if (match(",")) next();
-            else break;
+            if (match(","))
+                next();
+            else
+                break;
         } while (true);
         require(";");
         next();
     }
 
     void TPValidator::parseBlock() {
-        if (isKW("label")) parseLabelSection();
+        if (isKW("label"))
+            parseLabelSection();
         while (isKW("const") || isKW("type") || isKW("var") || isKW("procedure") || isKW("function")) {
-            if (isKW("const")) parseConstSection();
-            else if (isKW("type")) parseTypeSection();
-            else if (isKW("var")) parseVarSection();
-            else if (isKW("procedure") || isKW("function")) parseSubprogram();
+            if (isKW("const"))
+                parseConstSection();
+            else if (isKW("type"))
+                parseTypeSection();
+            else if (isKW("var"))
+                parseVarSection();
+            else if (isKW("procedure") || isKW("function"))
+                parseSubprogram();
         }
         parseCompoundStatement();
     }
@@ -207,8 +233,10 @@ namespace mxx {
             next();
             require(types::TokenType::TT_NUM);
             next();
-            if (match(",")) next();
-            else break;
+            if (match(","))
+                next();
+            else
+                break;
         } while (true);
         require(";");
         next();
@@ -222,7 +250,7 @@ namespace mxx {
                 isKW("begin") || isKW("procedure") || isKW("function")) {
                 break;
             }
-            const auto* nameTok = token;
+            const auto *nameTok = token;
             std::string name = token->getTokenValue();
             next();
             require("=");
@@ -237,20 +265,20 @@ namespace mxx {
     void TPValidator::parseTypeSection() {
         requireKW("type");
         next();
-        
+
         while (match(types::TokenType::TT_ID)) {
             if (isKW("procedure") || isKW("function") || isKW("var") || isKW("begin") || isKW("const")) {
                 break;
             }
-            
-            const auto* nameTok = token;
+
+            const auto *nameTok = token;
             std::string name = token->getTokenValue();
             next();
             require("=");
             next();
-            
+
             parseType(name);
-            
+
             declareType(name, nameTok);
             require(";");
             next();
@@ -261,7 +289,7 @@ namespace mxx {
         requireKW("var");
         next();
         while (match(types::TokenType::TT_ID)) {
-            if (isKW("procedure") || isKW("function") || isKW("begin") || 
+            if (isKW("procedure") || isKW("function") || isKW("begin") ||
                 isKW("type") || isKW("const")) {
                 break;
             }
@@ -300,14 +328,15 @@ namespace mxx {
             next();
         }
 
-        pushScope(); 
+        pushScope();
 
-        if (match("(")) parseFormalParams();
-        
+        if (match("("))
+            parseFormalParams();
+
         if (isProc) {
             require(";");
             next();
-        } else { 
+        } else {
             require(":");
             next();
             parseTypeName();
@@ -326,21 +355,28 @@ namespace mxx {
         parseBlock();
         require(";");
         next();
-        popScope(); 
+        popScope();
     }
 
     void TPValidator::parseFormalParams() {
         require("(");
         next();
-        if (match(")")) { next(); return; }
+        if (match(")")) {
+            next();
+            return;
+        }
         while (true) {
             bool byRef = isKW("var");
-            if (byRef) next();
+            if (byRef)
+                next();
             parseIdentList();
             require(":");
             next();
             parseType("");
-            if (match(";")) { next(); continue; }
+            if (match(";")) {
+                next();
+                continue;
+            }
             require(")");
             next();
             break;
@@ -362,11 +398,17 @@ namespace mxx {
     void TPValidator::parseType(const std::string &typeName) {
         if (isKW("array")) {
             next();
-            require("["); next();
+            require("[");
+            next();
             parseSubrange();
-            while (match(",")) { next(); parseSubrange(); }
-            require("]"); next();
-            requireKW("of"); next();
+            while (match(",")) {
+                next();
+                parseSubrange();
+            }
+            require("]");
+            next();
+            requireKW("of");
+            next();
             parseType("");
             return;
         }
@@ -375,17 +417,21 @@ namespace mxx {
             pushRecordFieldScope(typeName);
             while (!isKW("end")) {
                 parseFieldIdentList();
-                require(":"); next();
+                require(":");
+                next();
                 parseType("");
-                require(";"); next();
+                require(";");
+                next();
             }
-            requireKW("end"); next();
+            requireKW("end");
+            next();
             popRecordFieldScope();
             return;
         }
         if (isKW("set")) {
             next();
-            requireKW("of"); next();
+            requireKW("of");
+            next();
             parseTypeName();
             return;
         }
@@ -399,11 +445,15 @@ namespace mxx {
             if (match("[")) {
                 next();
                 parseConstExpr({"]"}, true);
-                require("]"); next();
+                require("]");
+                next();
             }
             return;
         }
-        if (isBuiltinType()) { next(); return; }
+        if (isBuiltinType()) {
+            next();
+            return;
+        }
         parseTypeName();
     }
 
@@ -423,13 +473,23 @@ namespace mxx {
     }
 
     void TPValidator::parseConstant() {
-        if (match("-")) { next(); parseConstSimple(); return; }
+        if (match("-")) {
+            next();
+            parseConstSimple();
+            return;
+        }
         parseConstSimple();
     }
 
     void TPValidator::parseConstSimple() {
-        if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) { next(); return; }
-        if (isKW("true") || isKW("false") || isKW("nil")) { next(); return; }
+        if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) {
+            next();
+            return;
+        }
+        if (isKW("true") || isKW("false") || isKW("nil")) {
+            next();
+            return;
+        }
         require(types::TokenType::TT_ID);
         checkConstOnly(token->getTokenValue(), token);
         next();
@@ -438,54 +498,84 @@ namespace mxx {
     void TPValidator::parseCompoundStatement() {
         requireKW("begin");
         next();
-        
+
         if (isKW("end")) {
             requireKW("end");
             next();
             return;
         }
-        
+
         while (!isKW("end")) {
             if (token == nullptr) {
                 fail("Unexpected end of file inside compound statement");
             }
-            
+
             parseStatement();
-            
-            
+
             if (match(";")) {
                 next();
-            
+
                 if (isKW("end")) {
                     break;
                 }
             } else if (isKW("end")) {
-                
+
                 break;
             } else {
-                
+
                 failHere("Expected ';' or 'end'");
             }
         }
-        
+
         requireKW("end");
         next();
     }
 
     void TPValidator::parseStatement() {
-        if (!token) failHere("Unexpected EOF in statement");    
-        if (isKW("begin")) { parseCompoundStatement(); return; }
-        if (isKW("if")) { parseIf(); return; }
-        if (isKW("while")) { parseWhile(); return; }
-        if (isKW("repeat")) { parseRepeat(); return; }
-        if (isKW("for")) { parseFor(); return; }
-        if (isKW("case")) { parseCase(); return; }
-        if (isKW("with")) { parseWith(); return; }
-        if (isKW("goto")) { parseGoto(); return; }
-        if (match(types::TokenType::TT_NUM)) failHere("Statement cannot start with number");
-        if (match(types::TokenType::TT_ID)) { parseSimpleOrCallOrAssign(); return; }
-        if (match(";") || match(")")) return;
-        if (isKW("end")) return; 
+        if (!token)
+            failHere("Unexpected EOF in statement");
+        if (isKW("begin")) {
+            parseCompoundStatement();
+            return;
+        }
+        if (isKW("if")) {
+            parseIf();
+            return;
+        }
+        if (isKW("while")) {
+            parseWhile();
+            return;
+        }
+        if (isKW("repeat")) {
+            parseRepeat();
+            return;
+        }
+        if (isKW("for")) {
+            parseFor();
+            return;
+        }
+        if (isKW("case")) {
+            parseCase();
+            return;
+        }
+        if (isKW("with")) {
+            parseWith();
+            return;
+        }
+        if (isKW("goto")) {
+            parseGoto();
+            return;
+        }
+        if (match(types::TokenType::TT_NUM))
+            failHere("Statement cannot start with number");
+        if (match(types::TokenType::TT_ID)) {
+            parseSimpleOrCallOrAssign();
+            return;
+        }
+        if (match(";") || match(")"))
+            return;
+        if (isKW("end"))
+            return;
         failHere("Invalid statement start");
     }
 
@@ -516,7 +606,7 @@ namespace mxx {
         next();
         while (true) {
             if (isKW("until")) {
-                break; 
+                break;
             }
             parseStatement();
             if (match(";")) {
@@ -525,7 +615,7 @@ namespace mxx {
                     break;
                 }
             } else if (isKW("until")) {
-                break; 
+                break;
             } else {
                 failHere("Expected ';' or 'until'");
             }
@@ -543,9 +633,13 @@ namespace mxx {
         next();
         require(":=");
         next();
-        parseExprStop({"to","downto"});
-        if (isKW("to")) next();
-        else { requireKW("downto"); next(); }
+        parseExprStop({"to", "downto"});
+        if (isKW("to"))
+            next();
+        else {
+            requireKW("downto");
+            next();
+        }
         parseExprStop({"do"});
         requireKW("do");
         next();
@@ -563,14 +657,17 @@ namespace mxx {
             require(":");
             next();
             parseStatement();
-            if (match(";")) next();
+            if (match(";"))
+                next();
             if (isKW("else")) {
                 next();
                 parseStatement();
-                if (match(";")) next();
+                if (match(";"))
+                    next();
                 break;
             }
-            if (isKW("end")) break;
+            if (isKW("end"))
+                break;
         }
         requireKW("end");
         next();
@@ -578,17 +675,22 @@ namespace mxx {
 
     void TPValidator::parseCaseLabelList() {
         parseCaseLabel();
-        while (match(",")) { next(); parseCaseLabel(); }
+        while (match(",")) {
+            next();
+            parseCaseLabel();
+        }
     }
 
     void TPValidator::parseCaseLabel() {
-        if (match("-")) next();
+        if (match("-"))
+            next();
         if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_STR) || match(types::TokenType::TT_ID)) {
-            const auto* at = token;
+            const auto *at = token;
             next();
             if (match("..")) {
                 next();
-                if (match("-")) next();
+                if (match("-"))
+                    next();
                 if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_STR) || match(types::TokenType::TT_ID)) {
                     next();
                     return;
@@ -604,7 +706,10 @@ namespace mxx {
         requireKW("with");
         next();
         parseDesignator();
-        while (match(",")) { next(); parseDesignator(); }
+        while (match(",")) {
+            next();
+            parseDesignator();
+        }
         requireKW("do");
         next();
         parseStatement();
@@ -626,7 +731,7 @@ namespace mxx {
         parseDesignator();
         if (match(":=")) {
             next();
-            parseExprStop({";","end","else",")","]","until","of","do","then"});
+            parseExprStop({";", "end", "else", ")", "]", "until", "of", "do", "then"});
             return;
         }
         if (match("(")) {
@@ -649,7 +754,10 @@ namespace mxx {
             if (match("[")) {
                 next();
                 parseExprStop({"]"});
-                while (match(",")) { next(); parseExprStop({"]"}); }
+                while (match(",")) {
+                    next();
+                    parseExprStop({"]"});
+                }
                 require("]");
                 next();
                 continue;
@@ -665,63 +773,109 @@ namespace mxx {
     void TPValidator::parseActualParams() {
         require("(");
         next();
-        if (match(")")) { next(); return; }
+        if (match(")")) {
+            next();
+            return;
+        }
         while (true) {
-            if (isKW("var")) next();
-            parseExprStop({")",";",","});
-            if (match(",")) { next(); continue; }
+            if (isKW("var"))
+                next();
+            parseExprStop({")", ";", ","});
+            if (match(",")) {
+                next();
+                continue;
+            }
             require(")");
             next();
             break;
         }
     }
 
-    void TPValidator::parseExprStop(const std::unordered_set<std::string>& stops) {
+    void TPValidator::parseExprStop(const std::unordered_set<std::string> &stops) {
         int paren = 0, bracket = 0;
         bool expectOperand = true;
         while (token) {
-            if (paren==0 && bracket==0 && token->getTokenType()==types::TokenType::TT_ID) {
-                if (stops.count(lower(token->getTokenValue()))) return;
+            if (paren == 0 && bracket == 0 && token->getTokenType() == types::TokenType::TT_ID) {
+                if (stops.count(lower(token->getTokenValue())))
+                    return;
             }
-            if (paren==0 && bracket==0 && token->getTokenType()==types::TokenType::TT_SYM) {
-                if (stops.count(token->getTokenValue())) return;
+            if (paren == 0 && bracket == 0 && token->getTokenType() == types::TokenType::TT_SYM) {
+                if (stops.count(token->getTokenValue()))
+                    return;
             }
 
-            if (match("(")) { ++paren; next(); expectOperand = true; continue; }
-            if (match(")")) { if (paren<=0) break; --paren; next(); expectOperand = false; continue; }
-            if (match("[")) { ++bracket; next(); expectOperand = true; continue; }
-            if (match("]")) { if (bracket<=0) break; --bracket; next(); expectOperand = false; continue; }
+            if (match("(")) {
+                ++paren;
+                next();
+                expectOperand = true;
+                continue;
+            }
+            if (match(")")) {
+                if (paren <= 0)
+                    break;
+                --paren;
+                next();
+                expectOperand = false;
+                continue;
+            }
+            if (match("[")) {
+                ++bracket;
+                next();
+                expectOperand = true;
+                continue;
+            }
+            if (match("]")) {
+                if (bracket <= 0)
+                    break;
+                --bracket;
+                next();
+                expectOperand = false;
+                continue;
+            }
 
             if (expectOperand) {
-                if (match("+")||match("-")||isKW("not")||match("@")) { next(); continue; }
-                if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) { next(); expectOperand=false; continue; }
+                if (match("+") || match("-") || isKW("not") || match("@")) {
+                    next();
+                    continue;
+                }
+                if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) {
+                    next();
+                    expectOperand = false;
+                    continue;
+                }
                 if (match(types::TokenType::TT_ID)) {
-                    const auto* at = token;
+                    const auto *at = token;
                     std::string name = token->getTokenValue();
                     next();
                     if (match("(")) {
                         parseActualParams();
                         expectOperand = false;
-                    
+
                     } else {
                         checkVarOrConst(name, at);
                         expectOperand = false;
                     }
 
-                    
                     while (true) {
-                        if (match("^")) { next(); continue; }
+                        if (match("^")) {
+                            next();
+                            continue;
+                        }
                         if (match(".")) {
                             next();
-                            require(types::TokenType::TT_ID); 
+                            require(types::TokenType::TT_ID);
                             next();
                             continue;
                         }
                         if (match("[")) {
                             next();
                             parseExprStop({"]"});
-                            while (match(",")) { next(); parseExprStop({"]"}); }
-                            require("]"); next();
+                            while (match(",")) {
+                                next();
+                                parseExprStop({"]"});
+                            }
+                            require("]");
+                            next();
                             continue;
                         }
                         break;
@@ -730,107 +884,139 @@ namespace mxx {
                 }
                 failHere("Invalid expression");
             } else {
-                if (isRelOp() || isAddOp() || isMulOp() || isSetOp()) { next(); expectOperand=true; continue; }
+                if (isRelOp() || isAddOp() || isMulOp() || isSetOp()) {
+                    next();
+                    expectOperand = true;
+                    continue;
+                }
                 return;
             }
         }
     }
 
-    void TPValidator::parseConstExpr(const std::unordered_set<std::string>& stops, bool constOnly) {
+    void TPValidator::parseConstExpr(const std::unordered_set<std::string> &stops, bool constOnly) {
         int paren = 0;
         bool expectOperand = true;
         while (token) {
-            if (paren==0) {
-                if (token->getTokenType()==types::TokenType::TT_ID && stops.count(lower(token->getTokenValue()))) return;
-                if (token->getTokenType()==types::TokenType::TT_SYM && stops.count(token->getTokenValue())) return;
+            if (paren == 0) {
+                if (token->getTokenType() == types::TokenType::TT_ID && stops.count(lower(token->getTokenValue())))
+                    return;
+                if (token->getTokenType() == types::TokenType::TT_SYM && stops.count(token->getTokenValue()))
+                    return;
             }
-            if (match("(")) { ++paren; next(); expectOperand = true; continue; }
-            if (match(")")) { if (paren<=0) break; --paren; next(); expectOperand = false; continue; }
+            if (match("(")) {
+                ++paren;
+                next();
+                expectOperand = true;
+                continue;
+            }
+            if (match(")")) {
+                if (paren <= 0)
+                    break;
+                --paren;
+                next();
+                expectOperand = false;
+                continue;
+            }
             if (expectOperand) {
-                if (match("+")||match("-")||isKW("not")) { next(); continue; }
-                if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) { next(); expectOperand=false; continue; }
-                if (match(types::TokenType::TT_ID)) {
-                    const auto* at = token;
-                    if (constOnly) checkConstOnly(token->getTokenValue(), token);
+                if (match("+") || match("-") || isKW("not")) {
                     next();
-                    if (match("(")) failAt(at, "Function call not allowed in constant expression");
+                    continue;
+                }
+                if (match(types::TokenType::TT_NUM) || match(types::TokenType::TT_HEX) || match(types::TokenType::TT_STR)) {
+                    next();
+                    expectOperand = false;
+                    continue;
+                }
+                if (match(types::TokenType::TT_ID)) {
+                    const auto *at = token;
+                    if (constOnly)
+                        checkConstOnly(token->getTokenValue(), token);
+                    next();
+                    if (match("("))
+                        failAt(at, "Function call not allowed in constant expression");
                     expectOperand = false;
                     continue;
                 }
                 failHere("Invalid constant expression");
             } else {
-                if (match("+")||match("-")||match("*")||match("/") ||
-                    isKW("div")||isKW("mod")||isKW("and")||isKW("or")||isKW("xor") ||
-                    match("<")||match("<=")||match(">")||match(">=")||match("=")||match("<>")) { next(); expectOperand=true; continue; }
+                if (match("+") || match("-") || match("*") || match("/") ||
+                    isKW("div") || isKW("mod") || isKW("and") || isKW("or") || isKW("xor") ||
+                    match("<") || match("<=") || match(">") || match(">=") || match("=") || match("<>")) {
+                    next();
+                    expectOperand = true;
+                    continue;
+                }
                 return;
             }
         }
     }
 
-    bool TPValidator::isRelOp() const { return isKW("in") || match("=")||match("<>")||match("<")||match("<=")||match(">")||match(">="); }
-    bool TPValidator::isAddOp() const { return match("+")||match("-")||isKW("or")||isKW("xor"); }
-    bool TPValidator::isMulOp() const { return match("*")||match("/")||isKW("div")||isKW("mod")||isKW("and")||isKW("shl")||isKW("shr"); }
-    bool TPValidator::isSetOp() const { return isKW("union")||isKW("exclude")||isKW("symdiff"); }
+    bool TPValidator::isRelOp() const { return isKW("in") || match("=") || match("<>") || match("<") || match("<=") || match(">") || match(">="); }
+    bool TPValidator::isAddOp() const { return match("+") || match("-") || isKW("or") || isKW("xor"); }
+    bool TPValidator::isMulOp() const { return match("*") || match("/") || isKW("div") || isKW("mod") || isKW("and") || isKW("shl") || isKW("shr"); }
+    bool TPValidator::isSetOp() const { return isKW("union") || isKW("exclude") || isKW("symdiff"); }
 
     bool TPValidator::isBuiltinType() const {
         return isKW("integer") || isKW("real") || isKW("boolean") || isKW("char") ||
-            isKW("byte") || isKW("word") || isKW("longint") || isKW("shortint") ||
-            isKW("smallint") || isKW("cardinal") || isKW("string") || isKW("text");
+               isKW("byte") || isKW("word") || isKW("longint") || isKW("shortint") ||
+               isKW("smallint") || isKW("cardinal") || isKW("string") || isKW("text");
     }
 
-    void TPValidator::checkType(const std::string& name, const scan::TToken* at) {
+    void TPValidator::checkType(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
-            if (it->types.count(key)) return;
+            if (it->types.count(key))
+                return;
         }
         if (!isBuiltinType()) {
             failAt(at, "Unknown type identifier '" + name + "'");
         }
     }
-        
-    mxx::Scope* TPValidator::currentScope() {
-        if (scopeStack.empty()) return nullptr;
+
+    mxx::Scope *TPValidator::currentScope() {
+        if (scopeStack.empty())
+            return nullptr;
         return &scopeStack.back();
     }
 
-    const mxx::Scope* TPValidator::currentScope() const {
-        if (scopeStack.empty()) return nullptr;
+    const mxx::Scope *TPValidator::currentScope() const {
+        if (scopeStack.empty())
+            return nullptr;
         return &scopeStack.back();
     }
-    
+
     static const std::unordered_set<std::string> pascal_keywords = {
         "program", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
-        "case", "of", "with", "goto","exit","break","continue",
+        "case", "of", "with", "goto", "exit", "break", "continue",
 
         "div", "mod", "and", "or", "not", "in",
         "integer", "real", "boolean", "char", "byte", "word", "longint", "shortint",
         "smallint", "cardinal", "string", "text", "double", "single", "extended",
-        "comp", "currency", "ptr", "array", "record", "set"
-    };
+        "comp", "currency", "ptr", "array", "record", "set"};
 
-    bool TPValidator::isPascalKeyword(const std::string& s) const {
+    bool TPValidator::isPascalKeyword(const std::string &s) const {
         return pascal_keywords.count(lower(s));
     }
 
-    
-    bool TPValidator::isVarDeclaredHere(const std::string& name) const {
+    bool TPValidator::isVarDeclaredHere(const std::string &name) const {
         return currentScope() && currentScope()->vars.count(lower(name));
     }
-    bool TPValidator::isTypeDeclaredHere(const std::string& name) const {
+    bool TPValidator::isTypeDeclaredHere(const std::string &name) const {
         return currentScope() && currentScope()->types.count(lower(name));
     }
-    bool TPValidator::isFuncDeclaredHere(const std::string& name) const {
+    bool TPValidator::isFuncDeclaredHere(const std::string &name) const {
         return currentScope() && currentScope()->funcs.count(lower(name));
     }
-    bool TPValidator::isProcDeclaredHere(const std::string& name) const {
+    bool TPValidator::isProcDeclaredHere(const std::string &name) const {
         return currentScope() && currentScope()->procs.count(lower(name));
     }
-    bool TPValidator::isParamDeclaredHere(const std::string& name) const {
+    bool TPValidator::isParamDeclaredHere(const std::string &name) const {
         return currentScope() && currentScope()->params.count(lower(name));
     }
 
-    void TPValidator::declareVar(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareVar(const std::string &name, const scan::TToken *at) {
         std::string key = lower(name);
         if (isVarDeclaredHere(key) || isParamDeclaredHere(key) ||
             isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isProcDeclaredHere(key)) {
@@ -839,7 +1025,7 @@ namespace mxx {
         currentScope()->vars.insert(key);
     }
 
-    void TPValidator::declareFunc(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareFunc(const std::string &name, const scan::TToken *at) {
         std::string key = lower(name);
         if (isFuncDeclaredHere(key) || isVarDeclaredHere(key) ||
             isTypeDeclaredHere(key) || isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
@@ -848,7 +1034,7 @@ namespace mxx {
         currentScope()->funcs.insert(key);
     }
 
-    void TPValidator::declareProc(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareProc(const std::string &name, const scan::TToken *at) {
         std::string key = lower(name);
         if (isProcDeclaredHere(key) || isVarDeclaredHere(key) ||
             isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isParamDeclaredHere(key)) {
@@ -857,7 +1043,7 @@ namespace mxx {
         currentScope()->procs.insert(key);
     }
 
-    void TPValidator::declareParam(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareParam(const std::string &name, const scan::TToken *at) {
         std::string key = lower(name);
         if (isParamDeclaredHere(key) || isVarDeclaredHere(key) ||
             isTypeDeclaredHere(key) || isFuncDeclaredHere(key) || isProcDeclaredHere(key)) {
@@ -866,7 +1052,7 @@ namespace mxx {
         currentScope()->params.insert(key);
     }
 
-    void TPValidator::declareType(const std::string& name, const scan::TToken* at) {
+    void TPValidator::declareType(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
         if (isTypeDeclaredHere(key) || isVarDeclaredHere(key) ||
             isFuncDeclaredHere(key) || isProcDeclaredHere(key) || isParamDeclaredHere(key)) {
@@ -874,38 +1060,38 @@ namespace mxx {
         }
         currentScope()->types.insert(key);
     }
-    
-    void TPValidator::pushRecordFieldScope(const std::string& recordTypeName) {
-            currentRecordTypeName = recordTypeName;
-            
-            if (recordFieldScopesByType.find(recordTypeName) == recordFieldScopesByType.end()) {
-                recordFieldScopesByType[recordTypeName] = std::unordered_set<std::string>();
-            }
+
+    void TPValidator::pushRecordFieldScope(const std::string &recordTypeName) {
+        currentRecordTypeName = recordTypeName;
+
+        if (recordFieldScopesByType.find(recordTypeName) == recordFieldScopesByType.end()) {
+            recordFieldScopesByType[recordTypeName] = std::unordered_set<std::string>();
+        }
+    }
+
+    void TPValidator::popRecordFieldScope() {
+        currentRecordTypeName.clear();
+    }
+
+    bool TPValidator::inRecordFieldScope() const {
+        return !currentRecordTypeName.empty();
+    }
+
+    void TPValidator::declareRecordField(const std::string &name, const scan::TToken *at) {
+        if (!inRecordFieldScope()) {
+            declareVar(name, at);
+            return;
         }
 
-        void TPValidator::popRecordFieldScope() {
-            currentRecordTypeName.clear();
+        std::string key = lower(name);
+        auto &fields = recordFieldScopesByType[currentRecordTypeName];
+
+        if (fields.count(key)) {
+            failAt(at, "Redeclaration of field '" + name + "' in this record");
         }
 
-        bool TPValidator::inRecordFieldScope() const {
-            return !currentRecordTypeName.empty();
-        }
-
-        void TPValidator::declareRecordField(const std::string& name, const scan::TToken* at) {
-            if (!inRecordFieldScope()) {
-                declareVar(name, at);
-                return;
-            }
-            
-            std::string key = lower(name);
-            auto& fields = recordFieldScopesByType[currentRecordTypeName];
-            
-            if (fields.count(key)) {
-                failAt(at, "Redeclaration of field '" + name + "' in this record");
-            }
-            
-            fields.insert(key);
-        }
+        fields.insert(key);
+    }
 
     void TPValidator::parseFieldIdentList() {
         require(types::TokenType::TT_ID);
@@ -919,4 +1105,4 @@ namespace mxx {
         }
     }
 
-}
+} // namespace mxx
