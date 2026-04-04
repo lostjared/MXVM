@@ -747,7 +747,7 @@ namespace mxvm {
                     break;
                 case VarType::VAR_BYTE:
                     out << "\tmovzbq (%rax), %rdx\n";
-                    out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                    out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
                     break;
                 default:
                     throw mx::Exception("LOAD: unsupported destination type");
@@ -769,7 +769,7 @@ namespace mxvm {
                         break;
                     case VarType::VAR_BYTE:
                         out << "\tmovzbq (%rax,%rcx," << stride << "), %rdx\n";
-                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                        out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
                         break;
                     default:
                         throw mx::Exception("LOAD: unsupported destination type");
@@ -791,7 +791,7 @@ namespace mxvm {
                         break;
                     case VarType::VAR_BYTE:
                         out << "\tmovzbq (%rax), %rdx\n";
-                        out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                        out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
                         break;
                     default:
                         throw mx::Exception("LOAD: unsupported destination type");
@@ -812,7 +812,7 @@ namespace mxvm {
                 break;
             case VarType::VAR_BYTE:
                 out << "\tmovzbq (%rax,%rcx,8), %rdx\n";
-                out << "\tmovq %rdx, " << getMangledName(i.op1) << "(%rip)\n";
+                out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
                 break;
             default:
                 throw mx::Exception("LOAD: unsupported destination type");
@@ -1677,13 +1677,16 @@ namespace mxvm {
             auto ra = sysv_reg_vars.find(i.op1.op);
             if (ra != sysv_reg_vars.end()) {
                 out << "\tcmpq $" << i.op2.op << ", " << ra->second << "\n";
+            } else if (type1 == VarType::VAR_BYTE) {
+                out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %rax\n";
+                out << "\tcmpq $" << i.op2.op << ", %rax\n";
             } else {
                 out << "\tcmpq $" << i.op2.op << ", " << getMangledName(i.op1) << "(%rip)\n";
             }
             last_cmp_type = CMP_INTEGER;
         } else {
-            generateLoadVar(out, VarType::VAR_INTEGER, "%rax", i.op1);
-            generateLoadVar(out, VarType::VAR_INTEGER, "%rcx", i.op2);
+            generateLoadVar(out, type1, "%rax", i.op1);
+            generateLoadVar(out, type2, "%rcx", i.op2);
             out << "\tcmpq %rcx, %rax\n";
             last_cmp_type = CMP_INTEGER;
         }
