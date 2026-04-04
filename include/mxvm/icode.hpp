@@ -469,6 +469,8 @@ namespace mxvm {
         void gen_jmp(std::ostream &out, const Instruction &i);
         void gen_cmp(std::ostream &out, const Instruction &i);
         void gen_alloc(std::ostream &out, const Instruction &i);
+        /** @brief Generate System V x86-64 assembly for the REALLOC instruction (dynamic array resize) */
+        void gen_realloc(std::ostream &out, const Instruction &i);
         void gen_free(std::ostream &out, const Instruction &i);
         void gen_load(std::ostream &out, const Instruction &i);
         void gen_store(std::ostream &out, const Instruction &i);
@@ -592,6 +594,8 @@ namespace mxvm {
         void x64_gen_invoke(std::ostream &out, const Instruction &i);
         void x64_gen_call(std::ostream &out, const Instruction &i);
         void x64_gen_alloc(std::ostream &out, const Instruction &i);
+        /** @brief Generate Win64 x86-64 assembly for the REALLOC instruction (dynamic array resize) */
+        void x64_gen_realloc(std::ostream &out, const Instruction &i);
         void x64_gen_free(std::ostream &out, const Instruction &i);
         void x64_gen_load(std::ostream &out, const Instruction &i);
         void x64_gen_store(std::ostream &out, const Instruction &i);
@@ -758,6 +762,15 @@ namespace mxvm {
         void exec_return(const Instruction &instr);
         void exec_lea(const Instruction &instr);
         void exec_neg(const Instruction &instr);
+        /**
+         * @brief Execute the REALLOC instruction in the interpreter
+         *
+         * Resizes the memory block pointed to by the destination variable.
+         * Operands: dest (pointer var), elemSize, count.
+         * Zero-initialises any newly allocated bytes beyond the old allocation.
+         * A count of zero frees the block.
+         */
+        void exec_realloc(const Instruction &instr);
         void exec_fcmp(const Instruction &instr);
         void exec_jae(const Instruction &instr);
         void exec_jbe(const Instruction &instr);

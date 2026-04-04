@@ -57,9 +57,16 @@ namespace mxx {
             return false;
         }
 
-        /** @brief Check if the current token's value matches a string */
+        /** @brief Check if the current token's value matches a string (case-insensitive) */
         bool peekIs(const std::string &s) {
-            return token && token->getTokenValue() == s;
+            if (!token) return false;
+            const auto &v = token->getTokenValue();
+            if (v.size() != s.size()) return false;
+            for (size_t i = 0; i < v.size(); ++i)
+                if (std::tolower(static_cast<unsigned char>(v[i])) !=
+                    std::tolower(static_cast<unsigned char>(s[i])))
+                    return false;
+            return true;
         }
         /** @brief Check if the current token's type matches */
         bool peekIs(const types::TokenType &t) {

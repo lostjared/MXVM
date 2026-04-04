@@ -57,8 +57,23 @@ namespace mxx {
         return true;
     }
 
+    /**
+     * @brief Case-insensitive string equality comparison
+     * @param a First string
+     * @param b Second string
+     * @return true if @p a and @p b are equal ignoring ASCII case
+     */
+    static bool ciEquals(const std::string &a, const std::string &b) {
+        if (a.size() != b.size()) return false;
+        for (size_t i = 0; i < a.size(); ++i)
+            if (std::tolower(static_cast<unsigned char>(a[i])) !=
+                std::tolower(static_cast<unsigned char>(b[i])))
+                return false;
+        return true;
+    }
+
     bool TPValidator::match(const std::string &s) const {
-        return token && token->getTokenValue() == s;
+        return token && ciEquals(token->getTokenValue(), s);
     }
 
     bool TPValidator::match(types::TokenType t) const {
@@ -80,7 +95,7 @@ namespace mxx {
     }
 
     bool TPValidator::peekIs(const std::string &s) {
-        return index < scanner.size() && scanner[index].getTokenValue() == s;
+        return index < scanner.size() && ciEquals(scanner[index].getTokenValue(), s);
     }
 
     void TPValidator::require(const std::string &s) {
@@ -590,6 +605,13 @@ namespace mxx {
     void TPValidator::parseType(const std::string &typeName) {
         if (isKW("array")) {
             next();
+            // Dynamic array: array of <type> (no bounds)
+            if (isKW("of")) {
+                next();
+                parseType("");
+                return;
+            }
+            // Static array: array[lo..hi] of <type>
             require("[");
             next();
             parseSubrange();
@@ -1184,7 +1206,7 @@ namespace mxx {
         "uses", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
         "case", "of", "with", "goto", "exit", "break", "continue",
-        "nil", "new", "dispose",
+        "nil", "new", "dispose", "setlength", "high", "low",
         "writeln", "write", "readln", "read", "seed_random", "rand_number",
 
         "div", "mod", "and", "or", "not", "in",

@@ -1046,6 +1046,16 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseArrayType() {
         expectToken("array");
         next();
+        // Dynamic array: array of <type> (no bounds)
+        if (peekIs("of")) {
+            next();
+            auto elementType = parseTypeSpec();
+            return std::make_unique<ArrayTypeNode>(
+                std::move(elementType),
+                nullptr,
+                nullptr);
+        }
+        // Static array: array[lo..hi] of <type>
         expectToken("[");
         next();
         auto lowerBound = parseExpression();

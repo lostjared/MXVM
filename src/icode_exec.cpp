@@ -301,6 +301,9 @@ namespace mxvm {
             case LEA:
                 exec_lea(instr);
                 break;
+            case REALLOC:
+                exec_realloc(instr);
+                break;
             default:
                 throw mx::Exception("Unknown instruction: " + std::to_string(instr.instruction));
                 break;
@@ -1866,6 +1869,76 @@ namespace mxvm {
                 throw mx::Exception("NEG: unsupported variable type");
             }
         }
+    }
+
+    /**
+     * @brief Execute the REALLOC instruction
+     *
+     * Resizes the heap block of a pointer variable using C realloc().
+     * Operands: op1 = destination ptr variable, op2 = element size,
+     * op3 = new element count.  Zero-fills newly allocated bytes.
+     * A count of zero frees the block.
+     */
+    void Program::exec_realloc(const Instruction &instr) {
+        if (!isVariable(instr.op1.op)) {
+            throw mx::Exception("REALLOC destination must be a variable");
+        }
+        Variable &dest = getVariable(instr.op1.op);
+        int64_t size = 0;
+        int64_t count = 1;
+
+        if (!instr.op2.op.empty()) {
+            if (isVariable(instr.op2.op)) {
+                size = getVariable(instr.op2.op).var_value.int_value;
+            } else {
+                size = std::stoll(instr.op2.op, nullptr, 0);
+            }
+        }
+
+        if (!instr.op3.op.empty()) {
+            if (isVariable(instr.op3.op)) {
+                count = getVariable(instr.op3.op).var_value.int_value;
+            } else {
+                count = std::stoll(instr.op3.op, nullptr, 0);
+            }
+        }
+        if (size <= 0 || count < 0) {
+            throw mx::Exception("REALLOC: size must be positive, count must be non-negative");
+        }
+
+        size_t newBytes = static_cast<size_t>(count) * static_cast<size_t>(size);
+        size_t oldBytes = static_cast<size_t>(dest.var_value.ptr_count) * static_cast<size_t>(dest.var_value.ptr_size);
+
+        if (count == 0) {
+            // SetLength(arr, 0) — free the memory
+            if (dest.var_value.ptr_value != nullptr && dest.var_value.owns) {
+                std::free(dest.var_value.ptr_value);
+            }
+            dest.var_value.ptr_value = nullptr;
+            dest.var_value.ptr_size = size;
+            dest.var_value.ptr_count = 0;
+            dest.var_value.owns = true;
+            dest.type = VarType::VAR_POINTER;
+            dest.var_value.type = VarType::VAR_POINTER;
+            return;
+        }
+
+        void *newPtr = std::realloc(dest.var_value.ptr_value, newBytes);
+        if (newPtr == nullptr) {
+            throw mx::Exception("REALLOC failed: realloc returned nullptr");
+        }
+
+        // Zero-initialize newly allocated portion
+        if (newBytes > oldBytes) {
+            std::memset(static_cast<char *>(newPtr) + oldBytes, 0, newBytes - oldBytes);
+        }
+
+        dest.type = VarType::VAR_POINTER;
+        dest.var_value.type = VarType::VAR_POINTER;
+        dest.var_value.ptr_value = newPtr;
+        dest.var_value.ptr_size = size;
+        dest.var_value.ptr_count = count;
+        dest.var_value.owns = true;
     }
 
     Variable Program::createTempVariable(VarType type, const std::string &value) {

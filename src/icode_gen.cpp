@@ -363,6 +363,9 @@ namespace mxvm {
         case FREE:
             gen_free(out, i);
             break;
+        case REALLOC:
+            gen_realloc(out, i);
+            break;
         case LOAD:
             gen_load(out, i);
             break;
@@ -699,6 +702,67 @@ namespace mxvm {
         out << ".alloc_done_" << error_label_count << ":\n";
         error_label_count++;
         v.var_value.owns = true;
+    }
+
+    /**
+     * @brief Generate System V x86-64 native code for REALLOC
+     *
+     * Computes total = count * elemSize, calls C realloc() with the
+     * existing pointer and new size, and stores the result back.
+     * Stack is 16-byte aligned around the call.  Registers are
+     * flushed/reloaded via sysv_emitFlushRegs / sysv_emitReloadRegs.
+     */
+    void Program::gen_realloc(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op)) {
+            throw mx::Exception("REALLOC destination must be a variable");
+        }
+        Variable &v = getVariable(i.op1.op);
+        if (v.type != VarType::VAR_POINTER) {
+            throw mx::Exception("REALLOC destination must be a pointer");
+        }
+
+        sysv_emitFlushRegs(out);
+
+        // Compute new total size = count * elemSize into %rsi
+        // %rdi = existing ptr (for realloc)
+        out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdi\n";
+
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                sysv_emitLoadVar(out, "%rax", i.op3);
+            } else {
+                out << "\tmovq $" << i.op3.op << ", %rax\n";
+            }
+        } else {
+            out << "\tmovq $1, %rax\n";
+        }
+
+        if (!i.op2.op.empty()) {
+            if (isVariable(i.op2.op)) {
+                sysv_emitLoadVar(out, "%rcx", i.op2);
+            } else {
+                out << "\tmovq $" << i.op2.op << ", %rcx\n";
+            }
+        } else {
+            out << "\tmovq $8, %rcx\n";
+        }
+
+        out << "\timulq %rcx, %rax\n";
+        out << "\tmovq %rax, %rsi\n";
+        out << "\tmovq %rsp, %rbx\n";
+        out << "\tandq $-16, %rsp\n";
+        out << "\tcall " << getPlatformSymbolName("realloc") << "\n";
+        out << "\tmovq %rbx, %rsp\n";
+        out << "\ttest %rax, %rax\n";
+        out << "\tjz .realloc_failed_" << error_label_count << "\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        out << "\tjmp .realloc_done_" << error_label_count << "\n";
+        out << ".realloc_failed_" << error_label_count << ":\n";
+        out << "\t# realloc failed, keep old pointer\n";
+        out << ".realloc_done_" << error_label_count << ":\n";
+        error_label_count++;
+        v.var_value.owns = true;
+        sysv_emitReloadRegs(out);
     }
 
     void Program::gen_load(std::ostream &out, const Instruction &i) {

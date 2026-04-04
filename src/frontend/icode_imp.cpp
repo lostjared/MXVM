@@ -4,8 +4,21 @@
  * @author Jared Bruni
  */
 #include "icode.hpp"
+#include <algorithm>
 
 namespace pascal {
+
+    /**
+     * @brief Convert a string to lowercase for case-insensitive comparison
+     * @param s Input string
+     * @return Lowercased copy of @p s
+     */
+    static std::string toLower(const std::string &s) {
+        std::string r = s;
+        std::transform(r.begin(), r.end(), r.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        return r;
+    }
 
     std::unordered_set<std::string> sdlFunctions = {
         "sdl_init", "sdl_quit", "sdl_create_window", "sdl_destroy_window", "sdl_set_window_title",
@@ -34,12 +47,14 @@ namespace pascal {
         "round", "trunc", "float_to_int", "int_to_float", "halt"};
 
     bool IOFunctionHandler::canHandle(const std::string &funcName) const {
-        return funcName == "writeln" || funcName == "write" || funcName == "readln" ||
-               funcName == "seed_random" || funcName == "rand_number";
+        auto f = toLower(funcName);
+        return f == "writeln" || f == "write" || f == "readln" ||
+               f == "seed_random" || f == "rand_number";
     }
 
-    void IOFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName,
+    void IOFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName_,
                                      const std::vector<std::unique_ptr<ASTNode>> &arguments) {
+        auto funcName = toLower(funcName_);
         if (funcName == "writeln" || funcName == "write") {
             for (const auto &arg : arguments) {
                 std::string val = visitor.eval(arg.get());
@@ -101,8 +116,9 @@ namespace pascal {
         }
     }
 
-    bool IOFunctionHandler::generateWithResult(CodeGenVisitor &visitor, const std::string &funcName,
+    bool IOFunctionHandler::generateWithResult(CodeGenVisitor &visitor, const std::string &funcName_,
                                                const std::vector<std::unique_ptr<ASTNode>> &arguments) {
+        auto funcName = toLower(funcName_);
         if (funcName == "seed_random") {
             visitor.usedModules.insert("io");
             if (arguments.size() != 0)
@@ -129,7 +145,7 @@ namespace pascal {
     }
 
     bool StdFunctionHandler::canHandle(const std::string &funcName) const {
-        return stdFunctions.find(funcName) != stdFunctions.end();
+        return stdFunctions.find(toLower(funcName)) != stdFunctions.end();
     }
 
     void StdFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName,
@@ -263,35 +279,7 @@ namespace pascal {
     }
 
     bool SDLFunctionHandler::canHandle(const std::string &funcName) const {
-        return funcName == "sdl_init" || funcName == "sdl_quit" ||
-               funcName == "sdl_create_window" || funcName == "sdl_destroy_window" ||
-               funcName == "sdl_create_renderer" || funcName == "sdl_destroy_renderer" ||
-               funcName == "sdl_set_draw_color" || funcName == "sdl_clear" || funcName == "sdl_present" ||
-               funcName == "sdl_draw_point" || funcName == "sdl_draw_line" || funcName == "sdl_draw_rect" ||
-               funcName == "sdl_fill_rect" || funcName == "sdl_poll_event" || funcName == "sdl_get_event_type" ||
-               funcName == "sdl_get_key_code" || funcName == "sdl_get_mouse_x" || funcName == "sdl_get_mouse_y" ||
-               funcName == "sdl_get_mouse_button" || funcName == "sdl_get_mouse_state" ||
-               funcName == "sdl_get_relative_mouse_state" || funcName == "sdl_get_mouse_buttons" ||
-               funcName == "sdl_get_relative_mouse_x" || funcName == "sdl_get_relative_mouse_y" ||
-               funcName == "sdl_get_relative_mouse_buttons" || funcName == "sdl_is_key_pressed" ||
-               funcName == "sdl_get_keyboard_state" || funcName == "sdl_get_num_keys" ||
-               funcName == "sdl_set_window_title" || funcName == "sdl_set_window_position" ||
-               funcName == "sdl_get_window_size" || funcName == "sdl_set_window_fullscreen" ||
-               funcName == "sdl_set_window_icon" || funcName == "sdl_get_renderer_output_size" ||
-               funcName == "sdl_show_cursor" || funcName == "sdl_create_rgb_surface" ||
-               funcName == "sdl_free_surface" || funcName == "sdl_blit_surface" ||
-               funcName == "sdl_set_clipboard_text" || funcName == "sdl_get_clipboard_text" ||
-               funcName == "sdl_create_texture" || funcName == "sdl_destroy_texture" ||
-               funcName == "sdl_load_texture" || funcName == "sdl_render_texture" ||
-               funcName == "sdl_get_ticks" || funcName == "sdl_delay" ||
-               funcName == "sdl_open_audio" || funcName == "sdl_close_audio" || funcName == "sdl_pause_audio" ||
-               funcName == "sdl_load_wav" || funcName == "sdl_free_wav" || funcName == "sdl_queue_audio" ||
-               funcName == "sdl_get_queued_audio_size" || funcName == "sdl_clear_queued_audio" ||
-               funcName == "sdl_update_texture" || funcName == "sdl_lock_texture" || funcName == "sdl_unlock_texture" ||
-               funcName == "sdl_init_text" || funcName == "sdl_quit_text" || funcName == "sdl_load_font" ||
-               funcName == "sdl_draw_text" || funcName == "sdl_create_render_target" ||
-               funcName == "sdl_set_render_target" || funcName == "sdl_destroy_render_target" ||
-               funcName == "sdl_present_scaled" || funcName == "sdl_present_stretched";
+        return sdlFunctions.count(toLower(funcName)) != 0;
     }
 
     void SDLFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) {
@@ -746,10 +734,11 @@ namespace pascal {
     bool StringFunctionHandler::canHandle(const std::string &f) const {
         static const std::unordered_set<std::string> funcs = {
             "length", "pos", "copy", "insert", "delete", "inttostr", "strtoint"};
-        return funcs.count(f) != 0;
+        return funcs.count(toLower(f)) != 0;
     }
 
-    VarType StringFunctionHandler::getReturnType(const std::string &f) const {
+    VarType StringFunctionHandler::getReturnType(const std::string &f_) const {
+        auto f = toLower(f_);
         if (f == "length" || f == "pos" || f == "strtoint")
             return VarType::INT;
         if (f == "copy" || f == "insert" || f == "delete" || f == "inttostr")

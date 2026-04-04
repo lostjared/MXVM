@@ -120,6 +120,7 @@ namespace mxvm {
         {"string_print", {"string_print", {OpKind::Any}}},
         {"exit", {"exit", {}, VArity::AnyTail, 0, 1}},
         {"alloc", {"alloc", {OpKind::Id, OpKind::Any, OpKind::Any}}},
+        {"realloc", {"realloc", {OpKind::Id, OpKind::Any, OpKind::Any}}},
         {"free", {"free", {OpKind::Id}}},
         {"lea", {"lea", {OpKind::Id, OpKind::Id}}},
         {"getline", {"getline", {OpKind::Id}}},

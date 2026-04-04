@@ -33,13 +33,14 @@ namespace pascal {
         int size = 0;                              ///< number of elements
         int elementSize = 8;                       ///< size (bytes) of each element
         bool elementIsArray = false;               ///< true if element type is itself an array
+        bool isDynamic = false;                    ///< true for dynamic arrays declared as `array of <type>` (no compile-time bounds)
         std::unique_ptr<ArrayInfo> elementArray;    ///< nested array descriptor (when elementIsArray)
 
         ArrayInfo() = default;
         ArrayInfo(const ArrayInfo &other)
             : elementType(other.elementType), lowerBound(other.lowerBound),
               upperBound(other.upperBound), size(other.size), elementSize(other.elementSize),
-              elementIsArray(other.elementIsArray) {
+              elementIsArray(other.elementIsArray), isDynamic(other.isDynamic) {
             if (other.elementArray) {
                 elementArray = std::make_unique<ArrayInfo>(*other.elementArray);
             }
@@ -53,6 +54,7 @@ namespace pascal {
                 size = other.size;
                 elementSize = other.elementSize;
                 elementIsArray = other.elementIsArray;
+                isDynamic = other.isDynamic;
                 if (other.elementArray) {
                     elementArray = std::make_unique<ArrayInfo>(*other.elementArray);
                 } else {
@@ -813,9 +815,18 @@ namespace pascal {
             };
 
             ArrayInfo info{};
-            info.lowerBound = std::stoi(evaluateConstantExpression(atn->lowerBound.get()));
-            info.upperBound = std::stoi(evaluateConstantExpression(atn->upperBound.get()));
-            info.size = info.upperBound - info.lowerBound + 1;
+
+            // Dynamic array: no bounds specified
+            if (!atn->lowerBound && !atn->upperBound) {
+                info.isDynamic = true;
+                info.lowerBound = 0;
+                info.upperBound = -1;
+                info.size = 0;
+            } else {
+                info.lowerBound = std::stoi(evaluateConstantExpression(atn->lowerBound.get()));
+                info.upperBound = std::stoi(evaluateConstantExpression(atn->upperBound.get()));
+                info.size = info.upperBound - info.lowerBound + 1;
+            }
 
             if (auto *childArr = dynamic_cast<ArrayTypeNode *>(atn->elementType.get())) {
                 info.elementType = "array";
@@ -1432,6 +1443,15 @@ namespace pascal {
             return VarType::UNKNOWN;
         }
 
+        /**
+         * @brief Emit bounds-check code for a static array access
+         * @param idxReg Register or variable holding the index
+         * @param lower  Compile-time lower bound
+         * @param upper  Compile-time upper bound
+         *
+         * Generates code that exits with code 1 when the index is out
+         * of the static [lower..upper] range.  Gated by MXVM_BOUNDS_CHECK.
+         */
         void emitArrayBoundsCheck(const std::string &idxReg, int lower, int upper) {
 #ifdef MXVM_BOUNDS_CHECK
             std::string L_ok = newLabel("IDX_OK");
@@ -1440,6 +1460,33 @@ namespace pascal {
             emit1("jl", L_fail);
             emit2("cmp", idxReg, std::to_string(upper));
             emit1("jg", L_fail);
+            emit1("jmp", L_ok);
+            emitLabel(L_fail);
+            emit1("exit", "1");
+            emitLabel(L_ok);
+#endif
+        }
+
+        /**
+         * @brief Emit bounds-check code for a dynamic array access
+         * @param idxReg Register or variable holding the index
+         * @param lenSym Variable holding the runtime array length
+         *
+         * Generates code that exits with code 1 when the index is
+         * negative or >= the runtime length stored in @p lenSym.
+         * Gated by MXVM_BOUNDS_CHECK.
+         */
+        void emitDynArrayBoundsCheck(const std::string &idxReg, const std::string &lenSym) {
+#ifdef MXVM_BOUNDS_CHECK
+            std::string L_ok = newLabel("IDX_OK");
+            std::string L_fail = newLabel("IDX_OOB");
+            emit2("cmp", idxReg, "0");
+            emit1("jl", L_fail);
+            std::string tmp = allocReg();
+            emit2("mov", tmp, lenSym);
+            emit2("cmp", idxReg, tmp);
+            freeReg(tmp);
+            emit1("jge", L_fail);
             emit1("jmp", L_ok);
             emitLabel(L_fail);
             emit1("exit", "1");
@@ -1470,9 +1517,10 @@ namespace pascal {
             if (auto varNode = dynamic_cast<VariableNode *>(node))
                 return getVarType(varNode->name);
             if (auto funcCall = dynamic_cast<FuncCallNode *>(node)) {
-                auto handler = builtinRegistry.findHandler(funcCall->name);
+                std::string fnLower = lc(funcCall->name);
+                auto handler = builtinRegistry.findHandler(fnLower);
                 if (handler)
-                    return handler->getReturnType(funcCall->name);
+                    return handler->getReturnType(fnLower);
                 auto it = funcSignatures.find(funcCall->name);
                 if (it != funcSignatures.end())
                     return it->second.returnType;
@@ -1632,6 +1680,7 @@ namespace pascal {
         std::unordered_map<std::string, std::string> realConstants;
 
         std::unordered_map<std::string, ArrayInfo> arrayInfo;
+        std::unordered_map<std::string, int> dynArrayLenSlot; ///< mangled array name → slot of companion length variable
 
         std::string getTypeString(ASTNode *typeNode) {
             if (auto simpleType = dynamic_cast<SimpleTypeNode *>(typeNode)) {

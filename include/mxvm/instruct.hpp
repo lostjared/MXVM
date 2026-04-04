@@ -74,7 +74,8 @@ enum Inc {
     JNO,
     JS,
     JNS,
-    LEA
+    LEA,
+    REALLOC         ///< Reallocate a dynamic memory block: realloc dest, elemSize, count
 };
 
 /** @brief String representations of Inc opcodes, indexed by enum value */
@@ -134,7 +135,8 @@ inline std::vector<std::string> IncType{
     "jno",          // JNO = 52 (jump if no overflow)
     "js",           // JS = 53 (jump if sign)
     "jns",          // JNS = 54 (jump if no sign)
-    "lea"           // LEA = 55 (load effective address)
+    "lea",          // LEA = 55 (load effective address)
+    "realloc"       // REALLOC = 56 (reallocate memory)
 };
 
 /**

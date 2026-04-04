@@ -119,16 +119,34 @@ namespace pascal {
                     varSlot[mangledName] = slot;
 
                     updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
-                    emit3("alloc",
-                          slotVar(slot),
-                          std::to_string(arrayInfo[mangledName].elementSize),
-                          std::to_string(arrayInfo[mangledName].size));
 
-                    std::string currentScope = getCurrentScopeName();
-                    if (currentScope.empty())
-                        globalArrays.push_back(slotVar(slot));
-                    else
-                        functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    if (arrayInfo[mangledName].isDynamic) {
+                        // Dynamic array: no alloc at declaration, starts as null
+                        // Create companion length variable
+                        std::string lenName = mangledName + "_dynlen";
+                        int lenSlot = newSlotFor(lenName);
+                        setSlotType(lenSlot, VarType::INT);
+                        varSlot[lenName] = lenSlot;
+                        updateDataSectionInitialValue(slotVar(lenSlot), "int", "0");
+                        dynArrayLenSlot[mangledName] = lenSlot;
+
+                        std::string currentScope = getCurrentScopeName();
+                        if (currentScope.empty())
+                            globalArrays.push_back(slotVar(slot));
+                        else
+                            functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    } else {
+                        emit3("alloc",
+                              slotVar(slot),
+                              std::to_string(arrayInfo[mangledName].elementSize),
+                              std::to_string(arrayInfo[mangledName].size));
+
+                        std::string currentScope = getCurrentScopeName();
+                        if (currentScope.empty())
+                            globalArrays.push_back(slotVar(slot));
+                        else
+                            functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    }
                     continue;
                 }
 
@@ -228,7 +246,11 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(ProcCallNode &node) {
-        if (node.name == "new") {
+        std::string procLower = node.name;
+        std::transform(procLower.begin(), procLower.end(), procLower.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+
+        if (procLower == "new") {
             if (node.arguments.size() != 1)
                 throw std::runtime_error("new() requires exactly one pointer argument");
 
@@ -364,7 +386,7 @@ namespace pascal {
             return;
         }
 
-        if (node.name == "dispose") {
+        if (procLower == "dispose") {
             if (node.arguments.size() != 1)
                 throw std::runtime_error("dispose() requires exactly one pointer argument");
 
@@ -463,9 +485,42 @@ namespace pascal {
             return;
         }
 
-        auto handler = builtinRegistry.findHandler(node.name);
+        // SetLength(arr, newSize) — resize a dynamic array
+        if (procLower == "setlength" && node.arguments.size() == 2) {
+                auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
+                if (!varNode)
+                    throw std::runtime_error("SetLength: first argument must be a dynamic array variable");
+
+                std::string mangled = findMangledArrayName(varNode->name);
+                auto it = arrayInfo.find(mangled);
+                if (it == arrayInfo.end())
+                    it = arrayInfo.find(varNode->name);
+                if (it == arrayInfo.end() || !it->second.isDynamic)
+                    throw std::runtime_error("SetLength: " + varNode->name + " is not a dynamic array");
+
+                std::string arrMangled = it->first;
+                std::string sym = storageSymbolFor(arrMangled);
+
+                // Evaluate the new size
+                std::string newSize = eval(node.arguments[1].get());
+
+                // Emit realloc: realloc arrPtr, elementSize, newCount
+                emit3("realloc", sym, std::to_string(it->second.elementSize), newSize);
+
+                // Update companion length variable
+                auto lenIt = dynArrayLenSlot.find(arrMangled);
+                if (lenIt != dynArrayLenSlot.end()) {
+                    emit2("mov", slotVar(lenIt->second), newSize);
+                }
+
+                if (isReg(newSize) && !isParmReg(newSize))
+                    freeReg(newSize);
+                return;
+            }
+
+        auto handler = builtinRegistry.findHandler(procLower);
         if (handler) {
-            handler->generate(*this, node.name, node.arguments);
+            handler->generate(*this, procLower, node.arguments);
             return;
         }
 
@@ -551,9 +606,56 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(FuncCallNode &node) {
-        auto handler = builtinRegistry.findHandler(node.name);
+        // Handle array-specific Length, High, Low before string Length builtin
+        std::string fnLower = node.name;
+        std::transform(fnLower.begin(), fnLower.end(), fnLower.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if ((fnLower == "length" || fnLower == "high" || fnLower == "low") && node.arguments.size() == 1) {
+            if (auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get())) {
+                std::string mangled = findMangledArrayName(varNode->name);
+                auto it = arrayInfo.find(mangled);
+                if (it == arrayInfo.end())
+                    it = arrayInfo.find(varNode->name);
+                if (it != arrayInfo.end()) {
+                    if (fnLower == "low") {
+                        // Dynamic arrays are always 0-based; static arrays use lowerBound
+                        std::string r = allocReg();
+                        emit2("mov", r, std::to_string(it->second.isDynamic ? 0 : it->second.lowerBound));
+                        pushValue(r);
+                        return;
+                    }
+                    if (it->second.isDynamic) {
+                        // Runtime: read from companion length variable
+                        std::string arrMangled = (it == arrayInfo.find(mangled)) ? mangled : varNode->name;
+                        auto lenIt = dynArrayLenSlot.find(arrMangled);
+                        if (lenIt == dynArrayLenSlot.end())
+                            throw std::runtime_error("Length/High: dynamic array has no companion length variable: " + varNode->name);
+                        std::string lenSym = slotVar(lenIt->second);
+                        std::string r = allocReg();
+                        emit2("mov", r, lenSym);
+                        if (fnLower == "high") {
+                            emit2("sub", r, "1");
+                        }
+                        pushValue(r);
+                        return;
+                    } else {
+                        // Static array: compile-time constants
+                        std::string r = allocReg();
+                        if (fnLower == "length") {
+                            emit2("mov", r, std::to_string(it->second.size));
+                        } else { // high
+                            emit2("mov", r, std::to_string(it->second.upperBound));
+                        }
+                        pushValue(r);
+                        return;
+                    }
+                }
+            }
+        }
+
+        auto handler = builtinRegistry.findHandler(fnLower);
         if (handler) {
-            if (handler->generateWithResult(*this, node.name, node.arguments))
+            if (handler->generateWithResult(*this, fnLower, node.arguments))
                 return;
         }
 
@@ -1383,7 +1485,15 @@ namespace pascal {
             }
 
 #ifdef MXVM_BOUNDS_CHECK
-            {
+            if (info->isDynamic) {
+                std::string arrName = getArrayNameFromBase(arr->base.get());
+                std::string mangled = findMangledArrayName(arrName);
+                auto lenIt = dynArrayLenSlot.find(mangled);
+                if (lenIt == dynArrayLenSlot.end())
+                    lenIt = dynArrayLenSlot.find(arrName);
+                if (lenIt != dynArrayLenSlot.end())
+                    emitDynArrayBoundsCheck(idx, slotVar(lenIt->second));
+            } else {
                 emitArrayBoundsCheck(idx, info->lowerBound, info->upperBound);
             }
 #endif
@@ -1578,7 +1688,11 @@ namespace pascal {
         }
 
 #ifdef MXVM_BOUNDS_CHECK
-        {
+        if (info.isDynamic) {
+            auto lenIt = dynArrayLenSlot.find(node.arrayName);
+            if (lenIt != dynArrayLenSlot.end())
+                emitDynArrayBoundsCheck(index, slotVar(lenIt->second));
+        } else {
             emitArrayBoundsCheck(index, info.lowerBound, info.upperBound);
         }
 #endif

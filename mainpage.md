@@ -189,6 +189,7 @@ The code section is a flat sequence of labeled instructions.
 | `store` | `src, ptr, index, size` | `*(ptr + index * size) <- src` |
 | `lea` | `dest, base, offset` | Load effective address |
 | `alloc` | `ptr, elem_size, count` | `ptr <- calloc(count, elem_size)` |
+| `realloc` | `ptr, elem_size, count` | Resize `ptr` to hold `count` elements of `elem_size` bytes; zero-fills new space |
 | `free` | `ptr` | Release allocated memory |
 
 ### Stack Operations
@@ -277,6 +278,23 @@ builds a typed AST, validates semantics with scope-based analysis, and emits
 MXVM bytecode.
 
 ## Supported Language Features
+
+### Case Insensitivity
+
+Like standard Pascal, all keywords, built-in routine names, and type names
+are **case-insensitive**.  `BEGIN`, `Begin`, and `begin` are equivalent.
+User-defined identifiers (variable names, function names, unit names) are
+also resolved case-insensitively:
+
+```pascal
+PROGRAM MixedCase;
+VAR x: INTEGER;
+BEGIN
+  x := 42;
+  WriteLn('x = ', x);
+  WRITELN('works too');
+END.
+```
 
 ### Program Structure
 
@@ -451,6 +469,7 @@ The implementation section may contain:
 | `string` | Heap-managed, pointer-based string |
 | `^Type` | Typed pointer (e.g. `^integer`, `^Point`) |
 | `array[lo..hi] of T` | Fixed-size array with arbitrary integer bounds |
+| `array of T` | Dynamic array (resized at runtime with `SetLength`) |
 | `record ... end` | Named record (struct) with typed fields |
 
 ### Constants
@@ -487,6 +506,7 @@ var
   name: string;
   pi: real;
   items: array[0..99] of integer;
+  data: array of real;         { dynamic array }
   pt: Point;
   p: ^integer;
 ```
@@ -607,6 +627,37 @@ end.
 - Multi-dimensional arrays via nested `array[...] of array[...]`.
 - Runtime bounds checking is enabled by default.
 
+### Dynamic Arrays
+
+Dynamic arrays have no compile-time bounds.  They are declared with `array of <type>`
+and resized at runtime with `SetLength`:
+
+```pascal
+var
+  data: array of integer;
+begin
+  SetLength(data, 10);           { allocate 10 elements (0..9) }
+  data[0] := 42;
+  writeln(Length(data));          { 10 }
+  writeln(High(data));           { 9 }
+  writeln(Low(data));            { 0 — always 0 for dynamic arrays }
+
+  SetLength(data, 20);           { grow to 20; existing data preserved }
+end.
+```
+
+| Routine | Description |
+|---------|-------------|
+| `SetLength(arr, n)` | Resize `arr` to `n` elements.  Existing data is preserved; new slots are zero-initialised.  Passing 0 frees the block. |
+| `Length(arr)` | Number of elements (runtime for dynamic, compile-time for static). |
+| `High(arr)` | Highest valid index (`Length(arr) - 1` for dynamic arrays, upper bound for static). |
+| `Low(arr)` | Lowest valid index (always 0 for dynamic arrays, lower bound for static). |
+
+- Dynamic arrays are always **0-based**.
+- Memory is managed via the `realloc` VM instruction; the compiler emits
+  a companion `_dynlen` variable that tracks the runtime length.
+- Bounds checking applies at runtime using the companion length variable.
+
 ### Pointers
 
 ```pascal
@@ -673,6 +724,15 @@ end.
 `new(ptr)`, `dispose(ptr)`, `malloc()`, `calloc()`, `free()`,
 `memcpy()`, `memcmp()`, `memmove()`, `memset()`
 
+#### Arrays
+
+| Routine | Description |
+|---------|-------------|
+| `SetLength(arr, n)` | Resize a dynamic array to `n` elements |
+| `Length(arr)` | Number of elements in a static or dynamic array |
+| `High(arr)` | Highest valid index |
+| `Low(arr)` | Lowest valid index |
+
 #### System
 
 `halt(code)`, `system(cmd)`, `rand()`, `srand()`,
@@ -690,7 +750,6 @@ The following limitations apply:
 | **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` -- not `x := MyFunc`. |
 | **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
 | **No enumerated types** | Only scalar types, records, arrays, and pointers. |
-| **No dynamic arrays** | Only static `array[lo..hi]` with compile-time bounds. |
 | **No variant records** | Records have flat fields only -- no `case` variant parts. |
 | **No sets** | The `set` keyword is reserved but not implemented. |
 | **No `file` type** | File I/O is done via module functions (`fopen`, `fread`, etc.), not Pascal `file of`. |
@@ -1002,6 +1061,43 @@ begin
   writeln('Point: (', p^.x, ', ', p^.y, ')');
   dispose(p);
 end.
+```
+
+## Pascal -- Dynamic Arrays
+
+```pascal
+program DynArrayDemo;
+
+var
+  arr: array of integer;
+  i: integer;
+
+begin
+  SetLength(arr, 5);
+  for i := 0 to High(arr) do
+    arr[i] := (i + 1) * 10;
+
+  writeln('Length = ', Length(arr));
+  write('Elements:');
+  for i := Low(arr) to High(arr) do
+    write(' ', arr[i]);
+  writeln;
+
+  { Grow the array — existing data is preserved }
+  SetLength(arr, 8);
+  arr[5] := 60;
+  arr[6] := 70;
+  arr[7] := 80;
+
+  writeln('After grow, Length = ', Length(arr));
+end.
+```
+
+Output:
+```
+Length =  5
+Elements: 10  20  30  40  50
+After grow, Length =  8
 ```
 
 ## Pascal -- Units (Separate Compilation)

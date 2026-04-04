@@ -598,6 +598,9 @@ namespace mxvm {
         case FREE:
             x64_gen_free(out, i);
             break;
+        case REALLOC:
+            x64_gen_realloc(out, i);
+            break;
         case LOAD:
             x64_gen_load(out, i);
             break;
@@ -783,6 +786,65 @@ namespace mxvm {
         out << ".alloc_done_" << error_label_count << ":\n";
 
         error_label_count++;
+    }
+
+    /**
+     * @brief Generate Win64 x86-64 native code for REALLOC
+     *
+     * Uses the Win64 calling convention (rcx = ptr, rdx = size) for the
+     * C realloc() call.  Shadow space is reserved.  Registers are
+     * flushed/reloaded around the call.
+     */
+    void Program::x64_gen_realloc(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op))
+            throw mx::Exception("REALLOC destination must be a variable");
+        Variable &v = getVariable(i.op1.op);
+        if (v.type != VarType::VAR_POINTER)
+            throw mx::Exception("REALLOC destination must be a pointer");
+
+        x64_emitFlushRegs(out);
+
+        // %rcx = existing ptr (first arg to realloc on Win x64)
+        out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rcx\n";
+
+        // Compute new total size = count * elemSize
+        if (!i.op3.op.empty()) {
+            if (isVariable(i.op3.op)) {
+                x64_emitLoadVar(out, "%rax", i.op3);
+            } else {
+                out << "\tmovq $" << i.op3.op << ", %rax\n";
+            }
+        } else {
+            out << "\tmovq $1, %rax\n";
+        }
+
+        if (!i.op2.op.empty()) {
+            if (isVariable(i.op2.op)) {
+                x64_emitLoadVar(out, "%r8", i.op2);
+            } else {
+                out << "\tmovq $" << i.op2.op << ", %r8\n";
+            }
+        } else {
+            out << "\tmovq $8, %r8\n";
+        }
+
+        out << "\timulq %r8, %rax\n";
+        out << "\tmovq %rax, %rdx\n"; // %rdx = new size (second arg)
+
+        size_t total = x64_reserve_call_area(out, 0);
+        out << "\tcall realloc\n";
+        x64_release_call_area(out, total);
+
+        out << "\ttest %rax, %rax\n";
+        out << "\tjz .realloc_failed_" << error_label_count << "\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        out << "\tjmp .realloc_done_" << error_label_count << "\n";
+        out << ".realloc_failed_" << error_label_count << ":\n";
+        out << "\t# realloc failed, keep old pointer\n";
+        out << ".realloc_done_" << error_label_count << ":\n";
+        error_label_count++;
+        v.var_value.owns = true;
+        x64_emitReloadRegs(out);
     }
 
     void Program::x64_gen_free(std::ostream &out, const Instruction &i) {
