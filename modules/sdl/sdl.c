@@ -296,6 +296,7 @@ int64_t load_texture(int64_t renderer_id, const char *file_path) {
     if (!surface)
         return -2;
 
+    SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 0, 0, 0));
     SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
     SDL_FreeSurface(surface);
     if (!texture)

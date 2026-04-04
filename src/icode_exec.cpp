@@ -1058,8 +1058,7 @@ namespace mxvm {
 
         if (instr.op1.type == OperandType::OP_CONSTANT) {
             int64_t cval = std::stoll(instr.op1.op, nullptr, 0);
-            size_t copy_size = std::min(stride, sizeof(int64_t));
-            std::memcpy(base, &cval, copy_size);
+            std::memcpy(base, &cval, sizeof(int64_t));
         } else {
             Variable &src = getVariable(instr.op1.op);
             switch (src.type) {

@@ -475,11 +475,17 @@ extern "C" void mxvm_string_inttostr(mxvm::Program *program, std::vector<mxvm::O
         throw mx::Exception("malloc failed in inttostr()");
     strcpy(new_buf, result_str.c_str());
 
-    program->vars["%rax"].var_value.ptr_value = new_buf;
-    program->vars["%rax"].var_value.ptr_size = 1;
-    program->vars["%rax"].var_value.ptr_count = static_cast<int64_t>(result_str.length() + 1);
-    program->vars["%rax"].var_value.owns = true;
-    program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
+    // Free old owned pointer in %rax before overwriting
+    auto &rax = program->vars["%rax"];
+    if (rax.type == mxvm::VarType::VAR_POINTER && rax.var_value.ptr_value && rax.var_value.owns) {
+        std::free(rax.var_value.ptr_value);
+    }
+
+    rax.var_value.ptr_value = new_buf;
+    rax.var_value.ptr_size = 1;
+    rax.var_value.ptr_count = static_cast<int64_t>(result_str.length() + 1);
+    rax.var_value.owns = true;
+    rax.type = mxvm::VarType::VAR_POINTER;
 }
 
 extern "C" void mxvm_string_strtoint(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {

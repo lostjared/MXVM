@@ -865,6 +865,11 @@ namespace pascal {
         for (auto &stmt : node.statements) {
             if (!stmt)
                 continue;
+
+            // snapshot allocated temp ptrs before statement
+            auto ptrsBefore = allocatedPtrs;
+            auto escapedBefore = escapedTempPtrs;
+
             if (auto v = dynamic_cast<VariableNode *>(stmt.get())) {
                 std::string mangled = findMangledFuncName(v->name, true);
                 if (declaredProcs.count(mangled)) {
@@ -873,10 +878,23 @@ namespace pascal {
                     if (eit != externalFuncs.end())
                         label = eit->second + "." + label;
                     emit1("call", label);
+                    // free any temp ptrs allocated during this statement (not escaped)
+                    for (auto &p : allocatedPtrs) {
+                        if (!ptrsBefore.count(p) && !escapedTempPtrs.count(p))
+                            emit("free " + p);
+                    }
+                    allocatedPtrs = ptrsBefore;
                     continue;
                 }
             }
             stmt->accept(*this);
+
+            // free any temp ptrs allocated during this statement (not escaped)
+            for (auto &p : allocatedPtrs) {
+                if (!ptrsBefore.count(p) && !escapedTempPtrs.count(p))
+                    emit("free " + p);
+            }
+            allocatedPtrs = ptrsBefore;
         }
     }
 
@@ -1602,6 +1620,22 @@ namespace pascal {
             const int byteOffset = fieldInfo.offset;
 
             std::string basePtr = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+
+            // Convert between float and int if field type doesn't match rhs type
+            VarType fieldType = getTypeFromString(fieldInfo.typeName);
+            if (fieldType == VarType::INT && isFloatReg(rhs)) {
+                std::string intReg = allocReg();
+                emit2("mov", intReg, rhs);
+                if (isReg(rhs) && !isParmReg(rhs))
+                    freeReg(rhs);
+                rhs = intReg;
+            } else if (fieldType == VarType::DOUBLE && !isFloatReg(rhs) && isReg(rhs)) {
+                std::string fltReg = allocFloatReg();
+                emit2("mov", fltReg, rhs);
+                if (!isParmReg(rhs))
+                    freeReg(rhs);
+                rhs = fltReg;
+            }
 
             emit4("store", rhs, basePtr, std::to_string(byteOffset), "1");
 
