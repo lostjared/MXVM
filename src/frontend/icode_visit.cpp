@@ -414,28 +414,54 @@ namespace pascal {
         }
 
         std::vector<std::string> evaluated_args;
-        size_t intRegIdx = 1;
-        size_t ptrRegIdx = 0;
-        size_t floatRegIdx = 0;
+        std::vector<VarType> argTypes;
 
         for (auto &arg : node.arguments) {
             std::string argVal = eval(arg.get());
             evaluated_args.push_back(argVal);
-            VarType argType = getExpressionType(arg.get());
+            argTypes.push_back(getExpressionType(arg.get()));
+        }
 
-            std::string targetReg;
-            if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
+        // Build target register list
+        std::vector<std::string> targetRegs(evaluated_args.size());
+        size_t intRegIdx = 1;
+        size_t ptrRegIdx = 0;
+        size_t floatRegIdx = 0;
+
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (argTypes[i] == VarType::STRING || argTypes[i] == VarType::PTR || argTypes[i] == VarType::RECORD) {
                 if (ptrRegIdx < ptrRegisters.size())
-                    targetReg = ptrRegisters[ptrRegIdx++];
-            } else if (argType == VarType::DOUBLE) {
+                    targetRegs[i] = ptrRegisters[ptrRegIdx++];
+            } else if (argTypes[i] == VarType::DOUBLE) {
                 if (floatRegIdx < floatRegisters.size())
-                    targetReg = floatRegisters[floatRegIdx++];
+                    targetRegs[i] = floatRegisters[floatRegIdx++];
             } else {
                 if (intRegIdx < registers.size())
-                    targetReg = registers[intRegIdx++];
+                    targetRegs[i] = registers[intRegIdx++];
             }
-            if (!targetReg.empty())
-                emit2("mov", targetReg, argVal);
+        }
+
+        // Spill any evaluated arg that sits in another arg's target register
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (evaluated_args[i].empty() || targetRegs[i].empty())
+                continue;
+            if (evaluated_args[i] == targetRegs[i])
+                continue;
+            for (size_t j = 0; j < evaluated_args.size(); ++j) {
+                if (j == i) continue;
+                if (evaluated_args[j] == targetRegs[i]) {
+                    // arg j's value is in a register that arg i needs as target
+                    std::string spill = allocReg();
+                    emit2("mov", spill, evaluated_args[j]);
+                    evaluated_args[j] = spill;
+                }
+            }
+        }
+
+        // Now move into target registers
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (!targetRegs[i].empty())
+                emit2("mov", targetRegs[i], evaluated_args[i]);
         }
 
         std::string mangledName = findMangledFuncName(node.name, true);
@@ -454,27 +480,53 @@ namespace pascal {
         }
 
         std::vector<std::string> evaluated_args;
-        size_t intRegIdx = 1;
-        size_t ptrRegIdx = 0;
-        size_t floatRegIdx = 0;
+        std::vector<VarType> argTypes;
 
         for (auto &arg : node.arguments) {
             std::string argVal = eval(arg.get());
             evaluated_args.push_back(argVal);
-            VarType argType = getExpressionType(arg.get());
-            std::string targetReg;
-            if (argType == VarType::STRING || argType == VarType::PTR || argType == VarType::RECORD) {
+            argTypes.push_back(getExpressionType(arg.get()));
+        }
+
+        // Build target register list
+        std::vector<std::string> targetRegs(evaluated_args.size());
+        size_t intRegIdx = 1;
+        size_t ptrRegIdx = 0;
+        size_t floatRegIdx = 0;
+
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (argTypes[i] == VarType::STRING || argTypes[i] == VarType::PTR || argTypes[i] == VarType::RECORD) {
                 if (ptrRegIdx < ptrRegisters.size())
-                    targetReg = ptrRegisters[ptrRegIdx++];
-            } else if (argType == VarType::DOUBLE) {
+                    targetRegs[i] = ptrRegisters[ptrRegIdx++];
+            } else if (argTypes[i] == VarType::DOUBLE) {
                 if (floatRegIdx < floatRegisters.size())
-                    targetReg = floatRegisters[floatRegIdx++];
+                    targetRegs[i] = floatRegisters[floatRegIdx++];
             } else {
                 if (intRegIdx < registers.size())
-                    targetReg = registers[intRegIdx++];
+                    targetRegs[i] = registers[intRegIdx++];
             }
-            if (!targetReg.empty())
-                emit2("mov", targetReg, argVal);
+        }
+
+        // Spill any evaluated arg that sits in another arg's target register
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (evaluated_args[i].empty() || targetRegs[i].empty())
+                continue;
+            if (evaluated_args[i] == targetRegs[i])
+                continue;
+            for (size_t j = 0; j < evaluated_args.size(); ++j) {
+                if (j == i) continue;
+                if (evaluated_args[j] == targetRegs[i]) {
+                    std::string spill = allocReg();
+                    emit2("mov", spill, evaluated_args[j]);
+                    evaluated_args[j] = spill;
+                }
+            }
+        }
+
+        // Now move into target registers
+        for (size_t i = 0; i < evaluated_args.size(); ++i) {
+            if (!targetRegs[i].empty())
+                emit2("mov", targetRegs[i], evaluated_args[i]);
         }
 
         std::string mangledName = findMangledFuncName(node.name, false);

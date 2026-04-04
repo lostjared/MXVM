@@ -99,6 +99,7 @@ namespace pascal {
       public:
         bool canHandle(const std::string &funcName) const override;
         void generate(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
+        bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
     };
 
     class StdFunctionHandler : public BuiltinFunctionHandler {

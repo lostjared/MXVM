@@ -291,7 +291,10 @@ namespace pascal {
                 if (peekIs("(")) {
                     return parseProcedureCall(varNode->name);
                 }
-                return lhs;
+                // Bare identifier as statement = parameterless procedure call
+                auto procCallNode = std::make_unique<ProcCallNode>(varNode->name, std::vector<std::unique_ptr<ASTNode>>{});
+                procCallNode->setLineNumber(lineNum);
+                return procCallNode;
             }
             error("Invalid statement: expected ':=' for assignment or '(' for procedure call");
             return nullptr;

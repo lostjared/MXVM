@@ -29,7 +29,8 @@ namespace pascal {
         "round", "trunc", "float_to_int", "int_to_float", "halt"};
 
     bool IOFunctionHandler::canHandle(const std::string &funcName) const {
-        return funcName == "writeln" || funcName == "write" || funcName == "readln";
+        return funcName == "writeln" || funcName == "write" || funcName == "readln" ||
+               funcName == "seed_random" || funcName == "rand_number";
     }
 
     void IOFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName,
@@ -87,7 +88,39 @@ namespace pascal {
                                              ": readln argument must be a variable");
                 }
             }
+        } else if (funcName == "seed_random") {
+            visitor.usedModules.insert("io");
+            if (arguments.size() != 0)
+                throw std::runtime_error("seed_random requires 0 arguments");
+            visitor.emit_invoke("seed_random", {});
         }
+    }
+
+    bool IOFunctionHandler::generateWithResult(CodeGenVisitor &visitor, const std::string &funcName,
+                                               const std::vector<std::unique_ptr<ASTNode>> &arguments) {
+        if (funcName == "seed_random") {
+            visitor.usedModules.insert("io");
+            if (arguments.size() != 0)
+                throw std::runtime_error("seed_random requires 0 arguments");
+            std::string dst = visitor.allocReg();
+            visitor.emit_invoke("seed_random", {});
+            visitor.emit("return " + dst);
+            visitor.pushValue(dst);
+            return true;
+        } else if (funcName == "rand_number") {
+            visitor.usedModules.insert("io");
+            if (arguments.size() != 1)
+                throw std::runtime_error("rand_number requires 1 argument (size)");
+            std::string arg = visitor.eval(arguments[0].get());
+            std::string dst = visitor.allocReg();
+            visitor.emit_invoke("rand_number", {arg});
+            visitor.emit("return " + dst);
+            if (visitor.isReg(arg) && !visitor.isParmReg(arg))
+                visitor.freeReg(arg);
+            visitor.pushValue(dst);
+            return true;
+        }
+        return false;
     }
 
     bool StdFunctionHandler::canHandle(const std::string &funcName) const {
@@ -432,6 +465,11 @@ namespace pascal {
                 throw std::runtime_error("Error on line " + std::to_string(lineNum) +
                                          ": sdl_unlock_texture requires 1 argument (texture_id)");
             visitor.emit_invoke("unlock_texture", args);
+        } else if (funcName == "sdl_init_text") {
+            if (arguments.size() != 0)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": sdl_init_text requires 0 arguments");
+            visitor.emit_invoke("init_text", {});
         } else if (funcName == "sdl_quit_text") {
             if (arguments.size() != 0)
                 throw std::runtime_error("Error on line " + std::to_string(lineNum) +
