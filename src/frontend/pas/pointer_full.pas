@@ -11,11 +11,15 @@ type
 var
   { pointer parameters and return values }
   a, b, temp: integer;
+  i: integer;
   p: ^integer;
   result: integer;
 
   { record with pointer field }
   node: TNode;
+
+  { array of pointers }
+  ptrs: array[1..3] of ^integer;
 
 { procedure with pointer parameter }
 procedure SetValue(ptr: ^integer; val: integer);
@@ -77,6 +81,18 @@ begin
   writeln(node.value);
   writeln(node.next^);
   dispose(node.next);
+
+  { Test 5: Array of pointers }
+  writeln('--- array of ^integer ---');
+  for i := 1 to 3 do
+  begin
+    new(ptrs[i]);
+    ptrs[i]^ := i * 100;
+  end;
+  for i := 1 to 3 do
+    writeln(ptrs[i]^);
+  for i := 1 to 3 do
+    dispose(ptrs[i]);
 
   writeln('=== done ===');
 end.

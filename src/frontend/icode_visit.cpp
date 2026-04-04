@@ -229,9 +229,66 @@ namespace pascal {
                 return;
             }
 
+            if (auto *arrNode = dynamic_cast<ArrayAccessNode *>(node.arguments[0].get())) {
+                ArrayInfo *info = getArrayInfoForArrayAccess(arrNode);
+                if (!info)
+                    throw std::runtime_error("new(): unknown array: " + getArrayNameFromBase(arrNode->base.get()));
+
+                int elemSize = 8;
+                std::string et = info->elementType;
+                if (!et.empty() && et[0] == '^') {
+                    std::string baseType = resolveTypeName(lc(et.substr(1)));
+                    elemSize = getTypeSizeByName(baseType);
+                    if (isRecordTypeName(baseType)) {
+                        auto rit = recordTypes.find(baseType);
+                        if (rit != recordTypes.end())
+                            elemSize = rit->second.size;
+                    }
+                }
+
+                std::string idx = eval(arrNode->index.get());
+                if (getExpressionType(arrNode->index.get()) == VarType::DOUBLE) {
+                    std::string intIdx = allocReg();
+                    emit2("mov", intIdx, idx);
+                    if (isReg(idx) && !isParmReg(idx))
+                        freeReg(idx);
+                    idx = intIdx;
+                }
+
+                std::string elemIndex;
+                if (isReg(idx) && !isParmReg(idx)) {
+                    elemIndex = idx;
+                } else {
+                    elemIndex = allocReg();
+                    emit2("mov", elemIndex, idx);
+                }
+                if (info->lowerBound != 0)
+                    emit2("sub", elemIndex, std::to_string(info->lowerBound));
+
+                std::string base;
+                if (auto var = dynamic_cast<VariableNode *>(arrNode->base.get())) {
+                    std::string mangled = findMangledArrayName(var->name);
+                    base = ensurePtrBase(storageSymbolFor(mangled));
+                } else {
+                    arrNode->base->accept(*this);
+                    base = popValue();
+                }
+
+                std::string tmp = allocTempPtr();
+                emit3("alloc", tmp, std::to_string(elemSize), "1");
+                emit4("store", tmp, base, elemIndex, std::to_string(info->elementSize));
+
+                if (isReg(tmp) && !isParmReg(tmp))
+                    freeReg(tmp);
+                if (elemIndex != idx && isReg(idx) && !isParmReg(idx))
+                    freeReg(idx);
+                freeReg(elemIndex);
+                return;
+            }
+
             auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
             if (!varNode)
-                throw std::runtime_error("new() argument must be a variable or record field");
+                throw std::runtime_error("new() argument must be a variable, record field, or array element");
 
             std::string mangled = findMangledName(varNode->name);
             std::string sym = storageSymbolFor(mangled);
@@ -295,9 +352,54 @@ namespace pascal {
                 return;
             }
 
+            if (auto *arrNode = dynamic_cast<ArrayAccessNode *>(node.arguments[0].get())) {
+                ArrayInfo *info = getArrayInfoForArrayAccess(arrNode);
+                if (!info)
+                    throw std::runtime_error("dispose(): unknown array: " + getArrayNameFromBase(arrNode->base.get()));
+
+                std::string idx = eval(arrNode->index.get());
+                if (getExpressionType(arrNode->index.get()) == VarType::DOUBLE) {
+                    std::string intIdx = allocReg();
+                    emit2("mov", intIdx, idx);
+                    if (isReg(idx) && !isParmReg(idx))
+                        freeReg(idx);
+                    idx = intIdx;
+                }
+
+                std::string elemIndex;
+                if (isReg(idx) && !isParmReg(idx)) {
+                    elemIndex = idx;
+                } else {
+                    elemIndex = allocReg();
+                    emit2("mov", elemIndex, idx);
+                }
+                if (info->lowerBound != 0)
+                    emit2("sub", elemIndex, std::to_string(info->lowerBound));
+
+                std::string base;
+                if (auto var = dynamic_cast<VariableNode *>(arrNode->base.get())) {
+                    std::string mangled = findMangledArrayName(var->name);
+                    base = ensurePtrBase(storageSymbolFor(mangled));
+                } else {
+                    arrNode->base->accept(*this);
+                    base = popValue();
+                }
+
+                std::string tmp = allocTempPtr();
+                emit4("load", tmp, base, elemIndex, std::to_string(info->elementSize));
+                emit1("free", tmp);
+
+                if (isReg(tmp) && !isParmReg(tmp))
+                    freeReg(tmp);
+                if (elemIndex != idx && isReg(idx) && !isParmReg(idx))
+                    freeReg(idx);
+                freeReg(elemIndex);
+                return;
+            }
+
             auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
             if (!varNode)
-                throw std::runtime_error("dispose() argument must be a variable or record field");
+                throw std::runtime_error("dispose() argument must be a variable, record field, or array element");
 
             std::string mangled = findMangledName(varNode->name);
             std::string sym = storageSymbolFor(mangled);
@@ -976,7 +1078,7 @@ namespace pascal {
         } else if (dynamic_cast<RecordTypeNode *>(node.arrayType->elementType.get())) {
             elementType = "record";
         } else if (auto *pt = dynamic_cast<PointerTypeNode *>(node.arrayType->elementType.get())) {
-            elementType = "pointer";
+            elementType = "^" + pt->baseTypeName;
         } else {
             elementType = "integer";
         }
@@ -1137,7 +1239,9 @@ namespace pascal {
             VarType elemType = VarType::INT;
             if (info->elementType == "real")
                 elemType = VarType::DOUBLE;
-            else if (info->elementType == "string" || info->elementType == "ptr")
+            else if (info->elementType == "string" || info->elementType == "ptr" ||
+                     info->elementType == "pointer" ||
+                     (!info->elementType.empty() && info->elementType[0] == '^'))
                 elemType = VarType::PTR;
 
             VarType rhsType = getExpressionType(node.expression.get());
@@ -1330,7 +1434,9 @@ namespace pascal {
         VarType elemType = VarType::INT;
         if (info.elementType == "real")
             elemType = VarType::DOUBLE;
-        else if (info.elementType == "string" || info.elementType == "ptr")
+        else if (info.elementType == "string" || info.elementType == "ptr" ||
+                 info.elementType == "pointer" ||
+                 (!info.elementType.empty() && info.elementType[0] == '^'))
             elemType = VarType::PTR;
         else if (isRecordTypeName(info.elementType))
             elemType = VarType::RECORD;

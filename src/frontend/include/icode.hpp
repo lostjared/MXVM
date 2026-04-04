@@ -778,6 +778,9 @@ namespace pascal {
             } else if (dynamic_cast<RecordTypeNode *>(atn->elementType.get())) {
                 info.elementType = "record";
                 info.elementSize = 8;
+            } else if (auto *pt = dynamic_cast<PointerTypeNode *>(atn->elementType.get())) {
+                info.elementType = "^" + pt->baseTypeName;
+                info.elementSize = 8;
             } else {
                 info.elementType = "integer";
                 info.elementSize = 8;
@@ -1360,7 +1363,9 @@ namespace pascal {
                         return VarType::DOUBLE;
                     if (t == "char")
                         return VarType::CHAR;
-                    if (t == "string" || t == "ptr")
+                    if (t == "string" || t == "ptr" ||
+                        t == "pointer" ||
+                        (!t.empty() && t[0] == '^'))
                         return VarType::PTR;
                     if (isRecordTypeName(t))
                         return VarType::RECORD;
