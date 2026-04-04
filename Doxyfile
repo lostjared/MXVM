@@ -54,7 +54,7 @@ WARN_NO_PARAMDOC       = NO
 INPUT                  = include \
                          src \
                          modules \
-                         README.md
+                         mainpage.md
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h \
                          *.hpp \
@@ -66,7 +66,7 @@ EXCLUDE                = build \
                          doxygen_output
 EXCLUDE_PATTERNS       = */build/* \
                          */CMakeFiles/*
-USE_MDFILE_AS_MAINPAGE = README.md
+USE_MDFILE_AS_MAINPAGE = mainpage.md
 
 #---------------------------------------------------------------------------
 # Configuration options related to source browsing
