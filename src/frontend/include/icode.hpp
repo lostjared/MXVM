@@ -299,9 +299,8 @@ namespace pascal {
             needsEmptyString = true;
             return "empty_str";
         }
-        const std::vector<size_t> scratchOrder = {8, 9, 10, 11, 12, 13};
-        size_t scratchPtr = 0;
-        const std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
+        int nextSpillReg = 0;
+        std::vector<std::string> registers = {"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"};
         const std::vector<std::string> ptrRegisters = {
             "arg0", "arg1", "arg2", "arg3", "arg4", "arg5", "arg6", "arg7", "arg8", "arg9"};
         std::vector<std::string> floatRegisters;
@@ -379,10 +378,10 @@ namespace pascal {
                     regInUse[i] = true;
                     return registers[i];
                 }
-            size_t idx = scratchOrder[scratchPtr];
-            scratchPtr = (scratchPtr + 1) % scratchOrder.size();
-            regInUse[idx] = true;
-            return registers[idx];
+            std::string name = "_ir" + std::to_string(nextSpillReg++);
+            registers.push_back(name);
+            regInUse.push_back(true);
+            return name;
         }
 
         std::string allocPtrReg() {
@@ -950,7 +949,6 @@ namespace pascal {
                 ptrRegInUse[i] = false;
             for (size_t i = 0; i < floatRegInUse.size(); ++i)
                 floatRegInUse[i] = false;
-            scratchPtr = 0;
 
             if (auto prog = dynamic_cast<ProgramNode *>(root))
                 name = prog->name;
