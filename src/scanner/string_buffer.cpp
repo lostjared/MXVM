@@ -4,8 +4,6 @@
  * @author Jared Bruni
  */
 #include "scanner/string_buffer.hpp"
-#include <optional>
-#include <utility>
 
 namespace scan {
 

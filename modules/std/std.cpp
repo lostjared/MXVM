@@ -4,13 +4,11 @@
  * @author Jared Bruni
  */
 #include "mx_std.h"
-#include "mxvm/mxvm.hpp"
-#include <algorithm>
+#include <mxvm/icode.hpp>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
-#include <iostream>
 #include <string>
 
 extern "C" void mxvm_std_abs(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {

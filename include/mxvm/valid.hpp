@@ -8,7 +8,6 @@
 
 #include "mxvm/instruct.hpp"
 #include "scanner/scanner.hpp"
-#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>

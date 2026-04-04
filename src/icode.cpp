@@ -4,14 +4,14 @@
  * @author Jared Bruni
  */
 #include "mxvm/icode.hpp"
-#include "mxvm/function.hpp"
 #include "mxvm/parser.hpp"
 #include "scanner/exception.hpp"
+#include <algorithm>
 #include <cstdint>
+#include <dlfcn.h>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
-#include <regex>
 #include <sstream>
 #include <unordered_set>
 

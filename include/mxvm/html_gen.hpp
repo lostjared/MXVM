@@ -6,7 +6,8 @@
 #ifndef __HTML__GEN___H_
 #define __HTML__GEN___H_
 
-#include "mxvm/instruct.hpp"
+#include <iosfwd>
+#include <string>
 
 namespace mxvm {
 

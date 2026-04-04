@@ -8,6 +8,7 @@
 #include "mxvm/icode.hpp"
 #include "scanner/exception.hpp"
 #include "scanner/scanner.hpp"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>

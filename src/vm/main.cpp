@@ -5,6 +5,7 @@
  */
 #include "argz.hpp"
 #include <csignal>
+#include <dlfcn.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>

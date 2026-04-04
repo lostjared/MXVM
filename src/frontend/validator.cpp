@@ -4,6 +4,7 @@
  * @author Jared Bruni
  */
 #include "validator.hpp"
+#include "scanner/exception.hpp"
 #include <cctype>
 #include <unordered_set>
 
@@ -225,15 +226,14 @@ namespace mxx {
 
     void TPValidator::parseUses() {
         requireKW("uses");
-        do {
+        next();
+        require(types::TokenType::TT_ID);
+        next();
+        while (match(",")) {
             next();
             require(types::TokenType::TT_ID);
             next();
-            if (match(","))
-                next();
-            else
-                break;
-        } while (true);
+        }
         require(";");
         next();
     }
@@ -1015,7 +1015,7 @@ namespace mxx {
     }
 
     static const std::unordered_set<std::string> pascal_keywords = {
-        "program", "var", "const", "type", "procedure", "function", "begin", "end",
+        "program", "uses", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
         "case", "of", "with", "goto", "exit", "break", "continue",
         "nil", "new", "dispose",

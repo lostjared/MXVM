@@ -5,6 +5,7 @@
  */
 #include "scanner/scanner.hpp"
 #include <set>
+#include <sstream>
 
 namespace scan {
 

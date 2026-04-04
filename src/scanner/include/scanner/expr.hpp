@@ -7,7 +7,6 @@
 #define __EXPR__H_
 #include "scanner/exception.hpp"
 #include "scanner/scanner.hpp"
-#include <iostream>
 #include <string>
 #include <unordered_map>
 

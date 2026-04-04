@@ -7,7 +7,6 @@
 #include "mxvm/instruct.hpp"
 #include "scanner/exception.hpp"
 #include <algorithm>
-#include <climits>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -245,7 +244,7 @@ namespace mxvm {
         int maxArgs = (spec.maxArgs >= 0) ? spec.maxArgs : (spec.varPolicy == VArity::None ? (int)spec.fixed.size() : INT32_MAX);
 
         if ((int)ops.size() < minArgs || (int)ops.size() > maxArgs) {
-            throw mx::Exception("Syntax Error in '" + filename + "': '" + op + "' expects " + std::to_string(minArgs) + ((maxArgs == INT32_MAX) ? "..∞" : ".." + std::to_string(maxArgs)) + " operands; found " + std::to_string(ops.size()));
+            throw mx::Exception("Syntax Error in '" + filename + "': '" + op + "' expects " + std::to_string(minArgs) + ((maxArgs == INT32_MAX) ? "..inf" : ".." + std::to_string(maxArgs)) + " operands; found " + std::to_string(ops.size()));
         }
 
         auto kindOk = [&](OpKind want, OpKind got) {

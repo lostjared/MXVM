@@ -4,6 +4,9 @@
  * @author Jared Bruni
  */
 #include "mx_sdl.h"
+#include "SDL.h"
+#include "SDL_ttf.h"
+
 
 static SDL_Event g_event;
 static SDL_Window **g_windows = NULL;

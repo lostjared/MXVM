@@ -7,8 +7,6 @@
 #include "mxvm/instruct.hpp"
 #include <algorithm>
 #include <cctype>
-#include <sstream>
-#include <unordered_map>
 #include <unordered_set>
 
 namespace {

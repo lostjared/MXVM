@@ -7,10 +7,6 @@
 #define _MX_STD_H__
 
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {

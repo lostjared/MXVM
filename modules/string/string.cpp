@@ -3,7 +3,6 @@
  * @brief String module C++ runtime bindings for the MXVM interpreter
  * @author Jared Bruni
  */
-#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

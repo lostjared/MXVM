@@ -8,9 +8,7 @@
 
 #include "mxvm/instruct.hpp"
 #include "mxvm/valid.hpp"
-#include "scanner/exception.hpp"
 #include "scanner/scanner.hpp"
-#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <memory>

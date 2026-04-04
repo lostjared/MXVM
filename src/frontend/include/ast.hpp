@@ -99,6 +99,7 @@ namespace pascal {
       public:
         std::string name;                  ///< program identifier
         std::unique_ptr<BlockNode> block;  ///< the program body
+        std::vector<std::string> uses;     ///< modules imported via 'uses' clause
 
         ProgramNode(const std::string &name, std::unique_ptr<BlockNode> blk);
 

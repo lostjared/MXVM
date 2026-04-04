@@ -6,7 +6,6 @@
 #ifndef ICODE_HPP_
 #define ICODE_HPP_
 
-#include "mxvm/function.hpp"
 #include "mxvm/instruct.hpp"
 #include "mxvm/parser.hpp"
 #include "scanner/exception.hpp"

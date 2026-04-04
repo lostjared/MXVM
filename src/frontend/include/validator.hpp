@@ -6,7 +6,6 @@
 #ifndef __VALIDATOR_H_
 #define __VALIDATOR_H_
 
-#include "scanner/exception.hpp"
 #include "scanner/scanner.hpp"
 #include "scanner/types.hpp"
 #include <string>

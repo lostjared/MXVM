@@ -1,11 +1,13 @@
-# MXVM — Virtual Machine, Compiler & Code Generator {#mainpage}
+# MXVM -- Virtual Machine, Compiler & Code Generator {#mainpage}
 
 **MXVM** is a custom virtual machine and compiler suite written in modern C++20.
 It provides a RISC-style bytecode language with an interpreter, a Pascal-subset
 compiler frontend, and native x86-64 code generators targeting Linux (System V ABI),
 macOS (Darwin), and Windows (Win64).
 
-> **Experimental / educational project — not intended for production use.**
+> **Experimental / educational project -- not intended for production use.**
+
+> **[Download PDF Reference Manual](https://lostsidedead.biz/MXVM/doc/MXVM_Reference.pdf)**
 
 ---
 
@@ -22,24 +24,30 @@ macOS (Darwin), and Windows (Win64).
 | **Backend** | Peephole Optimizer | Post-generation assembly cleanup passes |
 | **Runtime** | Module System | Dynamically loaded C shared libraries (`io`, `std`, `string`, `sdl`) |
 
-```
- .pas / .mxvm source
-       │
-       ▼
- ┌───────────┐   ┌───────────┐   ┌─────────────┐
- │  Scanner  │──▶│  Parser   │──▶│  Validator   │
- └───────────┘   └───────────┘   └──────┬──────-┘
-                                        │
-                                        ▼
-                                ┌──────────────┐
-                                │ CodeGen (IR)  │
-                                └───────┬──────┘
-                          ┌─────────────┼──────────────┐
-                          ▼             ▼              ▼
-                   ┌────────────┐ ┌──────────┐  ┌───────────┐
-                   │ Interpreter│ │ SysV x64 │  │ Win64 x64 │
-                   └────────────┘ └──────────┘  └───────────┘
-```
+@dot
+digraph pipeline {
+    rankdir=TB;
+    node [shape=box, style=filled, fillcolor="#E8F0FE", fontname="Helvetica", fontsize=12];
+    edge [color="#555555"];
+
+    source [label=".pas / .mxvm source", shape=note, fillcolor="#FFF9C4"];
+    scanner [label="Scanner"];
+    parser [label="Parser"];
+    validator [label="Validator"];
+    codegen [label="CodeGen (IR)", fillcolor="#D4EDDA"];
+    interp [label="Interpreter", fillcolor="#F8D7DA"];
+    sysv [label="SysV x64", fillcolor="#F8D7DA"];
+    win64 [label="Win64 x64", fillcolor="#F8D7DA"];
+
+    source -> scanner;
+    scanner -> parser;
+    parser -> validator;
+    validator -> codegen;
+    codegen -> interp;
+    codegen -> sysv;
+    codegen -> win64;
+}
+@enddot
 
 ---
 
@@ -51,7 +59,7 @@ cd MXVM && mkdir build && cd build
 cmake .. && make -j$(nproc)
 ```
 
-Requires: C++20 compiler, CMake ≥ 3.10.\n
+Requires: C++20 compiler, CMake >= 3.10.\n
 Optional: SDL2 + SDL2_ttf (for the SDL module), Emscripten (WebAssembly target).
 
 ---
@@ -61,8 +69,8 @@ Optional: SDL2 + SDL2_ttf (for the SDL module), Emscripten (WebAssembly target).
 | Mode | Command |
 |------|---------|
 | **Interpret** | `mxvmc program.mxvm --path /usr/local/lib` |
-| **Compile → Assembly** | `mxvmc program.mxvm --path /usr/local/lib --action translate` |
-| **Compile → Executable** | `mxvmc program.mxvm --path /usr/local/lib --action compile` |
+| **Compile -> Assembly** | `mxvmc program.mxvm --path /usr/local/lib --action translate` |
+| **Compile -> Executable** | `mxvmc program.mxvm --path /usr/local/lib --action compile` |
 
 ---
 
@@ -80,7 +88,7 @@ program MyApp {
     int    counter = 0
     float  pi      = 3.14159
     string msg     = "Hello, MXVM!\n"
-    ptr    buffer
+    ptr    buffer  = null
     byte   flags   = 0
   }
 
@@ -97,7 +105,7 @@ program MyApp {
 }
 ```
 
-### Data Section — Variable Types
+### Data Section -- Variable Types
 
 | Type | Size | Description |
 |------|------|-------------|
@@ -106,10 +114,10 @@ program MyApp {
 | `string` | varies | NUL-terminated string with optional max-length: `string name, 256` |
 | `ptr` | 64-bit | Opaque pointer (for `alloc`/module use) |
 | `byte` | 8-bit | Unsigned byte |
-| `label` | — | Code address (for indirect jumps) |
+| `label` | -- | Code address (for indirect jumps) |
 
 - Variables are declared with an optional initialiser: `int x = 42`.
-- All string literals must live in the data section — inline string constants
+- All string literals must live in the data section -- inline string constants
   are **not** allowed in the code section.
 - Hex immediates are supported in code: `mov x, 0xFF`.
 
@@ -143,13 +151,13 @@ The code section is a flat sequence of labeled instructions.
 
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
-| `mov` | `dest, src` | `dest ← src` |
-| `add` | `dest, a, b` | `dest ← a + b` (2-operand form: `dest += a`) |
-| `sub` | `dest, a, b` | `dest ← a − b` |
-| `mul` | `dest, a, b` | `dest ← a × b` |
-| `div` | `dest, a, b` | `dest ← a / b` (integer division for int operands) |
-| `mod` | `dest, a, b` | `dest ← a mod b` |
-| `neg` | `dest, a` | `dest ← −a` |
+| `mov` | `dest, src` | `dest <- src` |
+| `add` | `dest, a, b` | `dest <- a + b` (2-operand form: `dest += a`) |
+| `sub` | `dest, a, b` | `dest <- a - b` |
+| `mul` | `dest, a, b` | `dest <- a * b` |
+| `div` | `dest, a, b` | `dest <- a / b` (integer division for int operands) |
+| `mod` | `dest, a, b` | `dest <- a mod b` |
+| `neg` | `dest, a` | `dest <- -a` |
 | `or`  | `dest, a, b` | Bitwise OR |
 | `and` | `dest, a, b` | Bitwise AND |
 | `xor` | `dest, a, b` | Bitwise XOR |
@@ -159,7 +167,7 @@ The code section is a flat sequence of labeled instructions.
 
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
-| `cmp` | `a, b` | Set flags from `a − b` |
+| `cmp` | `a, b` | Set flags from `a - b` |
 | `fcmp` | `a, b` | Floating-point compare, set flags |
 | `jmp` | `label` | Unconditional jump |
 | `je` / `jne` | `label` | Jump if equal / not equal |
@@ -177,10 +185,10 @@ The code section is a flat sequence of labeled instructions.
 
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
-| `load` | `dest, ptr, index, size` | `dest ← *(ptr + index × size)` |
-| `store` | `src, ptr, index, size` | `*(ptr + index × size) ← src` |
+| `load` | `dest, ptr, index, size` | `dest <- *(ptr + index * size)` |
+| `store` | `src, ptr, index, size` | `*(ptr + index * size) <- src` |
 | `lea` | `dest, base, offset` | Load effective address |
-| `alloc` | `ptr, elem_size, count` | `ptr ← calloc(count, elem_size)` |
+| `alloc` | `ptr, elem_size, count` | `ptr <- calloc(count, elem_size)` |
 | `free` | `ptr` | Release allocated memory |
 
 ### Stack Operations
@@ -198,17 +206,17 @@ The code section is a flat sequence of labeled instructions.
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
 | `call` | `label` | Call an internal function (or `Object.Function`) |
-| `ret` | — | Return from function |
-| `invoke` | `func, args…` | Call an external module function (C ABI) |
+| `ret` | -- | Return from function |
+| `invoke` | `func, args...` | Call an external module function (C ABI) |
 | `return` | `var` | Capture the return value of the last `invoke` |
-| `done` | — | Normal program termination |
+| `done` | -- | Normal program termination |
 | `exit` | `code` | Terminate with exit code |
 
 ### I/O
 
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
-| `print` | `fmt, args…` | Printf-style formatted output |
+| `print` | `fmt, args...` | Printf-style formatted output |
 | `string_print` | `ptr` | Print raw string at pointer |
 | `getline` | `ptr` | Read a line from stdin into buffer |
 
@@ -216,10 +224,10 @@ The code section is a flat sequence of labeled instructions.
 
 | Instruction | Operands | Effect |
 |-------------|----------|--------|
-| `to_int` | `dest, ptr` | Parse string → integer |
-| `to_float` | `dest, ptr` | Parse string → float |
+| `to_int` | `dest, ptr` | Parse string -> integer |
+| `to_float` | `dest, ptr` | Parse string -> float |
 
-### Calling Convention — `invoke` / `return`
+### Calling Convention -- `invoke` / `return`
 
 External functions loaded from modules are called with `invoke`.
 The return value is captured into a variable with the `return` pseudo-instruction
@@ -237,7 +245,7 @@ return len
 
 ## Object System {#objects}
 
-MXVM supports **objects** — separately compiled units that can be
+MXVM supports **objects** -- separately compiled units that can be
 linked into a main program.
 
 ```
@@ -324,7 +332,7 @@ end.
 | `string` | Heap-managed, pointer-based string |
 | `^Type` | Typed pointer (e.g. `^integer`, `^Point`) |
 | `array[lo..hi] of T` | Fixed-size array with arbitrary integer bounds |
-| `record … end` | Named record (struct) with typed fields |
+| `record ... end` | Named record (struct) with typed fields |
 
 ### Constants
 
@@ -440,7 +448,7 @@ end;
 ```
 
 - **Parameters**: by value (default) or by reference (`var` keyword).
-- **Return values**: assigned by writing to the **function name** (`Factorial := …`).
+- **Return values**: assigned by writing to the **function name** (`Factorial := ...`).
 - **Nested** procedures and functions are supported.
 - **Recursion** is fully supported.
 
@@ -477,7 +485,7 @@ end.
 ```
 
 - Arbitrary integer bounds (not restricted to 0-based).
-- Multi-dimensional arrays via nested `array[…] of array[…]`.
+- Multi-dimensional arrays via nested `array[...] of array[...]`.
 - Runtime bounds checking is enabled by default.
 
 ### Pointers
@@ -508,8 +516,8 @@ begin
   n := length(s);                 { length }
   writeln(copy(s, 1, 5));         { substring }
   writeln(pos('World', s));       { search }
-  writeln(inttostr(42));          { int → string }
-  writeln(strtoint('123'));       { string → int }
+  writeln(inttostr(42));          { int -> string }
+  writeln(strtoint('123'));       { string -> int }
 end.
 ```
 
@@ -519,8 +527,8 @@ end.
 
 | Routine | Description |
 |---------|-------------|
-| `write(args…)` | Print values (no trailing newline) |
-| `writeln(args…)` | Print values with trailing newline |
+| `write(args...)` | Print values (no trailing newline) |
+| `writeln(args...)` | Print values with trailing newline |
 | `readln(var)` | Read a line from stdin; auto-converts to int/float |
 
 #### Math
@@ -560,11 +568,11 @@ The following limitations apply:
 
 | Area | Limitation |
 |------|------------|
-| **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` — not `x := MyFunc`. |
+| **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` -- not `x := MyFunc`. |
 | **No units/modules** | Only single-file `program` compilation. No `unit`, `interface`, `implementation` keywords. |
 | **No enumerated types** | Only scalar types, records, arrays, and pointers. |
 | **No dynamic arrays** | Only static `array[lo..hi]` with compile-time bounds. |
-| **No variant records** | Records have flat fields only — no `case` variant parts. |
+| **No variant records** | Records have flat fields only -- no `case` variant parts. |
 | **No sets** | The `set` keyword is reserved but not implemented. |
 | **No `file` type** | File I/O is done via module functions (`fopen`, `fread`, etc.), not Pascal `file of`. |
 | **No `with` statement** | The keyword is reserved but code generation is not implemented. |
@@ -580,7 +588,7 @@ The following limitations apply:
 
 # Runtime Module Reference {#modules}
 
-External functions are called from bytecode with `invoke func, args…` and
+External functions are called from bytecode with `invoke func, args...` and
 from Pascal with regular function-call syntax. Return values are captured
 with `return var` (bytecode) or assigned normally (Pascal).
 
@@ -596,13 +604,13 @@ File I/O, random numbers.
 | `fwrite` | 4 | INTEGER | Write buffer to file (src, size, count, fh). |
 | `fseek` | 3 | INTEGER | Seek within file (fh, offset, whence). |
 | `fsize` | 1 | INTEGER | Get file size in bytes. |
-| `fprintf` | ≥ 2 | — | Formatted write to file (fh, fmt, …). |
+| `fprintf` | >= 2 | -- | Formatted write to file (fh, fmt, ...). |
 | `rand_number` | 1 | INTEGER | Random integer in [0, max). |
 | `seed_random` | 0 | INTEGER | Seed RNG with current time. |
 
 ## Module: std {#mod_std}
 
-Standard library — math, memory, string conversion, system calls.
+Standard library -- math, memory, string conversion, system calls.
 
 ### Math Functions
 
@@ -622,7 +630,7 @@ Standard library — math, memory, string conversion, system calls.
 |----------|--------|---------|-------------|
 | `malloc` | 1 | POINTER | Allocate bytes. |
 | `calloc` | 2 | POINTER | Allocate zeroed memory (count, size). |
-| `free` | 1 | — | Release pointer. |
+| `free` | 1 | -- | Release pointer. |
 | `memcpy` | 3 | POINTER | Copy memory (dest, src, n). |
 | `memmove` | 3 | POINTER | Move memory (dest, src, n). |
 | `memset` | 3 | POINTER | Fill memory (dest, byte, n). |
@@ -632,8 +640,8 @@ Standard library — math, memory, string conversion, system calls.
 
 | Function | Params | Returns | Description |
 |----------|--------|---------|-------------|
-| `atoi` | 1 | INTEGER | String → int. |
-| `atof` | 1 | FLOAT | String → float. |
+| `atoi` | 1 | INTEGER | String -> int. |
+| `atof` | 1 | FLOAT | String -> float. |
 | `toupper`, `tolower` | 1 | INTEGER | Case conversion. |
 | `isalpha`, `isdigit`, `isspace` | 1 | INTEGER | Character classification. |
 
@@ -642,9 +650,9 @@ Standard library — math, memory, string conversion, system calls.
 | Function | Params | Returns | Description |
 |----------|--------|---------|-------------|
 | `system` | 1 | INTEGER | Execute shell command. |
-| `exit` | 1 | — | Terminate program. |
+| `exit` | 1 | -- | Terminate program. |
 | `rand` | 0 | INTEGER | Random integer. |
-| `srand` | 1 | — | Seed random. |
+| `srand` | 1 | -- | Seed random. |
 | `argc` | 0 | INTEGER | Argument count. |
 | `argv` | 1 | POINTER | Argument string by index. |
 
@@ -658,8 +666,8 @@ String manipulation.
 | `strcmp` | 2 | INTEGER | Compare two strings. Returns <0, 0, >0. |
 | `strncpy` | 3 | INTEGER | Copy up to n characters. |
 | `strncat` | 3 | INTEGER | Append up to n characters. |
-| `snprintf` | ≥ 4 | INTEGER | Printf into buffer (dest, size, fmt, …). |
-| `strfind` | 3 | INTEGER | Find substring (haystack, needle, start). Returns index or −1. |
+| `snprintf` | >= 4 | INTEGER | Printf into buffer (dest, size, fmt, ...). |
+| `strfind` | 3 | INTEGER | Find substring (haystack, needle, start). Returns index or -1. |
 | `substr` | 5 | INTEGER | Extract substring (dest, maxsize, src, pos, len). |
 | `strat` | 2 | INTEGER | Character code at index. |
 
@@ -702,7 +710,7 @@ SDL2 / SDL2_ttf bindings for graphics, events, audio, and text rendering.
 | `create_texture` | Create a blank texture. |
 | `destroy_texture` | Destroy a texture. |
 | `load_texture` | Load texture from image file. |
-| `render_texture` | Render src rect → dst rect. |
+| `render_texture` | Render src rect -> dst rect. |
 | `update_texture` | Upload pixel data to texture. |
 | `lock_texture` / `unlock_texture` | Direct pixel access. |
 | `create_rgb_surface` / `free_surface` | Surface management. |
@@ -772,8 +780,8 @@ SDL2 / SDL2_ttf bindings for graphics, events, audio, and text rendering.
 The code generator performs a register allocation pass that maps
 frequently-used variables to callee-saved registers:
 
-- **System V**: `r12`–`r15`, `rbx` (integer); `xmm6`–`xmm15` (float).
-- **Win64**: `r12`–`r15`, `rbx`, `rdi`, `rsi` (integer); extended XMM set.
+- **System V**: `r12`-`r15`, `rbx` (integer); `xmm6`-`xmm15` (float).
+- **Win64**: `r12`-`r15`, `rbx`, `rdi`, `rsi` (integer); extended XMM set.
 
 Variables not assigned to registers are kept in memory (BSS/data section)
 and accessed via RIP-relative addressing.
@@ -795,7 +803,7 @@ A post-generation pass (`gen_optimize`) applies pattern-based rewrites:
 
 # Examples {#examples}
 
-## MXVM Bytecode — Hello World
+## MXVM Bytecode -- Hello World
 
 ```
 program HelloWorld {
@@ -809,7 +817,7 @@ program HelloWorld {
 }
 ```
 
-## MXVM Bytecode — Fibonacci
+## MXVM Bytecode -- Fibonacci
 
 ```
 program Fibonacci {
@@ -834,7 +842,7 @@ program Fibonacci {
 }
 ```
 
-## Pascal — Recursive Factorial
+## Pascal -- Recursive Factorial
 
 ```pascal
 program FactorialDemo;
@@ -854,7 +862,7 @@ begin
 end.
 ```
 
-## Pascal — Records & Pointers
+## Pascal -- Records & Pointers
 
 ```pascal
 program RecordDemo;
@@ -883,26 +891,26 @@ end.
 
 ```
 MXVM/
-├── include/mxvm/          Core VM headers (parser, icode, instruct, etc.)
-├── src/                    Implementation sources
-│   ├── frontend/           Pascal parser, validator, AST, codegen
-│   │   └── include/        Frontend-specific headers
-│   ├── scanner/            Tokeniser / lexer
-│   │   └── include/scanner/ Scanner headers
-│   ├── vm/                 Interpreter, argument parsing
-│   │   └── include/        VM headers (argz.hpp)
-│   └── webasm/             WebAssembly target (experimental)
-├── modules/                Runtime C modules
-│   ├── io/                 File I/O, random numbers
-│   ├── std/                Math, memory, conversion, system
-│   ├── string/             String manipulation
-│   └── sdl/                SDL2 + SDL_ttf bindings
-├── docs/                   HTML reference pages
-├── mxvm_src/               Example .mxvm programs
-├── CMakeLists.txt          Top-level build script
-└── Doxyfile                Doxygen configuration
+|---- include/mxvm/          Core VM headers (parser, icode, instruct, etc.)
+|---- src/                    Implementation sources
+|   |---- frontend/           Pascal parser, validator, AST, codegen
+|   |   `---- include/        Frontend-specific headers
+|   |---- scanner/            Tokeniser / lexer
+|   |   `---- include/scanner/ Scanner headers
+|   |---- vm/                 Interpreter, argument parsing
+|   |   `---- include/        VM headers (argz.hpp)
+|   `---- webasm/             WebAssembly target (experimental)
+|---- modules/                Runtime C modules
+|   |---- io/                 File I/O, random numbers
+|   |---- std/                Math, memory, conversion, system
+|   |---- string/             String manipulation
+|   `---- sdl/                SDL2 + SDL_ttf bindings
+|---- docs/                   HTML reference pages
+|---- mxvm_src/               Example .mxvm programs
+|---- CMakeLists.txt          Top-level build script
+`---- Doxyfile                Doxygen configuration
 ```
 
 ---
 
-*Generated documentation — see the [source repository](https://github.com/lostjared/MXVM) for the latest code.*
+*Generated documentation -- see the [source repository](https://github.com/lostjared/MXVM) for the latest code.*

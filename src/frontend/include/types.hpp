@@ -6,8 +6,6 @@
 #ifndef __TYPES__H_HPP
 #define __TYPES__H_HPP
 
-#include <iostream>
-
 namespace mxx {
 
     /** @brief Standard Pascal reserved keyword enumeration */

@@ -63,9 +63,11 @@ FILE_PATTERNS          = *.h \
                          *.md
 RECURSIVE              = YES
 EXCLUDE                = build \
-                         doxygen_output
+                         doxygen_output \
+                         src/webasm
 EXCLUDE_PATTERNS       = */build/* \
-                         */CMakeFiles/*
+                         */CMakeFiles/* \
+                         */webasm/*
 USE_MDFILE_AS_MAINPAGE = mainpage.md
 
 #---------------------------------------------------------------------------
@@ -92,6 +94,7 @@ HTML_COLORSTYLE        = LIGHT
 HTML_COLORSTYLE_HUE    = 220
 HTML_COLORSTYLE_SAT    = 60
 HTML_COLORSTYLE_GAMMA  = 80
+HTML_EXTRA_STYLESHEET  = doxygen-custom.css
 HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = NO
 GENERATE_TREEVIEW      = YES
@@ -102,7 +105,12 @@ SERVER_BASED_SEARCH    = NO
 #---------------------------------------------------------------------------
 # Configuration options related to the LaTeX output
 #---------------------------------------------------------------------------
-GENERATE_LATEX         = NO
+GENERATE_LATEX         = YES
+LATEX_OUTPUT           = latex
+LATEX_CMD_NAME         = pdflatex
+PDF_HYPERLINKS         = YES
+USE_PDFLATEX           = YES
+LATEX_BATCHMODE        = YES
 
 #---------------------------------------------------------------------------
 # Configuration options related to the RTF output
@@ -133,7 +141,7 @@ INCLUDE_PATH           = include \
 #---------------------------------------------------------------------------
 # Configuration options related to the dot tool
 #---------------------------------------------------------------------------
-HAVE_DOT               = NO
+HAVE_DOT               = YES
 CLASS_DIAGRAMS         = YES
 CLASS_GRAPH            = YES
 COLLABORATION_GRAPH    = NO

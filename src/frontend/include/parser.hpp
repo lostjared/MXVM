@@ -6,7 +6,6 @@
 #ifndef _PARSER_H__H
 #define _PARSER_H__H
 #include "ast.hpp"
-#include "scanner/exception.hpp"
 #include "scanner/scanner.hpp"
 #include "validator.hpp"
 #include <memory>

@@ -4,6 +4,7 @@
  * @author Jared Bruni
  */
 #include "mxvm/instruct.hpp"
+#include <sstream>
 
 namespace mxvm {
     std::vector<std::string> keywords{"program", "object", "module", "data", "code", "section"};

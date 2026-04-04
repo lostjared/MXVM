@@ -6,7 +6,6 @@
 #include "parser.hpp"
 #include <algorithm>
 #include <cctype>
-#include <set>
 
 namespace pascal {
 
@@ -54,9 +53,25 @@ namespace pascal {
         next();
         expectToken(";");
         next();
+        std::vector<std::string> usesList;
+        if (peekIs("uses")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            usesList.push_back(token->getTokenValue());
+            next();
+            while (peekIs(",")) {
+                next();
+                expectToken(types::TokenType::TT_ID);
+                usesList.push_back(token->getTokenValue());
+                next();
+            }
+            expectToken(";");
+            next();
+        }
         auto block = parseBlock();
         expectToken(".");
         auto programNode = std::make_unique<ProgramNode>(programName, std::move(block));
+        programNode->uses = std::move(usesList);
         programNode->setLineNumber(lineNum);
         return programNode;
     }
@@ -98,7 +113,7 @@ namespace pascal {
                lower == "and" || lower == "or" || lower == "not" ||
                lower == "case" || lower == "of" || lower == "repeat" || lower == "until" ||
                lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue" ||
-               lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer";
+               lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer" || lower == "uses";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {

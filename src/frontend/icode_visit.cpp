@@ -16,6 +16,9 @@ namespace pascal {
 
     void CodeGenVisitor::visit(ProgramNode &node) {
         name = node.name;
+        for (const auto &mod : node.uses) {
+            usedModules.insert(mod);
+        }
         if (node.block) {
             node.block->accept(*this);
         }
