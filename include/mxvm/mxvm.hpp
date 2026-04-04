@@ -10,5 +10,5 @@
 #include "parser.hpp"
 #include <iostream>
 #include <string>
-#define VERSION_INFO "0.1.0"  ///< MXVM version string
+#define VERSION_INFO "1.0.0"  ///< MXVM version string
 #endif
