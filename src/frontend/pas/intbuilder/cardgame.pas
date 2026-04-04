@@ -264,7 +264,7 @@ begin
     halt(EXIT_FAILURE);
   end;
 
-  srand(sdl_get_ticks());
+  seed_random();
   init_deck();
   correct := 0;
   draw_card := 0;
