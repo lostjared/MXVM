@@ -463,6 +463,17 @@ extern "C" void mxvm_string_delete(mxvm::Program *program, std::vector<mxvm::Ope
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
 }
 
+/**
+ * @brief Convert an integer to its decimal string representation.
+ *
+ * Allocates a new heap buffer for the result string and returns it
+ * via %rax as a pointer.  Frees any previously-owned pointer in %rax
+ * before overwriting to prevent memory leaks from repeated calls
+ * (e.g. `inttostr(score)` inside a render loop).
+ *
+ * @param program  VM program context.
+ * @param operand  Single operand: the integer variable to convert.
+ */
 extern "C" void mxvm_string_inttostr(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 1)
         throw mx::Exception("inttostr requires 1 argument: (integer)");

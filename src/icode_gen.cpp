@@ -1351,6 +1351,17 @@ namespace mxvm {
         }
     }
 
+    /**
+     * @brief Emit x86-64 PUSH for a variable or constant.
+     *
+     * Handles integer/pointer (pushq), string (lea+pushq), and float
+     * variables.  Floating-point values are pushed via
+     * `movsd var(%rip), %xmm0; subq $8, %rsp; movsd %xmm0, (%rsp)`
+     * since x86 PUSH cannot operate directly on XMM registers.
+     *
+     * @param out  Assembly output stream.
+     * @param i    Instruction whose op1 is the value to push.
+     */
     void Program::gen_push(std::ostream &out, const Instruction &i) {
         if (isVariable(i.op1.op)) {
             Variable &v = getVariable(i.op1.op);
@@ -1375,6 +1386,17 @@ namespace mxvm {
         }
     }
 
+    /**
+     * @brief Emit x86-64 POP into a variable.
+     *
+     * Handles integer (popq + store), pointer/extern (popq + movq), and
+     * float variables.  Floating-point values are popped via
+     * `movsd (%rsp), %xmm0; addq $8, %rsp; movsd %xmm0, var(%rip)`
+     * mirroring the SSE push sequence in gen_push().
+     *
+     * @param out  Assembly output stream.
+     * @param i    Instruction whose op1 is the destination variable.
+     */
     void Program::gen_pop(std::ostream &out, const Instruction &i) {
         if (!isVariable(i.op1.op)) {
             throw mx::Exception("POP destination must be a variable");

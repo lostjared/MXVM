@@ -994,6 +994,17 @@ namespace mxvm {
         }
     }
 
+    /**
+     * @brief Execute a STORE instruction — write a value into a pointer at a given offset.
+     *
+     * Supports integer, float, pointer, byte, and string source types.
+     * For constants the full 8-byte integer representation is always stored,
+     * regardless of the stride operand, to prevent partial-write corruption
+     * when storing values larger than one byte.
+     *
+     * @param instr  Instruction with op1 = source, op2 = destination pointer,
+     *               op3 = index, vop[0] = stride.
+     */
     void Program::exec_store(const Instruction &instr) {
         void *ptr = nullptr;
         size_t allocated_size = 0;
@@ -1565,6 +1576,15 @@ namespace mxvm {
         }
     }
 
+    /**
+     * @brief Execute a PUSH instruction — save a variable or constant onto the VM stack.
+     *
+     * Handles integer/byte, pointer/extern, float, and string variable types.
+     * Float variables are pushed as native doubles so that POP can restore
+     * them correctly using std::get<double>.
+     *
+     * @param instr  Instruction whose op1 is the value to push.
+     */
     void Program::exec_push(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             try {
@@ -1589,6 +1609,15 @@ namespace mxvm {
         }
     }
 
+    /**
+     * @brief Execute a POP instruction — restore a value from the VM stack into a variable.
+     *
+     * Matches the pushed type via std::holds_alternative and writes back
+     * into the correct union member.  Float variables are restored from
+     * std::get<double> to preserve IEEE 754 representation.
+     *
+     * @param instr  Instruction whose op1 is the destination variable.
+     */
     void Program::exec_pop(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("POP destination must be a variable");

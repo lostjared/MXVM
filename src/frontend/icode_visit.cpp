@@ -861,6 +861,15 @@ namespace pascal {
         }
     }
 
+    /**
+     * @brief Visit a compound statement block, freeing temporary pointers after each statement.
+     *
+     * Snapshots the set of allocated temporary pointers before each statement
+     * and emits `free` instructions for any new temporaries that were not
+     * "escaped" (assigned to a named variable).  This prevents memory leaks
+     * from intermediate string concatenation results and other temporary
+     * heap allocations.
+     */
     void CodeGenVisitor::visit(CompoundStmtNode &node) {
         for (auto &stmt : node.statements) {
             if (!stmt)
@@ -1621,7 +1630,11 @@ namespace pascal {
 
             std::string basePtr = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
 
-            // Convert between float and int if field type doesn't match rhs type
+            // Convert between float and int if field type doesn't match rhs type.
+            // When assigning a float expression (e.g. trunc() result in xmm reg) to an
+            // integer record field, emit a mov to convert from float register to int
+            // register first.  Without this, the raw IEEE 754 double bit pattern would
+            // be stored into the integer field, producing garbage values.
             VarType fieldType = getTypeFromString(fieldInfo.typeName);
             if (fieldType == VarType::INT && isFloatReg(rhs)) {
                 std::string intReg = allocReg();

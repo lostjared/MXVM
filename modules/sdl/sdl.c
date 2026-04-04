@@ -288,6 +288,19 @@ void destroy_texture(int64_t texture_id) {
     }
 }
 
+/**
+ * @brief Load a BMP file as an SDL texture with black color-key transparency.
+ *
+ * Loads the bitmap via SDL_LoadBMP, sets pure black (0,0,0) as the
+ * transparent color key with SDL_SetColorKey, then creates an
+ * accelerated texture from the surface.  The surface is freed after
+ * texture creation.
+ *
+ * @param renderer_id  Index into the renderer array.
+ * @param file_path    Path to the .bmp file.
+ * @return Texture index on success, -1 on bad renderer, -2 on load failure,
+ *         -3 on texture creation failure.
+ */
 int64_t load_texture(int64_t renderer_id, const char *file_path) {
     if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
         return -1;

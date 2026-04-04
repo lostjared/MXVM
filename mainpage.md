@@ -1165,6 +1165,1028 @@ Output:
 99
 ```
 
+## Pascal -- SDL2 Space Shooter (Full Game)
+
+A complete space-shooter game demonstrating records, arrays, SDL2 textures,
+collision detection, and the full compile-to-native pipeline.  Each Pascal
+line is annotated with the MXVM bytecode assembly it compiles to.
+
+```pascal
+program SpaceShooter;
+{ -- MXVM bytecode header ---------------------------------------------------
+  program SpaceShooter {
+    section module { io, sdl, std, string }
+    section data {
+      int rax = 0           ;; general-purpose virtual registers
+      int rbx = 0
+      ...
+      float xmm0 = 0.0      ;; floating-point virtual registers
+      ...
+      ptr _tmpptr0 = null    ;; compiler-generated temp pointers
+      ...
+  -------------------------------------------------------------------------- }
+
+const
+  SDL_WINDOW_SHOWN = 4;           { inlined as immediate constants, no bytecode }
+  SDL_RENDERER_ACCELLERATED = 2;
+  SDL_QUIT = 256;
+  SDL_KEYDOWN = 768;
+  SDLK_ESCAPE = 27;
+  SDLK_RETURN = 13;
+  SDLK_SPACE = 32;
+
+  WIDTH = 1440;
+  HEIGHT = 1080;
+  SCALE_W = 1440;
+  SCALE_H = 1080;
+
+  MAX_PROJECTILES = 30;
+  MAX_ENEMIES = 20;
+  MAX_STARS = 100;
+  MAX_EXPLOSIONS = 15;
+  MAX_CIRCULAR = 8;
+
+  EXPTYPE_RED = 0;
+  EXPTYPE_BLUE = 1;
+
+  STATE_INTRO = 0;    { inlined: cmp game_state, 0 }
+  STATE_PLAYING = 1;  { inlined: cmp game_state, 1 }
+  STATE_DIED = 2;
+  STATE_GAMEOVER = 3;
+
+  fontfile = 'data/font.ttf';
+  { bytecode:
+      string str_0 = "data/font.ttf"
+      ...
+      mov fontfile, str_0      ;; ptr fontfile = &str_0 }
+
+type
+  Star = record        { bytecode: alloc stars, 24, 100   -- 24 bytes/element, 100 elements }
+    x, y, speed: integer;     { offsets 0, 8, 16 within each 24-byte record }
+  end;
+
+  Projectile = record  { alloc projectiles, 40, 30  -- 40 bytes/element }
+    x, y, w, h: integer;     { offsets 0, 8, 16, 24 }
+    active: boolean;          { offset 32 }
+  end;
+
+  Enemy = record        { alloc enemies, 40, 20 }
+    x, y, w, h: integer;
+    active: boolean;
+  end;
+
+  CircularEnemy = record  { alloc circular, 40, 8 }
+    x, y: integer;          { offsets 0, 8 }
+    angle: real;             { offset 16 -- stored as IEEE 754 double }
+    direction: integer;      { offset 24 }
+    active: boolean;         { offset 32 }
+  end;
+
+  Explosion = record     { alloc explosions, 64, 15 }
+    x, y: integer;          { offsets 0, 8 }
+    duration: integer;       { offset 16 }
+    cr, cg, cb: integer;    { offsets 24, 32, 40 }
+    die: boolean;            { offset 48 }
+    active: boolean;         { offset 56 }
+  end;
+
+var
+  running: boolean;                          { int running = 0 }
+  window_id, renderer, target_id: integer;   { int window_id = 0   int renderer = 0   int target_id = 0 }
+  font_id: integer;
+  logo_tex, spacelogo_tex: integer;
+  ship_tex, asteroid_tex, saucer_tex, particle_tex: integer;
+  game_state: integer;                       { int game_state = 0 }
+  player_x, player_y, player_w, player_h: integer;
+  player_die: boolean;
+  lives, score: integer;
+  stars: array[0..MAX_STARS - 1] of Star;
+  projectiles: array[0..MAX_PROJECTILES - 1] of Projectile;
+  enemies: array[0..MAX_ENEMIES - 1] of Enemy;
+  circular: array[0..MAX_CIRCULAR - 1] of CircularEnemy;
+  circular_cx: array[0..MAX_CIRCULAR - 1] of integer;
+  { bytecode: alloc circular_cx, 8, 8  -- parallel array for saucer center x positions }
+  explosions: array[0..MAX_EXPLOSIONS - 1] of Explosion;
+
+{ ---- collision detection ---- }
+function aabb(ax, ay, aw, ah, bx, by, bw, bh: integer): boolean;
+{ bytecode:
+    function FUNC_aabb:
+      mov aabb_ax, rbx        ;; receive 8 parameters from registers
+      mov aabb_ay, rcx
+      mov aabb_aw, rdx
+      mov aabb_ah, rsi
+      mov aabb_bx, rdi
+      mov aabb_by, r8
+      mov aabb_bw, r9
+      mov aabb_bh, r10
+      mov rbx, aabb_ax        ;; ax + aw <= bx ?
+      add rbx, aabb_aw
+      cmp rbx, aabb_bx
+      jle OR_ONE_396
+      mov rdx, aabb_bx        ;; bx + bw <= ax ?
+      add rdx, aabb_bw
+      cmp rdx, aabb_ax
+      jle OR_ONE_396
+      mov rdi, 0
+      jmp OR_END_397
+    OR_ONE_396:
+      mov rdi, 1              ;; at least one separating axis found
+    OR_END_397:
+      ...                     ;; repeat for y-axis
+      not r9                  ;; negate: overlap = NOT separated
+      mov rax, r9             ;; return value in rax
+    FUNC_END_aabb:
+      ret }
+begin
+  aabb := not ((ax + aw <= bx) or (bx + bw <= ax) or (ay + ah <= by) or (by + bh <= ay));
+end;
+
+{ ---- explosion helpers ---- }
+procedure add_explosion(ex, ey, etype: integer; d: boolean);
+{ bytecode:
+    function PROC_add_explosion:
+      mov add_explosion_ex, rbx   ;; receive parameters
+      mov add_explosion_ey, rcx
+      mov add_explosion_etype, rdx
+      mov add_explosion_d, rsi
+      mov add_explosion_i, 0
+    WHILE_48:
+      cmp add_explosion_i, 15     ;; while i < MAX_EXPLOSIONS
+      jge ENDWHILE_49
+      mov rcx, add_explosion_i
+      mul rdx, 64                 ;; index * sizeof(Explosion)
+      mov _tmpptr0, explosions
+      add _tmpptr0, rdx           ;; &explosions[i]
+      load rcx, _tmpptr0, 56, 1  ;; load active flag (offset 56)
+      cmp rcx, 0
+      jne ELSE_52                 ;; if active = false then ...
+      ...
+      store add_explosion_ex, _tmpptr1, 0, 1   ;; explosions[i].x := ex
+      store add_explosion_ey, _tmpptr1, 8, 1   ;; explosions[i].y := ey
+      store 60, _tmpptr1, 16, 1                ;; explosions[i].duration := 60
+      store add_explosion_d, _tmpptr1, 48, 1   ;; explosions[i].die := d
+      store 1, _tmpptr1, 56, 1                 ;; explosions[i].active := true }
+var
+  i: integer;
+begin
+  i := 0;
+  while i < MAX_EXPLOSIONS do
+  begin
+    if explosions[i].active = false then
+    begin
+      explosions[i].x := ex;
+      explosions[i].y := ey;
+      explosions[i].duration := 60;
+      explosions[i].die := d;
+      explosions[i].active := true;
+      if etype = EXPTYPE_RED then
+      begin
+        explosions[i].cr := 255;
+        explosions[i].cg := 0;
+        explosions[i].cb := 0;
+      end
+      else
+      begin
+        explosions[i].cr := 0;
+        explosions[i].cg := 0;
+        explosions[i].cb := 255;
+      end;
+      exit;
+    end;
+    i := i + 1;
+  end;
+end;
+
+procedure subtract_life;
+{ bytecode:
+    function PROC_subtract_life:
+      sub lives, 1               ;; lives := lives - 1
+      cmp lives, 0
+      jg ELSE_64
+      mov game_state, 3          ;; STATE_GAMEOVER
+      jmp ENDIF_65
+    ELSE_64:
+      mov game_state, 2          ;; STATE_DIED
+    ENDIF_65:
+      mov player_die, 0
+    PROC_END_subtract_life:
+      ret }
+begin
+  lives := lives - 1;
+  if lives <= 0 then
+    game_state := STATE_GAMEOVER
+  else
+    game_state := STATE_DIED;
+  player_die := false;
+end;
+
+procedure update_explosions;
+var
+  i: integer;
+begin
+  for i := 0 to MAX_EXPLOSIONS - 1 do
+  begin
+    if explosions[i].active then
+    begin
+      explosions[i].duration := explosions[i].duration - 1;
+      if explosions[i].duration <= 0 then
+      begin
+        explosions[i].active := false;
+        if explosions[i].die then
+          subtract_life;
+      end;
+    end;
+  end;
+end;
+
+procedure draw_explosions;
+{ bytecode:  (large player death explosion -- die=true branch)
+      cmp rcx, 0                ;; if explosions[i].die then
+      je ELSE_86
+      mov draw_explosions_k, 0
+    FOR_88:
+      cmp draw_explosions_k, 39 ;; for k := 0 to 39
+      jg ENDFOR_89
+      invoke rand               ;; dx := (rand() mod 160) - 80
+      return rbx
+      mod rbx, 160
+      sub rbx, 80
+      mov draw_explosions_dx, rbx
+      ...
+      invoke set_draw_color, renderer, 255, r9, r10, 255
+      invoke draw_line, renderer, ...
+      ...                       ;; 40 random lines + 15 white-hot core lines }
+var
+  i, k, dx, dy: integer;
+begin
+  for i := 0 to MAX_EXPLOSIONS - 1 do
+  begin
+    if explosions[i].active then
+    begin
+      if explosions[i].die then
+      begin
+        { large player death explosion }
+        for k := 0 to 39 do
+        begin
+          dx := (rand() mod 160) - 80;
+          dy := (rand() mod 160) - 80;
+          sdl_set_draw_color(renderer, 255, 200 + (rand() mod 56), rand() mod 80, 255);
+          sdl_draw_line(renderer, explosions[i].x, explosions[i].y,
+                        explosions[i].x + dx, explosions[i].y + dy);
+        end;
+        { white-hot core }
+        sdl_set_draw_color(renderer, 255, 255, 200, 255);
+        for k := 0 to 14 do
+        begin
+          dx := (rand() mod 40) - 20;
+          dy := (rand() mod 40) - 20;
+          sdl_draw_line(renderer, explosions[i].x + dx, explosions[i].y + dy,
+                        explosions[i].x + (rand() mod 20) - 10,
+                        explosions[i].y + (rand() mod 20) - 10);
+        end;
+      end
+      else
+      begin
+        { normal enemy explosion }
+        sdl_set_draw_color(renderer, explosions[i].cr, explosions[i].cg, explosions[i].cb, 255);
+        for k := 0 to 19 do
+        begin
+          dx := (rand() mod 60) - 30;
+          dy := (rand() mod 60) - 30;
+          sdl_draw_line(renderer, explosions[i].x, explosions[i].y,
+                        explosions[i].x + dx, explosions[i].y + dy);
+        end;
+      end;
+    end;
+  end;
+end;
+
+{ ---- drawing helpers ---- }
+procedure draw_gradient_triangle(x1, y1, y3: integer);
+var
+  i, r, g, height: integer;
+begin
+  if player_die then exit;
+  height := y3 - y1;
+  if height <= 0 then exit;
+  for i := 0 to height - 1 do
+  begin
+    r := 255 - (255 * i div height);
+    g := 255 * i div height;
+    sdl_set_draw_color(renderer, r, g, 255, 255);
+    sdl_draw_line(renderer, x1 - i, y1 + i, x1 + i, y1 + i);
+  end;
+end;
+
+procedure draw_gradient_diamond(cx, cy, hw, hh: integer);
+var
+  i, r, b, g2: integer;
+begin
+  for i := 0 to hh - 1 do
+  begin
+    r := 255 - (255 * i div hh);
+    b := 255 * i div hh;
+    sdl_set_draw_color(renderer, r, 255, b, 255);
+    sdl_draw_line(renderer, cx - i, cy - i, cx + i, cy - i);
+  end;
+  for i := 0 to hh - 1 do
+  begin
+    g2 := 255 - (255 * i div hh);
+    b := 255 * i div hh;
+    sdl_set_draw_color(renderer, 255, g2, b, 255);
+    sdl_draw_line(renderer, cx - i, cy + i, cx + i, cy + i);
+  end;
+end;
+
+procedure draw_gradient_circle(cx, cy, radius: integer);
+{ bytecode:
+    function PROC_draw_gradient_circle:
+      mov draw_gradient_circle_cx, rbx
+      mov draw_gradient_circle_cy, rcx
+      mov draw_gradient_circle_radius, rdx
+      mov draw_gradient_circle_i, 0
+    FOR_134:
+      cmp draw_gradient_circle_i, ...     ;; for i := 0 to radius - 1
+      jg ENDFOR_135
+      mov rbx, draw_gradient_circle_radius
+      sub rbx, draw_gradient_circle_i     ;; w := radius - i
+      ...
+      invoke draw_line, renderer, ...     ;; horizontal line pairs }
+var
+  i, w, color: integer;
+begin
+  for i := 0 to radius - 1 do
+  begin
+    w := radius - i;
+    color := 255 * w div radius;
+    sdl_set_draw_color(renderer, color, 0, color, 255);
+    sdl_draw_line(renderer, cx - w, cy - i, cx + w, cy - i);
+    sdl_draw_line(renderer, cx - w, cy + i, cx + w, cy + i);
+  end;
+end;
+
+{ ---- find free slot helpers ---- }
+function find_free_projectile: integer;
+{ bytecode:
+    function FUNC_find_free_projectile:
+      mov rbx, 0
+      sub rbx, 1
+      mov rax, rbx              ;; default return = -1
+      mov find_free_projectile_i, 0
+    FOR_406:
+      cmp find_free_projectile_i, 29
+      jg ENDFOR_407
+      mov rcx, find_free_projectile_i
+      mul rdx, 40                ;; index * sizeof(Projectile)
+      mov _tmpptr98, projectiles
+      add _tmpptr98, rdx         ;; &projectiles[i]
+      load rcx, _tmpptr98, 32, 1 ;; load .active (offset 32)
+      cmp rcx, 0
+      jne ELSE_409
+      mov rax, find_free_projectile_i  ;; return i
+      jmp FUNC_END_find_free_projectile
+    ELSE_409:
+    FOR_CONTINUE_408:
+      add find_free_projectile_i, 1
+      jmp FOR_406
+    ENDFOR_407:
+    FUNC_END_find_free_projectile:
+      ret }
+var
+  i: integer;
+begin
+  find_free_projectile := -1;
+  for i := 0 to MAX_PROJECTILES - 1 do
+    if projectiles[i].active = false then
+    begin
+      find_free_projectile := i;
+      exit;
+    end;
+end;
+
+function find_free_enemy: integer;
+var
+  i: integer;
+begin
+  find_free_enemy := -1;
+  for i := 0 to MAX_ENEMIES - 1 do
+    if enemies[i].active = false then
+    begin
+      find_free_enemy := i;
+      exit;
+    end;
+end;
+
+function find_free_circular: integer;
+var
+  i: integer;
+begin
+  find_free_circular := -1;
+  for i := 0 to MAX_CIRCULAR - 1 do
+    if circular[i].active = false then
+    begin
+      find_free_circular := i;
+      exit;
+    end;
+end;
+
+{ ---- init / reset ---- }
+procedure init_stars;
+{ bytecode:
+    function PROC_init_stars:
+      mov init_stars_i, 0
+    FOR_109:
+      cmp init_stars_i, 99         ;; for i := 0 to MAX_STARS-1
+      jg ENDFOR_110
+      invoke rand                  ;; stars[i].x := rand() mod SCALE_W
+      return rbx
+      mod rcx, 1440
+      mov rdx, init_stars_i
+      mul rsi, 24                  ;; index * sizeof(Star)
+      mov _tmpptr22, stars
+      add _tmpptr22, rsi           ;; &stars[i]
+      store rcx, _tmpptr22, 0, 1   ;; store x at offset 0
+      invoke rand                  ;; stars[i].y := rand() mod SCALE_H
+      ...
+      store rsi, _tmpptr22, 8, 1   ;; store y at offset 8
+      invoke rand                  ;; stars[i].speed := 1 + rand() mod 3
+      ...
+      store r9, _tmpptr22, 16, 1   ;; store speed at offset 16
+    FOR_CONTINUE_111:
+      add init_stars_i, 1
+      jmp FOR_109
+    ENDFOR_110:
+    PROC_END_init_stars:
+      ret }
+var
+  i: integer;
+begin
+  for i := 0 to MAX_STARS - 1 do
+  begin
+    stars[i].x := rand() mod SCALE_W;
+    stars[i].y := rand() mod SCALE_H;
+    stars[i].speed := 1 + (rand() mod 3);
+  end;
+end;
+
+procedure clear_all_entities;
+var
+  i: integer;
+begin
+  for i := 0 to MAX_PROJECTILES - 1 do
+    projectiles[i].active := false;
+  for i := 0 to MAX_ENEMIES - 1 do
+    enemies[i].active := false;
+  for i := 0 to MAX_CIRCULAR - 1 do
+    circular[i].active := false;
+  for i := 0 to MAX_EXPLOSIONS - 1 do
+    explosions[i].active := false;
+end;
+
+procedure reset_game;
+{ bytecode:
+    function PROC_reset_game:
+      mov rbx, 1440
+      div rbx, 2
+      sub rbx, 24
+      mov player_x, rbx          ;; player_x := (SCALE_W div 2) - 24
+      ...
+      mov lives, 5
+      mov score, 0
+      mov regular_enemies_destroyed, 0
+      ...
+      call PROC_init_stars
+      mov game_state, 1           ;; STATE_PLAYING
+    PROC_END_reset_game:
+      ret }
+begin
+  player_x := (SCALE_W div 2) - 24;
+  player_y := SCALE_H - 80;
+  player_w := 48;
+  player_h := 48;
+  player_die := false;
+  clear_all_entities;
+  lives := 5;
+  score := 0;
+  regular_enemies_destroyed := 0;
+  last_shot_time := 0;
+  last_spawn_time := sdl_get_ticks();
+  init_stars;
+  game_state := STATE_PLAYING;
+end;
+
+procedure reset_round;
+begin
+  clear_all_entities;
+  player_die := false;
+  player_x := (SCALE_W div 2) - 24;
+  player_y := SCALE_H - 80;
+  game_state := STATE_PLAYING;
+end;
+
+{ ---- game update ---- }
+procedure update_game;
+{ bytecode (excerpt -- circular enemy float update):
+      mov xmm0, circular[ci].angle   ;; load float field
+      add xmm0, real_const_2         ;; angle += 0.05
+      ...
+      push update_game_new_cx        ;; save float local across call
+      invoke cos, xmm0               ;; cos(angle)
+      return xmm0
+      pop update_game_new_cx         ;; restore float local
+      mul xmm0, real_const_3         ;; * 100.0
+      ...
+      mov rbx, xmm7                  ;; convert float -> int (trunc)
+      store rbx, _tmpptr, 0, 1       ;; circular[ci].x := trunc(new_cx) }
+var
+  dx, dy: integer;
+  ticks: integer;
+  i, ei, ci: integer;
+  slot: integer;
+  crect_x, crect_y: integer;
+  new_cx: real;
+begin
+  if (game_state <> STATE_PLAYING) then exit;
+
+  update_explosions;
+
+  dx := 0;
+  dy := 0;
+  if sdl_is_key_pressed(SDL_SCANCODE_LEFT) <> 0 then dx := dx - 5;
+  if sdl_is_key_pressed(SDL_SCANCODE_RIGHT) <> 0 then dx := dx + 5;
+  if sdl_is_key_pressed(SDL_SCANCODE_UP) <> 0 then dy := dy - 5;
+  if sdl_is_key_pressed(SDL_SCANCODE_DOWN) <> 0 then dy := dy + 5;
+
+  player_x := player_x + dx;
+  player_y := player_y + dy;
+
+  if player_x < 0 then player_x := 0;
+  if player_x > SCALE_W - player_w then player_x := SCALE_W - player_w;
+  if player_y < 0 then player_y := 0;
+  if player_y > SCALE_H - player_h then player_y := SCALE_H - player_h;
+
+  ticks := sdl_get_ticks();
+  if (sdl_is_key_pressed(SDL_SCANCODE_SPACE) <> 0) and (ticks - last_shot_time > 300) then
+  begin
+    slot := find_free_projectile();
+    if slot <> -1 then
+    begin
+      projectiles[slot].x := player_x + (player_w div 2) - 8;
+      projectiles[slot].y := player_y - 30;
+      projectiles[slot].w := 16;
+      projectiles[slot].h := 24;
+      projectiles[slot].active := true;
+      last_shot_time := ticks;
+    end;
+  end;
+
+  { projectile vs enemy collisions }
+  for i := 0 to MAX_PROJECTILES - 1 do
+  begin
+    if projectiles[i].active then
+    begin
+      projectiles[i].y := projectiles[i].y - 10;
+      if projectiles[i].y < -24 then
+        projectiles[i].active := false
+      else
+      begin
+        for ei := 0 to MAX_ENEMIES - 1 do
+          if enemies[ei].active and projectiles[i].active then
+            if aabb(projectiles[i].x, projectiles[i].y, projectiles[i].w, projectiles[i].h,
+                    enemies[ei].x, enemies[ei].y, enemies[ei].w, enemies[ei].h) then
+            begin
+              add_explosion(enemies[ei].x + enemies[ei].w div 2,
+                            enemies[ei].y + enemies[ei].h div 2, EXPTYPE_RED, false);
+              enemies[ei].active := false;
+              projectiles[i].active := false;
+              score := score + 5;
+              regular_enemies_destroyed := regular_enemies_destroyed + 1;
+              if (regular_enemies_destroyed mod 5) = 0 then
+              begin
+                slot := find_free_circular();
+                if slot <> -1 then
+                begin
+                  circular_cx[slot] := 100 + (rand() mod (SCALE_W - 200));
+                  circular[slot].x := circular_cx[slot];
+                  circular[slot].y := -128;
+                  circular[slot].angle := 0.0;
+                  circular[slot].direction := 1;
+                  circular[slot].active := true;
+                end;
+              end;
+            end;
+
+        for ci := 0 to MAX_CIRCULAR - 1 do
+          if circular[ci].active and projectiles[i].active then
+          begin
+            crect_x := circular[ci].x - 64;
+            crect_y := circular[ci].y - 64;
+            if aabb(projectiles[i].x, projectiles[i].y, projectiles[i].w, projectiles[i].h,
+                    crect_x, crect_y, 128, 128) then
+            begin
+              add_explosion(circular[ci].x, circular[ci].y, EXPTYPE_BLUE, false);
+              circular[ci].active := false;
+              projectiles[i].active := false;
+              score := score + 10;
+            end;
+          end;
+      end;
+    end;
+  end;
+
+  { enemy vs player collisions }
+  for ei := 0 to MAX_ENEMIES - 1 do
+    if enemies[ei].active then
+    begin
+      enemies[ei].y := enemies[ei].y + 2;
+      if enemies[ei].y > SCALE_H then
+      begin
+        add_explosion(enemies[ei].x + enemies[ei].w div 2, SCALE_H - 20, EXPTYPE_RED, true);
+        enemies[ei].active := false;
+      end
+      else if aabb(player_x, player_y, player_w, player_h,
+                   enemies[ei].x, enemies[ei].y, enemies[ei].w, enemies[ei].h) then
+      begin
+        add_explosion(player_x + player_w div 2, player_y + player_h div 2, EXPTYPE_RED, true);
+        enemies[ei].active := false;
+        player_die := true;
+      end;
+    end;
+
+  { circular enemy update -- sinusoidal motion }
+  for ci := 0 to MAX_CIRCULAR - 1 do
+    if circular[ci].active then
+    begin
+      circular[ci].angle := circular[ci].angle + 0.05;
+      new_cx := circular_cx[ci] + 100.0 * cos(circular[ci].angle);
+      circular[ci].x := trunc(new_cx);
+      circular[ci].y := circular[ci].y + circular[ci].direction * 2;
+      if circular[ci].y > SCALE_H then circular[ci].direction := -1;
+      if circular[ci].y < 0 then circular[ci].direction := 1;
+
+      crect_x := circular[ci].x - 64;
+      crect_y := circular[ci].y - 64;
+      if aabb(player_x, player_y, player_w, player_h,
+              crect_x, crect_y, 128, 128) then
+      begin
+        add_explosion(player_x + player_w div 2, player_y + player_h div 2, EXPTYPE_RED, true);
+        circular[ci].active := false;
+        player_die := true;
+      end;
+    end;
+
+  { star parallax }
+  for i := 0 to MAX_STARS - 1 do
+  begin
+    stars[i].y := stars[i].y + stars[i].speed;
+    if stars[i].y > SCALE_H then
+    begin
+      stars[i].y := 0;
+      stars[i].x := rand() mod SCALE_W;
+    end;
+  end;
+
+  { enemy spawning }
+  if ticks - last_spawn_time > 1000 then
+  begin
+    slot := find_free_enemy();
+    if slot <> -1 then
+    begin
+      enemies[slot].x := rand() mod (SCALE_W - 64);
+      enemies[slot].y := -64;
+      enemies[slot].w := 64;
+      enemies[slot].h := 64;
+      enemies[slot].active := true;
+    end;
+    last_spawn_time := ticks;
+  end;
+end;
+
+{ ---- rendering ---- }
+procedure render_game;
+{ bytecode (star rendering excerpt):
+    mov render_game_i, 0
+    FOR_200:
+      cmp render_game_i, 99          ;; for i := 0 to MAX_STARS-1
+      jg ENDFOR_201
+      ...
+      load rcx, _tmpptr, 16, 1      ;; stars[i].speed
+      mov rdx, 55
+      mul rdx, rcx
+      ...
+      invoke set_draw_color, renderer, render_game_brightness, ...
+      load r9, _tmpptr, 0, 1        ;; stars[i].x
+      load r10, _tmpptr, 8, 1       ;; stars[i].y
+      invoke draw_point, renderer, r9, r10
+    FOR_CONTINUE_202:
+      add render_game_i, 1
+      jmp FOR_200 }
+var
+  i: integer;
+  brightness: integer;
+  r1, g1, b1: integer;
+begin
+  draw_explosions;
+
+  for i := 0 to MAX_STARS - 1 do
+  begin
+    brightness := 200 + 55 * (stars[i].speed - 1);
+    if brightness > 255 then brightness := 255;
+    sdl_set_draw_color(renderer, brightness, brightness, brightness, 255);
+    sdl_draw_point(renderer, stars[i].x, stars[i].y);
+  end;
+
+  if game_state = STATE_PLAYING then
+  begin
+    if player_die = false then
+    begin
+      if ship_tex <> -1 then
+        sdl_render_texture(renderer, ship_tex, -1, -1, -1, -1,
+                           player_x - 8, player_y - 8, 64, 64)
+      else
+        draw_gradient_triangle(player_x + player_w div 2, player_y,
+                               player_y + player_h);
+    end;
+
+    for i := 0 to MAX_PROJECTILES - 1 do
+      if projectiles[i].active then
+        if particle_tex <> -1 then
+          sdl_render_texture(renderer, particle_tex, -1, -1, -1, -1,
+                             projectiles[i].x, projectiles[i].y,
+                             projectiles[i].w, projectiles[i].h)
+        else
+        begin
+          sdl_set_draw_color(renderer, 255, 255, 255, 255);
+          sdl_fill_rect(renderer, projectiles[i].x, projectiles[i].y,
+                        projectiles[i].w, projectiles[i].h);
+        end;
+
+    for i := 0 to MAX_ENEMIES - 1 do
+      if enemies[i].active then
+        if asteroid_tex <> -1 then
+          sdl_render_texture(renderer, asteroid_tex, -1, -1, -1, -1,
+                             enemies[i].x, enemies[i].y,
+                             enemies[i].w, enemies[i].h)
+        else
+          draw_gradient_diamond(enemies[i].x + enemies[i].w div 2,
+                                enemies[i].y + enemies[i].h div 2,
+                                enemies[i].w div 2, enemies[i].h div 2);
+
+    for i := 0 to MAX_CIRCULAR - 1 do
+      if circular[i].active then
+        if saucer_tex <> -1 then
+          sdl_render_texture(renderer, saucer_tex, -1, -1, -1, -1,
+                             circular[i].x - 64, circular[i].y - 64, 128, 128)
+        else
+          draw_gradient_circle(circular[i].x, circular[i].y, 64);
+  end;
+
+  { HUD }
+  sdl_draw_text(renderer, font_id, 'Lives: ' + inttostr(lives), 10, 10, 255, 255, 255, 255);
+  sdl_draw_text(renderer, font_id, 'Score: ' + inttostr(score), 10, 30, 255, 255, 255, 255);
+
+  if game_state = STATE_DIED then
+  begin
+    if spacelogo_tex <> -1 then
+      sdl_render_texture(renderer, spacelogo_tex, -1, -1, -1, -1, 0, 0, SCALE_W, SCALE_H);
+    r1 := rand() mod 255;
+    g1 := rand() mod 255;
+    b1 := rand() mod 255;
+    sdl_set_draw_color(renderer, 0, 0, 0, 255);
+    sdl_fill_rect(renderer, 470, 530, 500, 40);
+    sdl_draw_text(renderer, font_id, 'You Died! Press ENTER to continue', 490, 538, r1, g1, b1, 255);
+  end;
+
+  if game_state = STATE_GAMEOVER then
+  begin
+    if spacelogo_tex <> -1 then
+      sdl_render_texture(renderer, spacelogo_tex, -1, -1, -1, -1, 0, 0, SCALE_W, SCALE_H);
+    r1 := rand() mod 255;
+    g1 := rand() mod 255;
+    b1 := rand() mod 255;
+    sdl_set_draw_color(renderer, 0, 0, 0, 255);
+    sdl_fill_rect(renderer, 470, 530, 500, 40);
+    sdl_draw_text(renderer, font_id, 'Game Over! Press ENTER to restart', 490, 538, r1, g1, b1, 255);
+  end;
+end;
+
+{ ---- intro screen ---- }
+procedure render_intro;
+{ bytecode:
+    function PROC_render_intro:
+      mov rbx, 0
+      sub rbx, 1                ;; rbx = -1
+      cmp spacelogo_tex, rbx    ;; if spacelogo_tex <> -1
+      je ELSE_312
+      mov rdx, 0
+      sub rdx, 1                ;; src_x = -1  (use full texture)
+      mov rsi, 0
+      sub rsi, 1                ;; src_y = -1
+      mov rdi, 0
+      sub rdi, 1                ;; src_w = -1
+      mov r8, 0
+      sub r8, 1                 ;; src_h = -1
+      mov r9, 0                 ;; dst_x = 0
+      mov r10, 0                ;; dst_y = 0
+      mov r11, 1440             ;; dst_w = 1440
+      mov r12, 1080             ;; dst_h = 1080
+      invoke render_texture, renderer, spacelogo_tex, rdx, rsi, rdi, r8, r9, r10, r11, r12
+      jmp ENDIF_313
+    ELSE_312:
+      mov rdx, 0
+      mov rsi, 0
+      mov rdi, 0
+      mov r8, 255
+      invoke set_draw_color, renderer, rdx, rsi, rdi, r8
+      invoke clear, renderer
+    ENDIF_313:
+      ...                       ;; logo_tex rendering
+      invoke rand               ;; random flashing text color
+      return rdi
+      mod render_intro_r1, 255
+      invoke rand
+      ...
+      invoke draw_text, renderer, font_id, str_11, 640, 700, r1, g1, b1, 255
+      invoke draw_text, renderer, font_id, str_12, 584, 740, 180, 180, 180, 255
+    PROC_END_render_intro: }
+var
+  r1, g1, b1: integer;
+begin
+  if spacelogo_tex <> -1 then
+    sdl_render_texture(renderer, spacelogo_tex, -1, -1, -1, -1, 0, 0, 1440, 1080)
+  else
+  begin
+    sdl_set_draw_color(renderer, 0, 0, 0, 255);
+    sdl_clear(renderer);
+  end;
+
+  if logo_tex <> -1 then
+    sdl_render_texture(renderer, logo_tex, -1, -1, -1, -1, 0, 0, SCALE_W, SCALE_H);
+
+  r1 := rand() mod 255;
+  g1 := rand() mod 255;
+  b1 := rand() mod 255;
+
+  sdl_draw_text(renderer, font_id, 'Press ENTER to Start', 640, 700, r1, g1, b1, 255);
+  sdl_draw_text(renderer, font_id, 'Arrow Keys = Move   Space = Shoot', 584, 740, 180, 180, 180, 255);
+end;
+
+{ ---- SDL init / cleanup ---- }
+procedure init_sdl;
+var
+  result: integer;
+begin
+  result := sdl_init();
+  if result <> 0 then begin writeln('failed to init SDL'); halt(EXIT_FAILURE); end;
+  window_id := sdl_create_window('Space Shooter', 100, 100, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
+  renderer := sdl_create_renderer(window_id, -1, SDL_RENDERER_ACCELLERATED);
+  target_id := sdl_create_render_target(renderer, SCALE_W, SCALE_H);
+  sdl_set_draw_color(renderer, 0, 0, 0, 255);    { clear render target }
+  font_id := sdl_load_font(fontfile, 14);
+  logo_tex := sdl_load_texture(renderer, logofile);
+  spacelogo_tex := sdl_load_texture(renderer, spacelogofile);
+  ship_tex := sdl_load_texture(renderer, shipfile);
+  asteroid_tex := sdl_load_texture(renderer, asteroidfile);
+  saucer_tex := sdl_load_texture(renderer, saucerfile);
+  particle_tex := sdl_load_texture(renderer, particlefile);
+end;
+
+procedure cleanup;
+begin
+  if ship_tex <> -1 then sdl_destroy_texture(ship_tex);
+  if asteroid_tex <> -1 then sdl_destroy_texture(asteroid_tex);
+  if saucer_tex <> -1 then sdl_destroy_texture(saucer_tex);
+  if particle_tex <> -1 then sdl_destroy_texture(particle_tex);
+  if logo_tex <> -1 then sdl_destroy_texture(logo_tex);
+  if spacelogo_tex <> -1 then sdl_destroy_texture(spacelogo_tex);
+  sdl_destroy_render_target(target_id);
+  sdl_destroy_renderer(renderer);
+  sdl_destroy_window(window_id);
+  sdl_quit_text();
+  sdl_quit();
+end;
+
+{ ---- main loop ---- }
+{ bytecode:
+    start:
+      mov fontfile, str_0          ;; constant string assignments
+      ...
+      alloc stars, 24, 100         ;; heap-allocate record arrays
+      alloc projectiles, 40, 30
+      alloc enemies, 40, 20
+      alloc circular, 40, 8
+      alloc circular_cx, 8, 8
+      alloc explosions, 64, 15
+      call PROC_init_sdl
+      invoke seed_random
+      mov game_state, 0            ;; STATE_INTRO
+      mov lives, 5
+      mov score, 0
+      call PROC_clear_all_entities
+      call PROC_init_stars
+      invoke get_ticks
+      return rbx
+      mov prev_time, rbx
+      mov running, 1
+    WHILE_0:                        ;; while running = true do
+      cmp running, 1
+      jne ENDWHILE_1
+      ...
+      invoke set_render_target, renderer, target_id
+      invoke set_draw_color, renderer, 0, 0, 0, 255
+      invoke clear, renderer        ;; sdl_clear(renderer)
+      cmp game_state, 0
+      jne ELSE_44
+      call PROC_render_intro         ;; render_intro
+      jmp ENDIF_45
+    ELSE_44:
+      call PROC_render_game          ;; render_game
+    ENDIF_45:
+      invoke present_scaled, renderer, target_id, 1440, 1080
+      invoke delay, 16              ;; sdl_delay(16)
+      jmp WHILE_0                   ;; loop back
+    ENDWHILE_1:
+      call PROC_cleanup
+      free stars                    ;; deallocate record arrays
+      free projectiles
+      free enemies
+      free circular
+      free circular_cx
+      free explosions
+      done                          ;; program exit }
+var
+  prev_time, cur_time: integer;
+
+begin
+  init_sdl;
+  seed_random;
+  game_state := STATE_INTRO;
+  lives := 5;
+  score := 0;
+  clear_all_entities;
+  init_stars;
+
+  prev_time := sdl_get_ticks();
+  running := true;
+
+  while running = true do
+  begin
+    while sdl_poll_event() <> 0 do
+    begin
+      event_type_result := sdl_get_event_type();
+      if event_type_result = SDL_QUIT then running := false;
+      if event_type_result = SDL_KEYDOWN then
+      begin
+        key := sdl_get_key_code();
+        if key = SDLK_ESCAPE then running := false;
+        if key = SDLK_RETURN then
+        begin
+          if game_state = STATE_INTRO then reset_game
+          else if game_state = STATE_DIED then reset_round
+          else if game_state = STATE_GAMEOVER then reset_game;
+        end;
+      end;
+    end;
+
+    cur_time := sdl_get_ticks();
+    if cur_time - prev_time >= 15 then
+    begin
+      prev_time := cur_time;
+      if game_state = STATE_PLAYING then
+        update_game;
+    end;
+
+    sdl_set_render_target(renderer, target_id);
+    sdl_set_draw_color(renderer, 0, 0, 0, 255);
+    sdl_clear(renderer);
+
+    if game_state = STATE_INTRO then
+      render_intro
+    else
+      render_game;
+
+    sdl_present_scaled(renderer, target_id, WIDTH, HEIGHT);
+    sdl_delay(16);
+  end;
+
+  cleanup;
+end.
+```
+
+Compile and run:
+```bash
+mxx space.pas space.mxvm              # Pascal -> MXVM bytecode
+mxvmc space.mxvm                      # run in interpreter
+```
+
+Compile to native x86-64 binary:
+```bash
+LDFLAGS="-lSDL2 -lSDL2_ttf" mxvmc space.mxvm --action compile
+./SpaceShooter                        # run native binary
+```
+[Online Source Code](https://github.com/lostjared/MXVM/tree/main/src/frontend/pas/spaceshooter)
+
 ---
 
 # Project Layout {#layout}
@@ -1193,4 +2215,4 @@ MXVM/
 
 ---
 
-*Generated documentation -- see the [source repository](https://github.com/lostjared/MXVM) for the latest code.*
+ [source repository](https://github.com/lostjared/MXVM) for the latest code.*
