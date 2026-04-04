@@ -22,7 +22,7 @@ macOS (Darwin), and Windows (Win64).
 | **Backend** | Interpreter | Stack-based execution engine for bytecode |
 | **Backend** | x86-64 Codegen | Native assembly output (System V, Win64, Darwin) |
 | **Backend** | Peephole Optimizer | Post-generation assembly cleanup passes |
-| **Runtime** | Module System | Dynamically loaded C shared libraries (`io`, `std`, `string`, `sdl`) |
+| **Runtime** | Module System | Dynamically loaded C shared libraries (`io`, `std`, `string`, `sdl`) and Pascal unit linking |
 
 @dot
 digraph pipeline {
@@ -323,16 +323,122 @@ end.
 
 ### Uses Clause
 
-The optional `uses` clause imports runtime modules. It must appear immediately after the
-`program` declaration:
+The `uses` clause imports runtime modules and/or separately compiled units.
+It must appear immediately after the `program` (or `unit`) declaration:
 
 ```pascal
 program MyApp;
-uses std, io, string;
+uses std, io, string, MathUtils;
 ```
 
-Available modules: `std`, `io`, `string`, `sdl`. If no `uses` clause is present, modules are
-auto-detected from builtin function usage.
+Built-in runtime modules: `std`, `io`, `string`, `sdl`.  Any other name is
+treated as a reference to a separately compiled Pascal **unit** (see @ref units
+below).  If no `uses` clause is present, modules are auto-detected from
+builtin function usage.
+
+### Units (Separately Compiled Modules) {#units}
+
+Pascal units allow you to split a project into separately compiled modules.
+A unit has an **interface** section (exported declarations visible to importers)
+and an **implementation** section (private code).
+
+#### Unit Structure
+
+```pascal
+unit MathUtils;
+
+interface
+
+function Add(a, b: integer): integer;
+function Multiply(a, b: integer): integer;
+procedure PrintResult(x: integer);
+
+implementation
+
+uses io;
+
+function Add(a, b: integer): integer;
+begin
+  Add := a + b;
+end;
+
+function Multiply(a, b: integer): integer;
+begin
+  Multiply := a * b;
+end;
+
+procedure PrintResult(x: integer);
+begin
+  writeln(x);
+end;
+
+end.
+```
+
+#### Using a Unit
+
+A program imports a unit by listing it in the `uses` clause alongside any
+runtime modules:
+
+```pascal
+program TestMain;
+uses io, MathUtils;
+
+var
+  result: integer;
+
+begin
+  result := Add(3, 4);
+  writeln('3 + 4 = ', result);
+  result := Multiply(5, 6);
+  writeln('5 * 6 = ', result);
+  PrintResult(99);
+end.
+```
+
+#### Compiling and Linking
+
+Each unit is compiled to a separate `.mxvm` object file.  The main program
+is compiled separately and references the unit via `section object`.  At
+runtime the VM loads and links unit objects automatically.
+
+```bash
+# 1. Compile the unit
+mxx MathUtils.pas MathUtils.mxvm
+
+# 2. Compile the main program (unit .pas must be in the same directory)
+mxx TestMain.pas TestMain.mxvm
+
+# 3. Run — tell the VM where to find object files
+mxvmc TestMain.mxvm -x .
+```
+
+The `-x` (or `--object-path`) flag tells the VM where to search for `.mxvm`
+object files referenced by `section object` declarations.  The default is `.`
+(current directory).
+
+#### How It Works
+
+| Step | Detail |
+|------|--------|
+| **Unit compilation** | The Pascal compiler parses the unit and emits an MXVM `object` block (instead of `program`). The interface forward declarations register function signatures; the implementation section generates the actual function bodies. |
+| **Program compilation** | When compiling a program that `uses` a non-native module name, the compiler locates the unit's `.pas` file, parses its interface to learn function/procedure signatures, and emits qualified cross-object references (e.g. `call MathUtils.FUNC_Add`, `mov MathUtils.rbx, 3`). |
+| **VM linking** | The VM's `section object { MathUtils }` triggers loading of `MathUtils.mxvm` from the object path. Object labels and variables are merged into the execution environment using qualified names (`MathUtils.FUNC_Add`, `MathUtils.rax`, etc.). |
+
+#### Interface Section
+
+The interface section may contain:
+- Procedure and function **forward declarations** (signature only, no body)
+- Type declarations
+- Constant declarations
+- Variable declarations
+
+#### Implementation Section
+
+The implementation section may contain:
+- An optional additional `uses` clause
+- Full procedure and function definitions (with bodies)
+- Additional type, constant, and variable declarations
 
 ### Data Types
 
@@ -582,7 +688,7 @@ The following limitations apply:
 | Area | Limitation |
 |------|------------|
 | **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` -- not `x := MyFunc`. |
-| **Limited module support** | A `uses` clause (`uses std, io, string, sdl;`) imports runtime modules, but there is no `unit`, `interface`, or `implementation` keyword support. Only single-file `program` compilation. |
+| **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
 | **No enumerated types** | Only scalar types, records, arrays, and pointers. |
 | **No dynamic arrays** | Only static `array[lo..hi]` with compile-time bounds. |
 | **No variant records** | Records have flat fields only -- no `case` variant parts. |
@@ -896,6 +1002,71 @@ begin
   writeln('Point: (', p^.x, ', ', p^.y, ')');
   dispose(p);
 end.
+```
+
+## Pascal -- Units (Separate Compilation)
+
+**MathUtils.pas** (unit):
+```pascal
+unit MathUtils;
+
+interface
+
+function Add(a, b: integer): integer;
+function Multiply(a, b: integer): integer;
+procedure PrintResult(x: integer);
+
+implementation
+
+uses io;
+
+function Add(a, b: integer): integer;
+begin
+  Add := a + b;
+end;
+
+function Multiply(a, b: integer): integer;
+begin
+  Multiply := a * b;
+end;
+
+procedure PrintResult(x: integer);
+begin
+  writeln(x);
+end;
+
+end.
+```
+
+**TestMain.pas** (program using the unit):
+```pascal
+program TestMain;
+uses io, MathUtils;
+
+var
+  result: integer;
+
+begin
+  result := Add(3, 4);
+  writeln('3 + 4 = ', result);
+  result := Multiply(5, 6);
+  writeln('5 * 6 = ', result);
+  PrintResult(99);
+end.
+```
+
+Compile and run:
+```bash
+mxx MathUtils.pas MathUtils.mxvm
+mxx TestMain.pas TestMain.mxvm
+mxvmc TestMain.mxvm -x .
+```
+
+Output:
+```
+3 + 4 =  7
+5 * 6 =  30
+99
 ```
 
 ---

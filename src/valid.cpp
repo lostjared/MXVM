@@ -599,7 +599,7 @@ namespace mxvm {
                             require("=");
                             next();
                             skipSeparators();
-                            if (match("-")) {
+                            if (match("-") && match(types::TokenType::TT_SYM)) {
                                 next();
                                 skipSeparators();
                             }

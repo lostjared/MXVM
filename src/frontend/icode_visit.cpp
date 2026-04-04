@@ -690,8 +690,8 @@ namespace pascal {
                     }
                 }
             }
+            scopeHierarchy.pop_back();
         }
-        scopeHierarchy.pop_back();
     }
 
     void CodeGenVisitor::visit(TypeAliasNode &node) {

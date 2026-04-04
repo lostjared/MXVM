@@ -620,7 +620,7 @@ namespace pascal {
     std::unique_ptr<ASTNode> PascalParser::parseSimpleExpression() {
         std::unique_ptr<ASTNode> result;
         int lineNum = token ? token->getLine() : 1;
-        if (peekIs("+") || peekIs("-") || peekIs("not")) {
+        if (((peekIs("+") || peekIs("-")) && peekIs(types::TokenType::TT_SYM)) || peekIs("not")) {
             UnaryOpNode::Operator op = UnaryOpNode::PLUS;
             if (peekIs("+"))
                 op = UnaryOpNode::PLUS;
@@ -635,7 +635,7 @@ namespace pascal {
         } else {
             result = parseTerm();
         }
-        while (peekIs("+") || peekIs("-")) {
+        while ((peekIs("+") || peekIs("-")) && peekIs(types::TokenType::TT_SYM)) {
             BinaryOpNode::OpType op;
             if (peekIs("+"))
                 op = BinaryOpNode::PLUS;
@@ -884,10 +884,14 @@ namespace pascal {
     }
 
     bool PascalParser::isMulOperator() {
+        if (!peekIs(types::TokenType::TT_SYM) && !peekIs(types::TokenType::TT_ID))
+            return false;
         return peekIs("*") || peekIs("/") || peekIs("div") || peekIs("mod");
     }
 
     bool PascalParser::isRelationalOperator() {
+        if (!peekIs(types::TokenType::TT_SYM))
+            return false;
         return peekIs("=") || peekIs("<>") || peekIs("<") || peekIs("<=") || peekIs(">") || peekIs(">=");
     }
 

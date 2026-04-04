@@ -862,6 +862,18 @@ namespace pascal {
 
         BuiltinFunctionRegistry builtinRegistry; ///< registry of built-in function handlers
 
+        /**
+         * @brief Register a function or procedure as originating from an external unit
+         *
+         * When generating code for a program that imports units, the compiler
+         * needs to emit qualified MXVM object references (e.g. `MathUtils.FUNC_Add`)
+         * for cross-object calls.  This method records the mapping so that the
+         * code generator can prefix call targets and parameter/return registers
+         * with the correct object name.
+         *
+         * @param funcName Unqualified function or procedure name
+         * @param unitName Name of the unit that defines the function
+         */
         void registerExternalFunc(const std::string &funcName, const std::string &unitName) {
             externalFuncs[funcName] = unitName;
         }
@@ -1312,8 +1324,11 @@ namespace pascal {
             out << "}\n";
         }
 
+        /** @name AST Visitor Overrides
+         *  Code generation for each Pascal AST node type.
+         *  @{ */
         void visit(ProgramNode &node) override;
-        void visit(UnitNode &node) override;
+        void visit(UnitNode &node) override;   ///< Generate MXVM object code from a Pascal unit
         void visit(BlockNode &node) override;
         void visit(VarDeclNode &node) override;
         void visit(ProcCallNode &node) override;
@@ -1354,7 +1369,7 @@ namespace pascal {
         void visit(PointerTypeNode &node) override;
         void visit(PointerDerefNode &node) override;
         void visit(AddressOfNode &node) override;
-
+        /** @} */
         std::string getTypeString(const VarDeclNode &node) {
             if (std::holds_alternative<std::string>(node.type))
                 return std::get<std::string>(node.type);

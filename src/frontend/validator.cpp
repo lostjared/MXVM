@@ -5,7 +5,10 @@
  */
 #include "validator.hpp"
 #include "scanner/exception.hpp"
+#include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <sstream>
 #include <unordered_set>
 
 namespace mxx {
@@ -307,14 +310,97 @@ namespace mxx {
         requireKW("uses");
         next();
         require(types::TokenType::TT_ID);
+        std::vector<std::string> usedUnits;
+        usedUnits.push_back(token->getTokenValue());
         next();
         while (match(",")) {
             next();
             require(types::TokenType::TT_ID);
+            usedUnits.push_back(token->getTokenValue());
             next();
         }
         require(";");
         next();
+
+        // Import interface declarations from used units
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+        std::string inputDir;
+        {
+            auto pos = filename.find_last_of("/\\");
+            inputDir = (pos != std::string::npos) ? filename.substr(0, pos + 1) : "./";
+        }
+        for (const auto &unit : usedUnits) {
+            if (nativeModules.count(unit))
+                continue;
+            // Try to find the unit's .pas file
+            std::string unitFile = inputDir + unit + ".pas";
+            std::ifstream uf(unitFile);
+            if (!uf.is_open()) {
+                std::string lowerUnit = unit;
+                std::transform(lowerUnit.begin(), lowerUnit.end(), lowerUnit.begin(), ::tolower);
+                unitFile = inputDir + lowerUnit + ".pas";
+                uf.open(unitFile);
+            }
+            if (!uf.is_open())
+                continue;
+            std::ostringstream buf;
+            buf << uf.rdbuf();
+            uf.close();
+            try {
+                // Use a scanner to extract interface declarations
+                scan::Scanner unitScanner(buf.str());
+                unitScanner.scan();
+                auto &toks = unitScanner.getTokens();
+                // Strip brace comments
+                for (size_t i = 0; i < toks.size();) {
+                    if (toks[i].getTokenValue() == "{") {
+                        size_t start = i;
+                        ++i;
+                        while (i < toks.size() && toks[i].getTokenValue() != "}") ++i;
+                        if (i < toks.size()) ++i;
+                        toks.erase(toks.begin() + static_cast<int64_t>(start),
+                                   toks.begin() + static_cast<int64_t>(i));
+                        i = start;
+                    } else {
+                        ++i;
+                    }
+                }
+                // Find 'interface' keyword, then collect procedure/function names until 'implementation'
+                size_t ti = 0;
+                auto tlower = [](const std::string &s) {
+                    std::string r = s;
+                    std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+                    return r;
+                };
+                // Skip to 'interface'
+                while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "interface") ++ti;
+                if (ti < toks.size()) ++ti; // move past 'interface'
+                // Skip optional uses in interface
+                if (ti < toks.size() && tlower(toks[ti].getTokenValue()) == "uses") {
+                    while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                    if (ti < toks.size()) ++ti;
+                }
+                // Collect procedure/function names until 'implementation'
+                while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "implementation") {
+                    std::string kw = tlower(toks[ti].getTokenValue());
+                    if (kw == "procedure" && ti + 1 < toks.size()) {
+                        ++ti;
+                        declaredProcs.insert(lower(toks[ti].getTokenValue()));
+                        while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                        if (ti < toks.size()) ++ti;
+                    } else if (kw == "function" && ti + 1 < toks.size()) {
+                        ++ti;
+                        declaredFuncs.insert(lower(toks[ti].getTokenValue()));
+                        while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                        if (ti < toks.size()) ++ti;
+                    } else {
+                        ++ti;
+                    }
+                }
+            } catch (...) {
+                // Unit parsing failed; skip importing
+            }
+        }
     }
 
     void TPValidator::parseBlock() {
@@ -1099,6 +1185,7 @@ namespace mxx {
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
         "case", "of", "with", "goto", "exit", "break", "continue",
         "nil", "new", "dispose",
+        "writeln", "write", "readln", "read", "seed_random", "rand_number",
 
         "div", "mod", "and", "or", "not", "in",
         "integer", "real", "boolean", "char", "byte", "word", "longint", "shortint",
