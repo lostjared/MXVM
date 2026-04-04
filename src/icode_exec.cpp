@@ -1160,12 +1160,25 @@ namespace mxvm {
             throw mx::Exception("FREE argument must be a variable");
         }
         Variable &var = getVariable(instr.op1.op);
-        if (var.type == VarType::VAR_POINTER && var.var_value.owns && var.var_value.ptr_value != nullptr) {
-            std::free(var.var_value.ptr_value);
+        if (var.type == VarType::VAR_POINTER && var.var_value.ptr_value != nullptr) {
+            void *ptr_to_free = var.var_value.ptr_value;
+            std::free(ptr_to_free);
+            // Clear this variable
             var.var_value.ptr_value = nullptr;
             var.var_value.owns = false;
             var.var_value.ptr_size = 0;
             var.var_value.ptr_count = 0;
+            // Clear any other variables pointing to the same address to prevent double-free
+            for (auto &kv : vars) {
+                if (&kv.second != &var &&
+                    kv.second.type == VarType::VAR_POINTER &&
+                    kv.second.var_value.ptr_value == ptr_to_free) {
+                    kv.second.var_value.ptr_value = nullptr;
+                    kv.second.var_value.owns = false;
+                    kv.second.var_value.ptr_size = 0;
+                    kv.second.var_value.ptr_count = 0;
+                }
+            }
         }
     }
 

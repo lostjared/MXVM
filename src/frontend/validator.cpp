@@ -9,6 +9,28 @@ namespace mxx {
     bool TPValidator::validate(const std::string &name) {
         filename = name;
         scanner.scan();
+
+        { // strip { } comments
+            auto &toks = scanner.getTokens();
+            for (size_t i = 0; i < toks.size(); ) {
+                if (toks[i].getTokenValue() == "{") {
+                    size_t start = i;
+                    ++i;
+                    while (i < toks.size() && toks[i].getTokenValue() != "}") {
+                        ++i;
+                    }
+                    if (i < toks.size()) {
+                        ++i;
+                    }
+                    toks.erase(toks.begin() + static_cast<int64_t>(start),
+                               toks.begin() + static_cast<int64_t>(i));
+                    i = start;
+                } else {
+                    ++i;
+                }
+            }
+        }
+
         index = 0;
         token = nullptr;
         scopeStack.clear();
@@ -339,7 +361,7 @@ namespace mxx {
         } else {
             require(":");
             next();
-            parseTypeName();
+            parseType("");
             require(";");
             next();
         }

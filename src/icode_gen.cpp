@@ -950,9 +950,6 @@ namespace mxvm {
         if (v.type != VarType::VAR_POINTER) {
             throw mx::Exception("FREE argument must be a pointer");
         }
-        if (v.var_value.owns != true) {
-            throw mx::Exception("FREE argument must be owned by program");
-        }
 
         out << "\tmovq " << getMangledName(i.op1) << "(%rip), %rdi\n";
         out << "\ttest %rdi, %rdi\n";

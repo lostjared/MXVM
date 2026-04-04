@@ -175,9 +175,63 @@ namespace pascal {
         if (node.name == "new") {
             if (node.arguments.size() != 1)
                 throw std::runtime_error("new() requires exactly one pointer argument");
+
+            if (auto *fieldNode = dynamic_cast<FieldAccessNode *>(node.arguments[0].get())) {
+                std::string baseName;
+                std::string recType;
+                bool baseIsDirectPointer = false;
+
+                if (auto *v = dynamic_cast<VariableNode *>(fieldNode->recordExpr.get())) {
+                    baseName = findMangledName(v->name);
+                    recType = getVarRecordTypeName(v->name);
+                } else {
+                    fieldNode->recordExpr->accept(*this);
+                    baseName = popValue();
+                    baseIsDirectPointer = true;
+                    recType = getVarRecordTypeNameFromExpr(fieldNode->recordExpr.get());
+                }
+
+                recType = resolveTypeName(lc(recType));
+                auto recTypeIt = recordTypes.find(recType);
+                if (recTypeIt == recordTypes.end())
+                    throw std::runtime_error("new(): unknown record type: " + recType);
+
+                const std::string fieldName = lc(fieldNode->fieldName);
+                auto it = recTypeIt->second.nameToIndex.find(fieldName);
+                if (it == recTypeIt->second.nameToIndex.end())
+                    throw std::runtime_error("new(): field not found: " + fieldName);
+
+                const auto &fieldInfo = recTypeIt->second.fields[it->second];
+                const int byteOffset = fieldInfo.offset;
+
+                std::string fieldTypeName = fieldInfo.typeName;
+                int elemSize = 8;
+                if (!fieldTypeName.empty() && fieldTypeName[0] == '^') {
+                    std::string baseType = resolveTypeName(lc(fieldTypeName.substr(1)));
+                    elemSize = getTypeSizeByName(baseType);
+                    if (isRecordTypeName(baseType)) {
+                        auto rit = recordTypes.find(baseType);
+                        if (rit != recordTypes.end())
+                            elemSize = rit->second.size;
+                    }
+                }
+
+                std::string tmp = allocTempPtr();
+                emit3("alloc", tmp, std::to_string(elemSize), "1");
+
+                std::string basePtr = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+                emit4("store", tmp, basePtr, std::to_string(byteOffset), "1");
+
+                if (isReg(tmp) && !isParmReg(tmp))
+                    freeReg(tmp);
+                if (baseIsDirectPointer && isReg(basePtr) && !isParmReg(basePtr))
+                    freeReg(basePtr);
+                return;
+            }
+
             auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
             if (!varNode)
-                throw std::runtime_error("new() argument must be a variable");
+                throw std::runtime_error("new() argument must be a variable or record field");
 
             std::string mangled = findMangledName(varNode->name);
             std::string sym = storageSymbolFor(mangled);
@@ -200,9 +254,50 @@ namespace pascal {
         if (node.name == "dispose") {
             if (node.arguments.size() != 1)
                 throw std::runtime_error("dispose() requires exactly one pointer argument");
+
+            if (auto *fieldNode = dynamic_cast<FieldAccessNode *>(node.arguments[0].get())) {
+                std::string baseName;
+                std::string recType;
+                bool baseIsDirectPointer = false;
+
+                if (auto *v = dynamic_cast<VariableNode *>(fieldNode->recordExpr.get())) {
+                    baseName = findMangledName(v->name);
+                    recType = getVarRecordTypeName(v->name);
+                } else {
+                    fieldNode->recordExpr->accept(*this);
+                    baseName = popValue();
+                    baseIsDirectPointer = true;
+                    recType = getVarRecordTypeNameFromExpr(fieldNode->recordExpr.get());
+                }
+
+                recType = resolveTypeName(lc(recType));
+                auto recTypeIt = recordTypes.find(recType);
+                if (recTypeIt == recordTypes.end())
+                    throw std::runtime_error("dispose(): unknown record type: " + recType);
+
+                const std::string fieldName = lc(fieldNode->fieldName);
+                auto it = recTypeIt->second.nameToIndex.find(fieldName);
+                if (it == recTypeIt->second.nameToIndex.end())
+                    throw std::runtime_error("dispose(): field not found: " + fieldName);
+
+                const auto &fieldInfo = recTypeIt->second.fields[it->second];
+                const int byteOffset = fieldInfo.offset;
+
+                std::string basePtr = baseIsDirectPointer ? baseName : ensurePtrBase(baseName);
+                std::string tmp = allocTempPtr();
+                emit4("load", tmp, basePtr, std::to_string(byteOffset), "1");
+                emit1("free", tmp);
+
+                if (isReg(tmp) && !isParmReg(tmp))
+                    freeReg(tmp);
+                if (baseIsDirectPointer && isReg(basePtr) && !isParmReg(basePtr))
+                    freeReg(basePtr);
+                return;
+            }
+
             auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
             if (!varNode)
-                throw std::runtime_error("dispose() argument must be a variable");
+                throw std::runtime_error("dispose() argument must be a variable or record field");
 
             std::string mangled = findMangledName(varNode->name);
             std::string sym = storageSymbolFor(mangled);
@@ -389,6 +484,9 @@ namespace pascal {
             } else if (t == "real") {
                 setVarType(id, VarType::DOUBLE);
                 setSlotType(slot, VarType::DOUBLE);
+            } else if (!t.empty() && t[0] == '^') {
+                setVarType(id, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
             } else {
                 std::string rt = resolveTypeName(t);
                 if (recordTypes.count(rt)) {
@@ -877,6 +975,8 @@ namespace pascal {
             elementType = "array";
         } else if (dynamic_cast<RecordTypeNode *>(node.arrayType->elementType.get())) {
             elementType = "record";
+        } else if (auto *pt = dynamic_cast<PointerTypeNode *>(node.arrayType->elementType.get())) {
+            elementType = "pointer";
         } else {
             elementType = "integer";
         }
@@ -1380,6 +1480,8 @@ namespace pascal {
                     fieldTypeName = "array";
                 } else if (dynamic_cast<RecordTypeNode *>(typeNode.get())) {
                     fieldTypeName = "record";
+                } else if (auto *pt = dynamic_cast<PointerTypeNode *>(typeNode.get())) {
+                    fieldTypeName = "^" + lc(pt->baseTypeName);
                 } else if (auto *st = dynamic_cast<SimpleTypeNode *>(typeNode.get())) {
                     fieldTypeName = resolveTypeName(st->typeName);
                 }

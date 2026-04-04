@@ -139,9 +139,17 @@ namespace pascal {
         expectToken(":");
         next();
 
-        expectToken(types::TokenType::TT_ID);
-        std::string returnType = token->getTokenValue();
-        next();
+        std::string returnType;
+        if (peekIs("^")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            returnType = "^" + token->getTokenValue();
+            next();
+        } else {
+            expectToken(types::TokenType::TT_ID);
+            returnType = token->getTokenValue();
+            next();
+        }
 
         expectToken(";");
         next();
@@ -191,9 +199,17 @@ namespace pascal {
         expectToken(":");
         next();
 
-        expectToken(types::TokenType::TT_ID);
-        std::string typeName = token->getTokenValue();
-        next();
+        std::string typeName;
+        if (peekIs("^")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            typeName = "^" + token->getTokenValue();
+            next();
+        } else {
+            expectToken(types::TokenType::TT_ID);
+            typeName = token->getTokenValue();
+            next();
+        }
 
         auto parameterNode = std::make_unique<ParameterNode>(
             std::move(identifiers), typeName, isVar);
