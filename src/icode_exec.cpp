@@ -312,7 +312,29 @@ namespace mxvm {
         }
         Variable &dest = getVariable(instr.op1.op);
 
-        releaseOwnedPointer(dest);
+        // Before freeing dest's old pointer, transfer ownership to any alias
+        if (dest.type == VarType::VAR_POINTER && dest.var_value.ptr_value && dest.var_value.owns) {
+            void *old_ptr = dest.var_value.ptr_value;
+            bool transferred = false;
+            for (auto &kv : vars) {
+                if (&kv.second != &dest &&
+                    kv.second.type == VarType::VAR_POINTER &&
+                    kv.second.var_value.ptr_value == old_ptr) {
+                    kv.second.var_value.owns = true;
+                    transferred = true;
+                    break;
+                }
+            }
+            if (!transferred) {
+                std::free(old_ptr);
+            }
+            dest.var_value.ptr_value = nullptr;
+            dest.var_value.owns = false;
+            dest.var_value.ptr_size = 0;
+            dest.var_value.ptr_count = 0;
+        } else {
+            releaseOwnedPointer(dest);
+        }
 
         if (isVariable(instr.op2.op)) {
             Variable &src = getVariable(instr.op2.op);
@@ -1787,11 +1809,6 @@ namespace mxvm {
             Variable &v = getVariable(instr.op1.op);
             std::string name = v.var_name;
             Variable &r = getVariable(result.op);
-            std::string v_type_str = toStringFromVarType(v.type);
-            std::string r_type_str = toStringFromVarType(r.type);
-            if (v.type != r.type) {
-                throw mx::Exception("Invalid return type: " + instr.op1.op + ":" + v_type_str + " != " + result.op + ":" + r_type_str + " type mismatch.\n");
-            }
             releaseOwnedPointer(v);
             v = r;
             v.var_name = name;

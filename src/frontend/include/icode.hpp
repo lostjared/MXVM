@@ -974,9 +974,10 @@ namespace pascal {
                 }
                 auto temp1 = tempPtrByScope[scopeName];
                 for (const auto &tp : temp1) {
-                    if (allocatedPtrs.count(tp))
+                    if (allocatedPtrs.count(tp) && !escapedTempPtrs.count(tp))
                         emitFree(tp);
                 }
+                escapedTempPtrs.clear();
 
                 emit("ret");
                 scopeHierarchy = oldHierarchy;
@@ -1082,9 +1083,10 @@ namespace pascal {
 
                 auto temp1 = tempPtrByScope[scopeName];
                 for (const auto &tp : temp1) {
-                    if (allocatedPtrs.count(tp))
+                    if (allocatedPtrs.count(tp) && !escapedTempPtrs.count(tp))
                         emitFree(tp);
                 }
+                escapedTempPtrs.clear();
 
                 emit("ret");
                 scopeHierarchy = oldHierarchy;
@@ -1099,9 +1101,30 @@ namespace pascal {
 
         void emit_invoke(const std::string &funcName, const std::vector<std::string> &params) {
             std::string instruction = "invoke " + funcName;
-            for (const auto &p : params)
-                instruction += ", " + p;
+            std::vector<std::string> tempRegs;
+            for (const auto &p : params) {
+                if (isIntLiteral(p) || isRealNumber(p)) {
+                    std::string r = isRealNumber(p) ? allocFloatReg() : allocReg();
+                    emit2("mov", r, p);
+                    instruction += ", " + r;
+                    tempRegs.push_back(r);
+                } else {
+                    instruction += ", " + p;
+                }
+            }
             emit(instruction);
+            for (const auto &r : tempRegs)
+                freeReg(r);
+        }
+
+        bool isIntLiteral(const std::string &s) const {
+            if (s.empty()) return false;
+            size_t start = (s[0] == '-') ? 1 : 0;
+            if (start >= s.size()) return false;
+            for (size_t i = start; i < s.size(); ++i)
+                if (!std::isdigit(static_cast<unsigned char>(s[i])))
+                    return false;
+            return true;
         }
 
         void writeTo(std::ostream &out) const {
@@ -1487,6 +1510,7 @@ namespace pascal {
 
       private:
         std::unordered_set<std::string> allocatedPtrs;
+        std::unordered_set<std::string> escapedTempPtrs;
 
         std::unordered_map<std::string, std::string> realConstants;
 

@@ -1443,6 +1443,9 @@ namespace pascal {
             }
         }
 
+        if (isTempPtr(rhs) && allocatedPtrs.count(rhs) && !isTempPtr(varName))
+            escapedTempPtrs.insert(rhs);
+
         if (isReg(rhs) && !isParmReg(rhs))
             freeReg(rhs);
     }
