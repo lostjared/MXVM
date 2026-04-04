@@ -185,7 +185,8 @@ namespace mxvm {
               ptr_count(other.ptr_count),
               type(other.type),
               buffer_size(other.buffer_size),
-              owns(other.owns) {
+              owns(other.owns),
+              released(other.released) {
             switch (type) {
             case VarType::VAR_INTEGER:
             case VarType::VAR_BYTE:
@@ -212,6 +213,7 @@ namespace mxvm {
                 type = other.type;
                 buffer_size = other.buffer_size;
                 owns = other.owns;
+                released = other.released;
                 switch (type) {
                 case VarType::VAR_INTEGER:
                 case VarType::VAR_BYTE:
@@ -231,7 +233,7 @@ namespace mxvm {
             return *this;
         }
 
-        Variable_Value() : int_value(0), ptr_size(0), ptr_count(0), type(VarType::VAR_NULL), buffer_size(0), owns(false) {}
+        Variable_Value() : int_value(0), ptr_size(0), ptr_count(0), type(VarType::VAR_NULL), buffer_size(0), owns(false), released(false) {}
     };
 
     // Variable struct

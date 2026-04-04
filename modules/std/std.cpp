@@ -201,6 +201,9 @@ extern "C" void mxvm_std_malloc(mxvm::Program *program, std::vector<mxvm::Operan
     int64_t size = program->isVariable(operand[0].op) ? program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
 
     void *result = std::malloc(static_cast<size_t>(size));
+    if (result == nullptr) {
+        throw mx::Exception("malloc failed to allocate " + std::to_string(size) + " bytes");
+    }
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.ptr_value = result;
@@ -218,6 +221,9 @@ extern "C" void mxvm_std_calloc(mxvm::Program *program, std::vector<mxvm::Operan
     int64_t size = program->isVariable(operand[1].op) ? program->getVariable(operand[1].op).var_value.int_value : operand[1].op_value;
 
     void *result = std::calloc(static_cast<size_t>(count), static_cast<size_t>(size));
+    if (result == nullptr) {
+        throw mx::Exception("calloc failed to allocate " + std::to_string(count) + " * " + std::to_string(size) + " bytes");
+    }
     program->vars["%rax"].type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_POINTER;
     program->vars["%rax"].var_value.ptr_value = result;
@@ -242,6 +248,9 @@ extern "C" void mxvm_std_release(mxvm::Program *program, std::vector<mxvm::Opera
 
     std::free(var.var_value.ptr_value);
     var.var_value.ptr_value = nullptr;
+    var.var_value.owns = false;
+    var.var_value.ptr_size = 0;
+    var.var_value.ptr_count = 0;
 }
 
 // Character functions
@@ -326,6 +335,9 @@ extern "C" void mxvm_std_atoi(mxvm::Program *program, std::vector<mxvm::Operand>
     if (var.type == mxvm::VarType::VAR_STRING) {
         str = var.var_value.str_value.c_str();
     } else if (var.type == mxvm::VarType::VAR_POINTER) {
+        if (var.var_value.ptr_value == nullptr) {
+            throw mx::Exception("atoi: pointer argument is null");
+        }
         str = reinterpret_cast<const char *>(var.var_value.ptr_value);
     } else {
         throw mx::Exception("atoi argument must be a string or pointer variable.");
@@ -352,6 +364,9 @@ extern "C" void mxvm_std_atof(mxvm::Program *program, std::vector<mxvm::Operand>
     if (var.type == mxvm::VarType::VAR_STRING) {
         str = var.var_value.str_value.c_str();
     } else if (var.type == mxvm::VarType::VAR_POINTER) {
+        if (var.var_value.ptr_value == nullptr) {
+            throw mx::Exception("atof: pointer argument is null");
+        }
         str = reinterpret_cast<const char *>(var.var_value.ptr_value);
     } else {
         throw mx::Exception("atof argument must be a string or pointer variable.");
@@ -388,6 +403,9 @@ extern "C" void mxvm_std_system(mxvm::Program *program, std::vector<mxvm::Operan
     if (var.type == mxvm::VarType::VAR_STRING) {
         command = var.var_value.str_value.c_str();
     } else if (var.type == mxvm::VarType::VAR_POINTER) {
+        if (var.var_value.ptr_value == nullptr) {
+            throw mx::Exception("system: pointer argument is null");
+        }
         command = reinterpret_cast<const char *>(var.var_value.ptr_value);
     } else {
         throw mx::Exception("system argument must be a string or pointer variable.");

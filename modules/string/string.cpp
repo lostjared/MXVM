@@ -355,9 +355,12 @@ extern "C" void mxvm_string_strat(mxvm::Program *program, std::vector<mxvm::Oper
             pos = v.var_value.int_value;
         }
         mxvm::Variable &var = program->getVariable(operand[0].op);
+        if (pos < 0 || static_cast<size_t>(pos) >= var.var_value.str_value.size()) {
+            throw mx::Exception("strat: index " + std::to_string(pos) + " out of bounds for string of length " + std::to_string(var.var_value.str_value.size()));
+        }
         program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
         program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
-        program->vars["%rax"].var_value.int_value = static_cast<int64_t>(var.var_value.str_value[pos]);
+        program->vars["%rax"].var_value.int_value = static_cast<int64_t>(var.var_value.str_value[static_cast<size_t>(pos)]);
     }
 }
 
@@ -383,7 +386,13 @@ extern "C" void mxvm_string_copy(mxvm::Program *program, std::vector<mxvm::Opera
     int64_t index = program->getVariable(operand[1].op).var_value.int_value;
     int64_t count = program->getVariable(operand[2].op).var_value.int_value;
 
-    std::string result_str = s.substr(index - 1, count);
+    if (index < 1 || static_cast<size_t>(index - 1) > s.size()) {
+        throw mx::Exception("copy: index " + std::to_string(index) + " out of bounds for string of length " + std::to_string(s.size()));
+    }
+    if (count < 0) {
+        throw mx::Exception("copy: count must be non-negative");
+    }
+    std::string result_str = s.substr(static_cast<size_t>(index - 1), static_cast<size_t>(count));
 
     char *new_buf = static_cast<char *>(malloc(result_str.length() + 1));
     if (!new_buf)
@@ -405,7 +414,10 @@ extern "C" void mxvm_string_insert(mxvm::Program *program, std::vector<mxvm::Ope
     std::string dest = getStringFromVar(program, operand[1].op);
     int64_t index = program->getVariable(operand[2].op).var_value.int_value;
 
-    dest.insert(index - 1, source);
+    if (index < 1 || static_cast<size_t>(index - 1) > dest.size()) {
+        throw mx::Exception("insert: index " + std::to_string(index) + " out of bounds for string of length " + std::to_string(dest.size()));
+    }
+    dest.insert(static_cast<size_t>(index - 1), source);
 
     char *new_buf = static_cast<char *>(malloc(dest.length() + 1));
     if (!new_buf)
@@ -427,7 +439,13 @@ extern "C" void mxvm_string_delete(mxvm::Program *program, std::vector<mxvm::Ope
     int64_t index = program->getVariable(operand[1].op).var_value.int_value;
     int64_t count = program->getVariable(operand[2].op).var_value.int_value;
 
-    s.erase(index - 1, count);
+    if (index < 1 || static_cast<size_t>(index - 1) > s.size()) {
+        throw mx::Exception("delete: index " + std::to_string(index) + " out of bounds for string of length " + std::to_string(s.size()));
+    }
+    if (count < 0) {
+        throw mx::Exception("delete: count must be non-negative");
+    }
+    s.erase(static_cast<size_t>(index - 1), static_cast<size_t>(count));
 
     char *new_buf = static_cast<char *>(malloc(s.length() + 1));
     if (!new_buf)

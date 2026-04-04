@@ -42,6 +42,26 @@ namespace mxvm {
             if (handle)
                 dlclose(handle);
         }
+
+        Function(const Function &) = delete;
+        Function &operator=(const Function &) = delete;
+
+        Function(Function &&other) noexcept : handle(other.handle), fn(other.fn) {
+            other.handle = nullptr;
+            other.fn = nullptr;
+        }
+        Function &operator=(Function &&other) noexcept {
+            if (this != &other) {
+                if (handle)
+                    dlclose(handle);
+                handle = other.handle;
+                fn = other.fn;
+                other.handle = nullptr;
+                other.fn = nullptr;
+            }
+            return *this;
+        }
+
         R operator()(Args... args) const {
             if (!fn)
                 throw std::runtime_error("Null function pointer");

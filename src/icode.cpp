@@ -2,11 +2,13 @@
 #include "mxvm/function.hpp"
 #include "mxvm/parser.hpp"
 #include "scanner/exception.hpp"
+#include <cstdint>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <regex>
 #include <sstream>
+#include <unordered_set>
 
 namespace mxvm {
 
@@ -135,13 +137,18 @@ namespace mxvm {
     }
 
     Program::~Program() {
+        std::unordered_set<void *> freed_ptrs;
         for (auto &i : vars) {
             if (i.second.var_value.ptr_value != nullptr && i.second.var_value.owns) {
-                free(i.second.var_value.ptr_value);
-                i.second.var_value.ptr_value = nullptr;
-                if (debug_mode) {
-                    std::cerr << Col("MXVM: Warning ", mx::Color::RED) << "Possible Memory Leak, Pointer: " << name << "." << i.first << "\n";
+                if (freed_ptrs.find(i.second.var_value.ptr_value) == freed_ptrs.end()) {
+                    freed_ptrs.insert(i.second.var_value.ptr_value);
+                    free(i.second.var_value.ptr_value);
+                    if (debug_mode) {
+                        std::cerr << Col("MXVM: Warning ", mx::Color::RED) << "Possible Memory Leak, Pointer: " << name << "." << i.first << "\n";
+                    }
                 }
+                i.second.var_value.ptr_value = nullptr;
+                i.second.var_value.owns = false;
             }
         }
 
@@ -388,9 +395,9 @@ namespace mxvm {
                         if (var.second.var_value.ptr_value == nullptr)
                             out << std::setw(30) << "null";
                         else {
-                            char ptr_buf[256];
-                            snprintf(ptr_buf, sizeof(ptr_buf), "%p", var.second.var_value.ptr_value);
-                            out << std::setw(30) << ptr_buf << std::dec;
+                            std::ostringstream ptr_oss;
+                            ptr_oss << var.second.var_value.ptr_value;
+                            out << std::setw(30) << ptr_oss.str() << std::dec;
                         }
                         break;
                     case VarType::VAR_LABEL:

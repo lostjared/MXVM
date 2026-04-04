@@ -70,6 +70,9 @@ namespace mxvm {
                 if (tok.getTokenValue() == "{") {
                     ++brace_depth;
                 } else if (tok.getTokenValue() == "}") {
+                    if (brace_depth <= 0) {
+                        throw mx::Exception("Syntax Error in '" + filename + "': unexpected '}' in object section");
+                    }
                     --brace_depth;
                     if (brace_depth == 0) {
                         in_object_section = false;

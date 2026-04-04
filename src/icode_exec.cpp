@@ -809,21 +809,21 @@ namespace mxvm {
         if (dest.type == VarType::VAR_INTEGER) {
             int64_t v1 = (src1.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1.var_value.float_value) : src1.var_value.int_value;
             int64_t v2 = (src2.type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2.var_value.float_value) : src2.var_value.int_value;
-            if (v2 != 0) {
-                dest.var_value.int_value = v1 / v2;
-            } else {
-
-                dest.var_value.int_value = 0;
+            if (v2 == 0) {
+                throw mx::Exception("DIV: integer division by zero");
             }
+            if (v1 == INT64_MIN && v2 == -1) {
+                throw mx::Exception("DIV: signed integer overflow (INT64_MIN / -1)");
+            }
+            dest.var_value.int_value = v1 / v2;
             dest.var_value.type = VarType::VAR_INTEGER;
         } else if (dest.type == VarType::VAR_FLOAT) {
             double v1 = (src1.type == VarType::VAR_INTEGER) ? static_cast<double>(src1.var_value.int_value) : src1.var_value.float_value;
             double v2 = (src2.type == VarType::VAR_INTEGER) ? static_cast<double>(src2.var_value.int_value) : src2.var_value.float_value;
-            if (v2 != 0.0) {
-                dest.var_value.float_value = v1 / v2;
-            } else {
-                dest.var_value.float_value = 0.0;
+            if (v2 == 0.0) {
+                throw mx::Exception("DIV: floating-point division by zero");
             }
+            dest.var_value.float_value = v1 / v2;
             dest.var_value.type = VarType::VAR_FLOAT;
         }
     }
@@ -899,8 +899,14 @@ namespace mxvm {
             }
         }
 
+        if (stride == 0) {
+            throw mx::Exception("LOAD: stride must be non-zero");
+        }
+        if (index > SIZE_MAX / stride) {
+            throw mx::Exception("LOAD: index * stride overflow");
+        }
         size_t offset = index * stride;
-        if (allocated_size > 0 && (stride == 0 || index > (allocated_size - stride) / stride || offset + stride > allocated_size)) {
+        if (allocated_size > 0 && (offset + stride > allocated_size)) {
             throw mx::Exception("LOAD: index out of bounds, offset " + std::to_string(offset) +
                                 " + stride " + std::to_string(stride) +
                                 " exceeds allocated size " + std::to_string(allocated_size));
@@ -998,8 +1004,14 @@ namespace mxvm {
             }
         }
 
+        if (stride == 0) {
+            throw mx::Exception("STORE: stride must be non-zero");
+        }
+        if (index > SIZE_MAX / stride) {
+            throw mx::Exception("STORE: index * stride overflow");
+        }
         size_t offset = index * stride;
-        if (is_owned && allocated_size > 0 && (stride == 0 || index > (allocated_size - stride) / stride || offset + stride > allocated_size)) {
+        if (is_owned && allocated_size > 0 && (offset + stride > allocated_size)) {
             throw mx::Exception("STORE: index out of bounds, offset " + std::to_string(offset) +
                                 " + stride " + std::to_string(stride) +
                                 " exceeds allocated size " + std::to_string(allocated_size));
@@ -1055,7 +1067,6 @@ namespace mxvm {
     void Program::exec_and(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("AND destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         int64_t v1, v2;
@@ -1073,7 +1084,6 @@ namespace mxvm {
     void Program::exec_or(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("OR destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         int64_t v1, v2;
@@ -1091,7 +1101,6 @@ namespace mxvm {
     void Program::exec_xor(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("XOR destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         int64_t v1, v2;
@@ -1109,7 +1118,6 @@ namespace mxvm {
     void Program::exec_alloc(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("ALLOC destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         int64_t size = 0;
@@ -1147,7 +1155,6 @@ namespace mxvm {
     void Program::exec_free(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("FREE argument must be a variable");
-            return;
         }
         Variable &var = getVariable(instr.op1.op);
         if (var.type == VarType::VAR_POINTER && var.var_value.owns && var.var_value.ptr_value != nullptr) {
@@ -1162,7 +1169,6 @@ namespace mxvm {
     void Program::exec_not(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("NOT destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         if (dest.var_value.type != VarType::VAR_INTEGER) {
@@ -1209,7 +1215,7 @@ namespace mxvm {
             int64_t v1 = (src1->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src1->var_value.float_value) : src1->var_value.int_value;
             int64_t v2 = (src2->type == VarType::VAR_FLOAT) ? static_cast<int64_t>(src2->var_value.float_value) : src2->var_value.int_value;
             if (v2 == 0) {
-                dest.var_value.int_value = 0;
+                throw mx::Exception("MOD: integer modulo by zero");
             } else {
                 dest.var_value.int_value = v1 % v2;
             }
@@ -1292,13 +1298,11 @@ namespace mxvm {
     void Program::exec_string_print(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("STRING_PRINT destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
 
         if (dest.type != VarType::VAR_STRING) {
             throw mx::Exception("STRING_PRINT destination must be a string variable");
-            return;
         }
 
         std::string format;
@@ -1457,7 +1461,6 @@ namespace mxvm {
     void Program::exec_getline(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("GETLINE destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
         std::string input;
@@ -1481,7 +1484,6 @@ namespace mxvm {
                 return;
             } catch (...) {
                 throw mx::Exception("PUSH argument must be a variable or integer constant");
-                return;
             }
         }
         Variable &var = getVariable(instr.op1.op);
@@ -1497,13 +1499,11 @@ namespace mxvm {
     void Program::exec_pop(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("POP destination must be a variable");
-            return;
         }
         Variable &var = getVariable(instr.op1.op);
 
         if (stack.empty()) {
             throw mx::Exception("POP from empty stack");
-            return;
         }
 
         StackValue value = stack.pop();
@@ -1533,7 +1533,6 @@ namespace mxvm {
     void Program::exec_stack_load(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("STACK_LOAD destination must be a variable");
-            return;
         }
         Variable &dest = getVariable(instr.op1.op);
 
@@ -1548,7 +1547,6 @@ namespace mxvm {
 
         if (index >= stack.size()) {
             throw mx::Exception("STACK_LOAD: index out of bounds");
-            return;
         }
 
         StackValue &value = stack[index];
@@ -1572,7 +1570,6 @@ namespace mxvm {
     void Program::exec_stack_store(const Instruction &instr) {
         if (!isVariable(instr.op1.op)) {
             throw mx::Exception("STACK_STORE source must be a variable");
-            return;
         }
         Variable &src = getVariable(instr.op1.op);
 
@@ -1587,7 +1584,6 @@ namespace mxvm {
 
         if (index >= stack.size()) {
             throw mx::Exception("STACK_STORE: index out of bounds");
-            return;
         }
         StackValue &value = stack[index];
         if (src.type == VarType::VAR_INTEGER) {
@@ -1616,17 +1612,15 @@ namespace mxvm {
         }
         if (count > stack.size()) {
             throw mx::Exception("STACK_SUB: not enough values on stack to pop " + std::to_string(count));
-            return;
         }
         for (size_t i = 0; i < count; ++i) {
-            stack.pop();
+            (void)stack.pop();
         }
     }
 
     void Program::exec_call(const Instruction &instr) {
         if (instr.op1.op.empty()) {
             throw mx::Exception("CALL requires a label operand");
-            return;
         }
         auto it = labels.find(instr.op1.op);
         if (it != labels.end()) {
@@ -1640,12 +1634,10 @@ namespace mxvm {
     void Program::exec_ret(const Instruction &instr) {
         if (stack.empty()) {
             throw mx::Exception("RET: stack is empty, no return address");
-            return;
         }
         StackValue value = stack.pop();
         if (!std::holds_alternative<int64_t>(value)) {
             throw mx::Exception("RET: return address on stack is not an integer");
-            return;
         }
         pc = static_cast<size_t>(std::get<int64_t>(value)) - 1;
     }

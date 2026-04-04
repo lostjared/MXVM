@@ -20,16 +20,20 @@ namespace mxvm {
         void push(const StackValue &value) {
             data.push_back(value);
         }
-        StackValue pop() {
+        [[nodiscard]] StackValue pop() {
             if (data.empty())
                 throw mx::Exception("Stack underflow");
             StackValue val = data.back();
             data.pop_back();
             return val;
         }
-        bool empty() const { return data.empty(); }
-        size_t size() const { return data.size(); }
-        StackValue &operator[](size_t index) { return data[index]; }
+        [[nodiscard]] bool empty() const { return data.empty(); }
+        [[nodiscard]] size_t size() const { return data.size(); }
+        StackValue &operator[](size_t index) {
+            if (index >= data.size())
+                throw mx::Exception("Stack index out of bounds: " + std::to_string(index));
+            return data[index];
+        }
 
       private:
         std::vector<StackValue> data;

@@ -21,7 +21,7 @@ const
   BLOCK_H = 16;
   BLOCK_SPACING_X = 4;
   BLOCK_SPACING_Y = 4;
-  GRID_OFFSET_X = 8;
+  GRID_OFFSET_X = 2;
   GRID_OFFSET_Y = 40;
 
   PADDLE_W = 72;
