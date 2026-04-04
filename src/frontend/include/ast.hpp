@@ -472,6 +472,34 @@ namespace pascal {
         std::string toString() const override;
     };
 
+    class NilNode : public ASTNode {
+      public:
+        NilNode() = default;
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "nil"; }
+    };
+
+    class PointerTypeNode : public ASTNode {
+      public:
+        std::string baseTypeName;
+
+        PointerTypeNode(const std::string &base) : baseTypeName(base) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "PointerType: ^" + baseTypeName; }
+    };
+
+    class PointerDerefNode : public ASTNode {
+      public:
+        std::unique_ptr<ASTNode> pointer;
+
+        PointerDerefNode(std::unique_ptr<ASTNode> ptr) : pointer(std::move(ptr)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "PointerDeref"; }
+    };
+
     class RepeatStmtNode : public ASTNode {
       public:
         std::vector<std::unique_ptr<ASTNode>> statements;
@@ -553,6 +581,9 @@ namespace pascal {
         virtual void visit(ArrayTypeDeclarationNode &node) = 0;
         virtual void visit(ContinueNode &node) = 0;
         virtual void visit(BreakNode &node) = 0;
+        virtual void visit(NilNode &node) = 0;
+        virtual void visit(PointerTypeNode &node) = 0;
+        virtual void visit(PointerDerefNode &node) = 0;
     };
 } // namespace pascal
 

@@ -960,7 +960,8 @@ namespace mxx {
     bool TPValidator::isBuiltinType() const {
         return isKW("integer") || isKW("real") || isKW("boolean") || isKW("char") ||
                isKW("byte") || isKW("word") || isKW("longint") || isKW("shortint") ||
-               isKW("smallint") || isKW("cardinal") || isKW("string") || isKW("text");
+               isKW("smallint") || isKW("cardinal") || isKW("string") || isKW("text") ||
+               isKW("pointer");
     }
 
     void TPValidator::checkType(const std::string &name, const scan::TToken *at) {
@@ -990,11 +991,12 @@ namespace mxx {
         "program", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
         "case", "of", "with", "goto", "exit", "break", "continue",
+        "nil", "new", "dispose",
 
         "div", "mod", "and", "or", "not", "in",
         "integer", "real", "boolean", "char", "byte", "word", "longint", "shortint",
         "smallint", "cardinal", "string", "text", "double", "single", "extended",
-        "comp", "currency", "ptr", "array", "record", "set"};
+        "comp", "currency", "ptr", "pointer", "array", "record", "set"};
 
     bool TPValidator::isPascalKeyword(const std::string &s) const {
         return pascal_keywords.count(lower(s));

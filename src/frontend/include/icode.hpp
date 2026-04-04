@@ -851,6 +851,7 @@ namespace pascal {
             functionSetReturn = false;
             recordTypes.clear();
             varRecordType.clear();
+            pointerBaseType.clear();
             typeAliases.clear();
             arrayInfo.clear();
 
@@ -1225,6 +1226,9 @@ namespace pascal {
         void visit(ExitNode &node) override;
         void visit(BreakNode &node) override;
         void visit(ContinueNode &node) override;
+        void visit(NilNode &node) override;
+        void visit(PointerTypeNode &node) override;
+        void visit(PointerDerefNode &node) override;
 
         std::string getTypeString(const VarDeclNode &node) {
             if (std::holds_alternative<std::string>(node.type))
@@ -1272,6 +1276,10 @@ namespace pascal {
                 return VarType::PTR;
             if (base == "char")
                 return VarType::CHAR;
+            if (base == "pointer")
+                return VarType::PTR;
+            if (!base.empty() && base[0] == '^')
+                return VarType::PTR;
             if (isRecordTypeName(base))
                 return VarType::RECORD;
             if (arrayInfo.find(base) != arrayInfo.end())
@@ -1295,6 +1303,8 @@ namespace pascal {
         }
 
         VarType getExpressionType(ASTNode *node) {
+            if (dynamic_cast<NilNode *>(node))
+                return VarType::PTR;
             if (dynamic_cast<NumberNode *>(node)) {
                 auto n = static_cast<NumberNode *>(node);
                 return n->isReal ? VarType::DOUBLE : VarType::INT;
@@ -1304,6 +1314,12 @@ namespace pascal {
             }
             if (dynamic_cast<BooleanNode *>(node))
                 return VarType::BOOL;
+            if (auto derefNode = dynamic_cast<PointerDerefNode *>(node)) {
+                if (auto varNode = dynamic_cast<VariableNode *>(derefNode->pointer.get())) {
+                    return getPointerDerefType(varNode->name);
+                }
+                return VarType::INT;
+            }
             if (auto varNode = dynamic_cast<VariableNode *>(node))
                 return getVarType(varNode->name);
             if (auto funcCall = dynamic_cast<FuncCallNode *>(node)) {
@@ -1666,6 +1682,7 @@ namespace pascal {
         };
         std::unordered_map<std::string, RecordTypeInfo> recordTypes;
         std::unordered_map<std::string, std::string> varRecordType;
+        std::unordered_map<std::string, std::string> pointerBaseType;
 
         std::pair<int, int> getRecordFieldOffsetAndSize(const std::string &recType, const std::string &field) {
             std::string normalizedRecType = resolveTypeName(lc(recType));
@@ -1775,6 +1792,32 @@ namespace pascal {
         bool isArrayTypeName(const std::string &t) const {
             auto base = resolveTypeName(lc(t));
             return arrayInfo.find(base) != arrayInfo.end();
+        }
+
+        std::string getPointerBaseTypeName(const std::string &varName) const {
+            std::string mangled = findMangledName(varName);
+            auto it = pointerBaseType.find(mangled);
+            if (it != pointerBaseType.end())
+                return it->second;
+            it = pointerBaseType.find(varName);
+            if (it != pointerBaseType.end())
+                return it->second;
+            return "";
+        }
+
+        int getPointerElementSize(const std::string &varName) {
+            std::string base = getPointerBaseTypeName(varName);
+            if (base.empty())
+                return 8;
+            base = resolveTypeName(lc(base));
+            return getTypeSizeByName(base);
+        }
+
+        VarType getPointerDerefType(const std::string &varName) {
+            std::string base = getPointerBaseTypeName(varName);
+            if (base.empty())
+                return VarType::INT;
+            return getTypeFromString(base);
         }
 
       private:

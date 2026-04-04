@@ -408,4 +408,16 @@ namespace pascal {
         return "Continue Node";
     }
 
+    void NilNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void PointerTypeNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void PointerDerefNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
 } // namespace pascal

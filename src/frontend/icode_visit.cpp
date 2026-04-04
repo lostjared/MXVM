@@ -79,6 +79,18 @@ namespace pascal {
                     continue;
                 }
 
+                if (auto *ptrTypeNode = dynamic_cast<PointerTypeNode *>(typeNode.get())) {
+                    setVarType(varName, VarType::PTR);
+                    int slot = newSlotFor(mangledName);
+                    setSlotType(slot, VarType::PTR);
+                    varSlot[varName] = slot;
+                    varSlot[mangledName] = slot;
+                    pointerBaseType[mangledName] = ptrTypeNode->baseTypeName;
+                    pointerBaseType[varName] = ptrTypeNode->baseTypeName;
+                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                    continue;
+                }
+
                 if (auto *simpleTypeNode = dynamic_cast<SimpleTypeNode *>(typeNode.get())) {
                     typeName = simpleTypeNode->typeName;
                 } else if (dynamic_cast<RecordTypeNode *>(typeNode.get())) {
@@ -135,6 +147,16 @@ namespace pascal {
                 continue;
             }
 
+            if (!normalizedTypeName.empty() && normalizedTypeName[0] == '^') {
+                std::string baseType = normalizedTypeName.substr(1);
+                setVarType(varName, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
+                pointerBaseType[mangledName] = baseType;
+                pointerBaseType[varName] = baseType;
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                continue;
+            }
+
             VarType vType = getTypeFromString(typeName);
             setVarType(varName, vType);
             setSlotType(slot, vType);
@@ -150,6 +172,44 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(ProcCallNode &node) {
+        if (node.name == "new") {
+            if (node.arguments.size() != 1)
+                throw std::runtime_error("new() requires exactly one pointer argument");
+            auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
+            if (!varNode)
+                throw std::runtime_error("new() argument must be a variable");
+
+            std::string mangled = findMangledName(varNode->name);
+            std::string sym = storageSymbolFor(mangled);
+            int elemSize = getPointerElementSize(varNode->name);
+
+            std::string baseType = getPointerBaseTypeName(varNode->name);
+            baseType = resolveTypeName(lc(baseType));
+            int allocCount = 1;
+            if (isRecordTypeName(baseType)) {
+                auto it = recordTypes.find(baseType);
+                if (it != recordTypes.end()) {
+                    elemSize = it->second.size;
+                }
+            }
+
+            emit3("alloc", sym, std::to_string(elemSize), std::to_string(allocCount));
+            return;
+        }
+
+        if (node.name == "dispose") {
+            if (node.arguments.size() != 1)
+                throw std::runtime_error("dispose() requires exactly one pointer argument");
+            auto *varNode = dynamic_cast<VariableNode *>(node.arguments[0].get());
+            if (!varNode)
+                throw std::runtime_error("dispose() argument must be a variable");
+
+            std::string mangled = findMangledName(varNode->name);
+            std::string sym = storageSymbolFor(mangled);
+            emit1("free", sym);
+            return;
+        }
+
         auto handler = builtinRegistry.findHandler(node.name);
         if (handler) {
             handler->generate(*this, node.name, node.arguments);
@@ -926,6 +986,22 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(AssignmentNode &node) {
+        if (auto deref = dynamic_cast<PointerDerefNode *>(node.variable.get())) {
+            std::string rhs = eval(node.expression.get());
+            std::string ptrVal = eval(deref->pointer.get());
+            std::string base = ensurePtrBase(ptrVal);
+
+            emit4("store", rhs, base, "0", "1");
+
+            if (isReg(rhs) && !isParmReg(rhs))
+                freeReg(rhs);
+            if (isReg(ptrVal) && !isParmReg(ptrVal) && ptrVal != base)
+                freeReg(ptrVal);
+            if (isReg(base) && !isParmReg(base))
+                freeReg(base);
+            return;
+        }
+
         if (auto arr = dynamic_cast<ArrayAccessNode *>(node.variable.get())) {
             ArrayInfo *info = getArrayInfoForArrayAccess(arr);
             if (!info)
@@ -1395,6 +1471,44 @@ namespace pascal {
         if (!loopContinueLabels.empty()) {
             emit1("jmp", loopContinueLabels.back());
         }
+    }
+
+    void CodeGenVisitor::visit(NilNode &node) {
+        pushValue("0");
+    }
+
+    void CodeGenVisitor::visit(PointerTypeNode &node) {
+        // Handled in VarDeclNode visitor
+    }
+
+    void CodeGenVisitor::visit(PointerDerefNode &node) {
+        // Evaluate the pointer expression
+        std::string ptrVal = eval(node.pointer.get());
+
+        // Determine the pointed-to type
+        VarType derefType = VarType::INT;
+        if (auto varNode = dynamic_cast<VariableNode *>(node.pointer.get())) {
+            derefType = getPointerDerefType(varNode->name);
+        }
+
+        std::string base = ensurePtrBase(ptrVal);
+
+        if (derefType == VarType::DOUBLE) {
+            std::string result = allocFloatReg();
+            emit4("load", result, base, "0", "1");
+            pushValue(result);
+        } else if (derefType == VarType::PTR || derefType == VarType::STRING) {
+            std::string result = allocTempPtr();
+            emit4("load", result, base, "0", "1");
+            pushValue(result);
+        } else {
+            std::string result = allocReg();
+            emit4("load", result, base, "0", "1");
+            pushValue(result);
+        }
+
+        if (isReg(ptrVal) && !isParmReg(ptrVal) && ptrVal != base)
+            freeReg(ptrVal);
     }
 
 } // namespace pascal

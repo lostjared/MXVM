@@ -71,7 +71,8 @@ namespace pascal {
                lower == "true" || lower == "false" || lower == "div" || lower == "mod" ||
                lower == "and" || lower == "or" || lower == "not" ||
                lower == "case" || lower == "of" || lower == "repeat" || lower == "until" ||
-               lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue";
+               lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue" ||
+               lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {
@@ -475,6 +476,11 @@ namespace pascal {
             auto booleanNode = std::make_unique<BooleanNode>(value);
             booleanNode->setLineNumber(lineNum);
             return booleanNode;
+        } else if (peekIs("nil")) {
+            next();
+            auto nilNode = std::make_unique<NilNode>();
+            nilNode->setLineNumber(lineNum);
+            return nilNode;
         } else if (peekIs("(")) {
             next();
             auto expr = parseExpression();
@@ -500,6 +506,10 @@ namespace pascal {
                     std::string fieldName = token->getTokenValue();
                     next();
                     left = std::make_unique<FieldAccessNode>(std::move(left), fieldName);
+                    left->setLineNumber(lineNum);
+                } else if (peekIs("^")) {
+                    next();
+                    left = std::make_unique<PointerDerefNode>(std::move(left));
                     left->setLineNumber(lineNum);
                 } else if (peekIs("(")) {
                     if (auto varNode = dynamic_cast<VariableNode *>(left.get())) {
@@ -703,6 +713,12 @@ namespace pascal {
                 typeDefinition = std::make_unique<ArrayTypeDeclarationNode>(
                     typeName,
                     std::unique_ptr<ArrayTypeNode>(static_cast<ArrayTypeNode *>(arrayType.release())));
+            } else if (peekIs("^")) {
+                next();
+                expectToken(types::TokenType::TT_ID);
+                std::string baseType = token->getTokenValue();
+                next();
+                typeDefinition = std::make_unique<TypeAliasNode>(typeName, "^" + baseType);
             } else {
                 expectToken(types::TokenType::TT_ID);
                 std::string baseType = token->getTokenValue();
@@ -789,6 +805,13 @@ namespace pascal {
             return parseArrayType();
         if (peekIs("record"))
             return parseRecordType();
+        if (peekIs("^")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            std::string baseType = token->getTokenValue();
+            next();
+            return std::make_unique<PointerTypeNode>(baseType);
+        }
         expectToken(types::TokenType::TT_ID);
         auto t = std::make_unique<SimpleTypeNode>(token->getTokenValue());
         next();
@@ -853,6 +876,10 @@ namespace pascal {
                 std::string fieldName = token->getTokenValue();
                 next();
                 left = std::make_unique<FieldAccessNode>(std::move(left), fieldName);
+                left->setLineNumber(lineNum);
+            } else if (peekIs("^")) {
+                next();
+                left = std::make_unique<PointerDerefNode>(std::move(left));
                 left->setLineNumber(lineNum);
             } else {
                 break;
