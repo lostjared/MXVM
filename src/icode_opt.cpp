@@ -1,5 +1,4 @@
 #include "mxvm/icode.hpp"
-#include <cctype>
 #include <regex>
 #include <sstream>
 #include <string>
