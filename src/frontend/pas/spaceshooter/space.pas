@@ -186,13 +186,38 @@ begin
   begin
     if explosions[i].active then
     begin
-      sdl_set_draw_color(renderer, explosions[i].cr, explosions[i].cg, explosions[i].cb, 255);
-      for k := 0 to 19 do
+      if explosions[i].die then
       begin
-        dx := (rand() mod 60) - 30;
-        dy := (rand() mod 60) - 30;
-        sdl_draw_line(renderer, explosions[i].x, explosions[i].y,
-                      explosions[i].x + dx, explosions[i].y + dy);
+        { large player death explosion }
+        for k := 0 to 39 do
+        begin
+          dx := (rand() mod 160) - 80;
+          dy := (rand() mod 160) - 80;
+          sdl_set_draw_color(renderer, 255, 200 + (rand() mod 56), rand() mod 80, 255);
+          sdl_draw_line(renderer, explosions[i].x, explosions[i].y,
+                        explosions[i].x + dx, explosions[i].y + dy);
+        end;
+        { white-hot core }
+        sdl_set_draw_color(renderer, 255, 255, 200, 255);
+        for k := 0 to 14 do
+        begin
+          dx := (rand() mod 40) - 20;
+          dy := (rand() mod 40) - 20;
+          sdl_draw_line(renderer, explosions[i].x + dx, explosions[i].y + dy,
+                        explosions[i].x + (rand() mod 20) - 10, explosions[i].y + (rand() mod 20) - 10);
+        end;
+      end
+      else
+      begin
+        { normal enemy explosion }
+        sdl_set_draw_color(renderer, explosions[i].cr, explosions[i].cg, explosions[i].cb, 255);
+        for k := 0 to 19 do
+        begin
+          dx := (rand() mod 60) - 30;
+          dy := (rand() mod 60) - 30;
+          sdl_draw_line(renderer, explosions[i].x, explosions[i].y,
+                        explosions[i].x + dx, explosions[i].y + dy);
+        end;
       end;
     end;
   end;
@@ -470,6 +495,7 @@ begin
       begin
         add_explosion(player_x + player_w div 2, player_y + player_h div 2, EXPTYPE_RED, true);
         enemies[ei].active := false;
+        player_die := true;
       end;
     end;
   end;
@@ -491,8 +517,9 @@ begin
       if aabb(player_x, player_y, player_w, player_h,
               crect_x, crect_y, 128, 128) then
       begin
-        add_explosion(circular[ci].x, circular[ci].y, EXPTYPE_RED, true);
+        add_explosion(player_x + player_w div 2, player_y + player_h div 2, EXPTYPE_RED, true);
         circular[ci].active := false;
+        player_die := true;
       end;
     end;
   end;
@@ -546,12 +573,15 @@ begin
   if game_state = STATE_PLAYING then
   begin
     { draw player ship }
-    if ship_tex <> -1 then
-      sdl_render_texture(renderer, ship_tex, -1, -1, -1, -1,
-                         player_x - 8, player_y - 8, 64, 64)
-    else
-      draw_gradient_triangle(player_x + player_w div 2, player_y,
-                             player_y + player_h);
+    if player_die = false then
+    begin
+      if ship_tex <> -1 then
+        sdl_render_texture(renderer, ship_tex, -1, -1, -1, -1,
+                           player_x - 8, player_y - 8, 64, 64)
+      else
+        draw_gradient_triangle(player_x + player_w div 2, player_y,
+                               player_y + player_h);
+    end;
 
     { draw projectiles }
     for i := 0 to MAX_PROJECTILES - 1 do
@@ -690,6 +720,8 @@ begin
     sdl_quit();
     halt(EXIT_FAILURE);
   end;
+
+  sdl_set_draw_color(renderer, 0, 0, 0, 255);
 
   if sdl_init_text() <> 1 then
   begin

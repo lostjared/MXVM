@@ -1360,8 +1360,12 @@ namespace mxvm {
             } else if (v.type == VarType::VAR_STRING) {
                 out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rax\n";
                 out << "\tpushq %rax\n";
+            } else if (v.type == VarType::VAR_FLOAT) {
+                out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
+                out << "\tsubq $8, %rsp\n";
+                out << "\tmovsd %xmm0, (%rsp)\n";
             } else {
-                throw mx::Exception("PUSH only supports integer or pointer variables");
+                throw mx::Exception("PUSH only supports integer, pointer, or float variables");
             }
         } else if (i.op1.type == OperandType::OP_CONSTANT) {
             out << "\tmovq $" << i.op1.op << ", %rax\n";
@@ -1382,8 +1386,12 @@ namespace mxvm {
         } else if (v.type == VarType::VAR_POINTER || v.type == VarType::VAR_EXTERN) {
             out << "\tpopq %rax\n";
             out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        } else if (v.type == VarType::VAR_FLOAT) {
+            out << "\tmovsd (%rsp), %xmm0\n";
+            out << "\taddq $8, %rsp\n";
+            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
         } else {
-            throw mx::Exception("POP only supports integer or pointer variables");
+            throw mx::Exception("POP only supports integer, pointer, or float variables");
         }
     }
 
