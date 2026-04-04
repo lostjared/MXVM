@@ -28,6 +28,14 @@ namespace pascal {
         return "Program: " + name;
     }
 
+    void UnitNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    std::string UnitNode::toString() const {
+        return "Unit: " + name;
+    }
+
     void BlockNode::accept(ASTVisitor &visitor) {
         visitor.visit(*this);
     }

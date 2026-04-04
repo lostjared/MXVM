@@ -121,6 +121,10 @@ namespace pascal {
 
         /** @brief Parse a complete Pascal program and return the root AST node */
         std::unique_ptr<ProgramNode> parseProgram();
+        /** @brief Parse a Pascal unit and return the root AST node */
+        std::unique_ptr<UnitNode> parseUnit();
+        /** @brief Check if the source starts with a 'unit' keyword */
+        bool isUnitSource() const;
         mxx::TPValidator validator; ///< semantic validator
 
       private:
@@ -152,6 +156,12 @@ namespace pascal {
         std::unique_ptr<ASTNode> parseProcedureDeclaration();
         /** @brief Parse a function declaration */
         std::unique_ptr<ASTNode> parseFunctionDeclaration();
+        /** @brief Parse interface forward declarations (procedure/function signatures only) */
+        std::vector<std::unique_ptr<ASTNode>> parseInterfaceDeclarations();
+        /** @brief Parse a procedure forward declaration (signature only, no body) */
+        std::unique_ptr<ASTNode> parseProcedureForwardDecl();
+        /** @brief Parse a function forward declaration (signature only, no body) */
+        std::unique_ptr<ASTNode> parseFunctionForwardDecl();
         /** @brief Parse a formal parameter list */
         std::vector<std::unique_ptr<ASTNode>> parseParameterList();
         /** @brief Parse a list of statements (separated by semicolons) */

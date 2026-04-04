@@ -156,6 +156,10 @@ namespace mxx {
 
         /** @brief Validate a complete Pascal program */
         void parseProgram();
+        /** @brief Validate a Pascal unit */
+        void parseUnit();
+        /** @brief Validate interface section declarations */
+        void parseInterfaceSection();
         /** @brief Validate a uses clause */
         void parseUses();
         /** @brief Validate a block (declarations + compound statement) */

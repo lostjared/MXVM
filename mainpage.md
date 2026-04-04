@@ -321,6 +321,19 @@ begin
 end.
 ```
 
+### Uses Clause
+
+The optional `uses` clause imports runtime modules. It must appear immediately after the
+`program` declaration:
+
+```pascal
+program MyApp;
+uses std, io, string;
+```
+
+Available modules: `std`, `io`, `string`, `sdl`. If no `uses` clause is present, modules are
+auto-detected from builtin function usage.
+
 ### Data Types
 
 | Type | Description |
@@ -569,7 +582,7 @@ The following limitations apply:
 | Area | Limitation |
 |------|------------|
 | **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` -- not `x := MyFunc`. |
-| **No units/modules** | Only single-file `program` compilation. No `unit`, `interface`, `implementation` keywords. |
+| **Limited module support** | A `uses` clause (`uses std, io, string, sdl;`) imports runtime modules, but there is no `unit`, `interface`, or `implementation` keyword support. Only single-file `program` compilation. |
 | **No enumerated types** | Only scalar types, records, arrays, and pointers. |
 | **No dynamic arrays** | Only static `array[lo..hi]` with compile-time bounds. |
 | **No variant records** | Records have flat fields only -- no `case` variant parts. |

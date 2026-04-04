@@ -16,11 +16,56 @@ namespace pascal {
 
     void CodeGenVisitor::visit(ProgramNode &node) {
         name = node.name;
+        // Separate native modules from unit dependencies
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
         for (const auto &mod : node.uses) {
-            usedModules.insert(mod);
+            if (nativeModules.count(mod))
+                usedModules.insert(mod);
+            else
+                objectDeps.push_back(mod);
         }
         if (node.block) {
             node.block->accept(*this);
+        }
+    }
+
+    void CodeGenVisitor::visit(UnitNode &node) {
+        name = node.name;
+        isUnit = true;
+        // Process uses clause
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+        for (const auto &mod : node.uses) {
+            if (nativeModules.count(mod))
+                usedModules.insert(mod);
+            else
+                objectDeps.push_back(mod);
+        }
+        // Register interface declarations' signatures WITHOUT deferring code
+        // (interface declarations have null blocks — they are forward declarations)
+        for (auto &decl : node.interfaceDecls) {
+            if (!decl)
+                continue;
+            if (auto *funcDecl = dynamic_cast<FuncDeclNode *>(decl.get())) {
+                // Just register the signature info; don't call accept()
+                FuncInfo funcInfo;
+                funcInfo.returnType = getTypeFromString(funcDecl->returnType);
+                for (auto &p : funcDecl->parameters) {
+                    if (auto pn = dynamic_cast<ParameterNode *>(p.get())) {
+                        for (size_t i = 0; i < pn->identifiers.size(); ++i) {
+                            funcInfo.paramTypes.push_back(getTypeFromString(pn->type));
+                        }
+                    }
+                }
+                funcSignatures[funcDecl->name] = funcInfo;
+                setVarType(funcDecl->name, funcInfo.returnType);
+            }
+            // ProcDeclNode forward declarations don't need signature registration
+            // (they have no return type to track)
+        }
+        // Process implementation declarations (actual code)
+        for (auto &decl : node.implDecls) {
+            if (decl)
+                decl->accept(*this);
         }
     }
 
@@ -468,13 +513,23 @@ namespace pascal {
         }
 
         // Now move into target registers
-        for (size_t i = 0; i < evaluated_args.size(); ++i) {
-            if (!targetRegs[i].empty())
-                emit2("mov", targetRegs[i], evaluated_args[i]);
+        {
+            auto eit = externalFuncs.find(node.name);
+            std::string objPrefix = (eit != externalFuncs.end()) ? eit->second + "." : "";
+            for (size_t i = 0; i < evaluated_args.size(); ++i) {
+                if (!targetRegs[i].empty())
+                    emit2("mov", objPrefix + targetRegs[i], evaluated_args[i]);
+            }
         }
 
         std::string mangledName = findMangledFuncName(node.name, true);
-        emit1("call", "PROC_" + mangledName);
+        {
+            std::string label = "PROC_" + mangledName;
+            auto eit = externalFuncs.find(node.name);
+            if (eit != externalFuncs.end())
+                label = eit->second + "." + label;
+            emit1("call", label);
+        }
 
         for (const auto &arg : evaluated_args)
             if (isReg(arg) && !isParmReg(arg))
@@ -534,27 +589,41 @@ namespace pascal {
         }
 
         // Now move into target registers
-        for (size_t i = 0; i < evaluated_args.size(); ++i) {
-            if (!targetRegs[i].empty())
-                emit2("mov", targetRegs[i], evaluated_args[i]);
+        {
+            auto eit = externalFuncs.find(node.name);
+            std::string objPrefix = (eit != externalFuncs.end()) ? eit->second + "." : "";
+            for (size_t i = 0; i < evaluated_args.size(); ++i) {
+                if (!targetRegs[i].empty())
+                    emit2("mov", objPrefix + targetRegs[i], evaluated_args[i]);
+            }
         }
 
         std::string mangledName = findMangledFuncName(node.name, false);
-        emit1("call", "FUNC_" + mangledName);
+        {
+            std::string label = "FUNC_" + mangledName;
+            auto eit = externalFuncs.find(node.name);
+            if (eit != externalFuncs.end())
+                label = eit->second + "." + label;
+            emit1("call", label);
+        }
 
         auto it = funcSignatures.find(node.name);
         VarType returnType = (it != funcSignatures.end()) ? it->second.returnType : VarType::INT;
 
         std::string resultLocation;
-        if (returnType == VarType::DOUBLE) {
-            resultLocation = allocFloatReg();
-            emit2("mov", resultLocation, "xmm0");
-        } else if (returnType == VarType::STRING || returnType == VarType::PTR || returnType == VarType::RECORD) {
-            resultLocation = allocTempPtr();
-            emit2("mov", resultLocation, "arg0");
-        } else {
-            resultLocation = allocReg();
-            emit2("mov", resultLocation, "rax");
+        {
+            auto eit = externalFuncs.find(node.name);
+            std::string objPrefix = (eit != externalFuncs.end()) ? eit->second + "." : "";
+            if (returnType == VarType::DOUBLE) {
+                resultLocation = allocFloatReg();
+                emit2("mov", resultLocation, objPrefix + "xmm0");
+            } else if (returnType == VarType::STRING || returnType == VarType::PTR || returnType == VarType::RECORD) {
+                resultLocation = allocTempPtr();
+                emit2("mov", resultLocation, objPrefix + "arg0");
+            } else {
+                resultLocation = allocReg();
+                emit2("mov", resultLocation, objPrefix + "rax");
+            }
         }
         pushValue(resultLocation);
 
@@ -582,12 +651,13 @@ namespace pascal {
         funcSignatures[node.name] = funcInfo;
         setVarType(node.name, funcInfo.returnType);
 
-        auto path = scopeHierarchy;
-        path.push_back(node.name);
-        deferredFuncs.push_back({&node, path});
-
-        scopeHierarchy.push_back(node.name);
+        // Only defer code generation if there's an actual body (not a forward declaration)
         if (node.block) {
+            auto path = scopeHierarchy;
+            path.push_back(node.name);
+            deferredFuncs.push_back({&node, path});
+
+            scopeHierarchy.push_back(node.name);
             if (auto blockNode = dynamic_cast<BlockNode *>(node.block.get())) {
                 for (auto &decl : blockNode->declarations) {
                     if (dynamic_cast<ProcDeclNode *>(decl.get()) || dynamic_cast<FuncDeclNode *>(decl.get())) {
@@ -595,8 +665,8 @@ namespace pascal {
                     }
                 }
             }
+            scopeHierarchy.pop_back();
         }
-        scopeHierarchy.pop_back();
     }
 
     void CodeGenVisitor::visit(ProcDeclNode &node) {
@@ -606,12 +676,13 @@ namespace pascal {
         }
         declaredProcs[mangledName] = true;
 
-        auto path = scopeHierarchy;
-        path.push_back(node.name);
-        deferredProcs.push_back({&node, path});
-
-        scopeHierarchy.push_back(node.name);
+        // Only defer code generation if there's an actual body (not a forward declaration)
         if (node.block) {
+            auto path = scopeHierarchy;
+            path.push_back(node.name);
+            deferredProcs.push_back({&node, path});
+
+            scopeHierarchy.push_back(node.name);
             if (auto blockNode = dynamic_cast<BlockNode *>(node.block.get())) {
                 for (auto &decl : blockNode->declarations) {
                     if (dynamic_cast<ProcDeclNode *>(decl.get()) || dynamic_cast<FuncDeclNode *>(decl.get())) {
@@ -670,7 +741,11 @@ namespace pascal {
             if (auto v = dynamic_cast<VariableNode *>(stmt.get())) {
                 std::string mangled = findMangledFuncName(v->name, true);
                 if (declaredProcs.count(mangled)) {
-                    emit1("call", "PROC_" + mangled);
+                    std::string label = "PROC_" + mangled;
+                    auto eit = externalFuncs.find(v->name);
+                    if (eit != externalFuncs.end())
+                        label = eit->second + "." + label;
+                    emit1("call", label);
                     continue;
                 }
             }

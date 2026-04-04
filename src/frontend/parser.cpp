@@ -84,6 +84,160 @@ namespace pascal {
         return false;
     }
 
+    bool PascalParser::isUnitSource() const {
+        if (!token)
+            return false;
+        std::string val = token->getTokenValue();
+        std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+        return val == "unit";
+    }
+
+    std::unique_ptr<UnitNode> PascalParser::parseUnit() {
+        expectToken("unit");
+        int lineNum = token->getLine();
+        next();
+        expectToken(types::TokenType::TT_ID);
+        std::string unitName = token->getTokenValue();
+        next();
+        expectToken(";");
+        next();
+
+        auto unitNode = std::make_unique<UnitNode>(unitName);
+        unitNode->setLineNumber(lineNum);
+
+        // interface section
+        expectToken("interface");
+        next();
+
+        // optional uses clause in interface
+        std::vector<std::string> usesList;
+        if (peekIs("uses")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            usesList.push_back(token->getTokenValue());
+            next();
+            while (peekIs(",")) {
+                next();
+                expectToken(types::TokenType::TT_ID);
+                usesList.push_back(token->getTokenValue());
+                next();
+            }
+            expectToken(";");
+            next();
+        }
+        unitNode->uses = std::move(usesList);
+
+        // parse interface declarations (forward proc/func signatures)
+        unitNode->interfaceDecls = parseInterfaceDeclarations();
+
+        // implementation section
+        expectToken("implementation");
+        next();
+
+        // optional uses clause in implementation (additional modules)
+        if (peekIs("uses")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            unitNode->uses.push_back(token->getTokenValue());
+            next();
+            while (peekIs(",")) {
+                next();
+                expectToken(types::TokenType::TT_ID);
+                unitNode->uses.push_back(token->getTokenValue());
+                next();
+            }
+            expectToken(";");
+            next();
+        }
+
+        // parse implementation declarations (full proc/func with bodies, vars, consts, types)
+        unitNode->implDecls = parseDeclarations();
+
+        // end.
+        expectToken("end");
+        next();
+        expectToken(".");
+        return unitNode;
+    }
+
+    std::vector<std::unique_ptr<ASTNode>> PascalParser::parseInterfaceDeclarations() {
+        std::vector<std::unique_ptr<ASTNode>> decls;
+        while (peekIs("procedure") || peekIs("function") || peekIs("type") || peekIs("const") || peekIs("var")) {
+            if (peekIs("procedure")) {
+                decls.push_back(parseProcedureForwardDecl());
+            } else if (peekIs("function")) {
+                decls.push_back(parseFunctionForwardDecl());
+            } else if (peekIs("type")) {
+                decls.push_back(parseTypeDeclaration());
+            } else if (peekIs("const")) {
+                decls.push_back(parseConstDeclaration());
+            } else if (peekIs("var")) {
+                if (match("var")) {
+                    while (peekIs(types::TokenType::TT_ID) && !isKeyword(token->getTokenValue())) {
+                        auto decl = parseVarDeclaration();
+                        decls.push_back(std::move(decl));
+                    }
+                }
+            }
+        }
+        return decls;
+    }
+
+    std::unique_ptr<ASTNode> PascalParser::parseProcedureForwardDecl() {
+        expectToken("procedure");
+        int lineNum = token->getLine();
+        next();
+        expectToken(types::TokenType::TT_ID);
+        std::string procName = token->getTokenValue();
+        next();
+        std::vector<std::unique_ptr<ASTNode>> parameters;
+        if (peekIs("(")) {
+            next();
+            parameters = parseParameterList();
+            expectToken(")");
+            next();
+        }
+        expectToken(";");
+        next();
+        auto procDeclNode = std::make_unique<ProcDeclNode>(procName, std::move(parameters), nullptr);
+        procDeclNode->setLineNumber(lineNum);
+        return procDeclNode;
+    }
+
+    std::unique_ptr<ASTNode> PascalParser::parseFunctionForwardDecl() {
+        expectToken("function");
+        int lineNum = token->getLine();
+        next();
+        expectToken(types::TokenType::TT_ID);
+        std::string funcName = token->getTokenValue();
+        next();
+        std::vector<std::unique_ptr<ASTNode>> parameters;
+        if (peekIs("(")) {
+            next();
+            parameters = parseParameterList();
+            expectToken(")");
+            next();
+        }
+        expectToken(":");
+        next();
+        std::string returnType;
+        if (peekIs("^")) {
+            next();
+            expectToken(types::TokenType::TT_ID);
+            returnType = "^" + token->getTokenValue();
+            next();
+        } else {
+            expectToken(types::TokenType::TT_ID);
+            returnType = token->getTokenValue();
+            next();
+        }
+        expectToken(";");
+        next();
+        auto funcDeclNode = std::make_unique<FuncDeclNode>(funcName, std::move(parameters), returnType, nullptr);
+        funcDeclNode->setLineNumber(lineNum);
+        return funcDeclNode;
+    }
+
     bool PascalParser::match(types::TokenType t) {
         if (peekIs(t)) {
             next();
@@ -113,7 +267,8 @@ namespace pascal {
                lower == "and" || lower == "or" || lower == "not" ||
                lower == "case" || lower == "of" || lower == "repeat" || lower == "until" ||
                lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue" ||
-               lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer" || lower == "uses";
+               lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer" || lower == "uses" ||
+               lower == "unit" || lower == "interface" || lower == "implementation";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {

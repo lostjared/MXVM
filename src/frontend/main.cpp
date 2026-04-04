@@ -5,10 +5,12 @@
  */
 #include "icode.hpp"
 #include "parser.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
 
 std::string removeComments(const std::string &text) {
     std::ostringstream stream;
@@ -103,20 +105,78 @@ int main(int argc, char **argv) {
             std::cerr << "mxx: validation failed.\n";
             return EXIT_FAILURE;
         }
-        auto ast = parser.parseProgram();
-        if (ast) {
-            pascal::CodeGenVisitor emiter;
-            emiter.generate(ast.get());
-            std::fstream file;
-            file.open(argv[2], std::ios::out);
-            if (!file.is_open()) {
+
+        pascal::CodeGenVisitor emiter;
+
+        if (parser.isUnitSource()) {
+            auto ast = parser.parseUnit();
+            if (ast) {
+                emiter.generate(ast.get());
+            }
+        } else {
+            auto ast = parser.parseProgram();
+            if (ast) {
+                // For programs with unit imports, parse each unit's interface
+                // to register function/procedure signatures
+                std::string inputPath = argv[1];
+                std::string inputDir = inputPath.substr(0, inputPath.find_last_of("/\\") + 1);
+                if (inputDir.empty()) inputDir = "./";
+
+                for (const auto &dep : ast->uses) {
+                    // Skip native modules
+                    static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+                    if (nativeModules.count(dep)) continue;
+
+                    // Try to find and parse the unit's .pas file for interface declarations
+                    std::string unitFile = inputDir + dep + ".pas";
+                    std::ifstream uf(unitFile);
+                    if (!uf.is_open()) {
+                        // Try lowercase
+                        std::string lowerDep = dep;
+                        std::transform(lowerDep.begin(), lowerDep.end(), lowerDep.begin(), ::tolower);
+                        unitFile = inputDir + lowerDep + ".pas";
+                        uf.open(unitFile);
+                    }
+                    if (uf.is_open()) {
+                        std::ostringstream ubuf;
+                        ubuf << uf.rdbuf();
+                        uf.close();
+                        try {
+                            pascal::PascalParser unitParser(removeComments(ubuf.str()));
+                            auto unitAst = unitParser.parseUnit();
+                            if (unitAst) {
+                                // Register interface declarations as forward declarations in the main AST
+                                // and track which functions/procedures are external
+                                for (auto &decl : unitAst->interfaceDecls) {
+                                    if (auto *fd = dynamic_cast<pascal::FuncDeclNode *>(decl.get()))
+                                        emiter.registerExternalFunc(fd->name, dep);
+                                    else if (auto *pd = dynamic_cast<pascal::ProcDeclNode *>(decl.get()))
+                                        emiter.registerExternalFunc(pd->name, dep);
+                                    ast->block->declarations.push_back(std::move(decl));
+                                }
+                            }
+                        } catch (...) {
+                            // Unit source not available; user must ensure correct call signatures
+                        }
+                    }
+                }
+
+                emiter.generate(ast.get());
+            }
+        }
+
+        {
+            std::fstream outFile;
+            outFile.open(argv[2], std::ios::out);
+            if (!outFile.is_open()) {
                 std::cerr << "Error could not open file: " << argv[2] << "\n";
+                return EXIT_FAILURE;
             }
             std::ostringstream output;
             emiter.writeTo(output);
             std::string opt = pascal::mxvmOpt(output.str());
-            file << opt << "\n";
-            file.close();
+            outFile << opt << "\n";
+            outFile.close();
         }
     } catch (const pascal::ParseException &e) {
         std::cerr << "Parse Error: " << e.what() << std::endl;

@@ -44,7 +44,10 @@ namespace mxx {
         declaredFuncs.clear();
         pushScope();
         next();
-        parseProgram();
+        if (isKW("unit"))
+            parseUnit();
+        else
+            parseProgram();
         if (token)
             failHere("Unexpected tokens after end of program");
         popScope();
@@ -222,6 +225,82 @@ namespace mxx {
         parseBlock();
         require(".");
         next();
+    }
+
+    void TPValidator::parseUnit() {
+        requireKW("unit");
+        next();
+        require(types::TokenType::TT_ID);
+        next();
+        require(";");
+        next();
+
+        // interface section
+        requireKW("interface");
+        next();
+        if (isKW("uses"))
+            parseUses();
+        parseInterfaceSection();
+
+        // implementation section
+        requireKW("implementation");
+        next();
+        if (isKW("uses"))
+            parseUses();
+
+        // parse implementation declarations (const, type, var, procedure, function)
+        while (isKW("const") || isKW("type") || isKW("var") || isKW("procedure") || isKW("function")) {
+            if (isKW("const"))
+                parseConstSection();
+            else if (isKW("type"))
+                parseTypeSection();
+            else if (isKW("var"))
+                parseVarSection();
+            else if (isKW("procedure") || isKW("function"))
+                parseSubprogram();
+        }
+
+        requireKW("end");
+        next();
+        require(".");
+        next();
+    }
+
+    void TPValidator::parseInterfaceSection() {
+        while (isKW("procedure") || isKW("function") || isKW("type") || isKW("const") || isKW("var")) {
+            if (isKW("procedure")) {
+                next();
+                require(types::TokenType::TT_ID);
+                declaredProcs.insert(lower(token->getTokenValue()));
+                next();
+                pushScope();
+                if (match("("))
+                    parseFormalParams();
+                require(";");
+                next();
+                popScope();
+            } else if (isKW("function")) {
+                next();
+                require(types::TokenType::TT_ID);
+                declaredFuncs.insert(lower(token->getTokenValue()));
+                next();
+                pushScope();
+                if (match("("))
+                    parseFormalParams();
+                require(":");
+                next();
+                parseType("");
+                require(";");
+                next();
+                popScope();
+            } else if (isKW("type")) {
+                parseTypeSection();
+            } else if (isKW("const")) {
+                parseConstSection();
+            } else if (isKW("var")) {
+                parseVarSection();
+            }
+        }
     }
 
     void TPValidator::parseUses() {
@@ -1015,7 +1094,8 @@ namespace mxx {
     }
 
     static const std::unordered_set<std::string> pascal_keywords = {
-        "program", "uses", "var", "const", "type", "procedure", "function", "begin", "end",
+        "program", "unit", "interface", "implementation",
+        "uses", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
         "case", "of", "with", "goto", "exit", "break", "continue",
         "nil", "new", "dispose",

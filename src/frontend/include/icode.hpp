@@ -171,6 +171,9 @@ namespace pascal {
         int realConstantCounter = 0;
         std::unordered_map<std::string, std::string> currentParamTypes;
         std::set<std::string> usedModules;
+        std::vector<std::string> objectDeps;       ///< unit/object dependencies for section object
+        bool isUnit = false;                        ///< true when generating code for a unit (object output)
+        std::unordered_map<std::string, std::string> externalFuncs; ///< maps function/proc name to source unit name
         std::vector<std::string> globalArrays;
         std::unordered_map<std::string, std::vector<std::string>> functionScopedArrays;
         std::vector<std::string> scopeHierarchy;
@@ -859,6 +862,10 @@ namespace pascal {
 
         BuiltinFunctionRegistry builtinRegistry; ///< registry of built-in function handlers
 
+        void registerExternalFunc(const std::string &funcName, const std::string &unitName) {
+            externalFuncs[funcName] = unitName;
+        }
+
         /** @brief Construct and initialise registers and float register pool */
         CodeGenVisitor();
         virtual ~CodeGenVisitor() = default;
@@ -894,6 +901,8 @@ namespace pascal {
             deferredProcs.clear();
             deferredFuncs.clear();
             valueLocations.clear();
+            objectDeps.clear();
+            isUnit = false;
 
             varTypes.clear();
             globalArrays.clear();
@@ -921,19 +930,23 @@ namespace pascal {
 
             if (auto prog = dynamic_cast<ProgramNode *>(root))
                 name = prog->name;
+            if (auto unit = dynamic_cast<UnitNode *>(root))
+                name = unit->name;
 
             root->accept(*this);
 
-            for (const auto &arrayName : globalArrays)
-                emit1("free", arrayName);
+            if (!isUnit) {
+                for (const auto &arrayName : globalArrays)
+                    emit1("free", arrayName);
 
-            if (recordsToFreeInScope.count("")) {
-                for (const auto &recordVar : recordsToFreeInScope[""]) {
-                    emit1("free", recordVar);
+                if (recordsToFreeInScope.count("")) {
+                    for (const auto &recordVar : recordsToFreeInScope[""]) {
+                        emit1("free", recordVar);
+                    }
                 }
-            }
 
-            emit("done");
+                emit("done");
+            }
 
             generatingDeferredCode = true;
 
@@ -1195,7 +1208,21 @@ namespace pascal {
          * variables, string literals, real constants), and code section.
          */
         void writeTo(std::ostream &out) const {
-            out << "program " << name << " {\n";
+            out << (isUnit ? "object " : "program ") << name << " {\n";
+
+            // section object (unit/object dependencies)
+            if (!objectDeps.empty()) {
+                out << "\tsection object {\n\t\t";
+                bool first = true;
+                for (const auto &dep : objectDeps) {
+                    if (!first)
+                        out << ", ";
+                    out << dep;
+                    first = false;
+                }
+                out << "\n\t}\n";
+            }
+
             out << "\tsection module {\n ";
             bool first = true;
             for (const auto &mod : usedModules) {
@@ -1270,9 +1297,11 @@ namespace pascal {
             }
             out << "\t}\n";
             out << "\tsection code {\n";
-            out << "\tstart:\n";
-            for (auto &s : prolog)
-                out << "\t\t" << s << "\n";
+            if (!isUnit) {
+                out << "\tstart:\n";
+                for (auto &s : prolog)
+                    out << "\t\t" << s << "\n";
+            }
             for (auto &s : instructions) {
                 if (endsWithColon(s))
                     out << "\t" << s << "\n";
@@ -1284,6 +1313,7 @@ namespace pascal {
         }
 
         void visit(ProgramNode &node) override;
+        void visit(UnitNode &node) override;
         void visit(BlockNode &node) override;
         void visit(VarDeclNode &node) override;
         void visit(ProcCallNode &node) override;

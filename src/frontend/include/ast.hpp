@@ -108,6 +108,25 @@ namespace pascal {
     };
 
     /**
+     * @brief AST node for a Pascal unit (separately compiled module)
+     *
+     * A unit has an interface section (exported forward declarations) and
+     * an implementation section (actual code).  Compiles to an MXVM object.
+     */
+    class UnitNode : public ASTNode {
+      public:
+        std::string name;                                        ///< unit identifier
+        std::vector<std::string> uses;                           ///< modules/units imported via 'uses' clause
+        std::vector<std::unique_ptr<ASTNode>> interfaceDecls;    ///< exported procedure/function forward declarations
+        std::vector<std::unique_ptr<ASTNode>> implDecls;         ///< implementation declarations (proc/func/var/const/type)
+
+        UnitNode(const std::string &name) : name(name) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override;
+    };
+
+    /**
      * @brief AST node for variable declarations (var id1, id2 : type)
      */
     class VarDeclNode : public ASTNode {
@@ -642,6 +661,7 @@ namespace pascal {
       public:
         virtual ~ASTVisitor() = default;
         virtual void visit(ProgramNode &node) = 0;
+        virtual void visit(UnitNode &node) = 0;
         virtual void visit(BlockNode &node) = 0;
         virtual void visit(VarDeclNode &node) = 0;
         virtual void visit(ConstDeclNode &node) = 0;
