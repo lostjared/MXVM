@@ -1,3 +1,8 @@
+/**
+ * @file web.cpp
+ * @brief WebAssembly (Emscripten) bindings for running MXVM programs in the browser
+ * @author Jared Bruni
+ */
 #include <emscripten/bind.h>
 #include <mxvm/mxvm.hpp>
 #include <scanner/exception.hpp>

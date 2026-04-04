@@ -1,7 +1,8 @@
-/*
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file types.cpp
+ * @brief Stream operators for TokenType and CharType enumerations
+ * @author Jared Bruni
+ */
 #include "scanner/types.hpp"
 
 namespace types {

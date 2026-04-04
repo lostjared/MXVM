@@ -1,3 +1,8 @@
+/**
+ * @file icode_opt.cpp
+ * @brief Peephole optimizer for generated x86-64 assembly (SysV and Win64)
+ * @author Jared Bruni
+ */
 #include "mxvm/icode.hpp"
 #include <regex>
 #include <sstream>

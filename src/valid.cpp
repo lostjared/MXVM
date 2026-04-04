@@ -1,3 +1,8 @@
+/**
+ * @file valid.cpp
+ * @brief MXVM instruction operand validator and variable/label checker
+ * @author Jared Bruni
+ */
 #include "mxvm/valid.hpp"
 #include "mxvm/instruct.hpp"
 #include "scanner/exception.hpp"

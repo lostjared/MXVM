@@ -1,3 +1,8 @@
+/**
+ * @file ast.cpp
+ * @brief AST node accept() and toString() implementations for the MXVM Visitor pattern
+ * @author Jared Bruni
+ */
 
 #include "mxvm/ast.hpp"
 #include <sstream>

@@ -1,3 +1,8 @@
+/**
+ * @file validator.cpp
+ * @brief Pascal semantic validator — scope tracking, type checking, and declaration verification
+ * @author Jared Bruni
+ */
 #include "validator.hpp"
 #include <cctype>
 #include <unordered_set>

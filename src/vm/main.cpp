@@ -1,3 +1,8 @@
+/**
+ * @file main.cpp
+ * @brief MXVM command-line entry point — argument parsing, interpretation, and compilation dispatch
+ * @author Jared Bruni
+ */
 #include "argz.hpp"
 #include <csignal>
 #include <filesystem>

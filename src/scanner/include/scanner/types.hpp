@@ -1,8 +1,8 @@
-/*
-    MXDBG - Debugger with AI
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file types.hpp
+ * @brief Token, character, and operator type enumerations for the scanner
+ * @author Jared Bruni
+ */
 #ifndef _TYPES_X__
 #define _TYPES_X__
 
@@ -12,24 +12,27 @@
 #include <vector>
 
 namespace types {
+    /** @brief Classification of scanned tokens */
     enum class TokenType {
-        TT_ID,
-        TT_ARG,
-        TT_SYM,
-        TT_STR,
-        TT_NUM,
-        TT_HEX,
-        TT_NULL
+        TT_ID,    ///< identifier or keyword
+        TT_ARG,   ///< argument token (e.g. $1)
+        TT_SYM,   ///< symbol / operator token
+        TT_STR,   ///< string literal
+        TT_NUM,   ///< decimal numeric literal
+        TT_HEX,   ///< hexadecimal numeric literal
+        TT_NULL   ///< sentinel / invalid token
     };
+    /** @brief Classification of individual characters during lexing */
     enum class CharType {
-        TT_CHAR,
-        TT_DIGIT,
-        TT_SYMBOL,
-        TT_STRING,
-        TT_SINGLE,
-        TT_SPACE,
-        TT_NULL
+        TT_CHAR,    ///< alphabetic character
+        TT_DIGIT,   ///< digit character
+        TT_SYMBOL,  ///< multi-char symbol start
+        TT_STRING,  ///< string delimiter (quote)
+        TT_SINGLE,  ///< single-char operator
+        TT_SPACE,   ///< whitespace
+        TT_NULL     ///< unmapped / null
     };
+    /** @brief Enumeration of all recognised operator symbols */
     enum class OperatorType {
         OP_INC,           // '++'
         OP_DEC,           // '--'
@@ -82,6 +85,7 @@ namespace types {
         OP_AT,            // '@'
     };
 
+    /** @brief Human-readable display names indexed by OperatorType */
     inline std::vector<std::string> opName = {
         "Increment",             // OP_INC             -> '++'
         "Decrement",             // OP_DEC             -> '--'
@@ -129,11 +133,12 @@ namespace types {
         "Question Mark",         // OP_QUESTION        -> '?'
         "Hash",                  // OP_HASH            -> '#'
         "Scope",                 // OP_SCOPE           -> '::'
-        "Tilde"                  // OP_TILDE           -> '~'
+        "Tilde",                 // OP_TILDE           -> '~'
         "Dollar",                // OP_DOLLAR          -> '$'
         "AT",                    // OP_AT              -> '@'
     };
 
+    /** @brief Operator string representations indexed by OperatorType */
     inline std::vector<std::string> opStrings = {
         "++",  // OP_INC
         "--",  // OP_DEC
@@ -187,26 +192,48 @@ namespace types {
 
     };
 
+    /** @brief Keyword type enumeration */
     enum class KeywordType {
-        KW_LET,
-        KW_PROC,
-        KW_DEFINE,
-        KW_IF,
-        KW_ELSE,
-        KW_SWITCH,
-        KW_WHILE,
-        KW_FOR,
-        KW_RETURN,
-        KW_BREAK,
-        KW_CONTINUE
+        KW_LET,       ///< variable declaration
+        KW_PROC,      ///< procedure/function
+        KW_DEFINE,    ///< constant definition
+        KW_IF,        ///< conditional
+        KW_ELSE,      ///< else branch
+        KW_SWITCH,    ///< switch/case
+        KW_WHILE,     ///< while loop
+        KW_FOR,       ///< for loop
+        KW_RETURN,    ///< return statement
+        KW_BREAK,     ///< break statement
+        KW_CONTINUE   ///< continue statement
     };
+    /** @brief Keyword string representations indexed by KeywordType */
     inline std::vector<std::string> kwStr{"let", "proc", "define", "if", "else", "switch", "while", "for", "return", "break", "continue"};
 
-    extern std::vector<std::string> strTokenType;
-    extern std::vector<std::string> sstrCharType;
+    extern std::vector<std::string> strTokenType;   ///< string names of TokenType values
+    extern std::vector<std::string> sstrCharType;    ///< string names of CharType values
+    /**
+     * @brief Print a TokenType name to a stream
+     * @param out Output stream
+     * @param tt Token type to print
+     */
     void print_type_TokenType(std::ostream &out, const TokenType &tt);
+    /**
+     * @brief Print a CharType name to a stream
+     * @param out Output stream
+     * @param c Character type to print
+     */
     void print_type_CharType(std::ostream &out, const CharType &c);
+    /**
+     * @brief Look up an operator string and return its OperatorType
+     * @param op Operator string (e.g. "++", "<=")
+     * @return The matching OperatorType, or nullopt if not found
+     */
     std::optional<OperatorType> lookUp(const std::string &op);
+    /**
+     * @brief Look up a keyword string and return its KeywordType
+     * @param op Keyword string (e.g. "if", "while")
+     * @return The matching KeywordType, or nullopt if not found
+     */
     std::optional<KeywordType> lookUp_Keyword(const std::string &op);
 } // namespace types
 

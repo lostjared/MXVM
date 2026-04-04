@@ -1,3 +1,8 @@
+/**
+ * @file icode_visit.cpp
+ * @brief Pascal code generator AST visitor method implementations
+ * @author Jared Bruni
+ */
 #include "icode.hpp"
 
 namespace pascal {

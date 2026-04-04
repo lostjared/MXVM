@@ -1,3 +1,8 @@
+/**
+ * @file icode_gen_x64.cpp
+ * @brief x86-64 Win64 ABI native code generator for Windows
+ * @author Jared Bruni
+ */
 #include "mxvm/icode.hpp"
 
 #include <algorithm>

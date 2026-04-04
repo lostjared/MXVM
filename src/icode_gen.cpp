@@ -1,3 +1,8 @@
+/**
+ * @file icode_gen.cpp
+ * @brief x86-64 System V ABI native code generator for Linux/macOS
+ * @author Jared Bruni
+ */
 #include "mxvm/icode.hpp"
 
 #include <algorithm>

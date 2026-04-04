@@ -1,3 +1,8 @@
+/**
+ * @file html.cpp
+ * @brief mxvm-html command-line tool — converts MXVM source to syntax-highlighted HTML
+ * @author Jared Bruni
+ */
 #include "mxvm/html_gen.hpp"
 #include <fstream>
 #include <iostream>

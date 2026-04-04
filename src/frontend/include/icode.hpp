@@ -1,4 +1,8 @@
-
+/**
+ * @file icode.hpp
+ * @brief Pascal-to-MXVM code generator using the Visitor pattern over the Pascal AST
+ * @author Jared Bruni
+ */
 #ifndef __CODEGEN_H_
 #define __CODEGEN_H_
 #include "ast.hpp"
@@ -20,14 +24,17 @@
 
 namespace pascal {
 
+    /**
+     * @brief Metadata describing a Pascal array's bounds, element type, and sizing
+     */
     struct ArrayInfo {
-        std::string elementType;
-        int lowerBound = 0;
-        int upperBound = -1;
-        int size = 0;
-        int elementSize = 8;
-        bool elementIsArray = false;
-        std::unique_ptr<ArrayInfo> elementArray;
+        std::string elementType;                   ///< element type name (e.g. "integer", "real")
+        int lowerBound = 0;                        ///< declared lower index bound
+        int upperBound = -1;                       ///< declared upper index bound
+        int size = 0;                              ///< number of elements
+        int elementSize = 8;                       ///< size (bytes) of each element
+        bool elementIsArray = false;               ///< true if element type is itself an array
+        std::unique_ptr<ArrayInfo> elementArray;    ///< nested array descriptor (when elementIsArray)
 
         ArrayInfo() = default;
         ArrayInfo(const ArrayInfo &other)
@@ -60,35 +67,57 @@ namespace pascal {
 
     class CodeGenVisitor;
 
+    /** @brief Enumeration of variable / expression value types */
     enum class VarType {
-        INT,
-        DOUBLE,
-        STRING,
-        CHAR,
-        RECORD,
-        PTR,
-        BOOL,
-        UNKNOWN,
-        ARRAY_INT,
-        ARRAY_DOUBLE,
-        ARRAY_STRING
+        INT,          ///< integer
+        DOUBLE,       ///< real (floating-point)
+        STRING,       ///< string value
+        CHAR,         ///< character value
+        RECORD,       ///< record (struct)
+        PTR,          ///< generic pointer
+        BOOL,         ///< boolean
+        UNKNOWN,      ///< unresolved type
+        ARRAY_INT,    ///< array of integers
+        ARRAY_DOUBLE, ///< array of doubles
+        ARRAY_STRING  ///< array of strings
     };
 
+    /**
+     * @brief Abstract handler for a group of built-in functions/procedures
+     *
+     * Derived classes (IOFunctionHandler, StdFunctionHandler, etc.) implement
+     * code generation for built-in calls such as writeln, readln, chr, ord, etc.
+     */
     class BuiltinFunctionHandler {
       public:
         virtual ~BuiltinFunctionHandler() = default;
+        /** @brief Return true if this handler implements @p funcName */
         virtual bool canHandle(const std::string &funcName) const = 0;
+        /** @brief Emit code for a procedure-style call (no return value used) */
         virtual void generate(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) = 0;
+        /** @brief Emit code for a function-style call (result pushed on eval stack); return true if handled */
         virtual bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) { return false; }
+        /** @brief Return the VarType produced by @p funcName */
         virtual VarType getReturnType(const std::string &funcName) const { return VarType::UNKNOWN; }
     };
 
+    /**
+     * @brief Registry of BuiltinFunctionHandler instances
+     *
+     * Holds all built-in function group handlers and dispatches to
+     * the first handler that can handle a given function name.
+     */
     class BuiltinFunctionRegistry {
       private:
-        std::vector<std::unique_ptr<BuiltinFunctionHandler>> handlers;
+        std::vector<std::unique_ptr<BuiltinFunctionHandler>> handlers; ///< registered handlers
 
       public:
+        /** @brief Register a new handler */
         void registerHandler(std::unique_ptr<BuiltinFunctionHandler> handler) { handlers.push_back(std::move(handler)); }
+        /**
+         * @brief Find the handler for a given function name
+         * @return Pointer to the matching handler, or nullptr
+         */
         BuiltinFunctionHandler *findHandler(const std::string &funcName) {
             for (auto &h : handlers)
                 if (h->canHandle(funcName))
@@ -97,6 +126,7 @@ namespace pascal {
         }
     };
 
+    /** @brief Built-in handler for I/O procedures (write, writeln, read, readln) */
     class IOFunctionHandler : public BuiltinFunctionHandler {
       public:
         bool canHandle(const std::string &funcName) const override;
@@ -104,6 +134,7 @@ namespace pascal {
         bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
     };
 
+    /** @brief Built-in handler for standard library functions (chr, ord, inc, dec, etc.) */
     class StdFunctionHandler : public BuiltinFunctionHandler {
       public:
         bool canHandle(const std::string &funcName) const override;
@@ -111,6 +142,7 @@ namespace pascal {
         bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
     };
 
+    /** @brief Built-in handler for string library functions (length, copy, concat, etc.) */
     class StringFunctionHandler : public BuiltinFunctionHandler {
         bool canHandle(const std::string &funcName) const override;
         void generate(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
@@ -118,6 +150,7 @@ namespace pascal {
         VarType getReturnType(const std::string &funcName) const override;
     };
 
+    /** @brief Built-in handler for SDL2 bindings */
     class SDLFunctionHandler : public BuiltinFunctionHandler {
       public:
         bool canHandle(const std::string &funcName) const override;
@@ -125,6 +158,13 @@ namespace pascal {
         bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
     };
 
+    /**
+     * @brief AST visitor that generates MXVM intermediate code
+     *
+     * Traverses the Pascal AST, emitting register-based intermediate
+     * instructions into an instruction list.  The final output is
+     * written via writeTo() in MXVM program format.
+     */
     class CodeGenVisitor : public ASTVisitor {
       private:
         std::unordered_map<std::string, std::string> compileTimeConstants;
@@ -203,9 +243,10 @@ namespace pascal {
             return (isFunc ? "FUNC_" : "PROC_") + mangleWithScope(currentScope, parentScope);
         }
 
+        /** @brief Describes a user-declared function's parameter and return types */
         struct FuncInfo {
-            std::vector<VarType> paramTypes;
-            VarType returnType = VarType::UNKNOWN;
+            std::vector<VarType> paramTypes;            ///< parameter types in order
+            VarType returnType = VarType::UNKNOWN;      ///< return type
         };
 
         std::unordered_map<std::string, FuncInfo> funcSignatures;
@@ -295,13 +336,14 @@ namespace pascal {
             tempPtrByScope[getCurrentScopeName()].push_back(v);
         }
 
+        /** @brief Describes where a value currently resides (register, memory, or immediate) */
         struct ValueLocation {
             enum Type {
-                REGISTER,
-                MEMORY,
-                IMMEDIATE
+                REGISTER,   ///< value is in a named register
+                MEMORY,     ///< value is in a memory slot
+                IMMEDIATE   ///< value is a compile-time constant
             } type;
-            std::string location;
+            std::string location; ///< register name, slot name, or literal value
         };
         std::unordered_map<std::string, ValueLocation> valueLocations;
 
@@ -816,11 +858,13 @@ namespace pascal {
         friend class SDLFunctionHandler;
         friend class StringFunctionHandler;
 
-        BuiltinFunctionRegistry builtinRegistry;
+        BuiltinFunctionRegistry builtinRegistry; ///< registry of built-in function handlers
 
+        /** @brief Construct and initialise registers and float register pool */
         CodeGenVisitor();
         virtual ~CodeGenVisitor() = default;
 
+        /** @brief Register all built-in function handlers (IO, Std, SDL, String) */
         void initializeBuiltins() {
             builtinRegistry.registerHandler(std::make_unique<IOFunctionHandler>());
             builtinRegistry.registerHandler(std::make_unique<StdFunctionHandler>());
@@ -828,14 +872,19 @@ namespace pascal {
             builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
         }
 
-        std::string name = "App";
+        std::string name = "App"; ///< program name emitted in the output header
 
+        /** @brief Emit a free instruction for an allocated pointer */
         void emitFree(const std::string &s) {
             if (allocatedPtrs.erase(s)) {
                 emit("free " + s);
             }
         }
 
+        /**
+         * @brief Generate MXVM code for the entire AST
+         * @param root Root AST node (typically a ProgramNode)
+         */
         void generate(ASTNode *root) {
             if (!root)
                 return;
@@ -1101,8 +1150,14 @@ namespace pascal {
             currentParamLocations.clear();
         }
 
+        /** @brief Mark a pointer name as allocated (will be freed at scope end) */
         void markAllocatedPtr(const std::string &p) { allocatedPtrs.insert(p); }
 
+        /**
+         * @brief Emit an invoke instruction calling a named function with parameters
+         * @param funcName Function/procedure label
+         * @param params Values to pass (literals are first moved into registers)
+         */
         void emit_invoke(const std::string &funcName, const std::vector<std::string> &params) {
             std::string instruction = "invoke " + funcName;
             std::vector<std::string> tempRegs;
@@ -1133,6 +1188,13 @@ namespace pascal {
             return true;
         }
 
+        /**
+         * @brief Write the complete MXVM program to a stream
+         * @param out Output stream
+         *
+         * Emits the program header, module section, data section (registers,
+         * variables, string literals, real constants), and code section.
+         */
         void writeTo(std::ostream &out) const {
             out << "program " << name << " {\n";
             out << "\tsection module {\n ";
@@ -1700,13 +1762,14 @@ namespace pascal {
             return "";
         }
 
+        /** @brief A field within a record type definition */
         struct RecordField {
-            std::string name;
-            std::string typeName;
-            int offset;
-            int size;
-            bool isArray = false;
-            ArrayInfo arrayInfo;
+            std::string name;       ///< field name
+            std::string typeName;   ///< field type name
+            int offset;             ///< byte offset within the record
+            int size;               ///< field size in bytes
+            bool isArray = false;   ///< true if the field is an array
+            ArrayInfo arrayInfo;    ///< array descriptor (when isArray)
 
             RecordField() = default;
             RecordField(const RecordField &other) = default;
@@ -1714,10 +1777,11 @@ namespace pascal {
             RecordField &operator=(const RecordField &other) = default;
             RecordField &operator=(RecordField &&other) noexcept = default;
         };
+        /** @brief Complete description of a record type */
         struct RecordTypeInfo {
-            int size = 0;
-            std::vector<RecordField> fields;
-            std::unordered_map<std::string, int> nameToIndex;
+            int size = 0;                                        ///< total record size in bytes
+            std::vector<RecordField> fields;                      ///< ordered field list
+            std::unordered_map<std::string, int> nameToIndex;     ///< field name -> index into fields
         };
         std::unordered_map<std::string, RecordTypeInfo> recordTypes;
         std::unordered_map<std::string, std::string> varRecordType;

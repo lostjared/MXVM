@@ -1,3 +1,8 @@
+/**
+ * @file main.cpp
+ * @brief Pascal-to-MXVM compiler command-line entry point
+ * @author Jared Bruni
+ */
 #include "icode.hpp"
 #include "parser.hpp"
 #include <cstdlib>

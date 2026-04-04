@@ -1,3 +1,8 @@
+/**
+ * @file sdl.c
+ * @brief SDL2 module C implementation — window, renderer, texture, and event handling
+ * @author Jared Bruni
+ */
 #include "mx_sdl.h"
 
 static SDL_Event g_event;

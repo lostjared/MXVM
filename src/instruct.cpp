@@ -1,3 +1,8 @@
+/**
+ * @file instruct.cpp
+ * @brief Instruction toString(), keyword table, and opcode stream operator
+ * @author Jared Bruni
+ */
 #include "mxvm/instruct.hpp"
 
 namespace mxvm {

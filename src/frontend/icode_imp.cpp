@@ -1,3 +1,8 @@
+/**
+ * @file icode_imp.cpp
+ * @brief Pascal code generator helper methods and builtin function handler implementations
+ * @author Jared Bruni
+ */
 #include "icode.hpp"
 
 namespace pascal {

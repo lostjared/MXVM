@@ -1,3 +1,8 @@
+/**
+ * @file std.cpp
+ * @brief Standard library module C++ runtime bindings for the MXVM interpreter
+ * @author Jared Bruni
+ */
 #include "mx_std.h"
 #include "mxvm/mxvm.hpp"
 #include <algorithm>

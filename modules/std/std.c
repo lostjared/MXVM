@@ -1,3 +1,8 @@
+/**
+ * @file std.c
+ * @brief Standard library module C implementation — math, string conversion, and utility functions
+ * @author Jared Bruni
+ */
 // ...existing code...
 #include "mx_std.h"
 #include <stdlib.h>

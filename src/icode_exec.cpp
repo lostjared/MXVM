@@ -1,3 +1,8 @@
+/**
+ * @file icode_exec.cpp
+ * @brief MXVM interpreter — executes intermediate code instructions at runtime
+ * @author Jared Bruni
+ */
 #include "mxvm/icode.hpp"
 #include <cstring>
 #include <iomanip>

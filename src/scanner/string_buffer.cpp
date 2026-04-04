@@ -1,7 +1,8 @@
-/*
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file string_buffer.cpp
+ * @brief StringBuffer line/column tracking and line-directive processing
+ * @author Jared Bruni
+ */
 #include "scanner/string_buffer.hpp"
 #include <optional>
 #include <utility>

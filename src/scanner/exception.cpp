@@ -1,7 +1,8 @@
-/*
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file exception.cpp
+ * @brief Hex formatting utilities and exception helper implementations
+ * @author Jared Bruni
+ */
 #include "scanner/exception.hpp"
 #include <csignal>
 #include <cstdint>

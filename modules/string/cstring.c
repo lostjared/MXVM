@@ -1,3 +1,8 @@
+/**
+ * @file cstring.c
+ * @brief String module C implementation — string manipulation, comparison, and formatting
+ * @author Jared Bruni
+ */
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -1,3 +1,8 @@
+/**
+ * @file html_gen.cpp
+ * @brief Syntax-highlighted HTML generation from MXVM source code
+ * @author Jared Bruni
+ */
 #include "mxvm/html_gen.hpp"
 #include "mxvm/instruct.hpp"
 #include <algorithm>

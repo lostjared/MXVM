@@ -1,3 +1,8 @@
+/**
+ * @file mxvm.hpp
+ * @brief Main MXVM header aggregating all subsystem includes
+ * @author Jared Bruni
+ */
 #ifndef __MXVM__HPP_
 #define __MXVM__HPP_
 #include "icode.hpp"
@@ -5,5 +10,5 @@
 #include "parser.hpp"
 #include <iostream>
 #include <string>
-#define VERSION_INFO "0.1.0"
+#define VERSION_INFO "0.1.0"  ///< MXVM version string
 #endif

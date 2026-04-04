@@ -1,3 +1,8 @@
+/**
+ * @file types.hpp
+ * @brief Pascal keyword enumeration and string table
+ * @author Jared Bruni
+ */
 #ifndef __TYPES__H_HPP
 #define __TYPES__H_HPP
 
@@ -5,6 +10,7 @@
 
 namespace mxx {
 
+    /** @brief Standard Pascal reserved keyword enumeration */
     enum class Keywords {
         AND,
         ARRAY,
@@ -43,6 +49,7 @@ namespace mxx {
         WITH
     };
 
+    /** @brief String representations of Keywords values, indexed by enum ordinal */
     static const char *key_str[] = {
         "and",
         "array",

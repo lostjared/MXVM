@@ -1,7 +1,8 @@
-/*
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file expr.hpp
+ * @brief Expression parser and evaluator for constant integer expressions
+ * @author Jared Bruni
+ */
 #ifndef __EXPR__H_
 #define __EXPR__H_
 #include "scanner/exception.hpp"
@@ -12,48 +13,62 @@
 
 namespace expr_parser {
 
+    /** @brief Token types for the constant expression parser */
     enum class ExprTokenType {
-        END,
-        NUMBER,
-        PLUS,
-        MINUS,
-        MUL,
-        DIV,
-        MOD,
-        LPAREN,
-        RPAREN,
-        PLUSEQ,
-        MINUSEQ,
-        XOR,
-        OR,
-        AND,
-        LOGICAL_AND,
-        LOGICAL_OR,
-        NOT,
-        EQ,
-        NEQ,
-        GT,
-        GTE,
-        LT,
-        LTE,
-        VARIABLE
+        END,          ///< end of expression
+        NUMBER,       ///< numeric literal
+        PLUS,         ///< '+'
+        MINUS,        ///< '-'
+        MUL,          ///< '*'
+        DIV,          ///< '/'
+        MOD,          ///< '%'
+        LPAREN,       ///< '('
+        RPAREN,       ///< ')'
+        PLUSEQ,       ///< '+='
+        MINUSEQ,      ///< '-='
+        XOR,          ///< '^'
+        OR,           ///< '|'
+        AND,          ///< '&'
+        LOGICAL_AND,  ///< '&&'
+        LOGICAL_OR,   ///< '||'
+        NOT,          ///< '!'
+        EQ,           ///< '=='
+        NEQ,          ///< '!='
+        GT,           ///< '>'
+        GTE,          ///< '>='
+        LT,           ///< '<'
+        LTE,          ///< '<='
+        VARIABLE      ///< named variable reference
     };
 
+    /** @brief A single expression token holding its type and optional numeric value */
     struct ExprToken {
-        ExprTokenType type;
-        uint64_t value;
+        ExprTokenType type;  ///< token classification
+        uint64_t value;      ///< numeric value (valid when type == NUMBER)
     };
 
+    /** @brief Global variable map for the expression evaluator */
     inline std::unordered_map<std::string, uint64_t> vars;
 
+    /**
+     * @brief Lexer for constant integer expressions
+     *
+     * Tokenizes an expression string into ExprToken values using the
+     * underlying Scanner. Supports numbers, operators, and variable names.
+     */
     class ExprLexer {
       public:
-        std::string variable;
+        std::string variable;  ///< last scanned variable name
+        /**
+         * @brief Construct a lexer and scan the input string
+         * @param input Expression string to tokenize
+         */
         ExprLexer(const std::string &input) : scanner(input), pos(0) {
             scanner.scan();
             next();
         }
 
+        /** @brief Advance to the next token and update current */
         void next() {
             if (pos >= scanner.size()) {
                 current = {ExprTokenType::END, 0};
@@ -115,23 +130,41 @@ namespace expr_parser {
             }
         }
 
+        /** @brief Return the current token without consuming it */
         ExprToken peek() const { return current; }
+        /** @brief Consume the current token and advance to the next */
         void consume() { next(); }
 
       private:
-        scan::Scanner scanner;
-        size_t pos;
-        ExprToken current;
+        scan::Scanner scanner;  ///< underlying scanner for tokenization
+        size_t pos;             ///< current position in the token stream
+        ExprToken current;      ///< most recently read token
     };
 
+    /**
+     * @brief Recursive-descent parser and evaluator for constant integer expressions
+     *
+     * Evaluates expressions with C-like operator precedence:
+     * logical → comparison → bitwise → additive → term (mul/div/mod) → factor.
+     * Supports variable references resolved via the global @c vars map.
+     */
     class ExprParser {
       public:
+        /**
+         * @brief Construct a parser bound to a lexer
+         * @param lexer Reference to an initialised ExprLexer
+         */
         ExprParser(ExprLexer &lexer) : lexer(lexer) {}
+        /**
+         * @brief Parse and evaluate the expression
+         * @return Computed uint64_t result
+         */
         uint64_t parse() { return parseLogical(); }
 
       private:
-        ExprLexer &lexer;
+        ExprLexer &lexer;  ///< reference to the token source
 
+        /** @brief Parse additive expressions (+, -) */
         uint64_t parseAdd() {
             uint64_t val = parseTerm();
             while (lexer.peek().type == ExprTokenType::PLUS ||
@@ -147,6 +180,7 @@ namespace expr_parser {
             return val;
         }
 
+        /** @brief Parse bitwise expressions (^, |, &) */
         uint64_t parseBitwise() {
             uint64_t val = parseAdd();
             while (lexer.peek().type == ExprTokenType::XOR ||
@@ -166,6 +200,7 @@ namespace expr_parser {
             return val;
         }
 
+        /** @brief Parse comparison expressions (==, !=, >, >=, <, <=) */
         uint64_t parseComparison() {
             uint64_t val = parseBitwise();
             while (lexer.peek().type == ExprTokenType::EQ ||
@@ -197,6 +232,7 @@ namespace expr_parser {
             return val;
         }
 
+        /** @brief Parse logical expressions (&&, ||) — lowest precedence */
         uint64_t parseLogical() {
             uint64_t val = parseComparison();
             while (lexer.peek().type == ExprTokenType::LOGICAL_OR ||
@@ -212,6 +248,7 @@ namespace expr_parser {
             return val;
         }
 
+        /** @brief Parse multiplicative expressions (*, /, %) */
         uint64_t parseTerm() {
             uint64_t val = parseFactor();
             while (lexer.peek().type == ExprTokenType::MUL ||
@@ -237,6 +274,7 @@ namespace expr_parser {
             return val;
         }
 
+        /** @brief Parse primary expressions: numbers, variables, unary ops, and parenthesised sub-expressions */
         uint64_t parseFactor() {
             if (lexer.peek().type == ExprTokenType::NOT) {
                 lexer.consume();

@@ -1,3 +1,8 @@
+/**
+ * @file icode.cpp
+ * @brief Base and Program class core methods — instruction storage, variable management, and standard library registration
+ * @author Jared Bruni
+ */
 #include "mxvm/icode.hpp"
 #include "mxvm/function.hpp"
 #include "mxvm/parser.hpp"

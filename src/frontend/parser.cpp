@@ -1,3 +1,8 @@
+/**
+ * @file parser.cpp
+ * @brief Pascal recursive-descent parser implementation
+ * @author Jared Bruni
+ */
 #include "parser.hpp"
 #include <algorithm>
 #include <cctype>

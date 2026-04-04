@@ -1,3 +1,8 @@
+/**
+ * @file ast.hpp
+ * @brief AST node hierarchy for the MXVM parser using the Visitor pattern
+ * @author Jared Bruni
+ */
 #ifndef __AST_HPP_X_
 #define __AST_HPP_X_
 
@@ -10,6 +15,7 @@ namespace mxvm {
 
     class ASTVisitor;
 
+    /** @brief Abstract base class for all AST nodes */
     class ASTNode {
       public:
         virtual ~ASTNode() = default;
@@ -17,8 +23,10 @@ namespace mxvm {
         virtual std::string toString() const = 0;
     };
 
+    /** @brief Represents a program section (.data, .code, .module, .object) */
     class SectionNode : public ASTNode {
       public:
+        /** @brief Section type discriminator */
         enum SectionType {
             DATA,
             CODE,
@@ -38,10 +46,11 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief Root AST node representing an entire program or object */
     class ProgramNode : public ASTNode {
       public:
         std::string name;
-        bool object = false;
+        bool object = false;            ///< true if this node represents an object rather than a program
         std::string root_name;
         std::vector<std::unique_ptr<SectionNode>> sections;
         std::vector<std::unique_ptr<ProgramNode>> inlineObjects;
@@ -58,15 +67,16 @@ namespace mxvm {
         virtual std::string toString() const override;
     };
 
+    /** @brief AST node for a variable declaration in a .data section */
     class VariableNode : public ASTNode {
       public:
         std::string name;
         VarType type;
         std::string initialValue;
         bool hasInitializer;
-        size_t buffer_size = 0;
+        size_t buffer_size = 0;         ///< buffer allocation size (for pointer/array types)
         bool is_global = false;
-        std::string object;
+        std::string object;             ///< owning object name, if any
 
         VariableNode(VarType varType, const std::string &varName)
             : name(varName), type(varType), hasInitializer(false), buffer_size(0) {}
@@ -81,6 +91,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief AST node for a module import declaration */
     class ModuleNode : public ASTNode {
       public:
         std::string name;
@@ -89,6 +100,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief AST node for an object import declaration */
     class ObjectNode : public ASTNode {
       public:
         std::string name;
@@ -97,9 +109,10 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief AST node representing a single MXVM instruction with its operands */
     class InstructionNode : public ASTNode {
       public:
-        Inc instruction;
+        Inc instruction;                ///< instruction opcode
         std::vector<Operand> operands;
 
         InstructionNode(Inc inst) : instruction(inst) {}
@@ -115,16 +128,18 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief AST node for a label (or function entry point) in the code section */
     class LabelNode : public ASTNode {
       public:
         std::string name;
-        bool function = false;
+        bool function = false;          ///< true if this label marks a callable function
         LabelNode(const std::string &labelName) : name(labelName) {}
 
         void accept(ASTVisitor &visitor) override;
         std::string toString() const override;
     };
 
+    /** @brief AST node for a literal expression value */
     class ExpressionNode : public ASTNode {
       public:
         std::string value;
@@ -137,6 +152,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief AST node for a source-level comment */
     class CommentNode : public ASTNode {
       public:
         std::string text;
@@ -146,6 +162,7 @@ namespace mxvm {
         std::string toString() const override;
     };
 
+    /** @brief Visitor interface for traversing the AST node hierarchy */
     class ASTVisitor {
       public:
         virtual ~ASTVisitor() = default;

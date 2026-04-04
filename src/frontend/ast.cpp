@@ -1,3 +1,8 @@
+/**
+ * @file ast.cpp
+ * @brief Pascal AST node accept(), toString(), and print() implementations
+ * @author Jared Bruni
+ */
 #include "ast.hpp"
 #include <sstream>
 

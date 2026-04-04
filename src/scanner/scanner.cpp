@@ -1,7 +1,8 @@
-/*
-    coded by Jared Bruni (jaredbruni@protonmail.com)
-    https://lostsidedead.biz
-*/
+/**
+ * @file scanner.cpp
+ * @brief Lexical scanner implementation — tokenizes source text into identifiers, numbers, symbols, and strings
+ * @author Jared Bruni
+ */
 #include "scanner/scanner.hpp"
 #include <set>
 

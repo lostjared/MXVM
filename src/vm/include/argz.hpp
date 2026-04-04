@@ -1,3 +1,8 @@
+/**
+ * @file argz.hpp
+ * @brief Generic command-line argument parser with concept-constrained string types
+ * @author Jared Bruni
+ */
 #ifndef _ARGZ_HPP_X
 #define _ARGZ_HPP_X
 
@@ -11,6 +16,11 @@
 #include <vector>
 
 namespace mx {
+    /**
+     * @brief Concept constraining String template parameters to class types with
+     *        length(), operator[], operator+=, and operator= (e.g. std::string, std::wstring)
+     * @tparam T String-like type
+     */
     template <typename T>
     concept StringType = std::is_class_v<T> && requires(T type) {
         type.length();
@@ -25,6 +35,7 @@ namespace mx {
         { type = T{} } -> std::same_as<T &>;
     };
 
+    /** @brief Discriminates argument switch types (single-dash, double-dash, with/without value) */
     enum class ArgType {
         ARG_SINGLE,
         ARG_SINGLE_VALUE,
@@ -33,13 +44,17 @@ namespace mx {
         ARG_NONE
     };
 
+    /**
+     * @brief A parsed or registered command-line argument definition
+     * @tparam String A StringType-constrained string class
+     */
     template <StringType String>
     struct Argument {
-        String arg_name;
-        int arg_letter;
-        String arg_value;
-        ArgType arg_type;
-        String desc;
+        String arg_name;    ///< long option name (for double-dash)
+        int arg_letter;     ///< short option character code
+        String arg_value;   ///< parsed value (for value-taking options)
+        ArgType arg_type;   ///< switch type
+        String desc;        ///< help description
         Argument() : arg_name{}, arg_letter{}, arg_value{}, arg_type{}, desc{} {}
         Argument(const Argument &a) : arg_name{a.arg_name}, arg_letter{a.arg_letter}, arg_value{a.arg_value}, arg_type{a.arg_type}, desc{a.desc} {}
         Argument &operator=(const Argument<String> &a) {
@@ -53,10 +68,14 @@ namespace mx {
         auto operator<=>(const Argument<String> &a) const { return (arg_letter <=> a.arg_letter); }
     };
 
+    /**
+     * @brief Raw argument data collected from argc/argv
+     * @tparam String A StringType-constrained string class
+     */
     template <StringType String>
     struct ArgumentData {
-        std::vector<String> args;
-        int argc;
+        std::vector<String> args;  ///< parsed argument strings (argv[1..])
+        int argc;                  ///< original argument count
         ArgumentData() = default;
         ArgumentData(const ArgumentData<String> &a) : args{a.args}, argc{a.argc} {}
         ArgumentData &operator=(const ArgumentData<String> &a) {
@@ -75,22 +94,43 @@ namespace mx {
         }
     };
 
+    /**
+     * @brief Exception type thrown for argument parsing errors
+     * @tparam String A StringType-constrained string class
+     */
     template <StringType String>
     class ArgException {
       public:
         ArgException() = default;
+
+        /** @brief Construct with an error message */
         ArgException(const String &s) : value{s} {}
+
+        /** @brief Get the error message */
         String text() const { return value; }
 
       private:
         String value;
     };
 
+    /**
+     * @brief Generic command-line argument parser supporting single/double-dash options
+     *
+     * Supports short options (-x), short options with values (-x value),
+     * long options (--name), and long options with values (--name value).
+     * Template parameter must satisfy the StringType concept.
+     *
+     * @tparam String A StringType-constrained string class (std::string or std::wstring)
+     */
     template <StringType String>
     class Argz {
       public:
         Argz() = default;
+
+        /** @brief Construct and initialize from argc/argv */
         Argz(int argc, char **argv) { initArgs(argc, argv); }
+
+        /** @brief Copy constructor */
         Argz(const Argz<String> &a) : arg_data{a.arg_data}, arg_info{a.arg_info}, index{a.index}, cindex{a.cindex} {}
 
         Argz<String> &operator=(const Argz<String> &a) {
@@ -106,8 +146,10 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Move constructor */
         Argz(Argz<String> &&a) : arg_data{std::move(a.arg_data)}, arg_info{std::move(a.arg_info)}, index{a.index}, cindex{a.cindex} {}
 
+        /** @brief Move-assignment operator */
         Argz<String> &operator=(Argz<String> &&a) {
             arg_data = std::move(a.arg_data);
             arg_info = std::move(a.arg_info);
@@ -116,6 +158,11 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Initialize the parser from argc/argv (skips argv[0])
+         * @param argc Argument count
+         * @param argv Argument vector
+         * @return Reference to this parser for chaining
+         */
         Argz<String> &initArgs(int argc, char **argv) {
             arg_data.argc = argc;
             if constexpr (std::is_same<typename String::value_type, char>::value) {
@@ -142,11 +189,17 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Reset the parser index to the beginning */
         void reset() {
             index = 0;
             cindex = 1;
         }
 
+        /** @brief Register a single-dash flag (no value)
+         * @param c Option character
+         * @param description Help text
+         * @return Reference to this parser for chaining
+         */
         Argz<String> &addOptionSingle(const int &c, const String &description) {
             Argument<String> a{};
             a.arg_letter = c;
@@ -156,6 +209,11 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Register a single-dash option that takes a value
+         * @param c Option character
+         * @param description Help text
+         * @return Reference to this parser for chaining
+         */
         Argz<String> &addOptionSingleValue(const int &c, const String &description) {
             Argument<String> a{};
             a.arg_letter = c;
@@ -165,6 +223,12 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Register a double-dash flag (no value)
+         * @param code Numeric code identifying this option
+         * @param value Long option name (e.g. "help")
+         * @param description Help text
+         * @return Reference to this parser for chaining
+         */
         Argz<String> &addOptionDouble(const int &code, const String &value, const String &description) {
             Argument<String> a{};
             a.arg_letter = code;
@@ -175,6 +239,12 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Register a double-dash option that takes a value
+         * @param code Numeric code identifying this option
+         * @param value Long option name
+         * @param description Help text
+         * @return Reference to this parser for chaining
+         */
         Argz<String> &addOptionDoubleValue(const int &code, const String &value, const String &description) {
             Argument<String> a{};
             a.arg_letter = code;
@@ -185,6 +255,10 @@ namespace mx {
             return *this;
         }
 
+        /** @brief Look up a registered option's code by its long name
+         * @param value Long option name to search for
+         * @return The option code, or -1 if not found
+         */
         int lookUpCode(const String &value) {
             for (const auto &i : arg_info) {
                 if (i.second.arg_name == value) {
@@ -194,6 +268,11 @@ namespace mx {
             return -1;
         }
 
+        /** @brief Process the next argument from the command line
+         * @param[out] a Receives the matched Argument definition and parsed value
+         * @return The option code, '-' for positional arguments, or -1 when done
+         * @throws ArgException on malformed or unknown arguments
+         */
         int proc(Argument<String> &a) {
             if (index < static_cast<int>(arg_data.args.size())) {
                 const String &type{arg_data.args[index]};
@@ -340,6 +419,10 @@ namespace mx {
             return -1;
         }
 
+        /** @brief Print a formatted help message listing all registered options
+         * @tparam T Output stream type (e.g. std::ostream, std::wostream)
+         * @param cout Output stream
+         */
         template <typename T>
         void help(T &cout) {
             using char_type = typename std::decay<decltype(*std::declval<T>().rdbuf())>::type::char_type;
@@ -391,19 +474,25 @@ namespace mx {
         }
 
       protected:
-        ArgumentData<String> arg_data;
-        std::unordered_map<int, Argument<String>> arg_info;
+        ArgumentData<String> arg_data;                        ///< raw argument data from argc/argv
+        std::unordered_map<int, Argument<String>> arg_info;   ///< registered option definitions
 
       private:
-        int index = 0, cindex = 1;
+        int index = 0, cindex = 1;  ///< current parse position
     };
 
+    /** @brief Parsed SDL program arguments (resolution, path, fullscreen) */
     struct Arguments {
-        int width, height;
-        std::string path;
-        bool fullscreen;
+        int width, height;     ///< window dimensions
+        std::string path;      ///< assets path
+        bool fullscreen;       ///< fullscreen mode flag
     };
 
+    /** @brief Parse SDL-specific command-line arguments
+     * @param argc Argument count (may be modified)
+     * @param argv Argument vector
+     * @return Parsed Arguments struct
+     */
     inline Arguments proc_args(int &argc, char **argv) {
         Arguments args;
         Argz<std::string> parser(argc, argv);

@@ -1,3 +1,8 @@
+/**
+ * @file icode.cpp
+ * @brief Pascal-to-MXVM code generator — CodeGenVisitor visit methods and assembly output
+ * @author Jared Bruni
+ */
 #include "icode.hpp"
 #include <algorithm>
 #include <regex>

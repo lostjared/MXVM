@@ -1,3 +1,8 @@
+/**
+ * @file io.cpp
+ * @brief I/O module C++ runtime bindings for the MXVM interpreter
+ * @author Jared Bruni
+ */
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>

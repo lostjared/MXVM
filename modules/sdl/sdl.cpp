@@ -1,3 +1,8 @@
+/**
+ * @file sdl.cpp
+ * @brief SDL2 module C++ runtime bindings for the MXVM interpreter
+ * @author Jared Bruni
+ */
 #include "mx_sdl.h"
 #include <cstdint>
 #include <mxvm/icode.hpp>

@@ -1,3 +1,8 @@
+/**
+ * @file parser.cpp
+ * @brief MXVM parser — tokenization, AST construction, and intermediate code generation
+ * @author Jared Bruni
+ */
 #include "mxvm/parser.hpp"
 #include "mxvm/ast.hpp"
 #include "mxvm/icode.hpp"

@@ -1,3 +1,8 @@
+/**
+ * @file io.c
+ * @brief I/O module C implementation — file operations, random numbers, and time functions
+ * @author Jared Bruni
+ */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
