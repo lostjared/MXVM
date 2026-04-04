@@ -316,6 +316,7 @@ namespace pascal {
 
         std::vector<std::pair<FuncDeclNode *, std::vector<std::string>>> deferredFuncs;
         std::string currentFunctionName;
+        std::vector<std::string> currentFuncLocalSlots;
         bool functionSetReturn = false;
         int nextSlot = 0;
         int nextTemp = 0;
@@ -974,6 +975,7 @@ namespace pascal {
 
                 emitLabel(funcLabel("function PROC_", mangledName));
                 currentFunctionName = pn->name;
+                currentFuncLocalSlots.clear();
                 currentParamLocations.clear();
                 currentParamTypes.clear();
 
@@ -1015,6 +1017,7 @@ namespace pascal {
 
                                 if (!incomingReg.empty())
                                     emit2("mov", slotVar(localSlot), incomingReg);
+                                currentFuncLocalSlots.push_back(slotVar(localSlot));
 
                                 if (isArrayParam) {
                                     arrayInfo[mangledId] = arrayInfo.at(normType);
@@ -1072,6 +1075,7 @@ namespace pascal {
 
                 emitLabel(funcLabel("function FUNC_", mangledName));
                 currentFunctionName = fn->name;
+                currentFuncLocalSlots.clear();
                 currentParamLocations.clear();
                 currentParamTypes.clear();
                 functionSetReturn = false;
@@ -1109,6 +1113,7 @@ namespace pascal {
                                     setSlotType(localSlot, paramType);
                                     setVarType(id, paramType);
                                     emit2("mov", slotVar(localSlot), incomingReg);
+                                    currentFuncLocalSlots.push_back(slotVar(localSlot));
 
                                     if (isArrayParam) {
                                         arrayInfo[mangledId] = arrayInfo.at(normType);

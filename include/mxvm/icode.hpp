@@ -16,8 +16,8 @@
 
 namespace mxvm {
 
-    /** @brief Stack element: either a 64-bit integer or a raw pointer */
-    using StackValue = std::variant<int64_t, void *>;
+    /** @brief Stack element: integer, pointer, double, or string */
+    using StackValue = std::variant<int64_t, void *, double, std::string>;
 
     /** @brief Runtime operand stack for the MXVM interpreter */
     class Stack {

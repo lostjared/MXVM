@@ -357,7 +357,7 @@ namespace mxvm {
         if (base != nullptr) {
             for (auto &v : var_names) {
                 auto varx = getVariable(v);
-                if (varx.is_global) {
+                if (varx.is_global || object) {
                     switch (varx.type) {
                     case VarType::VAR_BYTE:
                     case VarType::VAR_FLOAT:
@@ -383,7 +383,7 @@ namespace mxvm {
         if (object) {
             for (auto &v : var_names) {
                 auto varx = getVariable(v);
-                if (varx.is_global && (varx.type == VarType::VAR_STRING || varx.type == VarType::VAR_POINTER))
+                if (varx.type == VarType::VAR_STRING || varx.type == VarType::VAR_POINTER)
                     out << "\t.globl " << getMangledName(v) << "\n";
             }
         }

@@ -214,6 +214,9 @@ namespace pascal {
             setVarType(varName, vType);
             setSlotType(slot, vType);
 
+            if (!currentFunctionName.empty())
+                currentFuncLocalSlots.push_back(slotVar(slot));
+
             if (vType == VarType::PTR || vType == VarType::RECORD) {
                 updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
             } else if (vType == VarType::DOUBLE) {
@@ -528,7 +531,18 @@ namespace pascal {
             auto eit = externalFuncs.find(node.name);
             if (eit != externalFuncs.end())
                 label = eit->second + "." + label;
+
+            if (!currentFuncLocalSlots.empty()) {
+                for (const auto &slot : currentFuncLocalSlots)
+                    emit1("push", slot);
+            }
+
             emit1("call", label);
+
+            if (!currentFuncLocalSlots.empty()) {
+                for (auto it2 = currentFuncLocalSlots.rbegin(); it2 != currentFuncLocalSlots.rend(); ++it2)
+                    emit1("pop", *it2);
+            }
         }
 
         for (const auto &arg : evaluated_args)
@@ -604,7 +618,18 @@ namespace pascal {
             auto eit = externalFuncs.find(node.name);
             if (eit != externalFuncs.end())
                 label = eit->second + "." + label;
+
+            if (!currentFuncLocalSlots.empty()) {
+                for (const auto &slot : currentFuncLocalSlots)
+                    emit1("push", slot);
+            }
+
             emit1("call", label);
+
+            if (!currentFuncLocalSlots.empty()) {
+                for (auto it2 = currentFuncLocalSlots.rbegin(); it2 != currentFuncLocalSlots.rend(); ++it2)
+                    emit1("pop", *it2);
+            }
         }
 
         auto it = funcSignatures.find(node.name);

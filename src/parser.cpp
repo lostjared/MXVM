@@ -479,7 +479,8 @@ namespace mxvm {
             index++;
 
             std::string add_op;
-            if (index < scanner.size() && this->operator[](index).getTokenValue() == "-") {
+            if (index < scanner.size() && this->operator[](index).getTokenValue() == "-"
+                && this->operator[](index).getTokenType() == types::TokenType::TT_SYM) {
                 add_op = "-";
                 index++;
             }

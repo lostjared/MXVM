@@ -1574,12 +1574,16 @@ namespace mxvm {
             }
         }
         Variable &var = getVariable(instr.op1.op);
-        if (var.var_value.type == VarType::VAR_INTEGER) {
+        if (var.var_value.type == VarType::VAR_INTEGER || var.var_value.type == VarType::VAR_BYTE) {
             stack.push(var.var_value.int_value);
         } else if (var.var_value.type == VarType::VAR_POINTER || var.var_value.type == VarType::VAR_EXTERN) {
             stack.push(var.var_value.ptr_value);
+        } else if (var.var_value.type == VarType::VAR_FLOAT) {
+            stack.push(var.var_value.float_value);
+        } else if (var.var_value.type == VarType::VAR_STRING) {
+            stack.push(var.var_value.str_value);
         } else {
-            throw mx::Exception("PUSH only supports integer or pointer types");
+            throw mx::Exception("PUSH: unsupported variable type");
         }
     }
 
@@ -1594,26 +1598,32 @@ namespace mxvm {
         }
 
         StackValue value = stack.pop();
-        if (var.type == VarType::VAR_INTEGER) {
+        if (var.type == VarType::VAR_INTEGER || var.type == VarType::VAR_BYTE) {
             if (!std::holds_alternative<int64_t>(value)) {
-                throw mx::Exception("POP type mismatch: expected integer, pointer found.");
+                throw mx::Exception("POP type mismatch: expected integer");
             }
             var.var_value.int_value = std::get<int64_t>(value);
-            var.var_value.type = VarType::VAR_INTEGER;
-        } else if (var.type == VarType::VAR_POINTER) {
+            var.var_value.type = var.type;
+        } else if (var.type == VarType::VAR_POINTER || var.type == VarType::VAR_EXTERN) {
             if (!std::holds_alternative<void *>(value)) {
-                throw mx::Exception("POP type mismatch: expected pointer, integer found.");
+                throw mx::Exception("POP type mismatch: expected pointer");
             }
             var.var_value.ptr_value = std::get<void *>(value);
-            var.var_value.type = VarType::VAR_POINTER;
-        } else if (var.type == VarType::VAR_EXTERN) {
-            if (!std::holds_alternative<void *>(value)) {
-                throw mx::Exception("POP type mismatch: expected pointer, integer found.");
+            var.var_value.type = var.type;
+        } else if (var.type == VarType::VAR_FLOAT) {
+            if (!std::holds_alternative<double>(value)) {
+                throw mx::Exception("POP type mismatch: expected float");
             }
-            var.var_value.ptr_value = std::get<void *>(value);
-            var.var_value.type = VarType::VAR_EXTERN;
+            var.var_value.float_value = std::get<double>(value);
+            var.var_value.type = VarType::VAR_FLOAT;
+        } else if (var.type == VarType::VAR_STRING) {
+            if (!std::holds_alternative<std::string>(value)) {
+                throw mx::Exception("POP type mismatch: expected string");
+            }
+            var.var_value.str_value = std::get<std::string>(value);
+            var.var_value.type = VarType::VAR_STRING;
         } else {
-            throw mx::Exception("POP only supports integer or pointer variables");
+            throw mx::Exception("POP: unsupported variable type");
         }
     }
 
@@ -1637,20 +1647,32 @@ namespace mxvm {
         }
 
         StackValue &value = stack[index];
-        if (dest.type == VarType::VAR_INTEGER) {
+        if (dest.type == VarType::VAR_INTEGER || dest.type == VarType::VAR_BYTE) {
             if (!std::holds_alternative<int64_t>(value)) {
-                throw mx::Exception("STACK_LOAD type mismatch: expected integer, found pointer");
+                throw mx::Exception("STACK_LOAD type mismatch: expected integer");
             }
             dest.var_value.int_value = std::get<int64_t>(value);
-            dest.var_value.type = VarType::VAR_INTEGER;
-        } else if (dest.type == VarType::VAR_POINTER) {
+            dest.var_value.type = dest.type;
+        } else if (dest.type == VarType::VAR_POINTER || dest.type == VarType::VAR_EXTERN) {
             if (!std::holds_alternative<void *>(value)) {
-                throw mx::Exception("STACK_LOAD type mismatch: expected pointer, found integer");
+                throw mx::Exception("STACK_LOAD type mismatch: expected pointer");
             }
             dest.var_value.ptr_value = std::get<void *>(value);
-            dest.var_value.type = VarType::VAR_POINTER;
+            dest.var_value.type = dest.type;
+        } else if (dest.type == VarType::VAR_FLOAT) {
+            if (!std::holds_alternative<double>(value)) {
+                throw mx::Exception("STACK_LOAD type mismatch: expected float");
+            }
+            dest.var_value.float_value = std::get<double>(value);
+            dest.var_value.type = VarType::VAR_FLOAT;
+        } else if (dest.type == VarType::VAR_STRING) {
+            if (!std::holds_alternative<std::string>(value)) {
+                throw mx::Exception("STACK_LOAD type mismatch: expected string");
+            }
+            dest.var_value.str_value = std::get<std::string>(value);
+            dest.var_value.type = VarType::VAR_STRING;
         } else {
-            throw mx::Exception("STACK_LOAD only supports integer or pointer variables");
+            throw mx::Exception("STACK_LOAD: unsupported variable type");
         }
     }
 
@@ -1673,18 +1695,16 @@ namespace mxvm {
             throw mx::Exception("STACK_STORE: index out of bounds");
         }
         StackValue &value = stack[index];
-        if (src.type == VarType::VAR_INTEGER) {
-            if (!std::holds_alternative<int64_t>(value)) {
-                throw mx::Exception("STACK_STORE type mismatch: expected integer slot");
-            }
+        if (src.type == VarType::VAR_INTEGER || src.type == VarType::VAR_BYTE) {
             value = src.var_value.int_value;
-        } else if (src.type == VarType::VAR_POINTER) {
-            if (!std::holds_alternative<void *>(value)) {
-                throw mx::Exception("STACK_STORE type mismatch: expected pointer slot");
-            }
+        } else if (src.type == VarType::VAR_POINTER || src.type == VarType::VAR_EXTERN) {
             value = src.var_value.ptr_value;
+        } else if (src.type == VarType::VAR_FLOAT) {
+            value = src.var_value.float_value;
+        } else if (src.type == VarType::VAR_STRING) {
+            value = src.var_value.str_value;
         } else {
-            throw mx::Exception("STACK_STORE only supports integer or pointer variables");
+            throw mx::Exception("STACK_STORE: unsupported variable type");
         }
     }
 
@@ -1986,6 +2006,10 @@ namespace mxvm {
                     } else {
                         out << "0x" << std::hex << reinterpret_cast<uintptr_t>(ptr) << std::dec;
                     }
+                } else if (std::holds_alternative<double>(value)) {
+                    out << std::get<double>(value);
+                } else if (std::holds_alternative<std::string>(value)) {
+                    out << "\"" << std::get<std::string>(value) << "\"";
                 } else {
                     out << "(unknown)";
                 }

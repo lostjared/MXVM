@@ -737,6 +737,9 @@ void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program> &program) {
             if (lbl.second.second)
                 mxvm::Program::base->add_extern(obj->name, lbl.first, false);
         }
+        for (auto &v : obj->vars) {
+            mxvm::Program::base->add_extern(obj->name, v.first, false);
+        }
     }
 }
 
