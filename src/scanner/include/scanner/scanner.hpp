@@ -32,6 +32,7 @@ namespace scan {
         TToken &operator[](size_t index);
         size_t size() const;
         void removeEOL();
+        std::vector<TToken> &getTokens() { return tokens; }
 
       private:
         TString string_buffer;

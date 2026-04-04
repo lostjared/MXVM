@@ -420,4 +420,8 @@ namespace pascal {
         visitor.visit(*this);
     }
 
+    void AddressOfNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
 } // namespace pascal

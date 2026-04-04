@@ -500,6 +500,16 @@ namespace pascal {
         std::string toString() const override { return "PointerDeref"; }
     };
 
+    class AddressOfNode : public ASTNode {
+      public:
+        std::unique_ptr<ASTNode> operand;
+
+        AddressOfNode(std::unique_ptr<ASTNode> op) : operand(std::move(op)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "AddressOf"; }
+    };
+
     class RepeatStmtNode : public ASTNode {
       public:
         std::vector<std::unique_ptr<ASTNode>> statements;
@@ -584,6 +594,7 @@ namespace pascal {
         virtual void visit(NilNode &node) = 0;
         virtual void visit(PointerTypeNode &node) = 0;
         virtual void visit(PointerDerefNode &node) = 0;
+        virtual void visit(AddressOfNode &node) = 0;
     };
 } // namespace pascal
 

@@ -237,6 +237,7 @@ namespace mxvm {
         void gen_invoke(std::ostream &out, const Instruction &i);
         void gen_return(std::ostream &out, const Instruction &i);
         void gen_neg(std::ostream &out, const Instruction &i);
+        void gen_lea(std::ostream &out, const Instruction &i);
         void gen_fcmp(std::ostream &out, const Instruction &i);
         void gen_jae(std::ostream &out, const Instruction &i);
         void gen_jbe(std::ostream &out, const Instruction &i);
@@ -294,6 +295,7 @@ namespace mxvm {
         void x64_gen_mov(std::ostream &out, const Instruction &i);
         void x64_gen_arth(std::ostream &out, std::string arth, const Instruction &i);
         void x64_gen_exit(std::ostream &out, const Instruction &i);
+        void x64_gen_lea(std::ostream &out, const Instruction &i);
         void x64_gen_fcmp(std::ostream &out, const Instruction &i);
         void x64_gen_jae(std::ostream &out, const Instruction &i);
         void x64_gen_jbe(std::ostream &out, const Instruction &i);
@@ -373,6 +375,7 @@ namespace mxvm {
         void exec_to_float(const Instruction &instr);
         void exec_invoke(const Instruction &instr);
         void exec_return(const Instruction &instr);
+        void exec_lea(const Instruction &instr);
         void exec_neg(const Instruction &instr);
         void exec_fcmp(const Instruction &instr);
         void exec_jae(const Instruction &instr);

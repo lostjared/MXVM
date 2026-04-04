@@ -293,6 +293,9 @@ namespace mxvm {
             case NEG:
                 exec_neg(instr);
                 break;
+            case LEA:
+                exec_lea(instr);
+                break;
             default:
                 throw mx::Exception("Unknown instruction: " + std::to_string(instr.instruction));
                 break;
@@ -1164,6 +1167,41 @@ namespace mxvm {
             var.var_value.ptr_size = 0;
             var.var_value.ptr_count = 0;
         }
+    }
+
+    void Program::exec_lea(const Instruction &instr) {
+        if (!isVariable(instr.op1.op))
+            throw mx::Exception("LEA destination must be a variable");
+        if (!isVariable(instr.op2.op))
+            throw mx::Exception("LEA source must be a variable");
+
+        Variable &dest = getVariable(instr.op1.op);
+        Variable &src = getVariable(instr.op2.op);
+
+        dest.type = VarType::VAR_POINTER;
+        dest.var_value.type = VarType::VAR_POINTER;
+
+        switch (src.type) {
+        case VarType::VAR_INTEGER:
+        case VarType::VAR_BYTE:
+            dest.var_value.ptr_value = &src.var_value.int_value;
+            dest.var_value.ptr_size = sizeof(int64_t);
+            break;
+        case VarType::VAR_FLOAT:
+            dest.var_value.ptr_value = &src.var_value.float_value;
+            dest.var_value.ptr_size = sizeof(double);
+            break;
+        case VarType::VAR_POINTER:
+            dest.var_value.ptr_value = &src.var_value.ptr_value;
+            dest.var_value.ptr_size = sizeof(void *);
+            break;
+        default:
+            dest.var_value.ptr_value = &src.var_value.int_value;
+            dest.var_value.ptr_size = sizeof(int64_t);
+            break;
+        }
+        dest.var_value.ptr_count = 1;
+        dest.var_value.owns = false;
     }
 
     void Program::exec_not(const Instruction &instr) {

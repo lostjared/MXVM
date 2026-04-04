@@ -117,6 +117,7 @@ namespace mxvm {
         {"exit", {"exit", {}, VArity::AnyTail, 0, 1}},
         {"alloc", {"alloc", {OpKind::Id, OpKind::Any, OpKind::Any}}},
         {"free", {"free", {OpKind::Id}}},
+        {"lea", {"lea", {OpKind::Id, OpKind::Id}}},
         {"getline", {"getline", {OpKind::Id}}},
         {"push", {"push", {OpKind::Any}}},
         {"pop", {"pop", {OpKind::Id}}},

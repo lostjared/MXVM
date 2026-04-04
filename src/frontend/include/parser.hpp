@@ -75,12 +75,21 @@ namespace pascal {
     class PascalParser : public mxx::XParser {
       public:
         PascalParser() = delete;
-        explicit PascalParser(const std::string &source) : mxx::XParser(source), validator(source) {}
+        explicit PascalParser(const std::string &source) : mxx::XParser(source), validator(source) {
+            removeBraceComments();
+            if (scanner.size() > 0) {
+                token = &scanner[0];
+                index = 0;
+            } else {
+                token = nullptr;
+            }
+        }
 
         std::unique_ptr<ProgramNode> parseProgram();
         mxx::TPValidator validator;
 
       private:
+        void removeBraceComments();
         void error(const std::string &message);
         void expectToken(const std::string &expected);
         void expectToken(types::TokenType expected);

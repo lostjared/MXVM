@@ -458,6 +458,9 @@ namespace mxvm {
         case JNS:
             gen_jns(out, i);
             break;
+        case LEA:
+            gen_lea(out, i);
+            break;
         default:
             throw mx::Exception("Invalid or unsupported instruction: " + std::to_string(static_cast<unsigned int>(i.instruction)));
         }
@@ -542,6 +545,23 @@ namespace mxvm {
         } else {
             throw mx::Exception("neg requires variable");
         }
+    }
+
+    void Program::gen_lea(std::ostream &out, const Instruction &i) {
+        if (!isVariable(i.op1.op))
+            throw mx::Exception("LEA destination must be a variable");
+        if (!isVariable(i.op2.op))
+            throw mx::Exception("LEA source must be a variable");
+
+        // Flush source register to memory before taking its address
+        auto it = sysv_reg_vars.find(i.op2.op);
+        if (it != sysv_reg_vars.end()) {
+            out << "\tmovq " << it->second << ", " << getMangledName(i.op2) << "(%rip)\n";
+        }
+
+        out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
+        out << "\tmovq %rax, " << getMangledName(i.op1) << "(%rip)\n";
+        getVariable(i.op1.op).var_value.owns = false;
     }
 
     void Program::gen_invoke(std::ostream &out, const Instruction &i) {
@@ -689,6 +709,8 @@ namespace mxvm {
         Variable &ptrVar = getVariable(i.op2.op);
 
         if (ptrVar.type == VarType::VAR_POINTER) {
+            // Flush all cached registers so pointer reads see current values
+            sysv_emitFlushRegs(out);
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
         } else if (ptrVar.type == VarType::VAR_STRING) {
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
@@ -805,6 +827,8 @@ namespace mxvm {
         Variable &ptrVar = getVariable(i.op2.op);
 
         if (ptrVar.type == VarType::VAR_POINTER) {
+            // Flush all cached registers before pointer store
+            sysv_emitFlushRegs(out);
             out << "\tmovq " << getMangledName(i.op2) << "(%rip), %rax\n";
         } else if (ptrVar.type == VarType::VAR_STRING && ptrVar.var_value.buffer_size > 0) {
             out << "\tleaq " << getMangledName(i.op2) << "(%rip), %rax\n";
@@ -911,6 +935,10 @@ namespace mxvm {
             } else {
                 out << "\tmovq %rdx, (%rax,%rcx,8)\n";
             }
+        }
+        // Reload cached registers after pointer store (memory may have changed)
+        if (ptrVar.type == VarType::VAR_POINTER) {
+            sysv_emitReloadRegs(out);
         }
     }
 

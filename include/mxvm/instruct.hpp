@@ -62,7 +62,8 @@ enum Inc { NULL_INC = 0,
            JO,
            JNO,
            JS,
-           JNS };
+           JNS,
+           LEA };
 
 inline std::vector<std::string> IncType{
     "NULL",         // NULL_INC = 0
@@ -119,7 +120,8 @@ inline std::vector<std::string> IncType{
     "jo",           // JO = 51 (jump if overflow)
     "jno",          // JNO = 52 (jump if no overflow)
     "js",           // JS = 53 (jump if sign)
-    "jns"           // JNS = 54 (jump if no sign)
+    "jns",          // JNS = 54 (jump if no sign)
+    "lea"           // LEA = 55 (load effective address)
 };
 
 std::ostream &operator<<(std::ostream &out, const enum Inc &i);

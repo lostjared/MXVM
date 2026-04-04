@@ -1511,4 +1511,15 @@ namespace pascal {
             freeReg(ptrVal);
     }
 
+    void CodeGenVisitor::visit(AddressOfNode &node) {
+        if (auto varNode = dynamic_cast<VariableNode *>(node.operand.get())) {
+            std::string mangled = findMangledName(varNode->name);
+            std::string result = allocTempPtr();
+            emit2("lea", result, mangled);
+            pushValue(result);
+        } else {
+            throw std::runtime_error("@ operator requires a variable operand");
+        }
+    }
+
 } // namespace pascal

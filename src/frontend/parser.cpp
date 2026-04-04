@@ -5,6 +5,27 @@
 
 namespace pascal {
 
+    void PascalParser::removeBraceComments() {
+        auto &toks = scanner.getTokens();
+        for (size_t i = 0; i < toks.size(); ) {
+            if (toks[i].getTokenValue() == "{") {
+                size_t start = i;
+                ++i;
+                while (i < toks.size() && toks[i].getTokenValue() != "}") {
+                    ++i;
+                }
+                if (i < toks.size()) {
+                    ++i; // skip closing }
+                }
+                toks.erase(toks.begin() + static_cast<int64_t>(start),
+                           toks.begin() + static_cast<int64_t>(i));
+                i = start;
+            } else {
+                ++i;
+            }
+        }
+    }
+
     void PascalParser::error(const std::string &message) {
         throw ParseException("Parse error: " + message + (token ? " at '" + token->getTokenValue() + "'" : " at end of input"));
     }
@@ -481,6 +502,12 @@ namespace pascal {
             auto nilNode = std::make_unique<NilNode>();
             nilNode->setLineNumber(lineNum);
             return nilNode;
+        } else if (peekIs("@")) {
+            next();
+            auto operand = parseFactor();
+            auto addrNode = std::make_unique<AddressOfNode>(std::move(operand));
+            addrNode->setLineNumber(lineNum);
+            return addrNode;
         } else if (peekIs("(")) {
             next();
             auto expr = parseExpression();

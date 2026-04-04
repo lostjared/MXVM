@@ -1229,6 +1229,7 @@ namespace pascal {
         void visit(NilNode &node) override;
         void visit(PointerTypeNode &node) override;
         void visit(PointerDerefNode &node) override;
+        void visit(AddressOfNode &node) override;
 
         std::string getTypeString(const VarDeclNode &node) {
             if (std::holds_alternative<std::string>(node.type))
@@ -1304,6 +1305,8 @@ namespace pascal {
 
         VarType getExpressionType(ASTNode *node) {
             if (dynamic_cast<NilNode *>(node))
+                return VarType::PTR;
+            if (dynamic_cast<AddressOfNode *>(node))
                 return VarType::PTR;
             if (dynamic_cast<NumberNode *>(node)) {
                 auto n = static_cast<NumberNode *>(node);
