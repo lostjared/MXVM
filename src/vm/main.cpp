@@ -14,13 +14,17 @@
 #include <windows.h>
 #endif
 
-enum class vm_action { null_action = 0,
-                       translate,
-                       interpret,
-                       compile };
-enum class vm_target { x86_64_linux,
-                       x86_64_macos,
-                       x86_64_windows };
+enum class vm_action {
+    null_action = 0,
+    translate,
+    interpret,
+    compile
+};
+enum class vm_target {
+    x86_64_linux,
+    x86_64_macos,
+    x86_64_windows
+};
 
 std::ostream &operator<<(std::ostream &out, const vm_action &ae) {
     switch (ae) {

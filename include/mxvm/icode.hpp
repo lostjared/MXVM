@@ -197,9 +197,11 @@ namespace mxvm {
         std::vector<std::string> args;
         bool main_function;
         bool object_external = false;
-        enum LastCmpType { CMP_NONE,
-                           CMP_INTEGER,
-                           CMP_FLOAT };
+        enum LastCmpType {
+            CMP_NONE,
+            CMP_INTEGER,
+            CMP_FLOAT
+        };
         LastCmpType last_cmp_type = CMP_NONE;
         bool last_call_returns_owned_ptr = false;
 

@@ -11,13 +11,15 @@
 
 namespace mxvm {
 
-    enum class OpKind { Num,
-                        Hex,
-                        Str,
-                        Id,
-                        Member,
-                        Label,
-                        Any };
+    enum class OpKind {
+        Num,
+        Hex,
+        Str,
+        Id,
+        Member,
+        Label,
+        Any
+    };
 
     struct ParsedOp {
         OpKind kind;
@@ -34,9 +36,11 @@ namespace mxvm {
         const scan::TToken *at;
     };
 
-    enum class VArity { None,
-                        AnyTail,
-                        ArgsTail };
+    enum class VArity {
+        None,
+        AnyTail,
+        ArgsTail
+    };
 
     struct OpSpec {
         std::string name;

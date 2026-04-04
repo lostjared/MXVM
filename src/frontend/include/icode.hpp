@@ -60,17 +60,19 @@ namespace pascal {
 
     class CodeGenVisitor;
 
-    enum class VarType { INT,
-                         DOUBLE,
-                         STRING,
-                         CHAR,
-                         RECORD,
-                         PTR,
-                         BOOL,
-                         UNKNOWN,
-                         ARRAY_INT,
-                         ARRAY_DOUBLE,
-                         ARRAY_STRING };
+    enum class VarType {
+        INT,
+        DOUBLE,
+        STRING,
+        CHAR,
+        RECORD,
+        PTR,
+        BOOL,
+        UNKNOWN,
+        ARRAY_INT,
+        ARRAY_DOUBLE,
+        ARRAY_STRING
+    };
 
     class BuiltinFunctionHandler {
       public:
@@ -294,9 +296,11 @@ namespace pascal {
         }
 
         struct ValueLocation {
-            enum Type { REGISTER,
-                        MEMORY,
-                        IMMEDIATE } type;
+            enum Type {
+                REGISTER,
+                MEMORY,
+                IMMEDIATE
+            } type;
             std::string location;
         };
         std::unordered_map<std::string, ValueLocation> valueLocations;
@@ -1118,9 +1122,11 @@ namespace pascal {
         }
 
         bool isIntLiteral(const std::string &s) const {
-            if (s.empty()) return false;
+            if (s.empty())
+                return false;
             size_t start = (s[0] == '-') ? 1 : 0;
-            if (start >= s.size()) return false;
+            if (start >= s.size())
+                return false;
             for (size_t i = start; i < s.size(); ++i)
                 if (!std::isdigit(static_cast<unsigned char>(s[i])))
                     return false;

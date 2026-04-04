@@ -448,7 +448,8 @@ namespace pascal {
             if (evaluated_args[i] == targetRegs[i])
                 continue;
             for (size_t j = 0; j < evaluated_args.size(); ++j) {
-                if (j == i) continue;
+                if (j == i)
+                    continue;
                 if (evaluated_args[j] == targetRegs[i]) {
                     // arg j's value is in a register that arg i needs as target
                     std::string spill = allocReg();
@@ -514,7 +515,8 @@ namespace pascal {
             if (evaluated_args[i] == targetRegs[i])
                 continue;
             for (size_t j = 0; j < evaluated_args.size(); ++j) {
-                if (j == i) continue;
+                if (j == i)
+                    continue;
                 if (evaluated_args[j] == targetRegs[i]) {
                     std::string spill = allocReg();
                     emit2("mov", spill, evaluated_args[j]);

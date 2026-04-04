@@ -1,8 +1,7 @@
 #include "mx_sdl.h"
-#include <cstdint> 
+#include <cstdint>
 #include <mxvm/icode.hpp>
 #include <mxvm/instruct.hpp>
-
 
 extern "C" void mxvm_sdl_init(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     int64_t result = init();

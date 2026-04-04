@@ -8,62 +8,64 @@
 #include <string>
 #include <vector>
 
-enum Inc { NULL_INC = 0,
-           MOV,
-           LOAD,
-           STORE,
-           ADD,
-           SUB,
-           MUL,
-           DIV,
-           OR,
-           AND,
-           XOR,
-           NOT,
-           MOD,
-           CMP,
-           JMP,
-           JE,
-           JNE,
-           JL,
-           JLE,
-           JG,
-           JGE,
-           JZ,
-           JNZ,
-           JA,
-           JB,
-           PRINT,
-           EXIT,
-           ALLOC,
-           FREE,
-           GETLINE,
-           PUSH,
-           POP,
-           STACK_LOAD,
-           STACK_STORE,
-           STACK_SUB,
-           CALL,
-           RET,
-           STRING_PRINT,
-           DONE,
-           TO_INT,
-           TO_FLOAT,
-           INVOKE,
-           RETURN,
-           NEG,
-           FCMP,
-           JAE,
-           JBE,
-           JC,
-           JNC,
-           JP,
-           JNP,
-           JO,
-           JNO,
-           JS,
-           JNS,
-           LEA };
+enum Inc {
+    NULL_INC = 0,
+    MOV,
+    LOAD,
+    STORE,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    OR,
+    AND,
+    XOR,
+    NOT,
+    MOD,
+    CMP,
+    JMP,
+    JE,
+    JNE,
+    JL,
+    JLE,
+    JG,
+    JGE,
+    JZ,
+    JNZ,
+    JA,
+    JB,
+    PRINT,
+    EXIT,
+    ALLOC,
+    FREE,
+    GETLINE,
+    PUSH,
+    POP,
+    STACK_LOAD,
+    STACK_STORE,
+    STACK_SUB,
+    CALL,
+    RET,
+    STRING_PRINT,
+    DONE,
+    TO_INT,
+    TO_FLOAT,
+    INVOKE,
+    RETURN,
+    NEG,
+    FCMP,
+    JAE,
+    JBE,
+    JC,
+    JNC,
+    JP,
+    JNP,
+    JO,
+    JNO,
+    JS,
+    JNS,
+    LEA
+};
 
 inline std::vector<std::string> IncType{
     "NULL",         // NULL_INC = 0
@@ -128,8 +130,10 @@ std::ostream &operator<<(std::ostream &out, const enum Inc &i);
 
 namespace mxvm {
 
-    enum class OperandType { OP_CONSTANT,
-                             OP_VARIABLE };
+    enum class OperandType {
+        OP_CONSTANT,
+        OP_VARIABLE
+    };
 
     struct Operand {
         std::string label;
@@ -147,21 +151,25 @@ namespace mxvm {
         std::string toString() const;
     };
 
-    enum class VarType { VAR_NULL = 0,
-                         VAR_INTEGER,
-                         VAR_FLOAT,
-                         VAR_STRING,
-                         VAR_POINTER,
-                         VAR_LABEL,
-                         VAR_ARRAY,
-                         VAR_EXTERN,
-                         VAR_BYTE };
-    enum class Keywords { KEY_PROGRAM,
-                          KEY_OBJECT,
-                          KEY_MODULE,
-                          KEY_DATA,
-                          KEY_CODE,
-                          KEY_SECTION };
+    enum class VarType {
+        VAR_NULL = 0,
+        VAR_INTEGER,
+        VAR_FLOAT,
+        VAR_STRING,
+        VAR_POINTER,
+        VAR_LABEL,
+        VAR_ARRAY,
+        VAR_EXTERN,
+        VAR_BYTE
+    };
+    enum class Keywords {
+        KEY_PROGRAM,
+        KEY_OBJECT,
+        KEY_MODULE,
+        KEY_DATA,
+        KEY_CODE,
+        KEY_SECTION
+    };
     extern std::vector<std::string> keywords;
     // const char *keywords[] = {"program", "object", "module", "data" , "code", "section" };
 

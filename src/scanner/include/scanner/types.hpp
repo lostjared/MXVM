@@ -12,20 +12,24 @@
 #include <vector>
 
 namespace types {
-    enum class TokenType { TT_ID,
-                           TT_ARG,
-                           TT_SYM,
-                           TT_STR,
-                           TT_NUM,
-                           TT_HEX,
-                           TT_NULL };
-    enum class CharType { TT_CHAR,
-                          TT_DIGIT,
-                          TT_SYMBOL,
-                          TT_STRING,
-                          TT_SINGLE,
-                          TT_SPACE,
-                          TT_NULL };
+    enum class TokenType {
+        TT_ID,
+        TT_ARG,
+        TT_SYM,
+        TT_STR,
+        TT_NUM,
+        TT_HEX,
+        TT_NULL
+    };
+    enum class CharType {
+        TT_CHAR,
+        TT_DIGIT,
+        TT_SYMBOL,
+        TT_STRING,
+        TT_SINGLE,
+        TT_SPACE,
+        TT_NULL
+    };
     enum class OperatorType {
         OP_INC,           // '++'
         OP_DEC,           // '--'
@@ -183,17 +187,19 @@ namespace types {
 
     };
 
-    enum class KeywordType { KW_LET,
-                             KW_PROC,
-                             KW_DEFINE,
-                             KW_IF,
-                             KW_ELSE,
-                             KW_SWITCH,
-                             KW_WHILE,
-                             KW_FOR,
-                             KW_RETURN,
-                             KW_BREAK,
-                             KW_CONTINUE };
+    enum class KeywordType {
+        KW_LET,
+        KW_PROC,
+        KW_DEFINE,
+        KW_IF,
+        KW_ELSE,
+        KW_SWITCH,
+        KW_WHILE,
+        KW_FOR,
+        KW_RETURN,
+        KW_BREAK,
+        KW_CONTINUE
+    };
     inline std::vector<std::string> kwStr{"let", "proc", "define", "if", "else", "switch", "while", "for", "return", "break", "continue"};
 
     extern std::vector<std::string> strTokenType;

@@ -1,22 +1,19 @@
-#include"mx_sdl.h"
-
+#include "mx_sdl.h"
 
 static SDL_Event g_event;
-static SDL_Window** g_windows = NULL;
-static SDL_Renderer** g_renderers = NULL;
-static SDL_Texture** g_textures = NULL;
+static SDL_Window **g_windows = NULL;
+static SDL_Renderer **g_renderers = NULL;
+static SDL_Texture **g_textures = NULL;
 static int64_t g_window_count = 0;
 static int64_t g_renderer_count = 0;
 static int64_t g_texture_count = 0;
-static TTF_Font** g_fonts = NULL;
+static TTF_Font **g_fonts = NULL;
 static int64_t g_font_count = 0;
 
-
-static SDL_Texture** g_render_targets = NULL;    
-static int64_t* g_target_widths = NULL;          
-static int64_t* g_target_heights = NULL;         
+static SDL_Texture **g_render_targets = NULL;
+static int64_t *g_target_widths = NULL;
+static int64_t *g_target_heights = NULL;
 static int64_t g_render_target_count = 0;
-
 
 int64_t init(void) {
     SDL_SetMainReady();
@@ -29,15 +26,22 @@ int64_t init(void) {
 void quit(void) {
     if (g_fonts) {
         for (int64_t i = 0; i < g_font_count; ++i) {
-            if (g_fonts[i]) TTF_CloseFont(g_fonts[i]);
+            if (g_fonts[i])
+                TTF_CloseFont(g_fonts[i]);
         }
         free(g_fonts);
         g_fonts = NULL;
         g_font_count = 0;
     }
 
-    if (g_target_widths) { free(g_target_widths); g_target_widths = NULL; }
-    if (g_target_heights) { free(g_target_heights); g_target_heights = NULL; }
+    if (g_target_widths) {
+        free(g_target_widths);
+        g_target_widths = NULL;
+    }
+    if (g_target_heights) {
+        free(g_target_heights);
+        g_target_heights = NULL;
+    }
     g_render_target_count = 0;
 
     if (g_textures) {
@@ -50,7 +54,8 @@ void quit(void) {
     }
     if (g_renderers) {
         for (int64_t i = 0; i < g_renderer_count; ++i) {
-            if (g_renderers[i]) SDL_DestroyRenderer(g_renderers[i]);
+            if (g_renderers[i])
+                SDL_DestroyRenderer(g_renderers[i]);
         }
         free(g_renderers);
         g_renderers = NULL;
@@ -58,7 +63,8 @@ void quit(void) {
     }
     if (g_windows) {
         for (int64_t i = 0; i < g_window_count; ++i) {
-            if (g_windows[i]) SDL_DestroyWindow(g_windows[i]);
+            if (g_windows[i])
+                SDL_DestroyWindow(g_windows[i]);
         }
         free(g_windows);
         g_windows = NULL;
@@ -67,16 +73,20 @@ void quit(void) {
     SDL_Quit();
 }
 
-int64_t create_window(const char* title, int64_t x, int64_t y, int64_t w, int64_t h, int64_t flags) {
-    SDL_Window* window = SDL_CreateWindow(title, (int)x, (int)y, (int)w, (int)h, (Uint32)flags);
-    if (!window) return -1;
-    
-    void *tmp = realloc(g_windows, sizeof(SDL_Window*) * (g_window_count + 1));
-    if (!tmp) { SDL_DestroyWindow(window); return -1; }
+int64_t create_window(const char *title, int64_t x, int64_t y, int64_t w, int64_t h, int64_t flags) {
+    SDL_Window *window = SDL_CreateWindow(title, (int)x, (int)y, (int)w, (int)h, (Uint32)flags);
+    if (!window)
+        return -1;
+
+    void *tmp = realloc(g_windows, sizeof(SDL_Window *) * (g_window_count + 1));
+    if (!tmp) {
+        SDL_DestroyWindow(window);
+        return -1;
+    }
     g_windows = tmp;
     g_windows[g_window_count] = window;
     SDL_Surface *surf = SDL_LoadBMP("icon.bmp");
-    if(surf != NULL) { 
+    if (surf != NULL) {
         SDL_SetWindowIcon(window, surf);
         SDL_FreeSurface(surf);
     }
@@ -90,21 +100,27 @@ void destroy_window(int64_t window_id) {
     }
 }
 
-void set_window_icon(uint64_t window_id, const char *path) { 
+void set_window_icon(uint64_t window_id, const char *path) {
     SDL_Surface *surf = SDL_LoadBMP(path);
-    if(!surf) return;
+    if (!surf)
+        return;
     SDL_SetWindowIcon(g_windows[window_id], surf);
-    SDL_FreeSurface(surf);   
+    SDL_FreeSurface(surf);
 }
 
 int64_t create_renderer(int64_t window_id, int64_t index, int64_t flags) {
-    if (window_id < 0 || window_id >= g_window_count || !g_windows[window_id]) return -1;
-    
-    SDL_Renderer* renderer = SDL_CreateRenderer(g_windows[window_id], (int)index, (Uint32)flags);
-    if (!renderer) return -1;
-    
-    void *tmp = realloc(g_renderers, sizeof(SDL_Renderer*) * (g_renderer_count + 1));
-    if (!tmp) { SDL_DestroyRenderer(renderer); return -1; }
+    if (window_id < 0 || window_id >= g_window_count || !g_windows[window_id])
+        return -1;
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(g_windows[window_id], (int)index, (Uint32)flags);
+    if (!renderer)
+        return -1;
+
+    void *tmp = realloc(g_renderers, sizeof(SDL_Renderer *) * (g_renderer_count + 1));
+    if (!tmp) {
+        SDL_DestroyRenderer(renderer);
+        return -1;
+    }
     g_renderers = tmp;
     g_renderers[g_renderer_count] = renderer;
     return g_renderer_count++;
@@ -117,17 +133,19 @@ void destroy_renderer(int64_t renderer_id) {
     }
 }
 
-
 int64_t create_render_target(int64_t renderer_id, int64_t width, int64_t height) {
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return -1;
 
     SDL_RenderSetLogicalSize(g_renderers[renderer_id], (int)width, (int)height);
 
     void *tmp2 = realloc(g_target_widths, sizeof(int64_t) * (g_render_target_count + 1));
     void *tmp3 = realloc(g_target_heights, sizeof(int64_t) * (g_render_target_count + 1));
     if (!tmp2 || !tmp3) {
-        if (tmp2) g_target_widths = tmp2;
-        if (tmp3) g_target_heights = tmp3;
+        if (tmp2)
+            g_target_widths = tmp2;
+        if (tmp3)
+            g_target_heights = tmp3;
         return -1;
     }
     g_target_widths = tmp2;
@@ -141,7 +159,6 @@ int64_t create_render_target(int64_t renderer_id, int64_t width, int64_t height)
 
     return g_render_target_count++;
 }
-
 
 void set_render_target(int64_t renderer_id, int64_t target_id) {
     (void)renderer_id;
@@ -188,7 +205,6 @@ void clear(int64_t renderer_id) {
     }
 }
 
-
 void present(int64_t renderer_id) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
         SDL_RenderPresent(g_renderers[renderer_id]);
@@ -199,19 +215,19 @@ void present_scaled(int64_t renderer_id, int64_t target_id, int64_t scale_width,
     (void)target_id;
     (void)scale_width;
     (void)scale_height;
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return;
     SDL_RenderPresent(g_renderers[renderer_id]);
 }
-
 
 void present_stretched(int64_t renderer_id, int64_t target_id, int64_t dst_width, int64_t dst_height) {
     (void)target_id;
     (void)dst_width;
     (void)dst_height;
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return;
     SDL_RenderPresent(g_renderers[renderer_id]);
 }
-
 
 void draw_point(int64_t renderer_id, int64_t x, int64_t y) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
@@ -239,15 +255,19 @@ void fill_rect(int64_t renderer_id, int64_t x, int64_t y, int64_t w, int64_t h) 
     }
 }
 
-
 int64_t create_texture(int64_t renderer_id, int64_t format, int64_t access, int64_t w, int64_t h) {
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
-    
-    SDL_Texture* texture = SDL_CreateTexture(g_renderers[renderer_id], (Uint32)format, (int)access, (int)w, (int)h);
-    if (!texture) return -1;
-    
-    void *tmp = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
-    if (!tmp) { SDL_DestroyTexture(texture); return -1; }
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return -1;
+
+    SDL_Texture *texture = SDL_CreateTexture(g_renderers[renderer_id], (Uint32)format, (int)access, (int)w, (int)h);
+    if (!texture)
+        return -1;
+
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture *) * (g_texture_count + 1));
+    if (!tmp) {
+        SDL_DestroyTexture(texture);
+        return -1;
+    }
     g_textures = tmp;
     g_textures[g_texture_count] = texture;
     return g_texture_count++;
@@ -260,21 +280,27 @@ void destroy_texture(int64_t texture_id) {
     }
 }
 
-int64_t load_texture(int64_t renderer_id, const char* file_path) {
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return -1;
-    
-    SDL_Surface* surface = SDL_LoadBMP(file_path);
-    if (!surface) return -2;
-    
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+int64_t load_texture(int64_t renderer_id, const char *file_path) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return -1;
+
+    SDL_Surface *surface = SDL_LoadBMP(file_path);
+    if (!surface)
+        return -2;
+
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
     SDL_FreeSurface(surface);
-    if (!texture) return -3;
-    
-    void *tmp = realloc(g_textures, sizeof(SDL_Texture*) * (g_texture_count + 1));
-    if (!tmp) { SDL_DestroyTexture(texture); return -1; }
+    if (!texture)
+        return -3;
+
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture *) * (g_texture_count + 1));
+    if (!tmp) {
+        SDL_DestroyTexture(texture);
+        return -1;
+    }
     g_textures = tmp;
     g_textures[g_texture_count] = texture;
-    
+
     return g_texture_count++;
 }
 
@@ -282,7 +308,7 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id] &&
         texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
         SDL_Renderer *renderer = g_renderers[renderer_id];
-        SDL_Texture  *texture  = g_textures[texture_id];
+        SDL_Texture *texture = g_textures[texture_id];
         int tex_w, tex_h;
         SDL_QueryTexture(texture, NULL, NULL, &tex_w, &tex_h);
         float su0 = 0.0f, sv0 = 0.0f, su1 = 1.0f, sv1 = 1.0f;
@@ -297,32 +323,37 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
         if (dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
             int ow, oh;
             SDL_GetRendererOutputSize(renderer, &ow, &oh);
-            dx = 0; dy = 0; dw = (float)ow; dh = (float)oh;
+            dx = 0;
+            dy = 0;
+            dw = (float)ow;
+            dh = (float)oh;
         } else {
-            dx = (float)dst_x; dy = (float)dst_y;
-            dw = (float)dst_w; dh = (float)dst_h;
+            dx = (float)dst_x;
+            dy = (float)dst_y;
+            dw = (float)dst_w;
+            dh = (float)dst_h;
         }
 
         SDL_Color white = {255, 255, 255, 255};
         SDL_Vertex verts[4] = {
-            { {dx,      dy     }, white, {su0, sv0} },
-            { {dx + dw, dy     }, white, {su1, sv0} },
-            { {dx + dw, dy + dh}, white, {su1, sv1} },
-            { {dx,      dy + dh}, white, {su0, sv1} },
+            {{dx, dy}, white, {su0, sv0}},
+            {{dx + dw, dy}, white, {su1, sv0}},
+            {{dx + dw, dy + dh}, white, {su1, sv1}},
+            {{dx, dy + dh}, white, {su0, sv1}},
         };
         int indices[6] = {0, 1, 2, 0, 2, 3};
         SDL_RenderGeometry(renderer, texture, verts, 4, indices, 6);
     }
 }
 
-int64_t update_texture(int64_t texture_id, const void* pixels, int64_t pitch) {
+int64_t update_texture(int64_t texture_id, const void *pixels, int64_t pitch) {
     if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
         return SDL_UpdateTexture(g_textures[texture_id], NULL, pixels, (int)pitch) == 0 ? 1 : 0;
     }
     return 0;
 }
 
-int64_t lock_texture(int64_t texture_id, void** pixels, int64_t* pitch) {
+int64_t lock_texture(int64_t texture_id, void **pixels, int64_t *pitch) {
     if (texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
         int p;
         int result = SDL_LockTexture(g_textures[texture_id], NULL, pixels, &p);
@@ -338,7 +369,6 @@ void unlock_texture(int64_t texture_id) {
     }
 }
 
-
 int64_t get_ticks(void) {
     return SDL_GetTicks();
 }
@@ -346,7 +376,6 @@ int64_t get_ticks(void) {
 void delay(int64_t ms) {
     SDL_Delay((Uint32)ms);
 }
-
 
 int64_t open_audio(int64_t freq, int64_t format, int64_t channels, int64_t samples) {
     SDL_AudioSpec wanted_spec;
@@ -356,7 +385,7 @@ int64_t open_audio(int64_t freq, int64_t format, int64_t channels, int64_t sampl
     wanted_spec.samples = (Uint16)samples;
     wanted_spec.callback = NULL;
     wanted_spec.userdata = NULL;
-    
+
     return SDL_OpenAudio(&wanted_spec, NULL) == 0 ? 1 : 0;
 }
 
@@ -368,17 +397,18 @@ void pause_audio(int64_t pause_on) {
     SDL_PauseAudio(pause_on ? 1 : 0);
 }
 
-int64_t load_wav(const char* file_path, int64_t* audio_buf, int64_t* audio_len, int64_t* audio_spec) {
-    SDL_AudioSpec* spec = (SDL_AudioSpec*)malloc(sizeof(SDL_AudioSpec));
-    if (!spec) return 0;
-    Uint8* buf;
+int64_t load_wav(const char *file_path, int64_t *audio_buf, int64_t *audio_len, int64_t *audio_spec) {
+    SDL_AudioSpec *spec = (SDL_AudioSpec *)malloc(sizeof(SDL_AudioSpec));
+    if (!spec)
+        return 0;
+    Uint8 *buf;
     Uint32 len;
-    
+
     if (SDL_LoadWAV(file_path, spec, &buf, &len) == NULL) {
         free(spec);
         return 0;
     }
-    
+
     *audio_buf = (int64_t)buf;
     *audio_len = len;
     *audio_spec = (int64_t)spec;
@@ -387,11 +417,11 @@ int64_t load_wav(const char* file_path, int64_t* audio_buf, int64_t* audio_len, 
 
 void free_wav(int64_t audio_buf) {
     if (audio_buf) {
-        SDL_FreeWAV((Uint8*)audio_buf);
+        SDL_FreeWAV((Uint8 *)audio_buf);
     }
 }
 
-int64_t queue_audio(const void* data, int64_t len) {
+int64_t queue_audio(const void *data, int64_t len) {
     return SDL_QueueAudio(1, data, (Uint32)len) == 0 ? 1 : 0;
 }
 
@@ -402,7 +432,6 @@ int64_t get_queued_audio_size(void) {
 void clear_queued_audio(void) {
     SDL_ClearQueuedAudio(1);
 }
-
 
 int64_t get_mouse_buttons(void) {
     int x, y;
@@ -426,18 +455,18 @@ int64_t get_relative_mouse_buttons(void) {
     return SDL_GetRelativeMouseState(&x, &y);
 }
 
-
-int64_t get_keyboard_state(int64_t* numkeys) {
+int64_t get_keyboard_state(int64_t *numkeys) {
     int nk;
-    const Uint8* state = SDL_GetKeyboardState(&nk);
+    const Uint8 *state = SDL_GetKeyboardState(&nk);
     *numkeys = nk;
     return (int64_t)state;
 }
 
 int64_t is_key_pressed(int64_t scancode) {
     int numkeys;
-    const Uint8* state = SDL_GetKeyboardState(&numkeys);
-    if (scancode < 0 || scancode >= numkeys) return 0;
+    const Uint8 *state = SDL_GetKeyboardState(&numkeys);
+    if (scancode < 0 || scancode >= numkeys)
+        return 0;
     return state[scancode] ? 1 : 0;
 }
 
@@ -447,20 +476,19 @@ int64_t get_num_keys(void) {
     return numkeys;
 }
 
-
-void set_clipboard_text(const char* text) {
+void set_clipboard_text(const char *text) {
     SDL_SetClipboardText(text);
 }
 
-const char* get_clipboard_text(void) {
-    static char* last_clipboard = NULL;
-    if (last_clipboard) SDL_free(last_clipboard);
+const char *get_clipboard_text(void) {
+    static char *last_clipboard = NULL;
+    if (last_clipboard)
+        SDL_free(last_clipboard);
     last_clipboard = SDL_GetClipboardText();
     return last_clipboard;
 }
 
-
-void set_window_title(int64_t window_id, const char* title) {
+void set_window_title(int64_t window_id, const char *title) {
     if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
         SDL_SetWindowTitle(g_windows[window_id], title);
     }
@@ -472,7 +500,7 @@ void set_window_position(int64_t window_id, int64_t x, int64_t y) {
     }
 }
 
-void get_window_size(int64_t window_id, int64_t* w, int64_t* h) {
+void get_window_size(int64_t window_id, int64_t *w, int64_t *h) {
     if (window_id >= 0 && window_id < g_window_count && g_windows[window_id]) {
         int ww, hh;
         SDL_GetWindowSize(g_windows[window_id], &ww, &hh);
@@ -487,7 +515,7 @@ void set_window_fullscreen(int64_t window_id, int64_t fullscreen) {
     }
 }
 
-void get_renderer_output_size(int64_t renderer_id, int64_t* w, int64_t* h) {
+void get_renderer_output_size(int64_t renderer_id, int64_t *w, int64_t *h) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id]) {
         int ww, hh;
         SDL_GetRendererOutputSize(g_renderers[renderer_id], &ww, &hh);
@@ -507,7 +535,8 @@ int64_t init_text(void) {
 void quit_text(void) {
     if (g_fonts) {
         for (int64_t i = 0; i < g_font_count; ++i) {
-            if (g_fonts[i]) TTF_CloseFont(g_fonts[i]);
+            if (g_fonts[i])
+                TTF_CloseFont(g_fonts[i]);
         }
         free(g_fonts);
         g_fonts = NULL;
@@ -516,41 +545,48 @@ void quit_text(void) {
     TTF_Quit();
 }
 
-int64_t load_font(const char* file, int64_t ptsize) {
-    TTF_Font* font = TTF_OpenFont(file, (int)ptsize);
-    if (!font) return -1;
-    void *tmp = realloc(g_fonts, sizeof(TTF_Font*) * (g_font_count + 1));
-    if (!tmp) { TTF_CloseFont(font); return -1; }
+int64_t load_font(const char *file, int64_t ptsize) {
+    TTF_Font *font = TTF_OpenFont(file, (int)ptsize);
+    if (!font)
+        return -1;
+    void *tmp = realloc(g_fonts, sizeof(TTF_Font *) * (g_font_count + 1));
+    if (!tmp) {
+        TTF_CloseFont(font);
+        return -1;
+    }
     g_fonts = tmp;
     g_fonts[g_font_count] = font;
     return g_font_count++;
 }
 
-void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a) {
-    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id]) return;
-    if (font_id < 0 || font_id >= g_font_count || !g_fonts[font_id]) return;
+void draw_text(int64_t renderer_id, int64_t font_id, const char *text, int64_t x, int64_t y, int64_t r, int64_t g, int64_t b, int64_t a) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return;
+    if (font_id < 0 || font_id >= g_font_count || !g_fonts[font_id])
+        return;
 
-    SDL_Color color = { (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a };
-    SDL_Surface* surface = TTF_RenderUTF8_Blended(g_fonts[font_id], text, color);
-    if (!surface) return;
+    SDL_Color color = {(Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a};
+    SDL_Surface *surface = TTF_RenderUTF8_Blended(g_fonts[font_id], text, color);
+    if (!surface)
+        return;
 
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
     if (!texture) {
         SDL_FreeSurface(surface);
         return;
     }
 
-    SDL_Rect dst = { (int)x, (int)y, surface->w, surface->h };
+    SDL_Rect dst = {(int)x, (int)y, surface->w, surface->h};
 
     /* Use SDL_RenderGeometry to avoid SDL3-compat crash */
     float fx = (float)x, fy = (float)y;
     float fw = (float)surface->w, fh = (float)surface->h;
     SDL_Color white = {255, 255, 255, 255};
     SDL_Vertex verts[4] = {
-        { {fx,      fy     }, white, {0.0f, 0.0f} },
-        { {fx + fw, fy     }, white, {1.0f, 0.0f} },
-        { {fx + fw, fy + fh}, white, {1.0f, 1.0f} },
-        { {fx,      fy + fh}, white, {0.0f, 1.0f} },
+        {{fx, fy}, white, {0.0f, 0.0f}},
+        {{fx + fw, fy}, white, {1.0f, 0.0f}},
+        {{fx + fw, fy + fh}, white, {1.0f, 1.0f}},
+        {{fx, fy + fh}, white, {0.0f, 1.0f}},
     };
     int indices[6] = {0, 1, 2, 0, 2, 3};
     SDL_RenderGeometry(g_renderers[renderer_id], texture, verts, 4, indices, 6);
@@ -560,41 +596,51 @@ void draw_text(int64_t renderer_id, int64_t font_id, const char* text, int64_t x
 }
 
 int64_t create_rgb_surface(int64_t width, int64_t height, int64_t depth) {
-    SDL_Surface* s = NULL;
+    SDL_Surface *s = NULL;
     int w = (int)width, h = (int)height, d = (int)depth;
 
-    if (d == 32) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
-    else if (d == 24) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
-    else if (d == 16) s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 16, SDL_PIXELFORMAT_RGB565);
-    else return 0;
+    if (d == 32)
+        s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
+    else if (d == 24)
+        s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 24, SDL_PIXELFORMAT_RGB24);
+    else if (d == 16)
+        s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 16, SDL_PIXELFORMAT_RGB565);
+    else
+        return 0;
 
     return (int64_t)s;
 }
 
 void free_surface(int64_t surf_ptr) {
-    if (surf_ptr) SDL_FreeSurface((SDL_Surface*)surf_ptr);
+    if (surf_ptr)
+        SDL_FreeSurface((SDL_Surface *)surf_ptr);
 }
 
 int64_t blit_surface(int64_t src_ptr, int64_t dst_ptr, int64_t x, int64_t y) {
-    if (!src_ptr || !dst_ptr) return 0;
-    SDL_Surface* src = (SDL_Surface*)src_ptr;
-    SDL_Surface* dst = (SDL_Surface*)dst_ptr;
-    SDL_Rect dst_rc = { (int)x, (int)y, 0, 0 };
+    if (!src_ptr || !dst_ptr)
+        return 0;
+    SDL_Surface *src = (SDL_Surface *)src_ptr;
+    SDL_Surface *dst = (SDL_Surface *)dst_ptr;
+    SDL_Rect dst_rc = {(int)x, (int)y, 0, 0};
     return SDL_BlitSurface(src, NULL, dst, &dst_rc) == 0 ? 1 : 0;
 }
 
-int64_t get_mouse_state(int64_t* x, int64_t* y) {
+int64_t get_mouse_state(int64_t *x, int64_t *y) {
     int ix, iy;
     Uint32 m = SDL_GetMouseState(&ix, &iy);
-    if (x) *x = ix;
-    if (y) *y = iy;
+    if (x)
+        *x = ix;
+    if (y)
+        *y = iy;
     return (int64_t)m;
 }
 
-int64_t get_relative_mouse_state(int64_t* x, int64_t* y) {
+int64_t get_relative_mouse_state(int64_t *x, int64_t *y) {
     int ix, iy;
     Uint32 m = SDL_GetRelativeMouseState(&ix, &iy);
-    if (x) *x = ix;
-    if (y) *y = iy;
+    if (x)
+        *x = ix;
+    if (y)
+        *y = iy;
     return (int64_t)m;
 }

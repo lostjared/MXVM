@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-
 namespace mxvm {
 
     static int error_label_count = 0;

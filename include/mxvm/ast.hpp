@@ -19,10 +19,12 @@ namespace mxvm {
 
     class SectionNode : public ASTNode {
       public:
-        enum SectionType { DATA,
-                           CODE,
-                           MODULE,
-                           OBJECT };
+        enum SectionType {
+            DATA,
+            CODE,
+            MODULE,
+            OBJECT
+        };
         SectionType type;
         std::vector<std::unique_ptr<ASTNode>> statements;
 

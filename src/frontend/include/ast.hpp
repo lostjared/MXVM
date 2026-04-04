@@ -360,20 +360,22 @@ namespace pascal {
 
     class BinaryOpNode : public ASTNode {
       public:
-        enum OpType { PLUS,
-                      MINUS,
-                      MULTIPLY,
-                      DIVIDE,
-                      DIV,
-                      MOD,
-                      EQUAL,
-                      NOT_EQUAL,
-                      LESS,
-                      LESS_EQUAL,
-                      GREATER,
-                      GREATER_EQUAL,
-                      AND,
-                      OR };
+        enum OpType {
+            PLUS,
+            MINUS,
+            MULTIPLY,
+            DIVIDE,
+            DIV,
+            MOD,
+            EQUAL,
+            NOT_EQUAL,
+            LESS,
+            LESS_EQUAL,
+            GREATER,
+            GREATER_EQUAL,
+            AND,
+            OR
+        };
 
         std::unique_ptr<ASTNode> left;
         OpType operator_;
@@ -393,9 +395,11 @@ namespace pascal {
 
     class UnaryOpNode : public ASTNode {
       public:
-        enum Operator { PLUS,
-                        MINUS,
-                        NOT };
+        enum Operator {
+            PLUS,
+            MINUS,
+            NOT
+        };
 
         Operator operator_;
         std::unique_ptr<ASTNode> operand;

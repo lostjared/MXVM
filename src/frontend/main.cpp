@@ -7,10 +7,12 @@
 
 std::string removeComments(const std::string &text) {
     std::ostringstream stream;
-    enum State { CODE,
-                 BRACE_COMMENT,
-                 PAREN_COMMENT,
-                 STRING };
+    enum State {
+        CODE,
+        BRACE_COMMENT,
+        PAREN_COMMENT,
+        STRING
+    };
     State state = CODE;
 
     for (size_t i = 0; i < text.length(); ++i) {

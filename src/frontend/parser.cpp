@@ -7,7 +7,7 @@ namespace pascal {
 
     void PascalParser::removeBraceComments() {
         auto &toks = scanner.getTokens();
-        for (size_t i = 0; i < toks.size(); ) {
+        for (size_t i = 0; i < toks.size();) {
             if (toks[i].getTokenValue() == "{") {
                 size_t start = i;
                 ++i;
