@@ -1,7 +1,5 @@
 program Tetris;
-{ Tetris game - translated from MXVM bytecode to Pascal }
-{ Requires: blocks.bmp, font.ttf in working directory }
-
+{ Tetris in MXVM Pascal/Bytecode }
 const
   BOARD_W = 10;
   BOARD_H = 20;
