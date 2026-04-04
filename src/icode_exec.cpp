@@ -942,9 +942,13 @@ namespace mxvm {
 
             switch (dest.type) {
             case VarType::VAR_INTEGER:
-            case VarType::VAR_BYTE:
                 std::memcpy(&dest.var_value.int_value, base, sizeof(int64_t));
-                dest.var_value.type = dest.type;
+                dest.var_value.type = VarType::VAR_INTEGER;
+                break;
+            case VarType::VAR_BYTE:
+                dest.var_value.int_value = 0;
+                std::memcpy(&dest.var_value.int_value, base, 1);
+                dest.var_value.type = VarType::VAR_BYTE;
                 break;
             case VarType::VAR_FLOAT:
                 std::memcpy(&dest.var_value.float_value, base, sizeof(double));
@@ -1046,14 +1050,19 @@ namespace mxvm {
 
         if (instr.op1.type == OperandType::OP_CONSTANT) {
             int64_t cval = std::stoll(instr.op1.op, nullptr, 0);
-            std::memcpy(base, &cval, sizeof(int64_t));
+            size_t copy_size = std::min(stride, sizeof(int64_t));
+            std::memcpy(base, &cval, copy_size);
         } else {
             Variable &src = getVariable(instr.op1.op);
             switch (src.type) {
             case VarType::VAR_INTEGER:
-            case VarType::VAR_BYTE:
                 std::memcpy(base, &src.var_value.int_value, sizeof(int64_t));
                 break;
+            case VarType::VAR_BYTE: {
+                uint8_t byte_val = static_cast<uint8_t>(src.var_value.int_value & 0xFF);
+                std::memcpy(base, &byte_val, 1);
+                break;
+            }
             case VarType::VAR_FLOAT:
                 std::memcpy(base, &src.var_value.float_value, sizeof(double));
                 break;
