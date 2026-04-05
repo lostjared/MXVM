@@ -363,7 +363,7 @@ begin
           game_started := 0;
       end;
       { Background processing: match clearing and gravity }
-      if (cur_tick - last_proc_tick) >= 100 then
+      if (cur_tick - last_proc_tick) >= 2 then
       begin
         ProcBlocks();
         ProcMoveDown();
@@ -372,14 +372,10 @@ begin
     end;
 
     { Only render at ~30fps to reduce interpreter load }
-    if (cur_tick - last_render_tick) >= 33 then
-    begin
-      Render;
-      sdl_present(renderer);
-      last_render_tick := cur_tick;
-    end;
-
-    sdl_delay(4);
+    Render;
+    sdl_present(renderer);
+    last_render_tick := cur_tick;
+    sdl_delay(16);
   end;
   Cleanup;
 end.

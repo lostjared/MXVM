@@ -38,9 +38,9 @@ end;
 
 procedure PieceRandColors;
 begin
-  piece_type[0] := FIRST_COLOR + (rand() mod NUM_BLOCK_TYPES);
-  piece_type[1] := FIRST_COLOR + (rand() mod NUM_BLOCK_TYPES);
-  piece_type[2] := FIRST_COLOR + (rand() mod NUM_BLOCK_TYPES);
+  piece_type[0] := FIRST_COLOR + (rand() mod (NUM_BLOCK_TYPES + 1));
+  piece_type[1] := FIRST_COLOR + (rand() mod (NUM_BLOCK_TYPES + 1));
+  piece_type[2] := FIRST_COLOR + (rand() mod (NUM_BLOCK_TYPES + 1));
 end;
 
 procedure PieceShiftDown;
