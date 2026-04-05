@@ -6,7 +6,7 @@
 #---------------------------------------------------------------------------
 PROJECT_NAME           = "MXVM"
 PROJECT_BRIEF          = "Virtual Machine, Compiler, and Pascal Frontend"
-PROJECT_NUMBER         = "1.1.0"
+PROJECT_NUMBER         = "1.2.1"
 OUTPUT_DIRECTORY       = doxygen_output
 CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = NO
