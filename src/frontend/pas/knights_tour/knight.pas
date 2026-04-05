@@ -1,27 +1,31 @@
+{ Knight's Tour -- SDL2 game
+  Uses Warnsdorff's heuristic with backtracking to find a
+  Hamiltonian path on an 8x8 chess board.  The player watches
+  the pre-computed tour unfold one move at a time. }
 program KnightsTour;
 
 const
   BOARD_SIZE = 8;
-  TOTAL_MOVES = 65;
-  START_X = 140;
-  START_Y = 40;
-  CELL_SIZE = 85;
-  CELL_DRAW_SIZE = 80;
-  KNIGHT_SIZE = 60;
+  TOTAL_MOVES = 65;       { 64 squares + 1 (move_count starts at 1) }
+  START_X = 140;           { board left edge in pixels }
+  START_Y = 40;            { board top edge (leaves room for HUD text) }
+  CELL_SIZE = 85;          { step between cell origins }
+  CELL_DRAW_SIZE = 80;     { drawn square size (5 px gap) }
+  KNIGHT_SIZE = 60;        { knight sprite size }
 
   WIN_W = 960;
   WIN_H = 720;
 
-  SDL_QUIT_EVENT = 256;
+  SDL_QUIT_EVENT = 256;        { SDL event constants }
   SDL_KEYDOWN = 768;
   SDL_MOUSEBUTTONDOWN = 1025;
-  SDLK_ESCAPE = 27;
+  SDLK_ESCAPE = 27;            { key codes }
   SDLK_RETURN = 13;
 
-  SDL_SCANCODE_SPACE = 44;
+  SDL_SCANCODE_SPACE = 44;     { scancode for space bar polling }
 
-  STATE_INTRO = 0;
-  STATE_PLAYING = 1;
+  STATE_INTRO = 0;             { game state: showing intro screen }
+  STATE_PLAYING = 1;           { game state: tour in progress }
 
   MAX_SEQ = 64;
 
@@ -57,6 +61,7 @@ var
   { intro timing }
   intro_start: integer;
 
+{ Populate the eight L-shaped knight move offset tables }
 procedure init_move_offsets;
 begin
   horizontal[0] := 2;  vertical[0] := -1;
@@ -69,6 +74,7 @@ begin
   horizontal[7] := 2;  vertical[7] := 1;
 end;
 
+{ Zero every cell on the board }
 procedure clear_board;
 var
   i: integer;
@@ -77,16 +83,21 @@ begin
     board[i] := 0;
 end;
 
+{ Read the board value at (row, col) }
 function get_board(row, col: integer): integer;
 begin
   get_board := board[row * BOARD_SIZE + col];
 end;
 
+{ Write val into the board at (row, col) }
 procedure set_board(row, col, val: integer);
 begin
   board[row * BOARD_SIZE + col] := val;
 end;
 
+{ Return 1 if (row, col) is on-board and unvisited, 0 otherwise.
+  Uses early exit instead of compound 'and' which does not
+  short-circuit in MXVM Pascal. }
 function is_valid_move(row, col: integer): integer;
 begin
   if (row < 0) or (row >= BOARD_SIZE) then
@@ -105,6 +116,7 @@ begin
     is_valid_move := 1;
 end;
 
+{ Count valid onward moves from (row, col) -- Warnsdorff degree }
 function get_degree(row, col: integer): integer;
 var
   i, nr, nc, count: integer;
@@ -120,6 +132,9 @@ begin
   get_degree := count;
 end;
 
+{ Selection sort the candidate moves by ascending degree.
+  Warnsdorff's rule: always visit the square with fewest onward
+  moves first, which dramatically reduces backtracking. }
 procedure sort_moves(n: integer);
 var
   i, j, min_idx, tmp: integer;
@@ -152,6 +167,10 @@ begin
   end;
 end;
 
+{ Recursively solve the knight's tour via depth-first search
+  with Warnsdorff-sorted candidates.  Records each move in the
+  seq_row / seq_col arrays for later playback.
+  Returns 1 on success, 0 on dead end (triggers backtracking). }
 function solve_tour(pos_row, pos_col, move_count: integer): integer;
 var
   i, nr, nc, n: integer;
@@ -202,6 +221,7 @@ begin
   solve_tour := 0;
 end;
 
+{ Generate a fresh tour from a random starting square }
 procedure reset_tour;
 var
   dummy: integer;
@@ -219,6 +239,9 @@ begin
   tour_over := false;
 end;
 
+{ Advance the knight one step along the pre-computed tour.
+  Marks the old square as visited (-1) and places the knight
+  on the next square.  No-op if the tour is already complete. }
 procedure next_move;
 var
   nr, nc: integer;
@@ -240,6 +263,8 @@ begin
     tour_over := true;
 end;
 
+{ Draw the 8x8 checkerboard.  Visited squares are black,
+  unvisited squares alternate white and red. }
 procedure draw_board;
 var
   i, j, rx, ry: integer;
@@ -263,6 +288,7 @@ begin
   end;
 end;
 
+{ Render the knight sprite centered on its current cell }
 procedure draw_knight;
 var
   dx, dy: integer;
@@ -295,6 +321,7 @@ begin
   if font_id = -1 then
     writeln('Could not open font..');
 
+  { load knight bitmap with white (255,255,255) as transparent color key }
   knight_tex := sdl_load_texture_color_key_rgb(renderer_id, 'data/knight.bmp', 255, 255, 255);
   if knight_tex = -1 then
     writeln('Warning: could not load knight.bmp');
@@ -438,6 +465,7 @@ begin
       sdl_delay(delay_time);
   end;
 
+  { clean up SDL resources }
   if knight_tex <> -1 then sdl_destroy_texture(knight_tex);
   if logo_tex <> -1 then sdl_destroy_texture(logo_tex);
   sdl_quit_text();

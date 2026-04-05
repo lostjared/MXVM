@@ -357,8 +357,22 @@ namespace pascal {
         }
     }
 
+    /**
+     * @brief Forward declaration — checks whether a name is a hardware register.
+     *
+     * Used by the peephole optimizer to distinguish register temporaries from
+     * global/local variable names when deciding whether a store is dead.
+     */
     static bool isRegisterName(const std::string &s);
 
+    /**
+     * @brief Copy-propagation peephole pass.
+     *
+     * Folds sequences like `mov reg, src ; op reg, rhs` into `op src, rhs`
+     * when the intermediate register is not referenced again.  The scan
+     * respects `ret` / `done` boundaries so that stores to global
+     * variables visible to the caller are never eliminated.
+     */
     static void copyPropagation(std::vector<std::string> &code) {
         static const std::unordered_set<std::string> twoOpInstructions = {
             "add", "sub", "mul", "div", "mod", "cmp", "fcmp", "mov", "and", "or", "xor"};

@@ -1165,6 +1165,183 @@ Output:
 99
 ```
 
+## Pascal -- SDL2 Knight's Tour (Full Game) {#knights_tour}
+
+A Knight's Tour game demonstrating Warnsdorff's heuristic with backtracking,
+flat-array board representation, selection sort, SDL2 textures with custom RGB
+color-key transparency, scancode polling with auto-repeat, and the full
+compile-to-native pipeline.
+
+The player watches the knight traverse every square on the board exactly once.
+Press **Space** (tap or hold) to advance the knight, **Return** to generate a
+new tour from a random starting position, or click **left mouse** / **right
+mouse** for move / reset.
+
+```pascal
+program KnightsTour;
+
+const
+  BOARD_SIZE = 8;
+  TOTAL_MOVES = 65;
+  START_X = 140;
+  START_Y = 40;
+  CELL_SIZE = 85;
+  CELL_DRAW_SIZE = 80;
+  KNIGHT_SIZE = 60;
+
+  WIN_W = 960;
+  WIN_H = 720;
+
+  SDL_QUIT_EVENT = 256;
+  SDL_KEYDOWN = 768;
+  SDL_MOUSEBUTTONDOWN = 1025;
+  SDLK_ESCAPE = 27;
+  SDLK_RETURN = 13;
+  SDL_SCANCODE_SPACE = 44;
+
+  STATE_INTRO = 0;
+  STATE_PLAYING = 1;
+  MAX_SEQ = 64;
+
+var
+  window_id, renderer_id: integer;
+  font_id, knight_tex, logo_tex: integer;
+  running: boolean;
+  game_state: integer;
+
+  { board as flat array: board[row * 8 + col] }
+  board: array[0..63] of integer;
+  seq_row: array[0..63] of integer;
+  seq_col: array[0..63] of integer;
+  seq_count: integer;
+
+  knight_row, knight_col: integer;
+  moves: integer;
+  tour_over: boolean;
+
+  { L-shaped move offsets }
+  horizontal: array[0..7] of integer;
+  vertical: array[0..7] of integer;
+
+  { scratch arrays for Warnsdorff sort }
+  sort_deg: array[0..7] of integer;
+  sort_row: array[0..7] of integer;
+  sort_col: array[0..7] of integer;
+  intro_start: integer;
+
+{ ... helper procedures: init_move_offsets, clear_board, get_board,
+  set_board, is_valid_move, get_degree, sort_moves ... }
+
+function solve_tour(pos_row, pos_col, move_count: integer): integer;
+var
+  i, nr, nc, n: integer;
+begin
+  if move_count = TOTAL_MOVES then
+  begin
+    solve_tour := 1;
+    exit;
+  end;
+
+  { collect and sort valid moves by Warnsdorff degree }
+  n := 0;
+  for i := 0 to 7 do
+  begin
+    nr := pos_row + vertical[i];
+    nc := pos_col + horizontal[i];
+    if is_valid_move(nr, nc) = 1 then
+    begin
+      sort_deg[n] := get_degree(nr, nc);
+      sort_row[n] := nr;
+      sort_col[n] := nc;
+      n := n + 1;
+    end;
+  end;
+  sort_moves(n);
+
+  { try each move with backtracking }
+  i := 0;
+  while i < n do
+  begin
+    set_board(sort_row[i], sort_col[i], move_count);
+    seq_row[seq_count] := sort_row[i];
+    seq_col[seq_count] := sort_col[i];
+    seq_count := seq_count + 1;
+
+    if solve_tour(sort_row[i], sort_col[i], move_count + 1) = 1 then
+    begin
+      solve_tour := 1;
+      exit;
+    end
+    else
+    begin
+      set_board(sort_row[i], sort_col[i], 0);
+      seq_count := seq_count - 1;
+    end;
+    i := i + 1;
+  end;
+  solve_tour := 0;
+end;
+
+procedure next_move;
+var
+  nr, nc: integer;
+begin
+  if moves >= 64 then exit;
+  if seq_count <= 0 then exit;
+  if tour_over then exit;
+  nr := seq_row[moves];
+  nc := seq_col[moves];
+  set_board(knight_row, knight_col, -1);
+  knight_row := nr;
+  knight_col := nc;
+  moves := moves + 1;
+  set_board(knight_row, knight_col, moves);
+  if moves >= 64 then
+    tour_over := true;
+end;
+
+{ ... draw_board, draw_knight, reset_tour ... }
+
+begin
+  sdl_init();
+  window_id := sdl_create_window('Knights Tour', 100, 100, WIN_W, WIN_H, 0);
+  renderer_id := sdl_create_renderer(window_id, -1, 0);
+  sdl_init_text();
+  font_id := sdl_load_font('data/font.ttf', 14);
+  knight_tex := sdl_load_texture_color_key_rgb(renderer_id,
+                    'data/knight.bmp', 255, 255, 255);
+  logo_tex := sdl_load_texture(renderer_id, 'data/logo.bmp');
+  seed_random;
+  init_move_offsets;
+  game_state := STATE_INTRO;
+  running := true;
+
+  while running do
+  begin
+    { poll SDL events, handle keys/mouse }
+    { space bar: first press immediate, hold repeats every 150 ms }
+    { render board, knight, and HUD text }
+    sdl_present(renderer_id);
+    sdl_delay(16 - (sdl_get_ticks() - frame_start));
+  end;
+
+  sdl_quit();
+end.
+```
+
+**Building & running:**
+
+```bash
+mxx knight.pas knight.mxvm               # compile Pascal -> bytecode
+mxvmc knight.mxvm                         # interpret
+mxvmc knight.mxvm --action translate      # emit x86-64 assembly
+mxvmc knight.mxvm --action compile        # compile to native executable
+```
+
+[Online Source Code](https://github.com/lostjared/MXVM/tree/main/src/frontend/pas/knights_tour)
+
+---
+
 ## Pascal -- SDL2 Space Shooter (Full Game)
 
 A complete space-shooter game demonstrating records, arrays, SDL2 textures,

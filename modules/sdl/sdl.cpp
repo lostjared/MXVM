@@ -634,7 +634,16 @@ extern "C" void mxvm_sdl_load_texture_color_key(mxvm::Program *program, std::vec
     program->vars["%rax"].var_value.int_value = result;
 }
 
-// SDL_LoadTextureColorKeyRGB
+/**
+ * @brief MXVM binding for load_texture_color_key_rgb.
+ *
+ * Loads a BMP texture with a caller-specified RGB color key for transparency.
+ * Expects 5 operands: renderer_id, file_path, r, g, b.
+ * Returns the texture ID in %%rax.
+ *
+ * @param program  Pointer to the running MXVM program.
+ * @param operand  Vector of 5 operands.
+ */
 extern "C" void mxvm_sdl_load_texture_color_key_rgb(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 5) {
         throw mx::Exception("sdl_load_texture_color_key_rgb requires 5 arguments (renderer_id, file_path, r, g, b).");
