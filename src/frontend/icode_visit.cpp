@@ -40,6 +40,10 @@ namespace pascal {
             else
                 objectDeps.push_back(mod);
         }
+
+        // Emit UNIT_INIT function label — allocs from interface vars go here
+        emitLabel("function PROC_UNIT_INIT");
+
         // Register interface declarations' signatures WITHOUT deferring code
         // (interface declarations have null blocks — they are forward declarations)
         for (auto &decl : node.interfaceDecls) {
@@ -58,10 +62,20 @@ namespace pascal {
                 }
                 funcSignatures[funcDecl->name] = funcInfo;
                 setVarType(funcDecl->name, funcInfo.returnType);
+            } else if (dynamic_cast<ConstDeclNode *>(decl.get()) ||
+                       dynamic_cast<VarDeclNode *>(decl.get()) ||
+                       dynamic_cast<TypeDeclNode *>(decl.get())) {
+                // Process interface const/var/type so they are available
+                // to the unit's own implementation code
+                decl->accept(*this);
             }
             // ProcDeclNode forward declarations don't need signature registration
             // (they have no return type to track)
         }
+
+        // Close UNIT_INIT function
+        emit("ret");
+
         // Process implementation declarations (actual code)
         for (auto &decl : node.implDecls) {
             if (decl)
@@ -582,7 +596,10 @@ namespace pascal {
 
         std::string mangledName = findMangledFuncName(node.name, true);
         {
-            std::string label = "PROC_" + mangledName;
+            std::string prefix = "PROC_";
+            if (funcSignatures.count(node.name))
+                prefix = "FUNC_";
+            std::string label = prefix + mangledName;
             auto eit = externalFuncs.find(node.name);
             if (eit != externalFuncs.end())
                 label = eit->second + "." + label;
@@ -882,7 +899,10 @@ namespace pascal {
             if (auto v = dynamic_cast<VariableNode *>(stmt.get())) {
                 std::string mangled = findMangledFuncName(v->name, true);
                 if (declaredProcs.count(mangled)) {
-                    std::string label = "PROC_" + mangled;
+                    std::string prefix = "PROC_";
+                    if (funcSignatures.count(v->name))
+                        prefix = "FUNC_";
+                    std::string label = prefix + mangled;
                     auto eit = externalFuncs.find(v->name);
                     if (eit != externalFuncs.end())
                         label = eit->second + "." + label;
@@ -1415,6 +1435,24 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(FieldAccessNode &node) {
+        // Cross-unit variable reference: UnitName.varName
+        if (auto *v = dynamic_cast<VariableNode *>(node.recordExpr.get())) {
+            if (isImportedUnit(v->name)) {
+                std::string qualifiedName = v->name + "." + node.fieldName;
+                VarType vt = getVarType(qualifiedName);
+                std::string dst;
+                if (vt == VarType::DOUBLE)
+                    dst = allocFloatReg();
+                else if (vt == VarType::PTR || vt == VarType::STRING)
+                    dst = allocTempPtr();
+                else
+                    dst = allocReg();
+                emit2("mov", dst, qualifiedName);
+                pushValue(dst);
+                return;
+            }
+        }
+
         std::string baseName;
         std::string recType;
         bool baseIsDirectPointer = false;
@@ -1563,16 +1601,23 @@ namespace pascal {
                 std::string mangled = findMangledArrayName(var->name);
                 base = ensurePtrBase(storageSymbolFor(mangled));
             } else if (auto field = dynamic_cast<FieldAccessNode *>(arr->base.get())) {
-                field->recordExpr->accept(*this);
-                std::string recPtr = popValue();
-                std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-                auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
-                int fieldOffset = ofs_sz.first;
+                // Cross-unit array assignment: UnitName.arrayName[index] := value
+                if (auto *baseVar = dynamic_cast<VariableNode *>(field->recordExpr.get());
+                    baseVar && isImportedUnit(baseVar->name)) {
+                    std::string qualifiedName = baseVar->name + "." + field->fieldName;
+                    base = ensurePtrBase(qualifiedName);
+                } else {
+                    field->recordExpr->accept(*this);
+                    std::string recPtr = popValue();
+                    std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                    auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
+                    int fieldOffset = ofs_sz.first;
 
-                std::string arrayPtr = allocTempPtr();
-                emit2("mov", arrayPtr, recPtr);
-                emit2("add", arrayPtr, std::to_string(fieldOffset));
-                base = arrayPtr;
+                    std::string arrayPtr = allocTempPtr();
+                    emit2("mov", arrayPtr, recPtr);
+                    emit2("add", arrayPtr, std::to_string(fieldOffset));
+                    base = arrayPtr;
+                }
             } else if (dynamic_cast<ArrayAccessNode *>(arr->base.get())) {
                 arr->base->accept(*this);
                 base = popValue();
@@ -1592,6 +1637,17 @@ namespace pascal {
         }
 
         if (auto field = dynamic_cast<FieldAccessNode *>(node.variable.get())) {
+            // Cross-unit simple variable assignment: UnitName.varName := value
+            if (auto *v = dynamic_cast<VariableNode *>(field->recordExpr.get());
+                v && isImportedUnit(v->name)) {
+                std::string qualifiedName = v->name + "." + field->fieldName;
+                std::string rhs = eval(node.expression.get());
+                emit2("mov", qualifiedName, rhs);
+                if (isReg(rhs) && !isParmReg(rhs))
+                    freeReg(rhs);
+                return;
+            }
+
             std::string rhs = eval(node.expression.get());
 
             std::string baseName;
@@ -1691,12 +1747,28 @@ namespace pascal {
 
         if (!currentFunctionName.empty() && varName == currentFunctionName) {
             VarType rt = getVarType(currentFunctionName);
-            if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
-                emit2("mov", "arg0", rhs);
-            else if (rt == VarType::DOUBLE)
-                emit2("mov", "xmm0", rhs);
-            else
-                emit2("mov", "rax", rhs);
+            if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD) {
+                if (currentFunctionReturnSlot.empty()) {
+                    int slot = newSlotFor("__funcret_" + currentFunctionName);
+                    currentFunctionReturnSlot = slotVar(slot);
+                    setSlotType(slot, VarType::PTR);
+                }
+                emit2("mov", currentFunctionReturnSlot, rhs);
+            } else if (rt == VarType::DOUBLE) {
+                if (currentFunctionReturnSlot.empty()) {
+                    int slot = newSlotFor("__funcret_" + currentFunctionName);
+                    currentFunctionReturnSlot = slotVar(slot);
+                    setSlotType(slot, VarType::DOUBLE);
+                }
+                emit2("mov", currentFunctionReturnSlot, rhs);
+            } else {
+                if (currentFunctionReturnSlot.empty()) {
+                    int slot = newSlotFor("__funcret_" + currentFunctionName);
+                    currentFunctionReturnSlot = slotVar(slot);
+                    setSlotType(slot, VarType::INT);
+                }
+                emit2("mov", currentFunctionReturnSlot, rhs);
+            }
             functionSetReturn = true;
         } else {
             std::string mangled = findMangledName(varName);
@@ -1823,16 +1895,23 @@ namespace pascal {
             std::string mangled = findMangledArrayName(var->name);
             base = ensurePtrBase(storageSymbolFor(mangled));
         } else if (auto field = dynamic_cast<FieldAccessNode *>(node.base.get())) {
-            field->recordExpr->accept(*this);
-            std::string recPtr = popValue();
-            std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
-            auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
-            int fieldOffset = ofs_sz.first;
+            // Cross-unit array access: UnitName.arrayName[index]
+            if (auto *baseVar = dynamic_cast<VariableNode *>(field->recordExpr.get());
+                baseVar && isImportedUnit(baseVar->name)) {
+                std::string qualifiedName = baseVar->name + "." + field->fieldName;
+                base = ensurePtrBase(qualifiedName);
+            } else {
+                field->recordExpr->accept(*this);
+                std::string recPtr = popValue();
+                std::string recType = getVarRecordTypeNameFromExpr(field->recordExpr.get());
+                auto ofs_sz = getRecordFieldOffsetAndSize(recType, field->fieldName);
+                int fieldOffset = ofs_sz.first;
 
-            std::string arrayPtr = allocTempPtr();
-            emit2("mov", arrayPtr, recPtr);
-            emit2("add", arrayPtr, std::to_string(fieldOffset));
-            base = arrayPtr;
+                std::string arrayPtr = allocTempPtr();
+                emit2("mov", arrayPtr, recPtr);
+                emit2("add", arrayPtr, std::to_string(fieldOffset));
+                base = arrayPtr;
+            }
         } else if (dynamic_cast<ArrayAccessNode *>(node.base.get())) {
             node.base->accept(*this);
             base = popValue();

@@ -63,6 +63,7 @@ namespace mxx {
         std::unordered_set<std::string> declaredConsts;  ///< globally declared constants
         std::unordered_set<std::string> declaredFuncs;   ///< globally declared functions
         std::unordered_set<std::string> declaredProcs;   ///< globally declared procedures
+        std::unordered_set<std::string> importedUnits;   ///< unit names from uses clause
         /** @brief Push a new scope onto the scope stack */
         void pushScope();
         /** @brief Pop the current scope from the stack */

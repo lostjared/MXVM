@@ -111,6 +111,49 @@ int main(int argc, char **argv) {
         if (parser.isUnitSource()) {
             auto ast = parser.parseUnit();
             if (ast) {
+                // For units with uses clause, parse each dependency's interface
+                // to import their declarations (vars, arrays, consts, types, funcs)
+                std::string inputPath = argv[1];
+                std::string inputDir = inputPath.substr(0, inputPath.find_last_of("/\\") + 1);
+                if (inputDir.empty()) inputDir = "./";
+
+                static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+                for (const auto &dep : ast->uses) {
+                    if (nativeModules.count(dep)) continue;
+
+                    std::string unitFile = inputDir + dep + ".pas";
+                    std::ifstream uf(unitFile);
+                    if (!uf.is_open()) {
+                        std::string lowerDep = dep;
+                        std::transform(lowerDep.begin(), lowerDep.end(), lowerDep.begin(), ::tolower);
+                        unitFile = inputDir + lowerDep + ".pas";
+                        uf.open(unitFile);
+                    }
+                    if (uf.is_open()) {
+                        std::ostringstream ubuf;
+                        ubuf << uf.rdbuf();
+                        uf.close();
+                        try {
+                            pascal::PascalParser unitParser(removeComments(ubuf.str()));
+                            auto unitAst = unitParser.parseUnit();
+                            if (unitAst) {
+                                for (auto &decl : unitAst->interfaceDecls) {
+                                    if (auto *fd = dynamic_cast<pascal::FuncDeclNode *>(decl.get()))
+                                        emiter.registerExternalFunc(fd->name, dep);
+                                    else if (auto *pd = dynamic_cast<pascal::ProcDeclNode *>(decl.get()))
+                                        emiter.registerExternalFunc(pd->name, dep);
+                                    else if (auto *vd = dynamic_cast<pascal::VarDeclNode *>(decl.get())) {
+                                        emiter.registerImportedVar(dep, *vd);
+                                        continue;
+                                    }
+                                    ast->interfaceDecls.push_back(std::move(decl));
+                                }
+                            }
+                        } catch (...) {
+                        }
+                    }
+                }
+
                 emiter.generate(ast.get());
             }
         } else {
@@ -152,6 +195,10 @@ int main(int argc, char **argv) {
                                         emiter.registerExternalFunc(fd->name, dep);
                                     else if (auto *pd = dynamic_cast<pascal::ProcDeclNode *>(decl.get()))
                                         emiter.registerExternalFunc(pd->name, dep);
+                                    else if (auto *vd = dynamic_cast<pascal::VarDeclNode *>(decl.get())) {
+                                        emiter.registerImportedVar(dep, *vd);
+                                        continue;
+                                    }
                                     ast->block->declarations.push_back(std::move(decl));
                                 }
                             }

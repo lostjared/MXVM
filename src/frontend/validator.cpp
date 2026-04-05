@@ -45,6 +45,7 @@ namespace mxx {
         scopeStack.clear();
         declaredProcs.clear();
         declaredFuncs.clear();
+        importedUnits.clear();
         pushScope();
         next();
         if (isKW("unit"))
@@ -203,7 +204,7 @@ namespace mxx {
                 return;
         }
 
-        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
+        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key) && !importedUnits.count(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
     }
@@ -215,7 +216,7 @@ namespace mxx {
                 return;
         }
 
-        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key)) {
+        if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key) && !importedUnits.count(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
     }
@@ -345,6 +346,7 @@ namespace mxx {
             inputDir = (pos != std::string::npos) ? filename.substr(0, pos + 1) : "./";
         }
         for (const auto &unit : usedUnits) {
+            importedUnits.insert(lower(unit));
             if (nativeModules.count(unit))
                 continue;
             // Try to find the unit's .pas file
@@ -387,29 +389,93 @@ namespace mxx {
                     std::transform(r.begin(), r.end(), r.begin(), ::tolower);
                     return r;
                 };
+                // Helper to skip newline tokens in the raw token stream
+                auto skipNL = [&]() {
+                    while (ti < toks.size() && toks[ti].getTokenType() == types::TokenType::TT_SYM
+                           && toks[ti].getTokenValue() == "\n") ++ti;
+                };
                 // Skip to 'interface'
                 while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "interface") ++ti;
                 if (ti < toks.size()) ++ti; // move past 'interface'
+                skipNL();
                 // Skip optional uses in interface
                 if (ti < toks.size() && tlower(toks[ti].getTokenValue()) == "uses") {
                     while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
                     if (ti < toks.size()) ++ti;
+                    skipNL();
                 }
-                // Collect procedure/function names until 'implementation'
+                // Collect procedure/function/const/var/type names until 'implementation'
                 while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "implementation") {
+                    skipNL();
+                    if (ti >= toks.size() || tlower(toks[ti].getTokenValue()) == "implementation") break;
                     std::string kw = tlower(toks[ti].getTokenValue());
                     if (kw == "procedure" && ti + 1 < toks.size()) {
-                        ++ti;
+                        ++ti; skipNL();
                         declaredProcs.insert(lower(toks[ti].getTokenValue()));
                         while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
                         if (ti < toks.size()) ++ti;
+                        skipNL();
                     } else if (kw == "function" && ti + 1 < toks.size()) {
-                        ++ti;
+                        ++ti; skipNL();
                         declaredFuncs.insert(lower(toks[ti].getTokenValue()));
                         while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
                         if (ti < toks.size()) ++ti;
+                        skipNL();
+                    } else if (kw == "const") {
+                        ++ti; skipNL(); // skip 'const'
+                        // Collect constant names: name = expr ;
+                        while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "implementation"
+                               && toks[ti].getTokenType() == types::TokenType::TT_ID
+                               && tlower(toks[ti].getTokenValue()) != "var"
+                               && tlower(toks[ti].getTokenValue()) != "type"
+                               && tlower(toks[ti].getTokenValue()) != "procedure"
+                               && tlower(toks[ti].getTokenValue()) != "function") {
+                            scopeStack.back().consts.insert(lower(toks[ti].getTokenValue()));
+                            // Skip past = expr ;
+                            while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                            if (ti < toks.size()) ++ti;
+                            skipNL();
+                        }
+                    } else if (kw == "var") {
+                        ++ti; skipNL(); // skip 'var'
+                        // Collect variable names: name [, name]* : type ;
+                        while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "implementation"
+                               && toks[ti].getTokenType() == types::TokenType::TT_ID
+                               && tlower(toks[ti].getTokenValue()) != "const"
+                               && tlower(toks[ti].getTokenValue()) != "type"
+                               && tlower(toks[ti].getTokenValue()) != "procedure"
+                               && tlower(toks[ti].getTokenValue()) != "function") {
+                            scopeStack.back().vars.insert(lower(toks[ti].getTokenValue()));
+                            ++ti;
+                            while (ti < toks.size() && toks[ti].getTokenValue() == ",") {
+                                ++ti; // skip ','
+                                if (ti < toks.size()) {
+                                    scopeStack.back().vars.insert(lower(toks[ti].getTokenValue()));
+                                    ++ti;
+                                }
+                            }
+                            // Skip past : type ;
+                            while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                            if (ti < toks.size()) ++ti;
+                            skipNL();
+                        }
+                    } else if (kw == "type") {
+                        ++ti; skipNL(); // skip 'type'
+                        // Collect type names: name = typedecl ;
+                        while (ti < toks.size() && tlower(toks[ti].getTokenValue()) != "implementation"
+                               && toks[ti].getTokenType() == types::TokenType::TT_ID
+                               && tlower(toks[ti].getTokenValue()) != "const"
+                               && tlower(toks[ti].getTokenValue()) != "var"
+                               && tlower(toks[ti].getTokenValue()) != "procedure"
+                               && tlower(toks[ti].getTokenValue()) != "function") {
+                            scopeStack.back().types.insert(lower(toks[ti].getTokenValue()));
+                            // Skip past = typedecl ;
+                            while (ti < toks.size() && toks[ti].getTokenValue() != ";") ++ti;
+                            if (ti < toks.size()) ++ti;
+                            skipNL();
+                        }
                     } else {
-                        ++ti;
+                        ++ti; skipNL();
                     }
                 }
             } catch (...) {
@@ -454,7 +520,8 @@ namespace mxx {
         next();
         while (match(types::TokenType::TT_ID)) {
             if (isKW("type") || isKW("var") || isKW("label") ||
-                isKW("begin") || isKW("procedure") || isKW("function")) {
+                isKW("begin") || isKW("procedure") || isKW("function") ||
+                isKW("implementation") || isKW("end") || isKW("interface")) {
                 break;
             }
             const auto *nameTok = token;
@@ -474,7 +541,8 @@ namespace mxx {
         next();
 
         while (match(types::TokenType::TT_ID)) {
-            if (isKW("procedure") || isKW("function") || isKW("var") || isKW("begin") || isKW("const")) {
+            if (isKW("procedure") || isKW("function") || isKW("var") || isKW("begin") || isKW("const") ||
+                isKW("implementation") || isKW("end") || isKW("interface")) {
                 break;
             }
 
@@ -497,7 +565,8 @@ namespace mxx {
         next();
         while (match(types::TokenType::TT_ID)) {
             if (isKW("procedure") || isKW("function") || isKW("begin") ||
-                isKW("type") || isKW("const")) {
+                isKW("type") || isKW("const") ||
+                isKW("implementation") || isKW("end") || isKW("interface")) {
                 break;
             }
             declareVar(token->getTokenValue(), token);

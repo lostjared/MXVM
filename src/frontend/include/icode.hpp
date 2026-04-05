@@ -176,6 +176,9 @@ namespace pascal {
         std::vector<std::string> objectDeps;       ///< unit/object dependencies for section object
         bool isUnit = false;                        ///< true when generating code for a unit (object output)
         std::unordered_map<std::string, std::string> externalFuncs; ///< maps function/proc name to source unit name
+        std::unordered_set<std::string> importedUnitNames;  ///< names of units imported via uses clause
+        std::unordered_map<std::string, ArrayInfo> importedArrayInfo;  ///< array metadata for imported unit vars
+        std::unordered_map<std::string, VarType> importedVarTypes;  ///< var types for imported unit vars
         std::vector<std::string> globalArrays;
         std::unordered_map<std::string, std::vector<std::string>> functionScopedArrays;
         std::vector<std::string> scopeHierarchy;
@@ -317,6 +320,7 @@ namespace pascal {
 
         std::vector<std::pair<FuncDeclNode *, std::vector<std::string>>> deferredFuncs;
         std::string currentFunctionName;
+        std::string currentFunctionReturnSlot; ///< slot variable that holds the return value until FUNC_END
         std::vector<std::string> currentFuncLocalSlots;
         bool functionSetReturn = false;
         int nextSlot = 0;
@@ -889,6 +893,36 @@ namespace pascal {
             externalFuncs[funcName] = unitName;
         }
 
+        /// @brief Check whether a name refers to an imported unit
+        [[nodiscard]] bool isImportedUnit(const std::string &name) const {
+            return importedUnitNames.count(name) > 0;
+        }
+
+        /// @brief Register imported variable metadata from a dependency unit (no alloc emitted)
+        void registerImportedVar(const std::string &unitName, VarDeclNode &node) {
+            importedUnitNames.insert(unitName);
+            for (const auto &varName : node.identifiers) {
+                std::string qualifiedName = unitName + "." + varName;
+                if (std::holds_alternative<std::unique_ptr<ASTNode>>(node.type)) {
+                    auto &typeNode = std::get<std::unique_ptr<ASTNode>>(node.type);
+                    if (auto *arrayTypeNode = dynamic_cast<ArrayTypeNode *>(typeNode.get())) {
+                        ArrayInfo info = buildArrayInfoFromNode(arrayTypeNode);
+                        importedArrayInfo[qualifiedName] = info;
+                        importedVarTypes[qualifiedName] = VarType::PTR;
+                        arrayInfo[qualifiedName] = std::move(info);
+                        setVarType(qualifiedName, VarType::PTR);
+                        continue;
+                    }
+                }
+                std::string typeName;
+                if (std::holds_alternative<std::string>(node.type))
+                    typeName = std::get<std::string>(node.type);
+                VarType vt = getTypeFromString(typeName);
+                importedVarTypes[qualifiedName] = vt;
+                setVarType(qualifiedName, vt);
+            }
+        }
+
         /** @brief Construct and initialise registers and float register pool */
         CodeGenVisitor();
         virtual ~CodeGenVisitor() = default;
@@ -942,6 +976,10 @@ namespace pascal {
             pointerBaseType.clear();
             typeAliases.clear();
             arrayInfo.clear();
+
+            // Restore imported unit variable metadata (registered before generate())
+            arrayInfo.insert(importedArrayInfo.begin(), importedArrayInfo.end());
+            varTypes.insert(importedVarTypes.begin(), importedVarTypes.end());
 
             for (size_t i = 0; i < regInUse.size(); ++i)
                 regInUse[i] = false;
@@ -1084,6 +1122,7 @@ namespace pascal {
 
                 emitLabel(funcLabel("function FUNC_", mangledName));
                 currentFunctionName = fn->name;
+                currentFunctionReturnSlot.clear();
                 currentFuncLocalSlots.clear();
                 currentParamLocations.clear();
                 currentParamTypes.clear();
@@ -1154,7 +1193,15 @@ namespace pascal {
 
                 emitLabel("FUNC_END_" + mangledName);
 
-                if (!functionSetReturn) {
+                if (functionSetReturn && !currentFunctionReturnSlot.empty()) {
+                    VarType rt = getVarType(fn->name);
+                    if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
+                        emit2("mov", "arg0", currentFunctionReturnSlot);
+                    else if (rt == VarType::DOUBLE)
+                        emit2("mov", "xmm0", currentFunctionReturnSlot);
+                    else
+                        emit2("mov", "rax", currentFunctionReturnSlot);
+                } else if (!functionSetReturn) {
                     VarType rt = getVarType(fn->name);
                     if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD) {
                         emit2("mov", "arg0", emptyString());
@@ -1325,6 +1372,10 @@ namespace pascal {
             out << "\tsection code {\n";
             if (!isUnit) {
                 out << "\tstart:\n";
+                // Call each dependency unit's UNIT_INIT to allocate their arrays
+                for (const auto &dep : objectDeps) {
+                    out << "\t\tcall " << dep << ".PROC_UNIT_INIT\n";
+                }
                 for (auto &s : prolog)
                     out << "\t\t" << s << "\n";
             }
@@ -2093,6 +2144,17 @@ namespace pascal {
                 return nullptr;
             }
             if (auto field = dynamic_cast<FieldAccessNode *>(arr->base.get())) {
+                // Cross-unit variable reference: UnitName.varName
+                if (auto *baseVar = dynamic_cast<VariableNode *>(field->recordExpr.get())) {
+                    if (isImportedUnit(baseVar->name)) {
+                        std::string qualifiedName = baseVar->name + "." + field->fieldName;
+                        auto it = arrayInfo.find(qualifiedName);
+                        if (it != arrayInfo.end())
+                            return &it->second;
+                        return nullptr;
+                    }
+                }
+                // Record field array access
                 std::string recTypeName = getVarRecordTypeNameFromExpr(field->recordExpr.get());
                 recTypeName = resolveTypeName(lc(recTypeName));
                 auto recTypeInfoIt = recordTypes.find(recTypeName);
