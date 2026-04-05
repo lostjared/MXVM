@@ -744,19 +744,19 @@ begin
   if spacelogo_tex = -1 then
     writeln('Warning: could not load ', spacelogofile);
 
-  ship_tex := sdl_load_texture(renderer, shipfile);
+  ship_tex := sdl_load_texture_color_key(renderer, shipfile);
   if ship_tex = -1 then
     writeln('Warning: could not load ', shipfile);
 
-  asteroid_tex := sdl_load_texture(renderer, asteroidfile);
+  asteroid_tex := sdl_load_texture_color_key(renderer, asteroidfile);
   if asteroid_tex = -1 then
     writeln('Warning: could not load ', asteroidfile);
 
-  saucer_tex := sdl_load_texture(renderer, saucerfile);
+  saucer_tex := sdl_load_texture_color_key(renderer, saucerfile);
   if saucer_tex = -1 then
     writeln('Warning: could not load ', saucerfile);
 
-  particle_tex := sdl_load_texture(renderer, particlefile);
+  particle_tex := sdl_load_texture_color_key(renderer, particlefile);
   if particle_tex = -1 then
     writeln('Warning: could not load ', particlefile);
 end;

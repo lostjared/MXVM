@@ -30,7 +30,7 @@ namespace pascal {
         "sdl_get_relative_mouse_buttons", "sdl_create_rgb_surface", "sdl_free_surface", "sdl_blit_surface",
         "sdl_get_mouse_state", "sdl_get_relative_mouse_state", "sdl_get_keyboard_state", "sdl_is_key_pressed",
         "sdl_get_num_keys", "sdl_set_clipboard_text", "sdl_get_clipboard_text", "sdl_show_cursor",
-        "sdl_create_texture", "sdl_destroy_texture", "sdl_load_texture", "sdl_render_texture",
+        "sdl_create_texture", "sdl_destroy_texture", "sdl_load_texture", "sdl_load_texture_color_key", "sdl_render_texture",
         "sdl_update_texture", "sdl_lock_texture", "sdl_unlock_texture", "sdl_get_ticks", "sdl_delay",
         "sdl_open_audio", "sdl_close_audio", "sdl_pause_audio", "sdl_load_wav", "sdl_free_wav",
         "sdl_queue_audio", "sdl_get_queued_audio_size", "sdl_clear_queued_audio", "sdl_init_text",
@@ -670,6 +670,14 @@ namespace pascal {
                 throw std::runtime_error("Error on line " + std::to_string(lineNum) +
                                          ": sdl_load_texture requires 2 arguments (renderer_id, file_path)");
             std::string r = emitCallWithReturn("load_texture");
+            visitor.pushValue(r);
+            freeArgs();
+            return true;
+        } else if (funcName == "sdl_load_texture_color_key") {
+            if (arguments.size() != 2)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": sdl_load_texture_color_key requires 2 arguments (renderer_id, file_path)");
+            std::string r = emitCallWithReturn("load_texture_color_key");
             visitor.pushValue(r);
             freeArgs();
             return true;

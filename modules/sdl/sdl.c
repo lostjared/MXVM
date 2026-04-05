@@ -54,6 +54,8 @@ void quit(void) {
 
     if (g_textures) {
         for (int64_t i = 0; i < g_texture_count; ++i) {
+            if (g_textures[i])
+                SDL_DestroyTexture(g_textures[i]);
             g_textures[i] = NULL;
         }
         free(g_textures);
@@ -309,11 +311,36 @@ int64_t load_texture(int64_t renderer_id, const char *file_path) {
     if (!surface)
         return -2;
 
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+    SDL_FreeSurface(surface);
+    if (!texture)
+        return -3;
+
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture *) * (g_texture_count + 1));
+    if (!tmp) {
+        SDL_DestroyTexture(texture);
+        return -1;
+    }
+    g_textures = tmp;
+    g_textures[g_texture_count] = texture;
+
+    return g_texture_count++;
+}
+
+int64_t load_texture_color_key(int64_t renderer_id, const char *file_path) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return -1;
+
+    SDL_Surface *surface = SDL_LoadBMP(file_path);
+    if (!surface)
+        return -2;
+
     SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 0, 0, 0));
     SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
     SDL_FreeSurface(surface);
     if (!texture)
         return -3;
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
 
     void *tmp = realloc(g_textures, sizeof(SDL_Texture *) * (g_texture_count + 1));
     if (!tmp) {
@@ -331,40 +358,28 @@ void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int6
         texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
         SDL_Renderer *renderer = g_renderers[renderer_id];
         SDL_Texture *texture = g_textures[texture_id];
-        int tex_w, tex_h;
-        SDL_QueryTexture(texture, NULL, NULL, &tex_w, &tex_h);
-        float su0 = 0.0f, sv0 = 0.0f, su1 = 1.0f, sv1 = 1.0f;
+
+        SDL_Rect *psrc = NULL;
+        SDL_Rect src_rect;
         if (!((src_x == -1 || src_y == -1) && src_w == -1 && src_h == -1)) {
-            su0 = (float)src_x / tex_w;
-            sv0 = (float)src_y / tex_h;
-            su1 = (float)(src_x + src_w) / tex_w;
-            sv1 = (float)(src_y + src_h) / tex_h;
+            src_rect.x = (int)src_x;
+            src_rect.y = (int)src_y;
+            src_rect.w = (int)src_w;
+            src_rect.h = (int)src_h;
+            psrc = &src_rect;
         }
 
-        float dx, dy, dw, dh;
-        if (dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1) {
-            int ow, oh;
-            SDL_GetRendererOutputSize(renderer, &ow, &oh);
-            dx = 0;
-            dy = 0;
-            dw = (float)ow;
-            dh = (float)oh;
-        } else {
-            dx = (float)dst_x;
-            dy = (float)dst_y;
-            dw = (float)dst_w;
-            dh = (float)dst_h;
+        SDL_Rect *pdst = NULL;
+        SDL_Rect dst_rect;
+        if (!(dst_x == -1 && dst_y == -1 && dst_w == -1 && dst_h == -1)) {
+            dst_rect.x = (int)dst_x;
+            dst_rect.y = (int)dst_y;
+            dst_rect.w = (int)dst_w;
+            dst_rect.h = (int)dst_h;
+            pdst = &dst_rect;
         }
 
-        SDL_Color white = {255, 255, 255, 255};
-        SDL_Vertex verts[4] = {
-            {{dx, dy}, white, {su0, sv0}},
-            {{dx + dw, dy}, white, {su1, sv0}},
-            {{dx + dw, dy + dh}, white, {su1, sv1}},
-            {{dx, dy + dh}, white, {su0, sv1}},
-        };
-        int indices[6] = {0, 1, 2, 0, 2, 3};
-        SDL_RenderGeometry(renderer, texture, verts, 4, indices, 6);
+        SDL_RenderCopy(renderer, texture, psrc, pdst);
     }
 }
 
@@ -599,20 +614,7 @@ void draw_text(int64_t renderer_id, int64_t font_id, const char *text, int64_t x
     }
 
     SDL_Rect dst = {(int)x, (int)y, surface->w, surface->h};
-
-    /* Use SDL_RenderGeometry to avoid SDL3-compat crash */
-    float fx = (float)x, fy = (float)y;
-    float fw = (float)surface->w, fh = (float)surface->h;
-    SDL_Color white = {255, 255, 255, 255};
-    SDL_Vertex verts[4] = {
-        {{fx, fy}, white, {0.0f, 0.0f}},
-        {{fx + fw, fy}, white, {1.0f, 0.0f}},
-        {{fx + fw, fy + fh}, white, {1.0f, 1.0f}},
-        {{fx, fy + fh}, white, {0.0f, 1.0f}},
-    };
-    int indices[6] = {0, 1, 2, 0, 2, 3};
-    SDL_RenderGeometry(g_renderers[renderer_id], texture, verts, 4, indices, 6);
-
+    SDL_RenderCopy(g_renderers[renderer_id], texture, NULL, &dst);
     SDL_DestroyTexture(texture);
     SDL_FreeSurface(surface);
 }

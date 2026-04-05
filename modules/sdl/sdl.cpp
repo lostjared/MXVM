@@ -608,6 +608,32 @@ extern "C" void mxvm_sdl_load_texture(mxvm::Program *program, std::vector<mxvm::
     program->vars["%rax"].var_value.int_value = result;
 }
 
+// SDL_LoadTextureColorKey
+extern "C" void mxvm_sdl_load_texture_color_key(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("sdl_load_texture_color_key requires 2 arguments (renderer_id, file_path).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ? program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+
+    std::string file_path;
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &var = program->getVariable(operand[1].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            file_path = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            file_path = std::string(reinterpret_cast<const char *>(var.var_value.ptr_value));
+        }
+    } else {
+        file_path = operand[1].op;
+    }
+
+    int64_t result = load_texture_color_key(renderer_id, file_path.c_str());
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
 // SDL_RenderTexture
 extern "C" void mxvm_sdl_render_texture(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 10) {
