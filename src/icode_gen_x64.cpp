@@ -134,7 +134,11 @@ namespace mxvm {
 
     size_t Program::x64_reserve_call_area(std::ostream &out, size_t spill_bytes) {
         const size_t need = 32 + spill_bytes;
-        const size_t aligned_need = (need + 15) & ~15;
+        size_t aligned_need = (need + 15) & ~15;
+        // Ensure RSP will be 16-byte aligned before the call instruction.
+        // If the stack is currently misaligned (x64_sp_mod16 == 8), add 8 more bytes.
+        if ((x64_sp_mod16 + aligned_need) % 16 != 0)
+            aligned_need += 8;
         out << "\tsub $" << aligned_need << ", %rsp\n";
         x64_sp_mod16 = (x64_sp_mod16 + aligned_need) % 16;
         return aligned_need;
@@ -413,7 +417,9 @@ namespace mxvm {
             x64_sp_mod16 = 0;
             if (uses_std_module) {
                 out << "\tpush %r12\n";
+                x64_sp_mod16 ^= 8;
                 out << "\tpush %r13\n";
+                x64_sp_mod16 ^= 8;
                 out << "\tmov %rcx, %r12\n";
                 out << "\tmov %rdx, %r13\n";
                 size_t total = x64_reserve_call_area(out, 0);
@@ -980,46 +986,94 @@ namespace mxvm {
         }
 
         if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            out << "\taddq %rcx, %rax\n";
             if (isVariable(i.vop[0].op)) {
                 x64_emitLoadVar(out, "%r8", i.vop[0]);
-            } else {
-                out << "\tmovq $" << i.vop[0].op << ", %r8\n";
-            }
+                out << "\timulq %r8, %rcx\n";
+                out << "\taddq %rcx, %rax\n";
 
-            if (i.vop.size() > 1 && !i.vop[1].op.empty()) {
-                if (isVariable(i.vop[1].op)) {
-                    x64_emitLoadVar(out, "%r9", i.vop[1]);
-                    out << "\timulq %r9, %r8\n";
+                switch (dest.type) {
+                case VarType::VAR_INTEGER:
+                case VarType::VAR_POINTER:
+                case VarType::VAR_EXTERN:
+                    out << "\tmovq (%rax), %rdx\n";
+                    x64_emitStoreVar(out, "%rdx", i.op1);
+                    break;
+                case VarType::VAR_FLOAT:
+                    out << "\tmovsd (%rax), %xmm0\n";
+                    out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                    break;
+                case VarType::VAR_BYTE:
+                    out << "\tmovzbq (%rax), %rdx\n";
+                    out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
+                    break;
+                default:
+                    throw mx::Exception("LOAD: unsupported destination type");
+                }
+            } else {
+                size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+
+                if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+                    switch (dest.type) {
+                    case VarType::VAR_INTEGER:
+                    case VarType::VAR_POINTER:
+                    case VarType::VAR_EXTERN:
+                        out << "\tmovq (%rax,%rcx," << stride << "), %rdx\n";
+                        x64_emitStoreVar(out, "%rdx", i.op1);
+                        break;
+                    case VarType::VAR_FLOAT:
+                        out << "\tmovsd (%rax,%rcx," << stride << "), %xmm0\n";
+                        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                        break;
+                    case VarType::VAR_BYTE:
+                        out << "\tmovzbq (%rax,%rcx," << stride << "), %rdx\n";
+                        out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
+                        break;
+                    default:
+                        throw mx::Exception("LOAD: unsupported destination type");
+                    }
                 } else {
-                    size_t stride = static_cast<size_t>(std::stoll(i.vop[1].op, nullptr, 0));
-                    out << "\timulq $" << stride << ", %r8\n";
+                    out << "\timulq $" << stride << ", %rcx\n";
+                    out << "\taddq %rcx, %rax\n";
+
+                    switch (dest.type) {
+                    case VarType::VAR_INTEGER:
+                    case VarType::VAR_POINTER:
+                    case VarType::VAR_EXTERN:
+                        out << "\tmovq (%rax), %rdx\n";
+                        x64_emitStoreVar(out, "%rdx", i.op1);
+                        break;
+                    case VarType::VAR_FLOAT:
+                        out << "\tmovsd (%rax), %xmm0\n";
+                        out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                        break;
+                    case VarType::VAR_BYTE:
+                        out << "\tmovzbq (%rax), %rdx\n";
+                        out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
+                        break;
+                    default:
+                        throw mx::Exception("LOAD: unsupported destination type");
+                    }
                 }
             }
-
-            out << "\taddq %r8, %rax\n";
         } else {
-            out << "\tshlq $3, %rcx\n";
-            out << "\taddq %rcx, %rax\n";
-        }
-
-        switch (dest.type) {
-        case VarType::VAR_INTEGER:
-        case VarType::VAR_POINTER:
-        case VarType::VAR_EXTERN:
-            out << "\tmovq (%rax), %rdx\n";
-            x64_emitStoreVar(out, "%rdx", i.op1);
-            break;
-        case VarType::VAR_FLOAT:
-            out << "\tmovsd (%rax), %xmm0\n";
-            out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
-            break;
-        case VarType::VAR_BYTE:
-            out << "\tmovzbq (%rax), %rdx\n";
-            out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
-            break;
-        default:
-            throw mx::Exception("LOAD: unsupported destination type");
+            switch (dest.type) {
+            case VarType::VAR_INTEGER:
+            case VarType::VAR_POINTER:
+            case VarType::VAR_EXTERN:
+                out << "\tmovq (%rax,%rcx,8), %rdx\n";
+                x64_emitStoreVar(out, "%rdx", i.op1);
+                break;
+            case VarType::VAR_FLOAT:
+                out << "\tmovsd (%rax,%rcx,8), %xmm0\n";
+                out << "\tmovsd %xmm0, " << getMangledName(i.op1) << "(%rip)\n";
+                break;
+            case VarType::VAR_BYTE:
+                out << "\tmovzbq (%rax,%rcx,8), %rdx\n";
+                out << "\tmovb %dl, " << getMangledName(i.op1) << "(%rip)\n";
+                break;
+            default:
+                throw mx::Exception("LOAD: unsupported destination type");
+            }
         }
 
         out << "\tjmp .load_done_" << error_label_count << "\n";
@@ -1064,70 +1118,88 @@ namespace mxvm {
             out << "\txorq %rdx, %rdx\n";
         }
 
-        if (!i.vop.empty() && !i.vop[0].op.empty()) {
-            out << "\taddq %rdx, %rcx\n";
-            if (isVariable(i.vop[0].op)) {
-                x64_emitLoadVar(out, "%r8", i.vop[0]);
-            } else {
-                out << "\tmovq $" << i.vop[0].op << ", %r8\n";
-            }
-
-            if (i.vop.size() > 1 && !i.vop[1].op.empty()) {
-                if (isVariable(i.vop[1].op)) {
-                    x64_emitLoadVar(out, "%r9", i.vop[1]);
-                    out << "\timulq %r9, %r8\n";
-                } else {
-                    size_t stride = static_cast<size_t>(std::stoll(i.vop[1].op, nullptr, 0));
-                    out << "\timulq $" << stride << ", %r8\n";
-                }
-            }
-
-            out << "\taddq %r8, %rcx\n";
-        } else {
-            out << "\tshlq $3, %rdx\n";
-            out << "\taddq %rdx, %rcx\n";
-        }
-
-        if (isVariable(i.op1.op)) {
+        // Load source value into %rax / %xmm0 / %dl before computing final address
+        // (so we don't clobber %rcx/%rdx during source load)
+        bool src_is_var = isVariable(i.op1.op);
+        VarType src_type = VarType::VAR_INTEGER;
+        if (src_is_var) {
             Variable &src = getVariable(i.op1.op);
+            src_type = src.type;
             switch (src.type) {
             case VarType::VAR_INTEGER:
             case VarType::VAR_POINTER:
             case VarType::VAR_EXTERN:
                 x64_emitLoadVar(out, "%rax", i.op1);
-                out << "\tmovq %rax, (%rcx)\n";
                 break;
             case VarType::VAR_STRING:
                 out << "\tleaq " << getMangledName(i.op1) << "(%rip), %rax\n";
-                out << "\tmovq %rax, (%rcx)\n";
                 break;
             case VarType::VAR_BYTE:
                 out << "\tmovzbq " << getMangledName(i.op1) << "(%rip), %rax\n";
-                out << "\tmovb %al, (%rcx)\n";
                 break;
             case VarType::VAR_FLOAT:
                 out << "\tmovsd " << getMangledName(i.op1) << "(%rip), %xmm0\n";
-                out << "\tmovsd %xmm0, (%rcx)\n";
                 break;
             default:
                 throw mx::Exception("STORE: unsupported source type");
             }
         } else {
-
             if (i.op1.op.find('.') != std::string::npos ||
                 i.op1.op.find('e') != std::string::npos ||
                 i.op1.op.find('E') != std::string::npos) {
-
                 double val = std::stod(i.op1.op);
                 uint64_t bits;
                 memcpy(&bits, &val, sizeof(bits));
                 out << "\tmovq $" << bits << ", %rax\n";
-                out << "\tmovq %rax, (%rcx)\n";
             } else {
-
                 out << "\tmovq $" << i.op1.op << ", %rax\n";
-                out << "\tmovq %rax, (%rcx)\n";
             }
+        }
+
+        if (!i.vop.empty() && !i.vop[0].op.empty()) {
+            if (isVariable(i.vop[0].op)) {
+                x64_emitLoadVar(out, "%r8", i.vop[0]);
+                out << "\timulq %r8, %rdx\n";
+                out << "\taddq %rdx, %rcx\n";
+
+                if (src_is_var && src_type == VarType::VAR_FLOAT)
+                    out << "\tmovsd %xmm0, (%rcx)\n";
+                else if (src_is_var && src_type == VarType::VAR_BYTE)
+                    out << "\tmovb %al, (%rcx)\n";
+                else
+                    out << "\tmovq %rax, (%rcx)\n";
+            } else {
+                size_t stride = static_cast<size_t>(std::stoll(i.vop[0].op, nullptr, 0));
+
+                if (stride == 1 || stride == 2 || stride == 4 || stride == 8) {
+                    if (src_is_var && src_type == VarType::VAR_FLOAT)
+                        out << "\tmovsd %xmm0, (%rcx,%rdx," << stride << ")\n";
+                    else if (src_is_var && src_type == VarType::VAR_BYTE)
+                        out << "\tmovb %al, (%rcx,%rdx," << stride << ")\n";
+                    else
+                        out << "\tmovq %rax, (%rcx,%rdx," << stride << ")\n";
+                } else {
+                    out << "\timulq $" << stride << ", %rdx\n";
+                    out << "\taddq %rdx, %rcx\n";
+
+                    if (src_is_var && src_type == VarType::VAR_FLOAT)
+                        out << "\tmovsd %xmm0, (%rcx)\n";
+                    else if (src_is_var && src_type == VarType::VAR_BYTE)
+                        out << "\tmovb %al, (%rcx)\n";
+                    else
+                        out << "\tmovq %rax, (%rcx)\n";
+                }
+            }
+        } else {
+            out << "\tshlq $3, %rdx\n";
+            out << "\taddq %rdx, %rcx\n";
+
+            if (src_is_var && src_type == VarType::VAR_FLOAT)
+                out << "\tmovsd %xmm0, (%rcx)\n";
+            else if (src_is_var && src_type == VarType::VAR_BYTE)
+                out << "\tmovb %al, (%rcx)\n";
+            else
+                out << "\tmovq %rax, (%rcx)\n";
         }
 
         out << "\tjmp .store_done_" << error_label_count << "\n";
