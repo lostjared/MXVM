@@ -102,7 +102,7 @@ end;
 
 procedure Render;
 var
-  x, y, idx, btype, image, flash_cycle, flash_phase: integer;
+  x, y, idx, btype, image, flash_phase: integer;
   b1, b2, b3: integer;
 begin
   sdl_set_draw_color(renderer, 0, 0, 0, 255);
@@ -125,16 +125,25 @@ begin
       end
       else if btype = BLOCK_CLEAR then
       begin
-        flash_cycle := (GridUnit.grid_flash[idx] div 3) mod 9;
-        flash_phase := GridUnit.grid_flash[idx] mod 12;
-        if (flash_phase >= 6) and (flash_phase < 8) then
+        flash_phase := GridUnit.grid_flash[idx] mod 6;
+        if flash_phase < 3 then
         begin
-          { skip drawing - flash blank }
+          { Show original block }
+          image := GridUnit.grid_original[idx] - FIRST_COLOR;
+          if (image >= 0) and (image <= 8) then
+            sdl_render_texture(renderer, block_tex[image], -1, -1, -1, -1,
+              x * BLOCK_W, y * BLOCK_H, BLOCK_W, BLOCK_H)
+          else
+          begin
+            sdl_set_draw_color(renderer, 255, 255, 255, 255);
+            sdl_fill_rect(renderer, x * BLOCK_W, y * BLOCK_H, BLOCK_W, BLOCK_H);
+          end;
         end
         else
         begin
-          sdl_render_texture(renderer, block_tex[flash_cycle], -1, -1, -1, -1,
-            x * BLOCK_W, y * BLOCK_H, BLOCK_W, BLOCK_H);
+          { Show random colored rectangle }
+          sdl_set_draw_color(renderer, rand() mod 256, rand() mod 256, rand() mod 256, 255);
+          sdl_fill_rect(renderer, x * BLOCK_W, y * BLOCK_H, BLOCK_W, BLOCK_H);
         end;
       end
       else if (btype >= FIRST_COLOR) and (btype <= LAST_COLOR) then

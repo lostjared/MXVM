@@ -584,6 +584,20 @@ namespace pascal {
             }
         }
 
+        // Save caller's in-use registers that could be clobbered by this call
+        std::vector<std::string> savedRegs;
+        for (size_t i = 1; i < regInUse.size() && i < registers.size(); ++i) {
+            if (!regInUse[i]) continue;
+            bool isEvalArg = false;
+            for (const auto &ea : evaluated_args) {
+                if (ea == registers[i]) { isEvalArg = true; break; }
+            }
+            if (isEvalArg) continue;
+            savedRegs.push_back(registers[i]);
+        }
+        for (const auto &sr : savedRegs)
+            emit1("push", sr);
+
         // Now move into target registers
         {
             auto eit = externalFuncs.find(node.name);
@@ -616,6 +630,10 @@ namespace pascal {
                     emit1("pop", *it2);
             }
         }
+
+        // Restore caller's saved registers
+        for (auto rit = savedRegs.rbegin(); rit != savedRegs.rend(); ++rit)
+            emit1("pop", *rit);
 
         for (const auto &arg : evaluated_args)
             if (isReg(arg) && !isParmReg(arg))
@@ -721,6 +739,20 @@ namespace pascal {
             }
         }
 
+        // Save caller's in-use registers that could be clobbered by this call
+        std::vector<std::string> savedRegs;
+        for (size_t i = 1; i < regInUse.size() && i < registers.size(); ++i) {
+            if (!regInUse[i]) continue;
+            bool isEvalArg = false;
+            for (const auto &ea : evaluated_args) {
+                if (ea == registers[i]) { isEvalArg = true; break; }
+            }
+            if (isEvalArg) continue;
+            savedRegs.push_back(registers[i]);
+        }
+        for (const auto &sr : savedRegs)
+            emit1("push", sr);
+
         // Now move into target registers
         {
             auto eit = externalFuncs.find(node.name);
@@ -750,6 +782,10 @@ namespace pascal {
                     emit1("pop", *it2);
             }
         }
+
+        // Restore caller's saved registers
+        for (auto rit = savedRegs.rbegin(); rit != savedRegs.rend(); ++rit)
+            emit1("pop", *rit);
 
         auto it = funcSignatures.find(node.name);
         VarType returnType = (it != funcSignatures.end()) ? it->second.returnType : VarType::INT;

@@ -9,6 +9,7 @@ var
   grid_blocks: array[0..439] of integer;
   grid_clear: array[0..439] of integer;
   grid_flash: array[0..439] of integer;
+  grid_original: array[0..439] of integer;
   game_level: integer;
   game_lines: integer;
   game_over: integer;
@@ -33,13 +34,15 @@ procedure GridKeyShiftDown;
 procedure GridKeyRotateLeft;
 procedure GridKeyRotateRight;
 function CheckBlock(x, y, btype: integer): integer;
-procedure ClearBlock(x, y: integer);
+procedure ClearBlock(x, y, expected: integer);
 procedure AddScore;
 function ProcBlocks: integer;
 function ProcMoveDown: integer;
 function IsGameOver: integer;
 function GetLevel: integer;
 function GetLines: integer;
+function BlockName(b: integer): string;
+procedure LogMatch(dir: string; x1, y1, x2, y2, x3, y3: integer);
 
 implementation
 
@@ -107,6 +110,7 @@ begin
     grid_blocks[i] := BLOCK_NULL;
     grid_clear[i] := 0;
     grid_flash[i] := 0;
+    grid_original[i] := BLOCK_NULL;
   end;
   game_level := 1;
   game_lines := 0;
@@ -249,8 +253,37 @@ begin
     CheckBlock := 0;
 end;
 
-procedure ClearBlock(x, y: integer);
+function BlockName(b: integer): string;
 begin
+  if b = BLOCK_NULL then BlockName := 'NULL'
+  else if b = BLOCK_CLEAR then BlockName := 'CLEAR'
+  else if b = RED1 then BlockName := 'RED1'
+  else if b = RED2 then BlockName := 'RED2'
+  else if b = RED3 then BlockName := 'RED3'
+  else if b = GREEN1 then BlockName := 'GREEN1'
+  else if b = GREEN2 then BlockName := 'GREEN2'
+  else if b = GREEN3 then BlockName := 'GREEN3'
+  else if b = BLUE1 then BlockName := 'BLUE1'
+  else if b = BLUE2 then BlockName := 'BLUE2'
+  else if b = BLUE3 then BlockName := 'BLUE3'
+  else if b = BLOCK_MATCH then BlockName := 'WILD'
+  else BlockName := '?' + inttostr(b);
+end;
+
+procedure LogMatch(dir: string; x1, y1, x2, y2, x3, y3: integer);
+begin
+  writeln('MATCH [', dir, '] (',
+    x1, ',', y1, ')=', BlockName(GridGet(x1, y1)), ' (',
+    x2, ',', y2, ')=', BlockName(GridGet(x2, y2)), ' (',
+    x3, ',', y3, ')=', BlockName(GridGet(x3, y3)));
+end;
+
+procedure ClearBlock(x, y, expected: integer);
+var
+  idx: integer;
+begin
+  idx := GridIndex(x, y);
+  grid_original[idx] := expected;
   GridSet(x, y, BLOCK_CLEAR);
   GridSetClear(x, y, 1);
   GridSetFlash(x, y, 0);
@@ -277,59 +310,59 @@ begin
     begin
       { Vertical matches (column of 3) }
       if (CheckBlock(x, y, RED1) = 1) and (CheckBlock(x, y+1, RED2) = 1) and (CheckBlock(x, y+2, RED3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-R123', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, RED1); ClearBlock(x, y+1, RED2); ClearBlock(x, y+2, RED3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, RED3) = 1) and (CheckBlock(x, y+1, RED2) = 1) and (CheckBlock(x, y+2, RED1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-R321', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, RED3); ClearBlock(x, y+1, RED2); ClearBlock(x, y+2, RED1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN1) = 1) and (CheckBlock(x, y+1, GREEN2) = 1) and (CheckBlock(x, y+2, GREEN3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-G123', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, GREEN1); ClearBlock(x, y+1, GREEN2); ClearBlock(x, y+2, GREEN3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN3) = 1) and (CheckBlock(x, y+1, GREEN2) = 1) and (CheckBlock(x, y+2, GREEN1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-G321', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, GREEN3); ClearBlock(x, y+1, GREEN2); ClearBlock(x, y+2, GREEN1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE1) = 1) and (CheckBlock(x, y+1, BLUE2) = 1) and (CheckBlock(x, y+2, BLUE3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-B123', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, BLUE1); ClearBlock(x, y+1, BLUE2); ClearBlock(x, y+2, BLUE3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE3) = 1) and (CheckBlock(x, y+1, BLUE2) = 1) and (CheckBlock(x, y+2, BLUE1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x, y+1); ClearBlock(x, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('V-B321', x, y, x, y+1, x, y+2); AddScore; ClearBlock(x, y, BLUE3); ClearBlock(x, y+1, BLUE2); ClearBlock(x, y+2, BLUE1); ProcBlocks := 1; exit; end;
 
       { Horizontal matches (row of 3) }
       if (CheckBlock(x, y, RED1) = 1) and (CheckBlock(x+1, y, RED2) = 1) and (CheckBlock(x+2, y, RED3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-R123', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, RED1); ClearBlock(x+1, y, RED2); ClearBlock(x+2, y, RED3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, RED3) = 1) and (CheckBlock(x+1, y, RED2) = 1) and (CheckBlock(x+2, y, RED1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-R321', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, RED3); ClearBlock(x+1, y, RED2); ClearBlock(x+2, y, RED1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN1) = 1) and (CheckBlock(x+1, y, GREEN2) = 1) and (CheckBlock(x+2, y, GREEN3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-G123', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, GREEN1); ClearBlock(x+1, y, GREEN2); ClearBlock(x+2, y, GREEN3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN3) = 1) and (CheckBlock(x+1, y, GREEN2) = 1) and (CheckBlock(x+2, y, GREEN1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-G321', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, GREEN3); ClearBlock(x+1, y, GREEN2); ClearBlock(x+2, y, GREEN1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE1) = 1) and (CheckBlock(x+1, y, BLUE2) = 1) and (CheckBlock(x+2, y, BLUE3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-B123', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, BLUE1); ClearBlock(x+1, y, BLUE2); ClearBlock(x+2, y, BLUE3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE3) = 1) and (CheckBlock(x+1, y, BLUE2) = 1) and (CheckBlock(x+2, y, BLUE1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y); ClearBlock(x+2, y); ProcBlocks := 1; exit; end;
+      begin LogMatch('H-B321', x, y, x+1, y, x+2, y); AddScore; ClearBlock(x, y, BLUE3); ClearBlock(x+1, y, BLUE2); ClearBlock(x+2, y, BLUE1); ProcBlocks := 1; exit; end;
 
       { Diagonal down-right matches }
       if (CheckBlock(x, y, RED1) = 1) and (CheckBlock(x+1, y+1, RED2) = 1) and (CheckBlock(x+2, y+2, RED3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-R123', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, RED1); ClearBlock(x+1, y+1, RED2); ClearBlock(x+2, y+2, RED3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, RED3) = 1) and (CheckBlock(x+1, y+1, RED2) = 1) and (CheckBlock(x+2, y+2, RED1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-R321', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, RED3); ClearBlock(x+1, y+1, RED2); ClearBlock(x+2, y+2, RED1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN1) = 1) and (CheckBlock(x+1, y+1, GREEN2) = 1) and (CheckBlock(x+2, y+2, GREEN3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-G123', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, GREEN1); ClearBlock(x+1, y+1, GREEN2); ClearBlock(x+2, y+2, GREEN3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN3) = 1) and (CheckBlock(x+1, y+1, GREEN2) = 1) and (CheckBlock(x+2, y+2, GREEN1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-G321', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, GREEN3); ClearBlock(x+1, y+1, GREEN2); ClearBlock(x+2, y+2, GREEN1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE1) = 1) and (CheckBlock(x+1, y+1, BLUE2) = 1) and (CheckBlock(x+2, y+2, BLUE3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-B123', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, BLUE1); ClearBlock(x+1, y+1, BLUE2); ClearBlock(x+2, y+2, BLUE3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE3) = 1) and (CheckBlock(x+1, y+1, BLUE2) = 1) and (CheckBlock(x+2, y+2, BLUE1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y+1); ClearBlock(x+2, y+2); ProcBlocks := 1; exit; end;
+      begin LogMatch('DR-B321', x, y, x+1, y+1, x+2, y+2); AddScore; ClearBlock(x, y, BLUE3); ClearBlock(x+1, y+1, BLUE2); ClearBlock(x+2, y+2, BLUE1); ProcBlocks := 1; exit; end;
 
       { Diagonal up-right matches }
       if (CheckBlock(x, y, RED1) = 1) and (CheckBlock(x+1, y-1, RED2) = 1) and (CheckBlock(x+2, y-2, RED3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-R123', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, RED1); ClearBlock(x+1, y-1, RED2); ClearBlock(x+2, y-2, RED3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, RED3) = 1) and (CheckBlock(x+1, y-1, RED2) = 1) and (CheckBlock(x+2, y-2, RED1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-R321', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, RED3); ClearBlock(x+1, y-1, RED2); ClearBlock(x+2, y-2, RED1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN1) = 1) and (CheckBlock(x+1, y-1, GREEN2) = 1) and (CheckBlock(x+2, y-2, GREEN3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-G123', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, GREEN1); ClearBlock(x+1, y-1, GREEN2); ClearBlock(x+2, y-2, GREEN3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, GREEN3) = 1) and (CheckBlock(x+1, y-1, GREEN2) = 1) and (CheckBlock(x+2, y-2, GREEN1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-G321', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, GREEN3); ClearBlock(x+1, y-1, GREEN2); ClearBlock(x+2, y-2, GREEN1); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE1) = 1) and (CheckBlock(x+1, y-1, BLUE2) = 1) and (CheckBlock(x+2, y-2, BLUE3) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-B123', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, BLUE1); ClearBlock(x+1, y-1, BLUE2); ClearBlock(x+2, y-2, BLUE3); ProcBlocks := 1; exit; end;
       if (CheckBlock(x, y, BLUE3) = 1) and (CheckBlock(x+1, y-1, BLUE2) = 1) and (CheckBlock(x+2, y-2, BLUE1) = 1) then
-      begin AddScore; ClearBlock(x, y); ClearBlock(x+1, y-1); ClearBlock(x+2, y-2); ProcBlocks := 1; exit; end;
+      begin LogMatch('UR-B321', x, y, x+1, y-1, x+2, y-2); AddScore; ClearBlock(x, y, BLUE3); ClearBlock(x+1, y-1, BLUE2); ClearBlock(x+2, y-2, BLUE1); ProcBlocks := 1; exit; end;
     end;
   end;
 end;
