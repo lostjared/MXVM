@@ -406,13 +406,45 @@ var
   result: integer;
 
 begin
-  result := Add(3, 4);
+  result := MathUtils.Add(3, 4);
   writeln('3 + 4 = ', result);
-  result := Multiply(5, 6);
+  result := MathUtils.Multiply(5, 6);
   writeln('5 * 6 = ', result);
-  PrintResult(99);
+  MathUtils.PrintResult(99);
 end.
 ```
+
+#### Qualified Names {#qualified-names}
+
+When calling functions or procedures from another unit, you may use
+**qualified names** (`UnitName.RoutineName`) to make the origin explicit:
+
+```pascal
+result := MathUtils.Add(3, 4);   { qualified function call }
+MathUtils.PrintResult(result);   { qualified procedure call }
+MathUtils.PrintResult;           { zero-arg qualified call (parens optional) }
+```
+
+Unqualified calls are also accepted -- the compiler resolves the name from
+the `uses` list:
+
+```pascal
+result := Add(3, 4);             { unqualified -- still valid }
+PrintResult(result);             { also valid }
+```
+
+**Variables** and **constants** from another unit **must** always be qualified:
+
+```pascal
+writeln(MathUtils.counter);      { variable -- qualification required }
+writeln(MathUtils.MAX_VALUE);    { constant -- qualification required }
+```
+
+| Element | Qualified | Unqualified |
+|---------|-----------|-------------|
+| **Variables** | Required | Not allowed |
+| **Constants** | Required | Not allowed |
+| **Functions / Procedures** | Allowed | Allowed |
 
 #### Compiling and Linking
 

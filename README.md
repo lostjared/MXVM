@@ -122,6 +122,8 @@ validates semantics, and emits MXVM bytecode.
 - **Procedures & functions** with by-value and `var` (by-reference) parameters,
   nesting, and recursion
 - **Units** (separately compiled modules with `interface` / `implementation` sections)
+- **Qualified names** for cross-unit calls (`UnitName.Routine`); variables and constants
+  from other units must always be qualified
 - **Operators**: arithmetic, relational, logical, string concatenation, pointer
   dereference (`^`) and address-of (`@`)
 - **Dynamic arrays**: `SetLength`, `Length`, `High`, `Low`
@@ -157,6 +159,11 @@ mxx MathUtils.pas MathUtils.mxvm    # compile unit
 mxx TestMain.pas TestMain.mxvm      # compile program
 mxvmc TestMain.mxvm -x .            # run with object path
 ```
+
+Functions and procedures from another unit can be called with qualified
+names (`MathUtils.Add(3, 4)`) or unqualified (`Add(3, 4)`).  Variables
+and constants from other units must always be qualified
+(`MathUtils.counter`, `MathUtils.MAX_VALUE`).
 
 ---
 
