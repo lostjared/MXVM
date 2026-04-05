@@ -634,6 +634,36 @@ extern "C" void mxvm_sdl_load_texture_color_key(mxvm::Program *program, std::vec
     program->vars["%rax"].var_value.int_value = result;
 }
 
+// SDL_LoadTextureColorKeyRGB
+extern "C" void mxvm_sdl_load_texture_color_key_rgb(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 5) {
+        throw mx::Exception("sdl_load_texture_color_key_rgb requires 5 arguments (renderer_id, file_path, r, g, b).");
+    }
+
+    int64_t renderer_id = program->isVariable(operand[0].op) ? program->getVariable(operand[0].op).var_value.int_value : operand[0].op_value;
+
+    std::string file_path;
+    if (program->isVariable(operand[1].op)) {
+        mxvm::Variable &var = program->getVariable(operand[1].op);
+        if (var.type == mxvm::VarType::VAR_STRING) {
+            file_path = var.var_value.str_value;
+        } else if (var.type == mxvm::VarType::VAR_POINTER) {
+            file_path = std::string(reinterpret_cast<const char *>(var.var_value.ptr_value));
+        }
+    } else {
+        file_path = operand[1].op;
+    }
+
+    int64_t r = program->isVariable(operand[2].op) ? program->getVariable(operand[2].op).var_value.int_value : operand[2].op_value;
+    int64_t g = program->isVariable(operand[3].op) ? program->getVariable(operand[3].op).var_value.int_value : operand[3].op_value;
+    int64_t b = program->isVariable(operand[4].op) ? program->getVariable(operand[4].op).var_value.int_value : operand[4].op_value;
+
+    int64_t result = load_texture_color_key_rgb(renderer_id, file_path.c_str(), r, g, b);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
 // SDL_RenderTexture
 extern "C" void mxvm_sdl_render_texture(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
     if (operand.size() != 10) {

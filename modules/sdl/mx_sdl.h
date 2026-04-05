@@ -236,6 +236,9 @@ int64_t load_texture(int64_t renderer_id, const char *file_path);
 /** @brief Load a BMP file as a texture with black color-key transparency */
 int64_t load_texture_color_key(int64_t renderer_id, const char *file_path);
 
+/** @brief Load a BMP file as a texture with a custom RGB color-key transparency */
+int64_t load_texture_color_key_rgb(int64_t renderer_id, const char *file_path, int64_t r, int64_t g, int64_t b);
+
 /** @brief Render a portion of a texture to a destination rectangle */
 void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int64_t src_y, int64_t src_w, int64_t src_h, int64_t dst_x, int64_t dst_y, int64_t dst_w, int64_t dst_h);
 /** @} */

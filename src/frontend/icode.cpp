@@ -357,6 +357,8 @@ namespace pascal {
         }
     }
 
+    static bool isRegisterName(const std::string &s);
+
     static void copyPropagation(std::vector<std::string> &code) {
         static const std::unordered_set<std::string> twoOpInstructions = {
             "add", "sub", "mul", "div", "mod", "cmp", "fcmp", "mov", "and", "or", "xor"};
@@ -416,6 +418,14 @@ namespace pascal {
                     }
                     if (!tk.empty() && tk.find("function ") != std::string::npos)
                         break;
+                    // A ret/done ends the current procedure/program.
+                    // Non-register stores before a return are observable
+                    // by the caller, so treat them as live.
+                    std::string ttk = trim(tk);
+                    if ((ttk == "ret" || ttk == "done") && !isRegisterName(movDst)) {
+                        usedLater = true;
+                        break;
+                    }
                 }
 
                 if (usedLater)
@@ -653,6 +663,16 @@ namespace pascal {
                     if (!nxt.empty() && std::regex_search(nxt, word)) {
                         usedLater = true;
                         break;
+                    }
+                    // A ret/done ends the current procedure/program.
+                    // Non-register stores before a return are observable
+                    // by the caller, so treat them as live.
+                    if (!nxt.empty()) {
+                        std::string tnxt = trim(nxt);
+                        if ((tnxt == "ret" || tnxt == "done") && !isRegisterName(dst)) {
+                            usedLater = true;
+                            break;
+                        }
                     }
                 }
                 if (!usedLater)

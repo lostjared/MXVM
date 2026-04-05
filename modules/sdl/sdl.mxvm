@@ -53,6 +53,7 @@ module sdl {
     extern destroy_texture
     extern load_texture
     extern load_texture_color_key
+    extern load_texture_color_key_rgb
     extern render_texture
     extern update_texture
     extern lock_texture

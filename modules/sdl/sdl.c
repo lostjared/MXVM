@@ -353,6 +353,32 @@ int64_t load_texture_color_key(int64_t renderer_id, const char *file_path) {
     return g_texture_count++;
 }
 
+int64_t load_texture_color_key_rgb(int64_t renderer_id, const char *file_path, int64_t r, int64_t g, int64_t b) {
+    if (renderer_id < 0 || renderer_id >= g_renderer_count || !g_renderers[renderer_id])
+        return -1;
+
+    SDL_Surface *surface = SDL_LoadBMP(file_path);
+    if (!surface)
+        return -2;
+
+    SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, (Uint8)r, (Uint8)g, (Uint8)b));
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(g_renderers[renderer_id], surface);
+    SDL_FreeSurface(surface);
+    if (!texture)
+        return -3;
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
+    void *tmp = realloc(g_textures, sizeof(SDL_Texture *) * (g_texture_count + 1));
+    if (!tmp) {
+        SDL_DestroyTexture(texture);
+        return -1;
+    }
+    g_textures = tmp;
+    g_textures[g_texture_count] = texture;
+
+    return g_texture_count++;
+}
+
 void render_texture(int64_t renderer_id, int64_t texture_id, int64_t src_x, int64_t src_y, int64_t src_w, int64_t src_h, int64_t dst_x, int64_t dst_y, int64_t dst_w, int64_t dst_h) {
     if (renderer_id >= 0 && renderer_id < g_renderer_count && g_renderers[renderer_id] &&
         texture_id >= 0 && texture_id < g_texture_count && g_textures[texture_id]) {
