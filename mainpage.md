@@ -1335,10 +1335,11 @@ end.
 mxx knight.pas knight.mxvm               # compile Pascal -> bytecode
 mxvmc knight.mxvm                         # interpret
 mxvmc knight.mxvm --action translate      # emit x86-64 assembly
-mxvmc knight.mxvm --action compile        # compile to native executable
+LDFLAGS="-lSDL2 -lSDL2_ttf" mxvmc knight.mxvm --action compile        # compile to native executable
 ```
 
 [Online Source Code](https://github.com/lostjared/MXVM/tree/main/src/frontend/pas/knights_tour)
+
 
 ---
 
@@ -2213,6 +2214,7 @@ LDFLAGS="-lSDL2 -lSDL2_ttf" mxvmc space.mxvm --action compile
 ./SpaceShooter                        # run native binary
 ```
 [Online Source Code](https://github.com/lostjared/MXVM/tree/main/src/frontend/pas/spaceshooter)
+
 
 ---
 
