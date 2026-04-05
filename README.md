@@ -1,74 +1,68 @@
-# MXVM
+# MXVM -- Virtual Machine, Compiler & Code Generator
 
-* project updated
+**MXVM** is a custom virtual machine and compiler suite written in modern C++20.
+It provides a RISC-style bytecode language with an interpreter, a Pascal-subset
+compiler frontend, and native x86-64 code generators targeting Linux (System V ABI),
+macOS (Darwin), and Windows (Win64).
 
-**Still Under Development.**
+> **Experimental / educational project -- not intended for production use.**
 
-MXVM is a custom virtual machine and compiler/interpreter project written in C++. It provides a small, RISC-style bytecode language, a parser/AST frontend, an interpreter, and an x86_64 code generator — all designed as a sandbox for learning and experimentation.
-
-## Project Purpose
-
-> **Not for production use.**  
-> Use MXVM to explore:
-> - VM architecture & instruction execution  
-> - Code parsing & AST generation  
-> - Modular design & dynamic loading of external functions  
-> - C++ code organization (headers, sources, CMake)  
-> - Cross-platform build & dependency management  
-> - Debugging, code generation, memory management  
-
-## Features
-
-- **Custom VM**  
-  A small instruction set (arithmetic, control flow, memory, string, etc.) implemented in C++.
-
-- **Parser & AST**  
-  A grammar for the MXVM language; builds an abstract syntax tree and emits intermediate code.
-
-- **Interpreter & JIT**  
-  Run directly in a stack-based VM or generate native x86_64 assembly.
-
-- **Modular System**  
-  Load “modules” (IO, string, math, etc.) as shared libraries via `invoke`.
-
-- **Debugging Tools**  
-  HTML debug output, memory dumps, verbose error reporting.
-
-- **CMake Build**  
-  Cross-platform, modular CMake scripts for Linux, macOS, Windows.
+> **[Download PDF Reference Manual](https://lostsidedead.biz/MXVM/doc/MXVM_Reference.pdf)**
 
 ---
 
-## RISC-Style Bytecode Design
+## Architecture Overview
 
-MXVM’s bytecode follows a **RISC** philosophy:
-
-1. **Load/Store Architecture**  
-   - Only `load` and `store` touch memory; all other ops work on registers or locals.
-
-2. **Simple, Orthogonal Instructions**  
-   - One operation per opcode (`add`, `jmp`, `cmp`, etc.), no complex “super” instructions.
-
-3. **Uniform, Fixed Format**  
-   - One instruction per line, fixed operand order (destination first).
-
-4. **Explicit Control Flow**  
-   - Conditional flags set by `cmp`, branches via `je`, `jne`, `jl`, etc.
+| Layer | Component | Description |
+|-------|-----------|-------------|
+| **Frontend** | Scanner / Lexer | Tokenises `.mxvm` and `.pas` source files |
+| **Frontend** | Parser / AST | Builds a typed abstract syntax tree |
+| **Frontend** | Validator | Scope-based semantic analysis and type checking |
+| **Middle** | Code Generator | Emits MXVM bytecode from the AST |
+| **Backend** | Interpreter | Stack-based execution engine for bytecode |
+| **Backend** | x86-64 Codegen | Native assembly output (System V, Win64, Darwin) |
+| **Backend** | Peephole Optimizer | Post-generation assembly cleanup passes |
+| **Runtime** | Module System | Dynamically loaded C shared libraries (`io`, `std`, `string`, `sdl`) and Pascal unit linking |
 
 ---
 
-## Language Overview
+## Building
 
-A typical `.mxvm` program:
+```bash
+git clone https://github.com/lostjared/MXVM.git
+cd MXVM && mkdir build && cd build
+cmake .. && make -j$(nproc)
+```
 
-```mxvm
+Requires: C++20 compiler, CMake >= 3.10.
+Optional: SDL2 + SDL2_ttf (for the SDL module), Emscripten (WebAssembly target).
+
+## Running
+
+| Mode | Command |
+|------|---------|
+| **Interpret** | `mxvmc program.mxvm --path /usr/local/lib` |
+| **Compile -> Assembly** | `mxvmc program.mxvm --path /usr/local/lib --action translate` |
+| **Compile -> Executable** | `mxvmc program.mxvm --path /usr/local/lib --action compile` |
+
+---
+
+## MXVM Bytecode Language
+
+Every `.mxvm` file is wrapped in a `program` block with **data**, **module**, and **code** sections:
+
+```
 program MyApp {
+
   section data {
     int    counter = 0
+    float  pi      = 3.14159
     string msg     = "Hello, MXVM!\n"
+    ptr    buffer  = null
+    byte   flags   = 0
   }
 
-  section module { io, string }
+  section module { io, string, std }
 
   section code {
   start:
@@ -80,159 +74,142 @@ program MyApp {
   }
 }
 ```
-- **`program <Name> { … }`**  
-  Top-level container.
 
-- **`section data { … }`**  
-  Declare storage:  
-  - `int` (64-bit), `ptr`, `byte`, `string <name>, <maxlen>`  
-  - Initializers only here.
+### Data Types
 
-- **`section module { … }`**  
-  List modules whose functions can be `invoke`d.
+| Type | Size | Description |
+|------|------|-------------|
+| `int` | 64-bit | Signed integer |
+| `float` | 64-bit | Double-precision floating point |
+| `string` | varies | NUL-terminated string (optional max-length: `string name, 256`) |
+| `ptr` | 64-bit | Opaque pointer (for `alloc`/module use) |
+| `byte` | 8-bit | Unsigned byte |
+| `label` | -- | Code address (for indirect jumps) |
 
-- **`section code { … }`**  
-  Sequence of labeled instructions.  
-  - **Operands**: first is always a destination (variable/register), following are sources (vars or immediates).  
-  - **No inline literals** of type string—only numbers or hex in code; strings live in `data`.  
+### Key Instructions
+
+| Category | Instructions |
+|----------|-------------|
+| **Arithmetic** | `mov`, `add`, `sub`, `mul`, `div`, `mod`, `neg`, `or`, `and`, `xor`, `not` |
+| **Branching** | `cmp`, `jmp`, `je`, `jne`, `jl`, `jle`, `jg`, `jge`, `jz`, `jnz`, `ja`, `jb` |
+| **Memory** | `load`, `store`, `lea`, `alloc`, `realloc`, `free` |
+| **Stack** | `push`, `pop`, `stack_load`, `stack_store`, `stack_sub` |
+| **I/O** | `print`, `string_print`, `getline` |
+| **Calls** | `call`, `ret`, `invoke`, `return`, `done`, `exit` |
+| **Conversion** | `to_int`, `to_float` |
+
+All instructions use **destination-first operand order** (RISC convention).
+
+### Object System
+
+Separately compiled units (`object` blocks) can be linked into a main program
+and referenced with dot notation: `call Utils.print_line`.
+
 ---
 
-## Instruction Set Reference
+## Pascal Frontend
 
-### Arithmetic & Logic
+MXVM includes a Pascal-subset compiler that parses Pascal source, builds a typed AST,
+validates semantics, and emits MXVM bytecode.
 
-| Instruction | Operands                        | Description                     |
-|-------------|---------------------------------|---------------------------------|
-| `mov`       | `dest, src`                     | Copy `src` → `dest`             |
-| `add`       | `dest, a, b`                    | `dest = a + b`                  |
-| `sub`       | `dest, a, b`                    | `dest = a - b`                  |
-| `mul`       | `dest, a, b`                    | `dest = a * b`                  |
-| `div`       | `dest, a, b`                    | `dest = a / b`                  |
-| `mod`       | `dest, a, b`                    | `dest = a % b`                  |
-| `neg`       | `dest, a`                       | `dest = -a`                     |
-| `or`        | `dest, a, b`                    | Bitwise OR                      |
-| `and`       | `dest, a, b`                    | Bitwise AND                     |
-| `xor`       | `dest, a, b`                    | Bitwise XOR                     |
-| `not`       | `dest, a`                       | Bitwise NOT                     |
+### Supported Features
 
-### Comparison & Branching
+- **Case-insensitive** keywords and identifiers
+- **Types**: `integer`, `real`, `boolean`, `char`, `string`, typed pointers (`^Type`),
+  fixed arrays (`array[lo..hi] of T`), dynamic arrays (`array of T`), and records
+- **Control flow**: `if/then/else`, `while/do`, `for/to/downto`, `repeat/until`,
+  `case`, `break`, `continue`, `exit`
+- **Procedures & functions** with by-value and `var` (by-reference) parameters,
+  nesting, and recursion
+- **Units** (separately compiled modules with `interface` / `implementation` sections)
+- **Operators**: arithmetic, relational, logical, string concatenation, pointer
+  dereference (`^`) and address-of (`@`)
+- **Dynamic arrays**: `SetLength`, `Length`, `High`, `Low`
+- **Pointers**: `new`, `dispose`, `@` (address-of)
+- **Built-in routines**: I/O (`write`, `writeln`, `readln`), math (`abs`, `sqrt`,
+  `sin`, `cos`, `pow`, ...), string ops (`length`, `pos`, `copy`, `insert`, `delete`),
+  memory (`malloc`, `calloc`, `free`, `memcpy`), system (`halt`, `system`, `rand`)
 
-| Instruction | Operands          | Description                        |
-|-------------|-------------------|------------------------------------|
-| `cmp`       | `a, b`            | Compare `a – b`, set flags         |
-| `jmp`       | `label`           | Unconditional jump                 |
-| `je`        | `label`           | Jump if equal                      |
-| `jne`       | `label`           | Jump if not equal                  |
-| `jl`        | `label`           | Jump if less (signed)              |
-| `jle`       | `label`           | Jump if ≤                           |
-| `jg`        | `label`           | Jump if greater (signed)           |
-| `jge`       | `label`           | Jump if ≥                           |
-| `jz`        | `label`           | Jump if zero flag set              |
-| `jnz`       | `label`           | Jump if zero flag clear            |
-| `ja`        | `label`           | Jump if above (unsigned)           |
-| `jb`        | `label`           | Jump if below (unsigned)           |
+### Example
 
-### Memory & Stack
+```pascal
+program FactorialDemo;
 
-| Instruction   | Operands                        | Description                                    |
-|---------------|---------------------------------|------------------------------------------------|
-| `load`        | `dest, ptr, index, size`        | `dest = *(ptr + index*size)`                   |
-| `store`       | `src, ptr, index, size`         | `*(ptr + index*size) = src`                    |
-| `alloc`       | `ptr, bytesize, count`          | Allocate `count` items each `bytesize` bytes   |
-| `free`        | `ptr`                           | Release allocated memory                       |
-| `push`        | `src`                           | Push value onto VM stack                       |
-| `pop`         | `dest`                          | Pop value from VM stack                        |
-| `stack_load`  | `dest, offset`                  | Load from stack at offset                      |
-| `stack_store` | `src, offset`                   | Store to stack at offset                       |
-| `stack_sub`   | `dest, offset, bytes`           | Sub-stack address arithmetic                   |
+function Factorial(n: integer): integer;
+begin
+  if n <= 1 then
+    Factorial := 1
+  else
+    Factorial := n * Factorial(n - 1);
+end;
 
-### I/O & Modules
-
-| Instruction     | Operands                 | Description                                         |
-|-----------------|--------------------------|-----------------------------------------------------|
-| `print`         | `fmt, args…`             | Print formatted output                              |
-| `getline`       | `ptr`                    | Read a line from stdin into buffer                  |
-| `invoke`        | `func, args…`            | Call an external (module) function                  |
-| `call`          | `Module.Func`            | Call an internal MXVM function                      |
-| `ret`           | —                        | Return from MXVM function                           |
-| `done`          | —                        | End program                                         |
-| `exit`          | `code`                   | Terminate VM with status                            |
-
-### Conversion & Misc
-
-| Instruction  | Operands          | Description                         |
-|--------------|-------------------|-------------------------------------|
-| `to_int`     | `dest, ptr`       | Convert string → integer            |
-| `to_float`   | `dest, ptr`       | Convert string → float              |
----
-
-## Module System
-Place compiled “.so”/“.dll” modules in `modules/`. Use:
-
-```mxvm
-section module { io, string, math }
-// …
-invoke fopen, filename, mode
-invoke strlen, mystr
+var i: integer;
+begin
+  for i := 1 to 12 do
+    writeln(i, '! = ', Factorial(i));
+end.
 ```
+
+### Compiling Pascal Units
+
+```bash
+mxx MathUtils.pas MathUtils.mxvm    # compile unit
+mxx TestMain.pas TestMain.mxvm      # compile program
+mxvmc TestMain.mxvm -x .            # run with object path
+```
+
+---
+
+## Runtime Modules
+
+External functions are called with `invoke` (bytecode) or normal call syntax (Pascal).
+
+| Module | Description | Key Functions |
+|--------|-------------|---------------|
+| **io** | File I/O, RNG | `fopen`, `fclose`, `fread`, `fwrite`, `fseek`, `fprintf`, `rand_number`, `seed_random` |
+| **std** | Math, memory, system | `abs`, `sqrt`, `sin`, `cos`, `pow`, `malloc`, `free`, `memcpy`, `atoi`, `system`, `argc`, `argv` |
+| **string** | String manipulation | `strlen`, `strcmp`, `strncpy`, `strncat`, `snprintf`, `strfind`, `substr` |
+| **sdl** | SDL2/SDL2_ttf graphics | Window, renderer, textures, events, audio, text rendering |
+
+---
+
+## Code Generation
+
+### Native x86-64 Targets
+
+| Platform | ABI | Notes |
+|----------|-----|-------|
+| **Linux** | System V | Default target. `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9` for args. |
+| **macOS** | System V (Darwin) | Underscore-prefixed symbols, PIC relocations. |
+| **Windows** | Win64 | `rcx`, `rdx`, `r8`, `r9` + shadow space. |
+
+### Peephole Optimiser
+
+Post-generation pass applies: redundant load elimination, dead store removal,
+strength reduction (multiply/divide by powers of 2 -> shifts), and redundant
+move elimination.
 
 ---
 
 ## Project Structure
 
 ```
-MXVM-main/
+MXVM/
 ├── CMakeLists.txt        # Build rules
 ├── LICENSE               # Apache-2.0
-├── README.md             # (this file)
-├── about.html            # Browser demo & docs
 ├── include/mxvm/         # Public headers
 ├── src/                  # VM + codegen implementation
-├── modules/              # Built-in extension modules
-└── mxvm_src/             # Example .mxvm programs
+├── modules/              # Built-in extension modules (io, std, string, sdl)
+├── mxvm_src/             # Example .mxvm programs
+└── docs/                 # HTML documentation
 ```
-
----
-
-## Building
-
-```bash
-git clone https://github.com/lostjared/MXVM.git
-cd MXVM
-mkdir build && cd build
-cmake ..
-make
-```
-
-- Requires a C++20 compiler, CMake 3.10+, and standard build tools.
-- Optional modules (e.g. WebAssembly) may need Emscripten or additional SDKs.
-
-## Running
-
-- **Interpreter mode**  
-  ```bash
-  mxvmc hello_world.mxvm --path /usr/local/lib
-  ```
-- **Compile ➔ to Assemlby**  
-  ```bash
-  mxvmc fibonacci.mxvm --path /usr/local/lib --object-path . --action translate
-  ```
-- **Compile ➔ to executable**  
-  ```bash
-  mxvmc fibonacci.mxvm --path /usr/local/lib --object-path . --action compile
-  ```
 
 ---
 
 ## Contributing
 
-1. Fork the repo  
-2. Create a branch (`git checkout -b feature/foo`)  
-3. Commit your changes (`git commit -am "Add feature"`)  
-4. Push (`git push origin feature/foo`)  
-5. Open a Pull Request  
-
----
-
-
-
+1. Fork the repo
+2. Create a branch (`git checkout -b feature/foo`)
+3. Commit your changes (`git commit -am "Add feature"`)
+4. Push (`git push origin feature/foo`)
+5. Open a Pull Request
