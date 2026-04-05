@@ -136,7 +136,7 @@ begin
   GridSet(PieceUnit.piece_x1, PieceUnit.piece_y1, PieceUnit.piece_c1);
   GridSet(PieceUnit.piece_x2, PieceUnit.piece_y2, PieceUnit.piece_c2);
   GridSet(PieceUnit.piece_x3, PieceUnit.piece_y3, PieceUnit.piece_c3);
-  PieceSpawn;
+  PieceUnit.PieceSpawn;
 end;
 
 function CanMoveLeft: integer;
@@ -468,7 +468,7 @@ end;
 procedure DropPiece;
 begin
   if CanMoveDown() = 1 then
-    PieceMoveDown
+    PieceUnit.PieceMoveDown
   else
     PlacePiece;
 end;
@@ -476,7 +476,7 @@ end;
 procedure HardDrop;
 begin
   while CanMoveDown() = 1 do
-    PieceMoveDown;
+    PieceUnit.PieceMoveDown;
   PlacePiece;
 end;
 
@@ -490,7 +490,7 @@ begin
   lines_per_speed := LINES_PER_LEVEL;
   game_over := 0;
   drop_timer := 0;
-  PieceInit;
+  PieceUnit.PieceInit;
 end;
 
 procedure UpdateGame;

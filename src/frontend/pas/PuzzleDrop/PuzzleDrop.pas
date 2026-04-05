@@ -109,7 +109,7 @@ begin
   sdl_clear(renderer);
 
   { Draw background for current level }
-  sdl_render_texture(renderer, bg_tex[GetLevel() - 1], -1, -1, -1, -1, 0, 0, WIN_W, WIN_H);
+  sdl_render_texture(renderer, bg_tex[GridUnit.GetLevel() - 1], -1, -1, -1, -1, 0, 0, WIN_W, WIN_H);
 
   { Draw grid blocks - direct array access to avoid function call overhead }
   for x := 0 to GRID_W - 1 do
@@ -183,11 +183,11 @@ begin
   end
   else
   begin
-    sdl_draw_text(renderer, font_id, 'Level: ' + inttostr(GetLevel()) + '  Lines: ' + inttostr(GetLines()),
+    sdl_draw_text(renderer, font_id, 'Level: ' + inttostr(GridUnit.GetLevel()) + '  Lines: ' + inttostr(GridUnit.GetLines()),
       16, 8, 255, 255, 255, 255);
   end;
 
-  if IsGameOver() = 1 then
+  if GridUnit.IsGameOver() = 1 then
   begin
     sdl_draw_text(renderer, font_id, 'GAME OVER', WIN_W div 2 - 100, WIN_H div 2, 255, 80, 80, 255);
     sdl_draw_text(renderer, font_id, 'Press N for New Game', WIN_W div 2 - 180, WIN_H div 2 + 48, 255, 255, 255, 255);
@@ -196,7 +196,7 @@ end;
 
 procedure NewGame;
 begin
-  GridClearAll;
+  GridUnit.GridClearAll;
   game_started := 1;
   drop_speed := DROP_INTERVAL;
   last_drop_tick := sdl_get_ticks();
@@ -213,10 +213,10 @@ begin
     exit;
   end;
   if game_started = 0 then exit;
-  if IsGameOver() = 1 then exit;
+  if GridUnit.IsGameOver() = 1 then exit;
 
-  if (k = SDLK_a) or (k = SDLK_UP) then GridKeyShiftUp
-  else if k = SDLK_s then GridKeyShiftDown;
+  if (k = SDLK_a) or (k = SDLK_UP) then GridUnit.GridKeyShiftUp
+  else if k = SDLK_s then GridUnit.GridKeyShiftDown;
 end;
 
 procedure Init;
@@ -270,7 +270,7 @@ begin
     halt(EXIT_FAILURE);
   end;
 
-  GridClearAll;
+  GridUnit.GridClearAll;
   game_started := 0;
   running := 1;
   drop_speed := DROP_INTERVAL;
@@ -344,38 +344,38 @@ begin
     cur_tick := sdl_get_ticks();
 
     { Poll keyboard state for movement keys (no event queue lag) }
-    if (game_started = 1) and (IsGameOver() = 0) then
+    if (game_started = 1) and (GridUnit.IsGameOver() = 0) then
     begin
       if (cur_tick - last_key_tick) >= KEY_REPEAT_MS then
       begin
         if sdl_is_key_pressed(SDL_SCANCODE_LEFT) <> 0 then
-        begin GridKeyLeft; last_key_tick := cur_tick; end
+        begin GridUnit.GridKeyLeft; last_key_tick := cur_tick; end
         else if sdl_is_key_pressed(SDL_SCANCODE_RIGHT) <> 0 then
-        begin GridKeyRight; last_key_tick := cur_tick; end
+        begin GridUnit.GridKeyRight; last_key_tick := cur_tick; end
         else if sdl_is_key_pressed(SDL_SCANCODE_DOWN) <> 0 then
-        begin GridKeyDown; last_key_tick := cur_tick; end
+        begin GridUnit.GridKeyDown; last_key_tick := cur_tick; end
         else if sdl_is_key_pressed(SDL_SCANCODE_Z) <> 0 then
-        begin GridKeyRotateLeft; last_key_tick := cur_tick; end
+        begin GridUnit.GridKeyRotateLeft; last_key_tick := cur_tick; end
         else if sdl_is_key_pressed(SDL_SCANCODE_X) <> 0 then
-        begin GridKeyRotateRight; last_key_tick := cur_tick; end;
+        begin GridUnit.GridKeyRotateRight; last_key_tick := cur_tick; end;
       end;
     end;
 
     { Auto drop piece on timer }
-    if (game_started = 1) and (IsGameOver() = 0) then
+    if (game_started = 1) and (GridUnit.IsGameOver() = 0) then
     begin
       if (cur_tick - last_drop_tick) >= drop_speed then
       begin
-        GridKeyDown;
+        GridUnit.GridKeyDown;
         last_drop_tick := cur_tick;
-        if IsGameOver() = 1 then
+        if GridUnit.IsGameOver() = 1 then
           game_started := 0;
       end;
       { Background processing: match clearing and gravity }
       if (cur_tick - last_proc_tick) >= 2 then
       begin
-        ProcBlocks();
-        ProcMoveDown();
+        GridUnit.ProcBlocks();
+        GridUnit.ProcMoveDown();
         last_proc_tick := cur_tick;
       end;
     end;

@@ -115,7 +115,7 @@ begin
   game_level := 1;
   game_lines := 0;
   game_over := 0;
-  PieceNew(GRID_W div 2, 0);
+  PieceUnit.PieceNew(GRID_W div 2, 0);
 end;
 
 function CheckPieceAt(px0, py0, px1, py1, px2, py2: integer): integer;
@@ -172,13 +172,13 @@ end;
 procedure GridKeyLeft;
 begin
   if CheckPieceDelta(-1, 0) = 1 then
-    PieceMoveLeft;
+    PieceUnit.PieceMoveLeft;
 end;
 
 procedure GridKeyRight;
 begin
   if CheckPieceDelta(1, 0) = 1 then
-    PieceMoveRight;
+    PieceUnit.PieceMoveRight;
 end;
 
 procedure GridKeyDown;
@@ -188,22 +188,22 @@ begin
   cd := CheckPieceDelta(0, 1);
 
   if cd = 1 then
-    PieceMoveDown
+    PieceUnit.PieceMoveDown
   else
   begin
     SetPieceOnGrid;
-    PieceNew(GRID_W div 2, 0);
+    PieceUnit.PieceNew(GRID_W div 2, 0);
   end;
 end;
 
 procedure GridKeyShiftUp;
 begin
-  PieceShiftUp;
+  PieceUnit.PieceShiftUp;
 end;
 
 procedure GridKeyShiftDown;
 begin
-  PieceShiftDown;
+  PieceUnit.PieceShiftDown;
 end;
 
 procedure GridKeyRotateLeft;
@@ -214,7 +214,7 @@ begin
   save_x1 := PieceUnit.piece_x[1]; save_y1 := PieceUnit.piece_y[1];
   save_x2 := PieceUnit.piece_x[2]; save_y2 := PieceUnit.piece_y[2];
   save_pos := PieceUnit.piece_position;
-  PieceRotateLeft;
+  PieceUnit.PieceRotateLeft;
   if CheckPieceDelta(0, 0) = 0 then
   begin
     PieceUnit.piece_x[0] := save_x0; PieceUnit.piece_y[0] := save_y0;
@@ -232,7 +232,7 @@ begin
   save_x1 := PieceUnit.piece_x[1]; save_y1 := PieceUnit.piece_y[1];
   save_x2 := PieceUnit.piece_x[2]; save_y2 := PieceUnit.piece_y[2];
   save_pos := PieceUnit.piece_position;
-  PieceRotateRight;
+  PieceUnit.PieceRotateRight;
   if CheckPieceDelta(0, 0) = 0 then
   begin
     PieceUnit.piece_x[0] := save_x0; PieceUnit.piece_y[0] := save_y0;

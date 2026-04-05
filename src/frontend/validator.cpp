@@ -1161,6 +1161,10 @@ namespace mxx {
                             next();
                             continue;
                         }
+                        if (match("(")) {
+                            parseActualParams();
+                            continue;
+                        }
                         break;
                     }
                     continue;

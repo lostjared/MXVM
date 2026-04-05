@@ -162,15 +162,15 @@ begin
   begin
     for c := 0 to GRID_COLS - 1 do
     begin
-      val := GridGet(c, r);
+      val := GridUnit.GridGet(c, r);
       if val = BLOCK_CLEAR then
       begin
         bx := BOARD_OX + c * CELL_W;
         by := BOARD_OY + r * CELL_H;
-        flash_phase := GridGetFlash(c, r) mod 6;
+        flash_phase := GridUnit.GridGetFlash(c, r) mod 6;
         if flash_phase < 3 then
         begin
-          orig := GridGetOriginal(c, r);
+          orig := GridUnit.GridGetOriginal(c, r);
           if (orig > 0) and (orig <= 10) then
             sdl_render_texture(renderer_id, block_tex[orig], -1, -1, -1, -1, bx, by, CELL_W, CELL_H);
         end

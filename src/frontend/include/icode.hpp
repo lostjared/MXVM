@@ -891,11 +891,38 @@ namespace pascal {
          */
         void registerExternalFunc(const std::string &funcName, const std::string &unitName) {
             externalFuncs[funcName] = unitName;
+            importedUnitNames.insert(unitName);
         }
 
         /// @brief Check whether a name refers to an imported unit
         [[nodiscard]] bool isImportedUnit(const std::string &name) const {
             return importedUnitNames.count(name) > 0;
+        }
+
+        /// @brief Register imported constant values from a dependency unit
+        void registerImportedConst(const std::string &unitName, ConstDeclNode &node) {
+            importedUnitNames.insert(unitName);
+            for (const auto &assignment : node.assignments) {
+                if (auto *strNode = dynamic_cast<StringNode *>(assignment->value.get())) {
+                    std::string sym = internString(strNode->value);
+                    std::string qualifiedName = unitName + "." + assignment->identifier;
+                    compileTimeConstants[qualifiedName] = sym;
+                    compileTimeConstants[assignment->identifier] = sym;
+                    continue;
+                }
+                try {
+                    std::string literalValue = evaluateConstantExpression(assignment->value.get());
+                    bool isFloat = isRealNumber(literalValue);
+                    if (isFloat)
+                        literalValue = ensureFloatConstSymbol(literalValue);
+                    std::string qualifiedName = unitName + "." + assignment->identifier;
+                    std::string val = isFloat ? realConstants[literalValue] : literalValue;
+                    compileTimeConstants[qualifiedName] = val;
+                    compileTimeConstants[assignment->identifier] = val;
+                } catch (...) {
+                    // Non-constant expression; skip
+                }
+            }
         }
 
         /// @brief Register imported variable metadata from a dependency unit (no alloc emitted)
@@ -963,6 +990,7 @@ namespace pascal {
 
             varTypes.clear();
             globalArrays.clear();
+            auto savedConstants = compileTimeConstants;
             compileTimeConstants.clear();
             functionScopedArrays.clear();
             scopeStack.clear();
@@ -980,6 +1008,7 @@ namespace pascal {
             // Restore imported unit variable metadata (registered before generate())
             arrayInfo.insert(importedArrayInfo.begin(), importedArrayInfo.end());
             varTypes.insert(importedVarTypes.begin(), importedVarTypes.end());
+            compileTimeConstants.insert(savedConstants.begin(), savedConstants.end());
 
             for (size_t i = 0; i < regInUse.size(); ++i)
                 regInUse[i] = false;

@@ -471,6 +471,17 @@ namespace pascal {
                 procCallNode->setLineNumber(lineNum);
                 return procCallNode;
             }
+            if (auto fieldNode = dynamic_cast<FieldAccessNode *>(lhs.get())) {
+                if (dynamic_cast<VariableNode *>(fieldNode->recordExpr.get())) {
+                    if (peekIs("(")) {
+                        return parseProcedureCall(fieldNode->fieldName);
+                    }
+                    // Bare qualified name as statement = parameterless procedure call
+                    auto procCallNode = std::make_unique<ProcCallNode>(fieldNode->fieldName, std::vector<std::unique_ptr<ASTNode>>{});
+                    procCallNode->setLineNumber(lineNum);
+                    return procCallNode;
+                }
+            }
             error("Invalid statement: expected ':=' for assignment or '(' for procedure call");
             return nullptr;
         } else {
@@ -735,6 +746,11 @@ namespace pascal {
                 } else if (peekIs("(")) {
                     if (auto varNode = dynamic_cast<VariableNode *>(left.get())) {
                         return parseFunctionCall(varNode->name);
+                    } else if (auto fieldNode = dynamic_cast<FieldAccessNode *>(left.get())) {
+                        if (dynamic_cast<VariableNode *>(fieldNode->recordExpr.get())) {
+                            return parseFunctionCall(fieldNode->fieldName);
+                        }
+                        error("Function call must be on a simple or qualified identifier");
                     } else {
                         error("Function call must be on a simple identifier");
                     }

@@ -41,7 +41,7 @@ begin
     begin
       if GameUI.cursor_pos = 0 then
       begin
-        ResetGame;
+        GridUnit.ResetGame;
         GameUI.current_screen := SCREEN_GAME;
       end
       else if GameUI.cursor_pos = 1 then
@@ -78,26 +78,26 @@ begin
       begin
         if kc = SDLK_LEFT then
         begin
-          if CanMoveLeft() = 1 then
-            PieceMoveLeft;
+          if GridUnit.CanMoveLeft() = 1 then
+            PieceUnit.PieceMoveLeft;
         end
         else if kc = SDLK_RIGHT then
         begin
-          if CanMoveRight() = 1 then
-            PieceMoveRight;
+          if GridUnit.CanMoveRight() = 1 then
+            PieceUnit.PieceMoveRight;
         end
         else if kc = SDLK_DOWN then
-          DropPiece
+          GridUnit.DropPiece
         else if (kc = SDLK_UP) or (kc = SDLK_s) or (kc = SDLK_S_UPPER) then
-          PieceShiftUp
+          PieceUnit.PieceShiftUp
         else if (kc = SDLK_a) or (kc = SDLK_A_UPPER) then
-          PieceShiftDown
+          PieceUnit.PieceShiftDown
         else if kc = SDLK_SPACE then
-          HardDrop
+          GridUnit.HardDrop
         else if kc = SDLK_RETURN then
         begin
-          if CanRotate() = 1 then
-            PieceRotate;
+          if GridUnit.CanRotate() = 1 then
+            PieceUnit.PieceRotate;
         end;
       end;
     end;
@@ -180,24 +180,24 @@ end;
 
 begin
   seed_random();
-  InitSDL;
-  load_result := LoadTextures();
+  GameUI.InitSDL;
+  load_result := GameUI.LoadTextures();
   if load_result <> 0 then
   begin
     writeln('Failed to load textures, exiting.');
-    ShutdownSDL;
+    GameUI.ShutdownSDL;
     halt(1);
   end;
-  ResetGame;
+  GridUnit.ResetGame;
   running := 1;
   while running = 1 do
   begin
     HandleInput;
     if (GameUI.current_screen = SCREEN_GAME) and (GameUI.paused = 0) then
-      UpdateGame;
-    RenderFrame;
+      GridUnit.UpdateGame;
+    GameUI.RenderFrame;
     sdl_delay(FRAME_DELAY);
   end;
   writeln('MasterPiece: Goodbye');
-  ShutdownSDL;
+  GameUI.ShutdownSDL;
 end.

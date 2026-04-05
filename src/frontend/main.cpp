@@ -145,6 +145,9 @@ int main(int argc, char **argv) {
                                     else if (auto *vd = dynamic_cast<pascal::VarDeclNode *>(decl.get())) {
                                         emiter.registerImportedVar(dep, *vd);
                                         continue;
+                                    } else if (auto *cd = dynamic_cast<pascal::ConstDeclNode *>(decl.get())) {
+                                        emiter.registerImportedConst(dep, *cd);
+                                        continue;
                                     }
                                     ast->interfaceDecls.push_back(std::move(decl));
                                 }
@@ -197,6 +200,9 @@ int main(int argc, char **argv) {
                                         emiter.registerExternalFunc(pd->name, dep);
                                     else if (auto *vd = dynamic_cast<pascal::VarDeclNode *>(decl.get())) {
                                         emiter.registerImportedVar(dep, *vd);
+                                        continue;
+                                    } else if (auto *cd = dynamic_cast<pascal::ConstDeclNode *>(decl.get())) {
+                                        emiter.registerImportedConst(dep, *cd);
                                         continue;
                                     }
                                     ast->block->declarations.push_back(std::move(decl));

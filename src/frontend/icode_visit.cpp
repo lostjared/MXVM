@@ -1257,9 +1257,17 @@ namespace pascal {
             pushValue(ct2->second);
             return;
         }
+        
 
         if (auto sit = varSlot.find(mangled); sit != varSlot.end()) {
             pushValue(slotVar(sit->second));
+            return;
+        }
+
+        // Zero-arg function call without parentheses
+        if (externalFuncs.count(node.name) || funcSignatures.count(node.name)) {
+            FuncCallNode syntheticCall(node.name, {});
+            visit(syntheticCall);
             return;
         }
 
@@ -1475,6 +1483,22 @@ namespace pascal {
         if (auto *v = dynamic_cast<VariableNode *>(node.recordExpr.get())) {
             if (isImportedUnit(v->name)) {
                 std::string qualifiedName = v->name + "." + node.fieldName;
+
+                // Check for imported constant first
+                auto ct = compileTimeConstants.find(qualifiedName);
+                if (ct != compileTimeConstants.end()) {
+                    pushValue(ct->second);
+                    return;
+                }
+
+                // Check for zero-arg function call: UnitName.FuncName
+                auto eit = externalFuncs.find(node.fieldName);
+                if (eit != externalFuncs.end()) {
+                    FuncCallNode syntheticCall(node.fieldName, {});
+                    visit(syntheticCall);
+                    return;
+                }
+
                 VarType vt = getVarType(qualifiedName);
                 std::string dst;
                 if (vt == VarType::DOUBLE)
