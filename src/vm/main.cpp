@@ -759,6 +759,12 @@ void collectAndRegisterAllExterns(std::unique_ptr<mxvm::Program> &program) {
 }
 
 void createMakefile(Args *args) {
+
+    if(args == nullptr) {
+        std::cerr << "Error arguments null.\n";
+        return;
+    }
+
     std::ofstream file("Makefile");
     if (!file.is_open()) {
         std::cerr << Col("MXVM Error: ", mx::Color::BRIGHT_RED) << " could not open file\n";

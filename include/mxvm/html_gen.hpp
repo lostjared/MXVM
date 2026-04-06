@@ -30,6 +30,45 @@ namespace mxvm {
       private:
         std::string source;  ///< the MXVM source text to convert
     };
+
+    /**
+     * @brief Generates syntax-highlighted HTML output from Pascal (.pas) source code
+     *
+     * Supports all keywords, types, and built-ins recognised by the MXVM Pascal
+     * compiler (from both the parser and validator keyword sets), plus Pascal
+     * comment styles (@c { }, @c (* *), @c //), single-quoted string literals
+     * with @c '' escape, hex literals (@c $FF), and char literals (@c #65 / @c #$41).
+     *
+     * The generated HTML links to an external stylesheet instead of embedding
+     * styles inline, so colours and fonts can be customised by editing that file.
+     * Call @c defaultCss() to obtain the bundled default stylesheet text.
+     */
+    class PasHTMLGen {
+      public:
+        /** @brief Construct from Pascal source text */
+        explicit PasHTMLGen(const std::string &src);
+
+        /**
+         * @brief Write generated HTML to an output stream
+         * @param out      Output stream
+         * @param filename Source filename (used in the HTML @c \<title\>)
+         * @param cssHref  @c href for the linked stylesheet (default: @c "mxvm-highlight.css")
+         */
+        void output(std::ostream &out, const std::string &filename,
+                    const std::string &cssHref = "mxvm-highlight.css");
+
+        /**
+         * @brief Return the default stylesheet text
+         *
+         * Covers all span classes used by both HTMLGen (.mxvm) and PasHTMLGen (.pas)
+         * output.  Write this string to @c mxvm-highlight.css alongside the HTML
+         * files and edit it freely to change the colour scheme.
+         */
+        static std::string defaultCss();
+
+      private:
+        std::string source;
+    };
 } // namespace mxvm
 
 #endif

@@ -7,7 +7,8 @@ target_include_directories(mxvm-html
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/include/mxvm
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/include
+        ${CMAKE_SOURCE_DIR}/src/vm/include
+     
 )
 target_link_libraries(mxvm-html PUBLIC mxvm)
 include(GNUInstallDirs)
