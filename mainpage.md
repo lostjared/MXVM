@@ -980,7 +980,7 @@ begin
   writeln(pos('World', s));       { search }
   writeln(inttostr(42));          { int -> string }
   writeln(strtoint('123'));       { string -> int }
-end.
+  end.
 ```
 
 ### Built-in Procedures & Functions
