@@ -996,10 +996,9 @@ namespace pascal {
             next();
 
             std::unique_ptr<ASTNode> typeDefinition;
-
-            bool isPacked = false;
+            //bool isPacked = false;
             if (peekIs("packed")) {
-                isPacked = true;
+              //  isPacked = true;
                 next(); // consume 'packed' modifier (accepted but has no effect)
             }
             if (peekIs("record")) {
