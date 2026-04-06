@@ -249,6 +249,13 @@ Args proc_args(int argc, char **argv) {
         std::cerr << Col("MXVM: ", mx::Color::RED) << " Exception: " << e.what() << "\n";
     }
 
+    if (!args.source_file.empty()) {
+        constexpr std::string_view ext = ".mxvm";
+        if (args.source_file.size() < ext.size() ||
+            std::string_view(args.source_file).substr(args.source_file.size() - ext.size()) != ext) {
+            args.source_file += ext;
+        }
+    }
     if (args.source_file.empty()) {
         std::cerr << Col("MXVM: Error ", mx::Color::RED) << "source file required..\n";
         exit(EXIT_FAILURE);
