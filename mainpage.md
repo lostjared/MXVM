@@ -66,6 +66,8 @@ Optional: SDL2 + SDL2_ttf (for the SDL module), Emscripten (WebAssembly target).
 
 ## Running
 
+> **Note:** The `.mxvm` extension is optional — if you omit it, `mxvmc` will append `.mxvm` automatically (e.g. `mxvmc program` is equivalent to `mxvmc program.mxvm`).
+
 | Mode | Command |
 |------|---------|
 | **Interpret** | `mxvmc program.mxvm --path /usr/local/lib` |
