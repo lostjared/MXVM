@@ -1576,14 +1576,25 @@ namespace mxvm {
 #endif
 
         std::string module_path_so = module_path + "modules/" + src + "/" + module_name + shared_ext;
+#ifdef _WIN32
+        // On Windows, DLLs may not have the "lib" prefix (e.g. mxvm_sdl.dll vs libmxvm_sdl.dll)
+        if (!std::filesystem::exists(module_path_so)) {
+            std::string alt = module_path + "modules/" + src + "/mxvm_" + src + shared_ext;
+            if (std::filesystem::exists(alt))
+                module_path_so = alt;
+        }
+#endif
         std::string msys2prefix;
 #ifdef _WIN32
-        msys2prefix = std::getenv("MSYSTEM_PREFIX");
-        size_t pos = msys2prefix.find("/msys64/");
-        if (pos != std::string::npos) {
-            msys2prefix = msys2prefix.substr(0, pos + 8);
-        } else {
-            msys2prefix = "";
+        const char *msys2env = std::getenv("MSYSTEM_PREFIX");
+        if (msys2env != nullptr) {
+            msys2prefix = msys2env;
+            size_t pos = msys2prefix.find("/msys64/");
+            if (pos != std::string::npos) {
+                msys2prefix = msys2prefix.substr(0, pos + 8);
+            } else {
+                msys2prefix = "";
+            }
         }
 #endif
         std::string module_src = msys2prefix + include_path + src + "/" + src + ".mxvm";
