@@ -247,6 +247,8 @@ namespace mxx {
         void declareRecordField(const std::string &name, const scan::TToken *at);
         /** @brief Parse a field identifier list within a record definition */
         void parseFieldIdentList();
+
+        int withDepth = 0; ///< nesting depth of with statements (suppress undeclared-id errors)
     };
 
 } // namespace mxx

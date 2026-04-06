@@ -10,6 +10,11 @@ begin
   StringUtils.PrintBanner('  MXVM Unit Demo  ', 20);
   writeln;
 
+
+  i := TestReturn;
+
+  writeln('Test return', i);
+
   { Basic arithmetic }
   StringUtils.PrintHeader('Arithmetic');
   a := 42;

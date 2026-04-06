@@ -452,7 +452,8 @@ namespace pascal {
             GREATER,
             GREATER_EQUAL,
             AND,
-            OR
+            OR,
+            IN
         };
 
         std::unique_ptr<ASTNode> left;   ///< left operand
@@ -622,10 +623,32 @@ namespace pascal {
         }
     };
 
+    /** @brief AST node for an enumerated type declaration (type Color = (Red, Green, Blue)) */
+    class EnumTypeDeclNode : public ASTNode {
+      public:
+        std::string typeName;                    ///< the enum type name
+        std::vector<std::string> values;         ///< ordered list of enum value identifiers
+
+        EnumTypeDeclNode(const std::string &name, std::vector<std::string> vals)
+            : typeName(name), values(std::move(vals)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "EnumTypeDecl: " + typeName; }
+    };
+
+    /** @brief A single variant arm inside a variant record */
+    struct VariantArm {
+        std::vector<std::unique_ptr<ASTNode>> caseLabels; ///< case constant(s) for this arm
+        std::vector<std::unique_ptr<ASTNode>> fields;      ///< field declarations in this arm
+    };
+
     /** @brief AST node for a record type (record ... end) */
     class RecordTypeNode : public ASTNode {
       public:
-        std::vector<std::unique_ptr<ASTNode>> fields; ///< field declarations
+        std::vector<std::unique_ptr<ASTNode>> fields; ///< fixed field declarations
+        std::string variantTagName;                    ///< tag field name (empty if no variant part)
+        std::string variantTagType;                    ///< tag field type name
+        std::vector<VariantArm> variantArms;           ///< variant arms (empty if no variant part)
         RecordTypeNode(std::vector<std::unique_ptr<ASTNode>> fields);
         void accept(ASTVisitor &visitor) override;
         std::string toString() const override;
@@ -639,6 +662,55 @@ namespace pascal {
         RecordDeclarationNode(const std::string &name, std::unique_ptr<RecordTypeNode> recordType);
         void accept(ASTVisitor &visitor) override;
         std::string toString() const override;
+    };
+
+    /** @brief AST node for a with statement (with record do statement) */
+    class WithStmtNode : public ASTNode {
+      public:
+        std::string recordVar;                ///< record variable name
+        std::unique_ptr<ASTNode> statement;   ///< body statement
+
+        WithStmtNode(const std::string &recordVar, std::unique_ptr<ASTNode> stmt)
+            : recordVar(recordVar), statement(std::move(stmt)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "WithStmt: " + recordVar; }
+    };
+
+    /** @brief AST node for a goto statement */
+    class GotoStmtNode : public ASTNode {
+      public:
+        std::string label; ///< target label (numeric string)
+
+        GotoStmtNode(const std::string &lbl) : label(lbl) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "Goto: " + label; }
+    };
+
+    /** @brief AST node for a label definition (label: statement) */
+    class LabelStmtNode : public ASTNode {
+      public:
+        std::string label;                    ///< the label (numeric string)
+        std::unique_ptr<ASTNode> statement;   ///< labeled statement
+
+        LabelStmtNode(const std::string &lbl, std::unique_ptr<ASTNode> stmt)
+            : label(lbl), statement(std::move(stmt)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "Label: " + label; }
+    };
+
+    /** @brief AST node for a set literal [val1, val2, ...] */
+    class SetLiteralNode : public ASTNode {
+      public:
+        std::vector<std::unique_ptr<ASTNode>> elements; ///< set elements
+
+        SetLiteralNode(std::vector<std::unique_ptr<ASTNode>> elems)
+            : elements(std::move(elems)) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "SetLiteral"; }
     };
 
     /** @brief AST node for accessing a record field (record.field) */
@@ -702,6 +774,11 @@ namespace pascal {
         virtual void visit(PointerTypeNode &node) = 0;
         virtual void visit(PointerDerefNode &node) = 0;
         virtual void visit(AddressOfNode &node) = 0;
+        virtual void visit(WithStmtNode &node) = 0;
+        virtual void visit(GotoStmtNode &node) = 0;
+        virtual void visit(LabelStmtNode &node) = 0;
+        virtual void visit(SetLiteralNode &node) = 0;
+        virtual void visit(EnumTypeDeclNode &node) = 0;
     };
 } // namespace pascal
 

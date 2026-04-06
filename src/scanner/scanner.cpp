@@ -459,14 +459,16 @@ namespace scan {
                     break;
                 }
             } else if (*ch == '\'') {
-                break;
+                // Pascal doubled-quote convention: '' becomes a literal '
+                if (string_buffer.peekch(0).has_value() && *string_buffer.peekch(0) == '\'') {
+                    string_buffer.getch();
+                    tok_value += '\'';
+                } else {
+                    break;
+                }
             } else {
                 tok_value += *ch;
             }
-        }
-
-        if (string_buffer.peekch().has_value() && *string_buffer.peekch() == '\'') {
-            string_buffer.getch();
         }
 
         token.set_pos(pos);

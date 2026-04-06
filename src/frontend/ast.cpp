@@ -200,6 +200,8 @@ namespace pascal {
             return "and";
         case OR:
             return "or";
+        case IN:
+            return "in";
         default:
             return "unknown";
         }
@@ -434,6 +436,26 @@ namespace pascal {
     }
 
     void AddressOfNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void WithStmtNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void GotoStmtNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void LabelStmtNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void SetLiteralNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
+    void EnumTypeDeclNode::accept(ASTVisitor &visitor) {
         visitor.visit(*this);
     }
 

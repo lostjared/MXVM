@@ -193,6 +193,14 @@ namespace pascal {
         std::unique_ptr<ASTNode> parseRepeatStatement();
         /** @brief Parse a case statement */
         std::unique_ptr<ASTNode> parseCaseStatement();
+        /** @brief Parse a with statement */
+        std::unique_ptr<ASTNode> parseWithStatement();
+        /** @brief Parse a goto statement */
+        std::unique_ptr<ASTNode> parseGotoStatement();
+        /** @brief Parse a label declaration section (label 100, 200;) */
+        void parseLabelDeclaration();
+        /** @brief Set of user-declared goto labels */
+        std::unordered_set<std::string> declaredLabels;
         /** @brief Parse a full expression (simple expression with optional relational op) */
         std::unique_ptr<ASTNode> parseExpression();
         /** @brief Parse a simple expression (terms combined by +, -, or) */

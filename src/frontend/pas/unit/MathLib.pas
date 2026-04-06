@@ -13,8 +13,14 @@ function Abs(x: integer): integer;
 function Max(a, b: integer): integer;
 function Min(a, b: integer): integer;
 procedure Swap(a, b: integer);
+function TestReturn: integer;
 
 implementation
+
+function TestReturn: integer;
+begin
+TestReturn := 10 * 10;
+end;
 
 function Add(a, b: integer): integer;
 begin

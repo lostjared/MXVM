@@ -1059,6 +1059,36 @@ namespace pascal {
         VarType lt = getExpressionType(node.left.get());
         VarType rt = getExpressionType(node.right.get());
 
+        // Handle 'in' operator: expr in [val1, val2, ...]
+        if (node.operator_ == BinaryOpNode::IN) {
+            auto *setNode = dynamic_cast<SetLiteralNode *>(node.right.get());
+            if (!setNode)
+                throw std::runtime_error("'in' operator requires a set literal on the right side");
+
+            std::string val = eval(node.left.get());
+            std::string foundLabel = newLabel("IN_FOUND");
+            std::string endLabel = newLabel("IN_END");
+            std::string result = allocReg();
+
+            for (auto &elem : setNode->elements) {
+                std::string elemVal = eval(elem.get());
+                emit2("cmp", val, elemVal);
+                emit1("je", foundLabel);
+                if (isReg(elemVal) && !isParmReg(elemVal))
+                    freeReg(elemVal);
+            }
+            emit2("mov", result, "0");
+            emit1("jmp", endLabel);
+            emitLabel(foundLabel);
+            emit2("mov", result, "1");
+            emitLabel(endLabel);
+
+            if (isReg(val) && !isParmReg(val))
+                freeReg(val);
+            pushValue(result);
+            return;
+        }
+
         if (node.operator_ == BinaryOpNode::PLUS && (isStrLike(lt) || isStrLike(rt))) {
             usedModules.insert("string");
             std::string left = eval(node.left.get());
@@ -1242,6 +1272,37 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(VariableNode &node) {
+        // 'result' inside a function refers to the return value
+        if (lc(node.name) == "result" && !currentFunctionName.empty()) {
+            if (!currentFunctionReturnSlot.empty()) {
+                pushValue(currentFunctionReturnSlot);
+            } else {
+                VarType rt = getVarType(currentFunctionName);
+                int slot = newSlotFor("__funcret_" + currentFunctionName);
+                if (rt == VarType::DOUBLE)
+                    setSlotType(slot, VarType::DOUBLE);
+                else if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD)
+                    setSlotType(slot, VarType::PTR);
+                else
+                    setSlotType(slot, VarType::INT);
+                currentFunctionReturnSlot = slotVar(slot);
+                pushValue(currentFunctionReturnSlot);
+            }
+            return;
+        }
+
+        // Check with-scopes: if this name is a field in an active 'with' block,
+        // treat it as recordVar.fieldName
+        for (auto it = withFieldScopes.rbegin(); it != withFieldScopes.rend(); ++it) {
+            auto fit = it->find(lc(node.name));
+            if (fit != it->end()) {
+                auto recExpr = std::make_unique<VariableNode>(fit->second);
+                FieldAccessNode syntheticField(std::move(recExpr), node.name);
+                visit(syntheticField);
+                return;
+            }
+        }
+
         if (auto pit = currentParamLocations.find(node.name); pit != currentParamLocations.end()) {
             pushValue(pit->second);
             return;
@@ -1577,6 +1638,22 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(AssignmentNode &node) {
+        // Intercept 'with' scope: if the LHS is a variable matching a record field, rewrite
+        if (auto *varLHS = dynamic_cast<VariableNode *>(node.variable.get())) {
+            for (auto it = withFieldScopes.rbegin(); it != withFieldScopes.rend(); ++it) {
+                auto fit = it->find(lc(varLHS->name));
+                if (fit != it->end()) {
+                    auto recExpr = std::make_unique<VariableNode>(fit->second);
+                    auto fieldAccess = std::make_unique<FieldAccessNode>(std::move(recExpr), varLHS->name);
+                    AssignmentNode syntheticAssign(std::move(fieldAccess), std::move(node.expression));
+                    visit(syntheticAssign);
+                    // Move expression back so the original node is not left in a moved-from state
+                    node.expression = std::move(syntheticAssign.expression);
+                    return;
+                }
+            }
+        }
+
         if (auto deref = dynamic_cast<PointerDerefNode *>(node.variable.get())) {
             std::string rhs = eval(node.expression.get());
             std::string ptrVal = eval(deref->pointer.get());
@@ -1805,7 +1882,7 @@ namespace pascal {
             return;
         }
 
-        if (!currentFunctionName.empty() && varName == currentFunctionName) {
+        if (!currentFunctionName.empty() && (varName == currentFunctionName || varName == "result")) {
             VarType rt = getVarType(currentFunctionName);
             if (rt == VarType::STRING || rt == VarType::PTR || rt == VarType::RECORD) {
                 if (currentFunctionReturnSlot.empty()) {
@@ -2085,6 +2162,83 @@ namespace pascal {
             }
         }
 
+        // Handle variant part (if present)
+        if (!node.recordType->variantTagName.empty()) {
+            // Add the tag field as a regular integer field
+            RecordField tagField;
+            tagField.name = lc(node.recordType->variantTagName);
+            tagField.typeName = resolveTypeName(node.recordType->variantTagType);
+            tagField.offset = offset;
+            tagField.size = getTypeSizeByName(tagField.typeName);
+            tagField.isArray = false;
+            info.nameToIndex[tagField.name] = (int)info.fields.size();
+            info.fields.push_back(tagField);
+            offset += tagField.size;
+
+            // All variant arms share the same starting offset (union semantics)
+            int variantStart = offset;
+            int maxArmSize = 0;
+
+            for (auto &arm : node.recordType->variantArms) {
+                int armOffset = variantStart;
+                int armSize = 0;
+
+                for (auto &f : arm.fields) {
+                    auto &fieldDecl = static_cast<VarDeclNode &>(*f);
+                    bool fieldIsArray = false;
+                    ArrayInfo arrInfo{};
+                    std::string fieldTypeName = "unknown";
+
+                    if (std::holds_alternative<std::unique_ptr<ASTNode>>(fieldDecl.type)) {
+                        auto &typeNode = std::get<std::unique_ptr<ASTNode>>(fieldDecl.type);
+                        if (auto *at = dynamic_cast<ArrayTypeNode *>(typeNode.get())) {
+                            fieldIsArray = true;
+                            arrInfo = buildArrayInfoFromNode(at);
+                            fieldTypeName = "array";
+                        } else if (dynamic_cast<RecordTypeNode *>(typeNode.get())) {
+                            fieldTypeName = "record";
+                        } else if (auto *pt = dynamic_cast<PointerTypeNode *>(typeNode.get())) {
+                            fieldTypeName = "^" + lc(pt->baseTypeName);
+                        } else if (auto *st = dynamic_cast<SimpleTypeNode *>(typeNode.get())) {
+                            fieldTypeName = resolveTypeName(st->typeName);
+                        }
+                    } else {
+                        fieldTypeName = resolveTypeName(std::get<std::string>(fieldDecl.type));
+                    }
+
+                    for (const auto &rawName : fieldDecl.identifiers) {
+                        RecordField rf;
+                        rf.name = lc(rawName);
+                        rf.offset = armOffset;
+                        rf.isArray = fieldIsArray;
+
+                        if (fieldIsArray) {
+                            rf.arrayInfo = arrInfo;
+                            rf.typeName = "array";
+                            rf.size = rf.arrayInfo.size * rf.arrayInfo.elementSize;
+                        } else if (isRecordTypeName(fieldTypeName)) {
+                            rf.typeName = fieldTypeName;
+                            auto it = recordTypes.find(fieldTypeName);
+                            rf.size = (it != recordTypes.end()) ? it->second.size : 8;
+                        } else {
+                            rf.typeName = fieldTypeName;
+                            rf.size = getTypeSizeByName(rf.typeName);
+                        }
+
+                        info.nameToIndex[rf.name] = (int)info.fields.size();
+                        info.fields.push_back(rf);
+                        armOffset += rf.size;
+                        armSize += rf.size;
+                    }
+                }
+
+                if (armSize > maxArmSize)
+                    maxArmSize = armSize;
+            }
+
+            offset = variantStart + maxArmSize;
+        }
+
         info.size = offset;
         std::string recordName = lc(node.name);
         recordTypes[recordName] = info;
@@ -2193,6 +2347,76 @@ namespace pascal {
         } else {
             throw std::runtime_error("@ operator requires a variable operand");
         }
+    }
+
+    void CodeGenVisitor::visit(WithStmtNode &node) {
+        std::string recType = getVarRecordTypeName(node.recordVar);
+        recType = resolveTypeName(lc(recType));
+        if (recType.empty()) {
+            throw std::runtime_error("'with' variable '" + node.recordVar + "' is not a record type");
+        }
+        auto it = recordTypes.find(recType);
+        if (it == recordTypes.end()) {
+            throw std::runtime_error("Unknown record type '" + recType + "' in with statement");
+        }
+        std::unordered_map<std::string, std::string> fieldMap;
+        for (const auto &[fieldName, idx] : it->second.nameToIndex) {
+            fieldMap[fieldName] = node.recordVar;
+        }
+        withFieldScopes.push_back(std::move(fieldMap));
+        if (node.statement)
+            node.statement->accept(*this);
+        withFieldScopes.pop_back();
+    }
+
+    void CodeGenVisitor::visit(GotoStmtNode &node) {
+        std::string lbl;
+        auto it = gotoLabels.find(node.label);
+        if (it != gotoLabels.end()) {
+            lbl = it->second;
+        } else {
+            lbl = newLabel("GOTO_" + node.label);
+            gotoLabels[node.label] = lbl;
+        }
+        emit1("jmp", lbl);
+    }
+
+    void CodeGenVisitor::visit(LabelStmtNode &node) {
+        std::string lbl;
+        auto it = gotoLabels.find(node.label);
+        if (it != gotoLabels.end()) {
+            lbl = it->second;
+        } else {
+            lbl = newLabel("GOTO_" + node.label);
+            gotoLabels[node.label] = lbl;
+        }
+        emitLabel(lbl);
+        if (node.statement)
+            node.statement->accept(*this);
+    }
+
+    void CodeGenVisitor::visit(SetLiteralNode &node) {
+        // Set literals are only used as the RHS of the 'in' operator
+        // and handled directly in visit(BinaryOpNode) for IN.
+        throw std::runtime_error("Set literal cannot appear outside 'in' expression");
+    }
+
+    void CodeGenVisitor::visit(EnumTypeDeclNode &node) {
+        auto lc = [](std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+            return s;
+        };
+        std::string typeName = lc(node.typeName);
+        std::vector<std::string> valueNames;
+        for (int i = 0; i < static_cast<int>(node.values.size()); ++i) {
+            std::string valName = lc(node.values[i]);
+            enumConstants[valName] = i;
+            compileTimeConstants[valName] = std::to_string(i);
+            valueNames.push_back(valName);
+        }
+        enumTypes[typeName] = std::move(valueNames);
+        // Treat enum type as an alias for integer
+        typeAliases[typeName] = "integer";
     }
 
 } // namespace pascal

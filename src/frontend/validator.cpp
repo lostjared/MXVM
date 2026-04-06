@@ -204,6 +204,9 @@ namespace mxx {
                 return;
         }
 
+        if (withDepth > 0)
+            return;
+
         if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key) && !importedUnits.count(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
         }
@@ -215,6 +218,9 @@ namespace mxx {
             if (it->vars.count(key) || it->consts.count(key))
                 return;
         }
+
+        if (withDepth > 0)
+            return;
 
         if (!declaredFuncs.count(key) && !declaredProcs.count(key) && !isBuiltinConst(name) && !isPascalKeyword(key) && !importedUnits.count(key)) {
             failAt(at, "Use of undeclared identifier '" + name + "'");
@@ -487,8 +493,10 @@ namespace mxx {
     void TPValidator::parseBlock() {
         if (isKW("label"))
             parseLabelSection();
-        while (isKW("const") || isKW("type") || isKW("var") || isKW("procedure") || isKW("function")) {
-            if (isKW("const"))
+        while (isKW("const") || isKW("type") || isKW("var") || isKW("procedure") || isKW("function") || isKW("label")) {
+            if (isKW("label"))
+                parseLabelSection();
+            else if (isKW("const"))
                 parseConstSection();
             else if (isKW("type"))
                 parseTypeSection();
@@ -502,15 +510,14 @@ namespace mxx {
 
     void TPValidator::parseLabelSection() {
         requireKW("label");
-        do {
+        next();
+        require(types::TokenType::TT_NUM);
+        next();
+        while (match(",")) {
             next();
             require(types::TokenType::TT_NUM);
             next();
-            if (match(","))
-                next();
-            else
-                break;
-        } while (true);
+        }
         require(";");
         next();
     }
@@ -565,7 +572,7 @@ namespace mxx {
         next();
         while (match(types::TokenType::TT_ID)) {
             if (isKW("procedure") || isKW("function") || isKW("begin") ||
-                isKW("type") || isKW("const") ||
+                isKW("type") || isKW("const") || isKW("label") ||
                 isKW("implementation") || isKW("end") || isKW("interface")) {
                 break;
             }
@@ -849,8 +856,16 @@ namespace mxx {
             parseGoto();
             return;
         }
-        if (match(types::TokenType::TT_NUM))
-            failHere("Statement cannot start with number");
+        if (match(types::TokenType::TT_NUM)) {
+            // Label prefix: 100: statement
+            next();
+            if (match(":")) {
+                next();
+                parseStatement();
+                return;
+            }
+            failHere("Statement cannot start with number (expected ':' for label)");
+        }
         if (match(types::TokenType::TT_ID)) {
             parseSimpleOrCallOrAssign();
             return;
@@ -995,7 +1010,9 @@ namespace mxx {
         }
         requireKW("do");
         next();
+        ++withDepth;
         parseStatement();
+        --withDepth;
     }
 
     void TPValidator::parseGoto() {
@@ -1171,6 +1188,11 @@ namespace mxx {
                 }
                 failHere("Invalid expression");
             } else {
+                if (bracket > 0 && match(",")) {
+                    next();
+                    expectOperand = true;
+                    continue;
+                }
                 if (isRelOp() || isAddOp() || isMulOp() || isSetOp()) {
                     next();
                     expectOperand = true;
@@ -1278,7 +1300,7 @@ namespace mxx {
         "program", "unit", "interface", "implementation",
         "uses", "var", "const", "type", "procedure", "function", "begin", "end",
         "if", "then", "else", "while", "do", "for", "to", "downto", "repeat", "until",
-        "case", "of", "with", "goto", "exit", "break", "continue",
+        "case", "of", "with", "goto", "label", "exit", "break", "continue",
         "nil", "new", "dispose", "setlength", "high", "low",
         "writeln", "write", "readln", "read", "seed_random", "rand_number",
 

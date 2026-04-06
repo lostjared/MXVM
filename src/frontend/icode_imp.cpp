@@ -44,7 +44,8 @@ namespace pascal {
         "isspace", "atoi", "atof", "exit", "system", "memcpy", "memcmp",
         "memmove", "memset", "exp", "exp2", "log", "log10", "log2", "fmod",
         "atan2", "asin", "acos", "atan", "sinh", "cosh", "tanh", "hypot",
-        "round", "trunc", "float_to_int", "int_to_float", "halt"};
+        "round", "trunc", "float_to_int", "int_to_float", "halt",
+        "ord", "chr", "succ", "pred", "inc", "dec"};
 
     bool IOFunctionHandler::canHandle(const std::string &funcName) const {
         auto f = toLower(funcName);
@@ -174,6 +175,18 @@ namespace pascal {
                 throw std::runtime_error("Error on line " + std::to_string(lineNum) +
                                          ": halt requires 1 argument");
             visitor.emit("exit " + args[0]);
+        } else if (funcName == "inc") {
+            if (arguments.size() < 1 || arguments.size() > 2)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": inc requires 1 or 2 arguments");
+            std::string amount = (arguments.size() == 2) ? args[1] : "1";
+            visitor.emit2("add", args[0], amount);
+        } else if (funcName == "dec") {
+            if (arguments.size() < 1 || arguments.size() > 2)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": dec requires 1 or 2 arguments");
+            std::string amount = (arguments.size() == 2) ? args[1] : "1";
+            visitor.emit2("sub", args[0], amount);
         }
 
         for (const std::string &arg : args) {
@@ -272,6 +285,46 @@ namespace pascal {
             visitor.pushValue(floatReg);
             if (visitor.isReg(argLocation))
                 visitor.freeReg(argLocation);
+            return true;
+        } else if (funcName == "ord") {
+            if (arguments.size() != 1)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": ord requires 1 argument");
+            std::string a = visitor.eval(arguments[0].get());
+            // ord() is identity for integers/chars/enums — value is already an ordinal
+            visitor.pushValue(a);
+            return true;
+        } else if (funcName == "chr") {
+            if (arguments.size() != 1)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": chr requires 1 argument");
+            std::string a = visitor.eval(arguments[0].get());
+            // chr() is identity — just changes interpretation to char
+            visitor.pushValue(a);
+            return true;
+        } else if (funcName == "succ") {
+            if (arguments.size() != 1)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": succ requires 1 argument");
+            std::string a = visitor.eval(arguments[0].get());
+            std::string r = visitor.allocReg();
+            visitor.emit2("mov", r, a);
+            visitor.emit2("add", r, "1");
+            if (visitor.isReg(a) && !visitor.isParmReg(a))
+                visitor.freeReg(a);
+            visitor.pushValue(r);
+            return true;
+        } else if (funcName == "pred") {
+            if (arguments.size() != 1)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": pred requires 1 argument");
+            std::string a = visitor.eval(arguments[0].get());
+            std::string r = visitor.allocReg();
+            visitor.emit2("mov", r, a);
+            visitor.emit2("sub", r, "1");
+            if (visitor.isReg(a) && !visitor.isParmReg(a))
+                visitor.freeReg(a);
+            visitor.pushValue(r);
             return true;
         }
 

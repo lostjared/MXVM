@@ -1463,7 +1463,18 @@ namespace pascal {
         void visit(PointerTypeNode &node) override;
         void visit(PointerDerefNode &node) override;
         void visit(AddressOfNode &node) override;
+        void visit(WithStmtNode &node) override;
+        void visit(GotoStmtNode &node) override;
+        void visit(LabelStmtNode &node) override;
+        void visit(SetLiteralNode &node) override;
+        void visit(EnumTypeDeclNode &node) override;
         /** @} */
+
+        /// Enum value → ordinal mapping (lowercased name → integer)
+        std::unordered_map<std::string, int> enumConstants;
+        /// Enum type name → ordered list of value names
+        std::unordered_map<std::string, std::vector<std::string>> enumTypes;
+
         std::string getTypeString(const VarDeclNode &node) {
             if (std::holds_alternative<std::string>(node.type))
                 return std::get<std::string>(node.type);
@@ -2102,6 +2113,11 @@ namespace pascal {
       private:
         std::vector<std::string> loopEndLabels;
         std::vector<std::string> loopContinueLabels;
+
+        /** @brief Stack of active `with` scopes: each entry maps unqualified field name -> record variable name */
+        std::vector<std::unordered_map<std::string, std::string>> withFieldScopes;
+        /** @brief Maps user-declared goto label numbers to generated MXVM labels */
+        std::unordered_map<std::string, std::string> gotoLabels;
 
         std::string getCurrentEndLabel() const {
             if (currentFunctionName.empty())

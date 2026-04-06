@@ -802,20 +802,8 @@ The following limitations apply:
 
 | Area | Limitation |
 |------|------------|
-| **Function calls** | Functions **require parentheses** even when called with no arguments: `x := MyFunc()` -- not `x := MyFunc`. |
 | **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
-| **No enumerated types** | Only scalar types, records, arrays, and pointers. |
-| **No variant records** | Records have flat fields only -- no `case` variant parts. |
-| **No sets** | The `set` keyword is reserved but not implemented. |
-| **No `file` type** | File I/O is done via module functions (`fopen`, `fread`, etc.), not Pascal `file of`. |
-| **No `with` statement** | The keyword is reserved but code generation is not implemented. |
-| **No `goto`** | `label` and `goto` are reserved but not implemented. |
-| **No `packed`** | Reserved but has no effect. |
-| **No `in` operator** | Reserved but not implemented (no set support). |
-| **String escapes** | Strings use C-style escapes (`\n`, `\t`, `\\`, `\"`) rather than Pascal doubled-quote convention. |
-| **Return convention** | Functions return values by assigning to the function name (`Func := val`), not via a `result` variable. |
-| **`forward`** | Parsed and validated but codegen depends on declaration order. |
-| **Operator precedence** | Follows standard Pascal precedence: `not` > `* / div mod and` > `+ - or` > relational. |
+| **String escapes** | Strings support both C-style escapes (`\n`, `\t`, `\\`, `\"`) and Pascal doubled-quote convention (`''` for a literal single quote). |
 
 ---
 
