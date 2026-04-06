@@ -152,11 +152,20 @@ begin
 end.
 ```
 
-### Compiling Pascal Units
+### Compiling Pascal with `mxx`
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Legacy** | `mxx source.pas output.mxvm` | Compile a single file to a named output |
+| **Explicit I/O** | `mxx -i source.pas -o output.mxvm` | Explicit input/output flags; `-o` is optional — when omitted, the output filename is derived from the `program` or `unit` name declared inside the source file (e.g. `program Test;` → `Test.mxvm`) |
+| **Batch** | `mxx -c source1.pas source2.pas ...` | Compile multiple files; each output filename is derived from the declared `program`/`unit` name inside the file |
 
 ```bash
-mxx MathUtils.pas MathUtils.mxvm    # compile unit
-mxx TestMain.pas TestMain.mxvm      # compile program
+mxx MathUtils.pas MathUtils.mxvm    # legacy: explicit output name
+mxx TestMain.pas TestMain.mxvm      # legacy: explicit output name
+mxx -i TestMain.pas -o TestMain.mxvm  # explicit I/O flags
+mxx -i TestMain.pas                   # -o omitted: reads 'program TestMain;' -> TestMain.mxvm
+mxx -c MathUtils.pas TestMain.pas   # batch: reads declared names -> MathUtils.mxvm, TestMain.mxvm
 mxvmc TestMain.mxvm -x .            # run with object path
 ```
 

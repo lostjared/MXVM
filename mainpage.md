@@ -72,6 +72,27 @@ Optional: SDL2 + SDL2_ttf (for the SDL module), Emscripten (WebAssembly target).
 | **Compile -> Assembly** | `mxvmc program.mxvm --path /usr/local/lib --action translate` |
 | **Compile -> Executable** | `mxvmc program.mxvm --path /usr/local/lib --action compile` |
 
+### `mxx` Pascal Compiler Arguments
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Legacy** | `mxx source.pas output.mxvm` | Compile a single file to a named output |
+| **Explicit I/O** | `mxx -i source.pas -o output.mxvm` | Explicit input/output flags; `-o` is optional — when omitted, the output filename is derived from the `program` or `unit` name declared inside the source file (e.g. `program Test;` → `Test.mxvm`) |
+| **Batch** | `mxx -c source1.pas source2.pas ...` | Compile multiple files; each output filename is derived from the declared `program`/`unit` name inside the file |
+
+```bash
+# Legacy positional arguments (explicit output name)
+mxx program.pas program.mxvm
+
+# Explicit input/output flags
+mxx -i program.pas -o program.mxvm
+mxx -i program.pas        # reads 'program MyApp;' inside -> MyApp.mxvm
+
+# Batch compile: output names come from the declared program/unit names
+mxx -c unit1.pas unit2.pas main.pas
+# e.g. 'unit MathUtils;' -> MathUtils.mxvm, 'program TestMain;' -> TestMain.mxvm
+```
+
 ---
 
 # MXVM Bytecode Language Reference {#bytecode}

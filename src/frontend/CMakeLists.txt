@@ -18,6 +18,7 @@ target_include_directories(mxx
         ${CMAKE_CURRENT_SOURCE_DIR}/include/mxvm
         ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src/mxx/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vm/include
 )
 target_link_libraries(mxx PUBLIC mxvm)
 include(GNUInstallDirs)
