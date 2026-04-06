@@ -9,6 +9,8 @@ macOS (Darwin), and Windows (Win64).
 
 > **[Download PDF Reference Manual](https://lostsidedead.biz/MXVM/doc/MXVM_Reference.pdf)**
 
+> **[View Examples Online](https://lostsidedead.biz/MXVM/code/)**
+
 ---
 
 ## Architecture Overview
@@ -23,6 +25,7 @@ macOS (Darwin), and Windows (Win64).
 | **Backend** | x86-64 Codegen | Native assembly output (System V, Win64, Darwin) |
 | **Backend** | Peephole Optimizer | Post-generation assembly cleanup passes |
 | **Runtime** | Module System | Dynamically loaded C shared libraries (`io`, `std`, `string`, `sdl`) and Pascal unit linking |
+| **Tools** | mxvm-html | Converts `.mxvm` and `.pas` source files to syntax-highlighted HTML (Borland Delphi colour scheme) |
 
 @dot
 digraph pipeline {
@@ -94,6 +97,90 @@ mxx -i program.pas        # reads 'program MyApp;' inside -> MyApp.mxvm
 mxx -c unit1.pas unit2.pas main.pas
 # e.g. 'unit MathUtils;' -> MathUtils.mxvm, 'program TestMain;' -> TestMain.mxvm
 ```
+
+---
+
+# mxvm-html — Syntax Highlighter {#mxvm_html}
+
+`mxvm-html` converts `.mxvm` bytecode and `.pas` Pascal source files to
+self-contained, syntax-highlighted HTML pages using a Borland Delphi 7
+colour scheme.  The generated pages embed all CSS inline and work without a
+web server.  An optional external stylesheet can override the defaults.
+
+**Installed location:** `/usr/local/bin/mxvm-html`
+
+## Usage
+
+| Mode | Command |
+|------|---------|
+| **Single file** | `mxvm-html -i <file> [-o <output.html>] [-s <stylesheet.css>]` |
+| **Batch** | `mxvm-html -c <file1> [file2 ...]` |
+| **Help** | `mxvm-html -h` |
+
+### Options
+
+| Flag | Argument | Description |
+|------|----------|-------------|
+| `-i` | `<file>` | Input file (`.mxvm` or `.pas`) |
+| `-o` | `<file.html>` | Output HTML file.  Defaults to auto-named (see below). |
+| `-s` | `<stylesheet.css>` | External CSS href embedded in the `<link>` tag.  Defaults to `mxvm-highlight.css`. |
+| `-c` | `<file1> [file2 …]` | Batch mode — convert multiple files in one invocation. |
+| `-h` | — | Print usage and exit. |
+
+### Auto-naming
+
+When `-o` is omitted, the output name is derived from the first top-level
+declaration in the source file:
+
+| Keyword | Example | Output |
+|---------|---------|--------|
+| `program` | `program HelloWorld;` | `HelloWorld.html` |
+| `unit` | `unit MathUtils;` | `MathUtils.html` |
+| `object` | `object Stack;` | `Stack.html` |
+
+If no declaration is found the output falls back to `<input>.html`.
+
+## Examples
+
+```bash
+# Highlight a single Pascal source file
+mxvm-html -i hello.pas -o hello.html
+
+# Auto-name from 'program Hello;' declaration
+mxvm-html -i hello.pas          # -> Hello.html
+
+# Full pipeline: compile, then highlight both source and bytecode
+mxx -i program.pas -o program.mxvm
+mxvm-html -i program.pas  -o program.pas.html
+mxvm-html -i program.mxvm -o program.mxvm.html
+
+# Batch-convert a directory of Pascal files
+mxvm-html -c examples/*.pas
+
+# Use a custom stylesheet
+mxvm-html -i hello.pas -o hello.html -s ../../mxvm-highlight.css
+```
+
+## CSS Customisation
+
+Each output page contains an inline `<style>` block (Borland Delphi defaults)
+followed by a `<link>` to an external stylesheet.  Rules in the external file
+take precedence via normal CSS cascade.  The relevant span classes are:
+
+| Class | Applies to |
+|-------|-----------|
+| `.kw` | Reserved keywords / instructions |
+| `.typ` | Built-in types |
+| `.bi` | Built-in routines and constants (Pascal only) |
+| `.str` | String and character literals |
+| `.num` | Numeric literals |
+| `.com` | Comments |
+| `.lbl` | Label declarations (`.mxvm` only) |
+| `.op` | Operators / punctuation (`.mxvm` only) |
+| `.id` | All other identifiers |
+
+See [docs/mxvm-html.html](docs/mxvm-html.html) for the full reference and a
+dark-theme CSS example.
 
 ---
 
@@ -2762,6 +2849,7 @@ MXVM/
 |---- src/                    Implementation sources
 |   |---- frontend/           Pascal parser, validator, AST, codegen
 |   |   `---- include/        Frontend-specific headers
+|   |---- html_gen/           mxvm-html tool (html.cpp, CMakeLists.txt)
 |   |---- scanner/            Tokeniser / lexer
 |   |   `---- include/scanner/ Scanner headers
 |   |---- vm/                 Interpreter, argument parsing
@@ -2772,7 +2860,7 @@ MXVM/
 |   |---- std/                Math, memory, conversion, system
 |   |---- string/             String manipulation
 |   `---- sdl/                SDL2 + SDL_ttf bindings
-|---- docs/                   HTML reference pages
+|---- docs/                   HTML reference pages (index, standard, sdl, mxvm-html, examples/)
 |---- mxvm_src/               Example .mxvm programs
 |---- CMakeLists.txt          Top-level build script
 `---- Doxyfile                Doxygen configuration
