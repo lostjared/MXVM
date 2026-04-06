@@ -199,6 +199,10 @@ namespace mxx {
 
     void TPValidator::checkVar(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
+
+        if (key == "result" && inFunctionDepth > 0)
+            return;
+
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             if (it->vars.count(key))
                 return;
@@ -214,6 +218,10 @@ namespace mxx {
 
     void TPValidator::checkVarOrConst(const std::string &name, const scan::TToken *at) {
         auto key = lower(name);
+
+        if (key == "result" && inFunctionDepth > 0)
+            return;
+
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             if (it->vars.count(key) || it->consts.count(key))
                 return;
@@ -635,7 +643,11 @@ namespace mxx {
             return;
         }
 
+        if (!isProc)
+            ++inFunctionDepth;
         parseBlock();
+        if (!isProc)
+            --inFunctionDepth;
         require(";");
         next();
         popScope();
@@ -705,13 +717,52 @@ namespace mxx {
         if (isKW("record")) {
             next();
             pushRecordFieldScope(typeName);
-            while (!isKW("end")) {
+            while (!isKW("end") && !isKW("case")) {
                 parseFieldIdentList();
                 require(":");
                 next();
                 parseType("");
                 require(";");
                 next();
+            }
+            if (isKW("case")) {
+                next();
+                require(types::TokenType::TT_ID);
+                next();
+                require(":");
+                next();
+                parseType("");
+                requireKW("of");
+                next();
+                while (!isKW("end")) {
+                    parseConstExpr({":", ","}, false);
+                    while (match(",")) {
+                        next();
+                        parseConstExpr({":", ","}, false);
+                    }
+                    require(":");
+                    next();
+                    require("(");
+                    next();
+                    while (!match(")")) {
+                        require(types::TokenType::TT_ID);
+                        next();
+                        while (match(",")) {
+                            next();
+                            require(types::TokenType::TT_ID);
+                            next();
+                        }
+                        require(":");
+                        next();
+                        parseType("");
+                        if (match(";"))
+                            next();
+                    }
+                    require(")");
+                    next();
+                    if (match(";"))
+                        next();
+                }
             }
             requireKW("end");
             next();
@@ -723,6 +774,18 @@ namespace mxx {
             requireKW("of");
             next();
             parseTypeName();
+            return;
+        }
+        if (match("(")) {
+            next();
+            while (match(types::TokenType::TT_ID)) {
+                declareConst(token->getTokenValue(), token);
+                next();
+                if (match(","))
+                    next();
+            }
+            require(")");
+            next();
             return;
         }
         if (match("^")) {

@@ -1318,6 +1318,10 @@ namespace pascal {
             pushValue(ct2->second);
             return;
         }
+        if (auto ct3 = compileTimeConstants.find(lc(node.name)); ct3 != compileTimeConstants.end()) {
+            pushValue(ct3->second);
+            return;
+        }
         
 
         if (auto sit = varSlot.find(mangled); sit != varSlot.end()) {

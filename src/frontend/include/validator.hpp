@@ -55,6 +55,7 @@ namespace mxx {
         std::string source;                ///< original source text
         std::string filename;              ///< source filename for error messages
         size_t index = 0;                  ///< current token index
+        int inFunctionDepth = 0;           ///< > 0 when inside a function body
 
         /** @brief Check if a string is a Pascal reserved keyword */
         bool isPascalKeyword(const std::string &s) const;

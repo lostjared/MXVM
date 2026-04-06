@@ -525,7 +525,8 @@ The implementation section may contain:
 | `^Type` | Typed pointer (e.g. `^integer`, `^Point`) |
 | `array[lo..hi] of T` | Fixed-size array with arbitrary integer bounds |
 | `array of T` | Dynamic array (resized at runtime with `SetLength`) |
-| `record ... end` | Named record (struct) with typed fields |
+| `record ... end` | Named record (struct) with typed fields; variant parts supported (`case tag: type of`) |
+| `(id, id, ...)` | Enumerated type -- constants mapped to integers starting from 0 |
 
 ### Constants
 
@@ -550,6 +551,18 @@ type
   Point = record
     x: integer;
     y: integer;
+  end;
+
+  { Enumerated types }
+  Color     = (Red, Green, Blue, Yellow);
+  Direction = (North, East, South, West);
+
+  { Variant records }
+  Shape = record
+    x, y: integer;
+    case tag: integer of
+      0: (radius: integer);
+      1: (width, height: integer);
   end;
 ```
 
@@ -642,9 +655,32 @@ end;
 ```
 
 - **Parameters**: by value (default) or by reference (`var` keyword).
-- **Return values**: assigned by writing to the **function name** (`Factorial := ...`).
+- **Return values**: assigned by writing to the **function name** (`Factorial := ...`)
+  or by assigning to the special `result` variable (Delphi/FreePascal style).
 - **Nested** procedures and functions are supported.
 - **Recursion** is fully supported.
+
+#### Result Variable
+
+Inside any function body, the identifier `result` is an implicit alias for the
+function return value.  Both styles may be used interchangeably:
+
+```pascal
+function Max(a, b: integer): integer;
+begin
+  if a > b then
+    result := a
+  else
+    result := b;
+end;
+
+function Clamp(val, lo, hi: integer): integer;
+begin
+  result := val;
+  if result < lo then result := lo;
+  if result > hi then result := hi;
+end;
+```
 
 ### Records
 
@@ -665,6 +701,127 @@ end.
 
 Records may contain fields of any type including arrays, strings,
 pointers, and other record types.
+
+#### Variant Records
+
+Records may include a **variant part** after the fixed fields.  All variant
+arms share the same memory region (union semantics), and a tag field selects
+which arm is active:
+
+```pascal
+type
+  Shape = record
+    name: string;
+    x, y: integer;
+    case tag: integer of
+      0: (radius: integer);               { circle }
+      1: (width, height: integer);         { rectangle }
+      2: (base, side1, side2: integer);    { triangle }
+  end;
+
+var s: Shape;
+begin
+  s.tag := 1;
+  s.width := 8;
+  s.height := 6;
+  writeln('Area = ', s.width * s.height);
+end.
+```
+
+### Enumerated Types
+
+Enumerated types define an ordered set of named constants.  Each value is
+assigned a sequential integer starting from 0:
+
+```pascal
+type
+  Color = (Red, Green, Blue, Yellow);
+  Season = (Spring, Summer, Autumn, Winter);
+
+var c: integer;
+begin
+  c := Red;            { c = 0 }
+  c := Blue;           { c = 2 }
+  writeln(ord(Green));  { 1 }
+  writeln(succ(Red));   { 1 }
+  writeln(pred(Blue));  { 1 }
+  inc(c);               { c = 3 }
+  dec(c);               { c = 2 }
+end.
+```
+
+| Routine | Description |
+|---------|-------------|
+| `ord(x)` | Return the ordinal (integer) value of an enum constant |
+| `succ(x)` | Return the next value (ordinal + 1) |
+| `pred(x)` | Return the previous value (ordinal - 1) |
+| `inc(x)` / `inc(x, n)` | Increment variable by 1 or by `n` |
+| `dec(x)` / `dec(x, n)` | Decrement variable by 1 or by `n` |
+
+### With Statement
+
+The `with` statement provides shorthand access to record fields without
+repeating the record variable name:
+
+```pascal
+type
+  Point = record x, y: integer; end;
+
+var pt: Point;
+begin
+  with pt do
+  begin
+    x := 10;
+    y := 20;
+    writeln('(', x, ', ', y, ')');
+  end;
+end.
+```
+
+### Goto and Labels
+
+Labels must be declared in a `label` section and may be numeric or named.
+`goto` performs an unconditional jump to the labelled statement:
+
+```pascal
+label 100, 200;
+var i: integer;
+begin
+  i := 0;
+100:
+  i := i + 1;
+  if i > 5 then goto 200;
+  write(i, ' ');
+  goto 100;
+200:
+  writeln;
+end.
+```
+
+### In Operator (Set Membership)
+
+The `in` operator tests whether a value is a member of a set literal:
+
+```pascal
+if x in [1, 3, 5, 7, 9] then
+  writeln('odd')
+else
+  writeln('even');
+
+for n := 1 to 20 do
+  if n in [2, 3, 5, 7, 11, 13, 17, 19] then
+    writeln(n, ' is prime');
+```
+
+### Doubled-Quote Strings
+
+To include a single-quote character inside a string literal, double it
+(standard Pascal convention):
+
+```pascal
+writeln('It''s a test');      { prints: It's a test }
+writeln('She said ''hi''');   { prints: She said 'hi' }
+```
 
 ### Arrays
 
@@ -803,7 +960,11 @@ The following limitations apply:
 | Area | Limitation |
 |------|------------|
 | **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
-| **String escapes** | Strings support both C-style escapes (`\n`, `\t`, `\\`, `\"`) and Pascal doubled-quote convention (`''` for a literal single quote). |
+| **No sets** | The `set` keyword is reserved but not implemented. The `in` operator works with set literal syntax (`x in [1, 2, 3]`). |
+| **No `file` type** | File I/O is done via module functions (`fopen`, `fread`, etc.), not Pascal `file of`. |
+| **No `packed`** | Reserved but has no effect. |
+| **`forward`** | Parsed and validated but codegen depends on declaration order. |
+| **Operator precedence** | Follows standard Pascal precedence: `not` > `* / div mod and` > `+ - or` > relational. |
 
 ---
 
@@ -1142,6 +1303,97 @@ Length =  5
 Elements: 10  20  30  40  50
 After grow, Length =  8
 ```
+
+## Pascal -- Extended Features Demo
+
+Demonstrates enumerated types, variant records, the `result` variable,
+`with` statement, `goto`/`label`, `in` operator, and doubled-quote strings:
+
+```pascal
+program FeaturesDemo;
+
+type
+  Season = (Spring, Summer, Autumn, Winter);
+
+  Shape = record
+    name: string;
+    x, y: integer;
+    case tag: integer of
+      0: (radius: integer);
+      1: (width, height: integer);
+  end;
+
+var
+  s: integer;
+  shape1: Shape;
+
+label 100, 200;
+
+function SeasonName(s: integer): string;
+begin
+  case s of
+    0: result := 'Spring';
+    1: result := 'Summer';
+    2: result := 'Autumn';
+    3: result := 'Winter';
+  else
+    result := 'Unknown';
+  end;
+end;
+
+function Max(a, b: integer): integer;
+begin
+  if a > b then result := a else result := b;
+end;
+
+begin
+  { Doubled-quote strings }
+  writeln('It''s a beautiful day!');
+
+  { Enumerated types }
+  for s := Spring to Winter do
+    writeln(SeasonName(s));
+  writeln('succ(Spring) = ', succ(Spring));
+  s := East;
+  inc(s, 2);
+
+  { In operator }
+  for s := 1 to 10 do
+    if s in [2, 3, 5, 7] then
+      writeln(s, ' is prime');
+
+  { With statement }
+  with shape1 do
+  begin
+    name := 'Circle';
+    x := 10;
+    y := 20;
+    tag := 0;
+    radius := 5;
+  end;
+  writeln(shape1.name, ' r=', shape1.radius);
+
+  { Variant record: switch to rectangle }
+  shape1.tag := 1;
+  shape1.width := 8;
+  shape1.height := 6;
+
+  { Result variable }
+  writeln('Max(42, 17) = ', Max(42, 17));
+
+  { Goto / Label }
+  s := 0;
+100:
+  s := s + 1;
+  if s > 5 then goto 200;
+  write(s, ' ');
+  goto 100;
+200:
+  writeln;
+end.
+```
+
+[Full source](https://github.com/lostjared/MXVM/blob/main/src/frontend/pas/features_demo.pas)
 
 ## Pascal -- Units (Separate Compilation)
 

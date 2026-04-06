@@ -118,11 +118,18 @@ validates semantics, and emits MXVM bytecode.
 
 - **Case-insensitive** keywords and identifiers
 - **Types**: `integer`, `real`, `boolean`, `char`, `string`, typed pointers (`^Type`),
-  fixed arrays (`array[lo..hi] of T`), dynamic arrays (`array of T`), and records
+  fixed arrays (`array[lo..hi] of T`), dynamic arrays (`array of T`), records
+  (including variant records), and enumerated types
 - **Control flow**: `if/then/else`, `while/do`, `for/to/downto`, `repeat/until`,
-  `case`, `break`, `continue`, `exit`
+  `case`, `break`, `continue`, `exit`, `goto`/`label`
 - **Procedures & functions** with by-value and `var` (by-reference) parameters,
   nesting, and recursion
+- **Result variable**: functions can return values via `result := ...` (Delphi style)
+  or by assigning to the function name
+- **With statement**: shorthand access to record fields (`with rec do begin ... end`)
+- **In operator**: set membership testing (`x in [1, 2, 3]`)
+- **Enumerated types**: `type Color = (Red, Green, Blue);` with `ord`, `succ`, `pred`, `inc`, `dec`
+- **Variant records**: `case tag: type of` inside records (union semantics)
 - **Units** (separately compiled modules with `interface` / `implementation` sections)
 - **Qualified names** for cross-unit calls (`UnitName.Routine`); variables and constants
   from other units must always be qualified
@@ -130,6 +137,7 @@ validates semantics, and emits MXVM bytecode.
   dereference (`^`) and address-of (`@`)
 - **Dynamic arrays**: `SetLength`, `Length`, `High`, `Low`
 - **Pointers**: `new`, `dispose`, `@` (address-of)
+- **Doubled-quote strings**: `'It''s'` produces `It's` (standard Pascal convention)
 - **Built-in routines**: I/O (`write`, `writeln`, `readln`), math (`abs`, `sqrt`,
   `sin`, `cos`, `pow`, ...), string ops (`length`, `pos`, `copy`, `insert`, `delete`),
   memory (`malloc`, `calloc`, `free`, `memcpy`), system (`halt`, `system`, `rand`)
