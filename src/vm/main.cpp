@@ -88,7 +88,7 @@ struct Args {
 template <typename T>
 void print_help(T &type) {
     std::cout << Col("MXVM: Compiler/Interpreter ", mx::Color::BRIGHT_CYAN) << "v" << VERSION_INFO << "\n";
-    std::cout << "(C) 2025 " << Col("LostSideDead Software", mx::Color::BRIGHT_BLUE) << "\n";
+    std::cout << "(C) 2026 " << Col("LostSideDead Software", mx::Color::BRIGHT_BLUE) << "\n";
     std::cout << "https://lostsidedead.biz\n";
     type.help(std::cout);
 }
