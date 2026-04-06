@@ -15,7 +15,7 @@ add_executable(mxx
 target_include_directories(mxx
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/mxvm
+        ${CMAKE_SOURCE_DIR}/include/mxvm
         ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src/mxx/include
         ${CMAKE_CURRENT_SOURCE_DIR}/../vm/include

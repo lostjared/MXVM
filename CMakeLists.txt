@@ -124,6 +124,7 @@ if(WITH_SDL)
 endif()
 target_include_directories(mxvm PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/mxvm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scanner/include
 )
 

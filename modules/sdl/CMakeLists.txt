@@ -16,10 +16,12 @@ add_library(mxvm_sdl SHARED sdl.cpp)
 
 target_include_directories(mxvm_sdl_static PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 
 target_include_directories(mxvm_sdl PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 
 target_link_libraries(mxvm_sdl_static PRIVATE 

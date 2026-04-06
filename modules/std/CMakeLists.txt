@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 include(CheckFunctionExists)
 target_include_directories(mxvm_std
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 target_link_libraries(mxvm_std
     PRIVATE 
@@ -16,6 +17,7 @@ target_link_libraries(mxvm_std
 )
 target_include_directories(mxvm_std_static
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 target_link_libraries(mxvm_std_static
     PRIVATE 

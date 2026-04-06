@@ -12,6 +12,9 @@
 #include <sstream>
 #include <unordered_set>
 #include "argz.hpp"
+#include "version_info.hpp"
+
+
 
 std::string removeComments(const std::string &text) {
     std::ostringstream stream;
@@ -341,10 +344,11 @@ int main(int argc, char **argv) {
     } else {
         // Legacy mode: mxx <source> <output>
         if (files.size() != 2) {
+            std::cerr << argv[0] << " v" << VERSION_INFO << "\n(C) 2026 LostSideDead Software\n\n";
             std::cerr << "Usage:\n"
-                      << "  mxx <source.pas> <output.mxvm>\n"
-                      << "  mxx -i <source.pas> [-o <output.mxvm>]\n"
-                      << "  mxx -c <source1.pas> [source2.pas ...]\n";
+                      << "  " << argv[0] << " <source.pas> <output.mxvm>\n"
+                      << "  " << argv[0] << " -i <source.pas> [-o <output.mxvm>]\n"
+                      << "  " << argv[0] << " -c <source1.pas> [source2.pas ...]\n";
             return EXIT_FAILURE;
         }
         if (!compileFile(files[0], files[1]))

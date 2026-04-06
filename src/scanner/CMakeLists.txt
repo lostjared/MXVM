@@ -12,6 +12,7 @@ set(SCANNER_SRC
 add_library(scanner STATIC ${SCANNER_SRC})
 target_include_directories(scanner PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 target_include_directories(scanner PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

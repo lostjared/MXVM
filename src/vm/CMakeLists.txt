@@ -6,7 +6,7 @@ add_executable(mxvmc main.cpp)
 target_include_directories(mxvmc
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/mxvm
+        ${CMAKE_SOURCE_DIR}/include/mxvm
         ${CMAKE_CURRENT_SOURCE_DIR}/src/vm/include
 )
 target_link_libraries(mxvmc PUBLIC mxvm)

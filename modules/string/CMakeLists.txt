@@ -5,6 +5,7 @@ add_library(mxvm_string SHARED ${SOURCES})
 target_include_directories(mxvm_string
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/include/mxvm
 )
 target_link_libraries(mxvm_string
     PUBLIC
