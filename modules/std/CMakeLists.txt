@@ -28,6 +28,8 @@ set_target_properties(mxvm_std PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/std"
 )
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/std.mxvm ${CMAKE_CURRENT_BINARY_DIR}/std.mxvm COPYONLY)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/std.mxvm
     DESTINATION include/mxvm/modules/std
     RENAME std.mxvm

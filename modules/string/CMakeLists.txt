@@ -46,6 +46,8 @@ set_target_properties(mxvm_string PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/string"
 )
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/string.mxvm ${CMAKE_CURRENT_BINARY_DIR}/string.mxvm COPYONLY)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/string.mxvm
     DESTINATION include/mxvm/modules/string
     RENAME string.mxvm

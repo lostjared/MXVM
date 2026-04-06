@@ -40,6 +40,8 @@ if(NOT HAVE_FSEEK)
     message(FATAL_ERROR "Required function 'fseek' not found.")
 endif()
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm ${CMAKE_CURRENT_BINARY_DIR}/io.mxvm COPYONLY)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/io.mxvm
     DESTINATION include/mxvm/modules/io
     RENAME io.mxvm

@@ -17,9 +17,7 @@ int64_t fsize(FILE *fptr) {
 }
 
 int64_t seed_random() {
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-    unsigned int seed = (unsigned int)(ts.tv_sec ^ ts.tv_nsec ^ (uintptr_t)&ts);
+    unsigned int seed = (unsigned int)time(NULL) ^ (uintptr_t)&seed;
     srand(seed);
     return 0;
 }

@@ -42,6 +42,8 @@ set_target_properties(mxvm_sdl PROPERTIES
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/sdl"
 )
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sdl.mxvm ${CMAKE_CURRENT_BINARY_DIR}/sdl.mxvm COPYONLY)
+
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/sdl.mxvm
     DESTINATION include/mxvm/modules/sdl
     RENAME sdl.mxvm

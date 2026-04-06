@@ -1601,6 +1601,11 @@ namespace mxvm {
         std::fstream file;
         file.open(module_src, std::ios::in);
         if (!file.is_open()) {
+            // Fall back to looking in the module directory
+            module_src = module_path + "modules/" + src + "/" + src + ".mxvm";
+            file.open(module_src, std::ios::in);
+        }
+        if (!file.is_open()) {
             throw mx::Exception("Error could not find module source file: " + module_src);
         }
         std::ostringstream data;
