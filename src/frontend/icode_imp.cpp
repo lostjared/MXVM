@@ -45,7 +45,7 @@ namespace pascal {
         "memmove", "memset", "exp", "exp2", "log", "log10", "log2", "fmod",
         "atan2", "asin", "acos", "atan", "sinh", "cosh", "tanh", "hypot",
         "round", "trunc", "float_to_int", "int_to_float", "halt",
-        "ord", "chr", "succ", "pred", "inc", "dec"};
+        "ord", "chr", "succ", "pred", "inc", "dec", "include", "exclude"};
 
     bool IOFunctionHandler::canHandle(const std::string &funcName) const {
         auto f = toLower(funcName);
@@ -57,49 +57,123 @@ namespace pascal {
                                      const std::vector<std::unique_ptr<ASTNode>> &arguments) {
         auto funcName = toLower(funcName_);
         if (funcName == "writeln" || funcName == "write") {
-            for (const auto &arg : arguments) {
+            // Check if first argument is a file variable
+            bool fileOutput = false;
+            std::string fileSlot;
+            size_t startArg = 0;
+            if (!arguments.empty()) {
+                if (auto *varNode = dynamic_cast<VariableNode *>(arguments[0].get())) {
+                    std::string mangledName = visitor.findMangledName(varNode->name);
+                    if (visitor.fileVars.count(toLower(mangledName)) ||
+                        visitor.fileVars.count(toLower(varNode->name))) {
+                        fileOutput = true;
+                        fileSlot = visitor.eval(arguments[0].get());
+                        startArg = 1;
+                        visitor.usedModules.insert("io");
+                    }
+                }
+            }
+
+            for (size_t i = startArg; i < arguments.size(); ++i) {
+                const auto &arg = arguments[i];
                 std::string val = visitor.eval(arg.get());
                 VarType type = visitor.getExpressionType(arg.get());
-                if (type == VarType::STRING || type == VarType::PTR) {
-                    visitor.usedStrings.insert("fmt_str");
-                    visitor.emit2("print", "fmt_str", val);
-                } else if (type == VarType::DOUBLE) {
-                    visitor.usedStrings.insert("fmt_float");
-                    visitor.emit2("print", "fmt_float", val);
-                } else if (type == VarType::CHAR) {
-                    visitor.usedStrings.insert("fmt_chr");
-                    visitor.emit2("print", "fmt_chr", val);
+
+                if (fileOutput) {
+                    // Use fprintf for file output
+                    if (type == VarType::STRING || type == VarType::PTR) {
+                        visitor.usedStrings.insert("fmt_str");
+                        visitor.emit_invoke("fprintf", {fileSlot, "fmt_str", val});
+                    } else if (type == VarType::DOUBLE) {
+                        visitor.usedStrings.insert("fmt_float");
+                        visitor.emit_invoke("fprintf", {fileSlot, "fmt_float", val});
+                    } else if (type == VarType::CHAR) {
+                        visitor.usedStrings.insert("fmt_chr");
+                        visitor.emit_invoke("fprintf", {fileSlot, "fmt_chr", val});
+                    } else {
+                        visitor.usedStrings.insert("fmt_int");
+                        visitor.emit_invoke("fprintf", {fileSlot, "fmt_int", val});
+                    }
                 } else {
-                    visitor.usedStrings.insert("fmt_int");
-                    visitor.emit2("print", "fmt_int", val);
+                    if (type == VarType::STRING || type == VarType::PTR) {
+                        visitor.usedStrings.insert("fmt_str");
+                        visitor.emit2("print", "fmt_str", val);
+                    } else if (type == VarType::DOUBLE) {
+                        visitor.usedStrings.insert("fmt_float");
+                        visitor.emit2("print", "fmt_float", val);
+                    } else if (type == VarType::CHAR) {
+                        visitor.usedStrings.insert("fmt_chr");
+                        visitor.emit2("print", "fmt_chr", val);
+                    } else {
+                        visitor.usedStrings.insert("fmt_int");
+                        visitor.emit2("print", "fmt_int", val);
+                    }
                 }
                 if (visitor.isReg(val) && !visitor.isParmReg(val)) {
                     visitor.freeReg(val);
                 }
             }
             if (funcName == "writeln") {
-                visitor.usedStrings.insert("newline");
-                visitor.emit1("print", "newline");
+                if (fileOutput) {
+                    std::string nlLabel = visitor.internString("\n");
+                    visitor.emit_invoke("fputs", {nlLabel, fileSlot});
+                } else {
+                    visitor.usedStrings.insert("newline");
+                    visitor.emit1("print", "newline");
+                }
             }
+            if (fileOutput && visitor.isReg(fileSlot) && !visitor.isParmReg(fileSlot))
+                visitor.freeReg(fileSlot);
         } else if (funcName == "readln") {
             if (arguments.empty()) {
                 visitor.emit1("getline", "input_buffer");
                 return;
             }
 
-            for (auto &arg : arguments) {
+            // Check if first argument is a file variable
+            bool fileInput = false;
+            std::string fileSlot;
+            size_t startArg = 0;
+            if (auto *firstVar = dynamic_cast<VariableNode *>(arguments[0].get())) {
+                std::string mangledName = visitor.findMangledName(firstVar->name);
+                if (visitor.fileVars.count(toLower(mangledName)) ||
+                    visitor.fileVars.count(toLower(firstVar->name))) {
+                    fileInput = true;
+                    fileSlot = visitor.eval(arguments[0].get());
+                    startArg = 1;
+                    visitor.usedModules.insert("io");
+                }
+            }
+
+            for (size_t i = startArg; i < arguments.size(); ++i) {
+                auto &arg = arguments[i];
                 if (auto varNode = dynamic_cast<VariableNode *>(arg.get())) {
                     std::string varName = varNode->name;
                     int slot = visitor.newSlotFor(varName);
                     std::string memLoc = visitor.slotVar(slot);
 
                     auto varType = visitor.getVarType(varName);
-                    visitor.emit1("getline", "input_buffer");
 
-                    if (varType == VarType::DOUBLE) {
-                        visitor.emit2("to_float", memLoc, "input_buffer");
-                    } else if (varType == VarType::INT) {
-                        visitor.emit2("to_int", memLoc, "input_buffer");
+                    if (fileInput) {
+                        // Read line from file using mxvm_fgets
+                        visitor.emit_invoke("mxvm_fgets", {fileSlot});
+                        std::string retReg = visitor.allocReg();
+                        visitor.emit("return " + retReg);
+                        if (varType == VarType::DOUBLE) {
+                            visitor.emit2("to_float", memLoc, retReg);
+                        } else if (varType == VarType::INT) {
+                            visitor.emit2("to_int", memLoc, retReg);
+                        } else {
+                            visitor.emit2("mov", memLoc, retReg);
+                        }
+                        visitor.freeReg(retReg);
+                    } else {
+                        visitor.emit1("getline", "input_buffer");
+                        if (varType == VarType::DOUBLE) {
+                            visitor.emit2("to_float", memLoc, "input_buffer");
+                        } else if (varType == VarType::INT) {
+                            visitor.emit2("to_int", memLoc, "input_buffer");
+                        }
                     }
 
                     visitor.recordLocation(varName, {CodeGenVisitor::ValueLocation::MEMORY, memLoc});
@@ -109,6 +183,8 @@ namespace pascal {
                                              ": readln argument must be a variable");
                 }
             }
+            if (fileInput && visitor.isReg(fileSlot) && !visitor.isParmReg(fileSlot))
+                visitor.freeReg(fileSlot);
         } else if (funcName == "seed_random") {
             visitor.usedModules.insert("io");
             if (arguments.size() != 0)
@@ -187,6 +263,24 @@ namespace pascal {
                                          ": dec requires 1 or 2 arguments");
             std::string amount = (arguments.size() == 2) ? args[1] : "1";
             visitor.emit2("sub", args[0], amount);
+        } else if (funcName == "include") {
+            if (arguments.size() != 2)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": include requires 2 arguments (set, element)");
+            std::string setPtr = visitor.ensurePtrBase(args[0]);
+            std::string oneReg = visitor.allocReg();
+            visitor.emit2("mov", oneReg, "1");
+            visitor.emit4("store", oneReg, setPtr, args[1], "8");
+            visitor.freeReg(oneReg);
+        } else if (funcName == "exclude") {
+            if (arguments.size() != 2)
+                throw std::runtime_error("Error on line " + std::to_string(lineNum) +
+                                         ": exclude requires 2 arguments (set, element)");
+            std::string setPtr = visitor.ensurePtrBase(args[0]);
+            std::string zeroReg = visitor.allocReg();
+            visitor.emit2("mov", zeroReg, "0");
+            visitor.emit4("store", zeroReg, setPtr, args[1], "8");
+            visitor.freeReg(zeroReg);
         }
 
         for (const std::string &arg : args) {
@@ -887,4 +981,124 @@ namespace pascal {
         freeArgs();
         return true;
     }
+
+    static std::unordered_set<std::string> fileFunctions = {
+        "assign", "reset", "rewrite", "append", "close", "eof", "eoln"};
+
+    bool FileFunctionHandler::canHandle(const std::string &funcName) const {
+        return fileFunctions.find(toLower(funcName)) != fileFunctions.end();
+    }
+
+    void FileFunctionHandler::generate(CodeGenVisitor &visitor, const std::string &funcName_,
+                                       const std::vector<std::unique_ptr<ASTNode>> &arguments) {
+        auto funcName = toLower(funcName_);
+        visitor.usedModules.insert("io");
+
+        if (arguments.empty())
+            throw std::runtime_error(funcName + " requires at least 1 argument");
+
+        // Get the file variable name from the first argument
+        auto *fileVarNode = dynamic_cast<VariableNode *>(arguments[0].get());
+        if (!fileVarNode)
+            throw std::runtime_error(funcName + " first argument must be a file variable");
+
+        std::string fileVarName = fileVarNode->name;
+        std::string mangledFile = visitor.findMangledName(fileVarName);
+        std::string fileSlot = visitor.eval(arguments[0].get());
+
+        if (funcName == "assign") {
+            if (arguments.size() != 2)
+                throw std::runtime_error("assign requires 2 arguments (file, filename)");
+            std::string filenameVal = visitor.eval(arguments[1].get());
+            // Store filename in companion variable
+            auto fnIt = visitor.fileVarNames.find(mangledFile);
+            if (fnIt == visitor.fileVarNames.end())
+                fnIt = visitor.fileVarNames.find(fileVarName);
+            if (fnIt != visitor.fileVarNames.end()) {
+                auto slotIt = visitor.varSlot.find(fnIt->second);
+                if (slotIt != visitor.varSlot.end())
+                    visitor.emit2("mov", visitor.slotVar(slotIt->second), filenameVal);
+                else
+                    visitor.emit2("mov", fnIt->second, filenameVal);
+            }
+            if (visitor.isReg(filenameVal) && !visitor.isParmReg(filenameVal))
+                visitor.freeReg(filenameVal);
+        } else if (funcName == "reset" || funcName == "rewrite" || funcName == "append") {
+            // Open file: reset='r', rewrite='w', append='a'
+            std::string mode;
+            if (funcName == "reset") mode = "r";
+            else if (funcName == "rewrite") mode = "w";
+            else mode = "a";
+
+            // Get filename from companion variable
+            auto fnIt = visitor.fileVarNames.find(mangledFile);
+            if (fnIt == visitor.fileVarNames.end())
+                fnIt = visitor.fileVarNames.find(fileVarName);
+            std::string filenameSlot;
+            if (fnIt != visitor.fileVarNames.end()) {
+                auto slotIt = visitor.varSlot.find(fnIt->second);
+                if (slotIt != visitor.varSlot.end())
+                    filenameSlot = visitor.slotVar(slotIt->second);
+                else
+                    filenameSlot = fnIt->second;
+            } else {
+                throw std::runtime_error(funcName + ": file variable not found: " + fileVarName);
+            }
+
+            // Create mode string constant
+            std::string modeLabel = visitor.internString(mode);
+
+            visitor.emit_invoke("fopen", {filenameSlot, modeLabel});
+            std::string retReg = visitor.allocReg();
+            visitor.emit("return " + retReg);
+            // Store the file pointer back into the file variable
+            auto fSlotIt = visitor.varSlot.find(mangledFile);
+            if (fSlotIt != visitor.varSlot.end())
+                visitor.emit2("mov", visitor.slotVar(fSlotIt->second), retReg);
+            else
+                visitor.emit2("mov", mangledFile, retReg);
+            visitor.freeReg(retReg);
+        } else if (funcName == "close") {
+            visitor.emit_invoke("fclose", {fileSlot});
+        }
+
+        if (visitor.isReg(fileSlot) && !visitor.isParmReg(fileSlot))
+            visitor.freeReg(fileSlot);
+    }
+
+    bool FileFunctionHandler::generateWithResult(CodeGenVisitor &visitor, const std::string &funcName_,
+                                                  const std::vector<std::unique_ptr<ASTNode>> &arguments) {
+        auto funcName = toLower(funcName_);
+        visitor.usedModules.insert("io");
+
+        if (funcName == "eof") {
+            if (arguments.size() != 1)
+                throw std::runtime_error("eof requires 1 argument (file variable)");
+            std::string fileSlot = visitor.eval(arguments[0].get());
+            visitor.emit_invoke("feof", {fileSlot});
+            std::string dst = visitor.allocReg();
+            visitor.emit("return " + dst);
+            if (visitor.isReg(fileSlot) && !visitor.isParmReg(fileSlot))
+                visitor.freeReg(fileSlot);
+            visitor.pushValue(dst);
+            return true;
+        } else if (funcName == "eoln") {
+            // eoln not fully supported, return false as a stub
+            if (arguments.size() != 1)
+                throw std::runtime_error("eoln requires 1 argument (file variable)");
+            std::string dst = visitor.allocReg();
+            visitor.emit2("mov", dst, "0");
+            visitor.pushValue(dst);
+            return true;
+        }
+        return false;
+    }
+
+    VarType FileFunctionHandler::getReturnType(const std::string &funcName) const {
+        auto f = toLower(funcName);
+        if (f == "eof" || f == "eoln")
+            return VarType::INT;
+        return VarType::UNKNOWN;
+    }
+
 } // namespace pascal

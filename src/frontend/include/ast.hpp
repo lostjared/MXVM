@@ -712,7 +712,16 @@ namespace pascal {
         void accept(ASTVisitor &visitor) override;
         std::string toString() const override { return "SetLiteral"; }
     };
+    /** @brief AST node for a set type declaration (set of <base type>) */
+    class SetTypeNode : public ASTNode {
+      public:
+        std::string baseTypeName; ///< the ordinal base type of the set
 
+        SetTypeNode(const std::string &base) : baseTypeName(base) {}
+
+        void accept(ASTVisitor &visitor) override;
+        std::string toString() const override { return "SetType: set of " + baseTypeName; }
+    };
     /** @brief AST node for accessing a record field (record.field) */
     class FieldAccessNode : public ASTNode {
       public:
@@ -778,6 +787,7 @@ namespace pascal {
         virtual void visit(GotoStmtNode &node) = 0;
         virtual void visit(LabelStmtNode &node) = 0;
         virtual void visit(SetLiteralNode &node) = 0;
+        virtual void visit(SetTypeNode &node) = 0;
         virtual void visit(EnumTypeDeclNode &node) = 0;
     };
 } // namespace pascal

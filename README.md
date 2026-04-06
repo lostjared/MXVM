@@ -119,7 +119,7 @@ validates semantics, and emits MXVM bytecode.
 - **Case-insensitive** keywords and identifiers
 - **Types**: `integer`, `real`, `boolean`, `char`, `string`, typed pointers (`^Type`),
   fixed arrays (`array[lo..hi] of T`), dynamic arrays (`array of T`), records
-  (including variant records), and enumerated types
+  (including variant records), enumerated types, sets (`set of T`), and file types
 - **Control flow**: `if/then/else`, `while/do`, `for/to/downto`, `repeat/until`,
   `case`, `break`, `continue`, `exit`, `goto`/`label`
 - **Procedures & functions** with by-value and `var` (by-reference) parameters,
@@ -127,7 +127,11 @@ validates semantics, and emits MXVM bytecode.
 - **Result variable**: functions can return values via `result := ...` (Delphi style)
   or by assigning to the function name
 - **With statement**: shorthand access to record fields (`with rec do begin ... end`)
-- **In operator**: set membership testing (`x in [1, 2, 3]`)
+- **Sets**: `set of T` with `in`, `+` (union), `-` (difference), `*` (intersection),
+  `include`, `exclude`
+- **File I/O**: Pascal-style `file` type with `assign`, `reset`, `rewrite`, `append`,
+  `close`, `eof`, file-parameterized `writeln`/`readln`
+- **Packed**: `packed record` and `packed array` accepted (no layout effect)
 - **Enumerated types**: `type Color = (Red, Green, Blue);` with `ord`, `succ`, `pred`, `inc`, `dec`
 - **Variant records**: `case tag: type of` inside records (union semantics)
 - **Units** (separately compiled modules with `interface` / `implementation` sections)
@@ -192,7 +196,7 @@ External functions are called with `invoke` (bytecode) or normal call syntax (Pa
 
 | Module | Description | Key Functions |
 |--------|-------------|---------------|
-| **io** | File I/O, RNG | `fopen`, `fclose`, `fread`, `fwrite`, `fseek`, `fprintf`, `rand_number`, `seed_random` |
+| **io** | File I/O, RNG | `fopen`, `fclose`, `fread`, `fwrite`, `fseek`, `fprintf`, `feof`, `fgets`, `fputs`, `rand_number`, `seed_random` |
 | **std** | Math, memory, system | `abs`, `sqrt`, `sin`, `cos`, `pow`, `malloc`, `free`, `memcpy`, `atoi`, `system`, `argc`, `argv` |
 | **string** | String manipulation | `strlen`, `strcmp`, `strncpy`, `strncat`, `snprintf`, `strfind`, `substr` |
 | **sdl** | SDL2/SDL2_ttf graphics | Window, renderer, textures, events, audio, text rendering |

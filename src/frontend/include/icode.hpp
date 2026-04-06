@@ -159,6 +159,15 @@ namespace pascal {
         bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
     };
 
+    /** @brief Built-in handler for Pascal file I/O procedures (assign, reset, rewrite, append, close, eof, eoln) */
+    class FileFunctionHandler : public BuiltinFunctionHandler {
+      public:
+        bool canHandle(const std::string &funcName) const override;
+        void generate(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
+        bool generateWithResult(CodeGenVisitor &visitor, const std::string &funcName, const std::vector<std::unique_ptr<ASTNode>> &arguments) override;
+        VarType getReturnType(const std::string &funcName) const override;
+    };
+
     /**
      * @brief AST visitor that generates MXVM intermediate code
      *
@@ -190,6 +199,7 @@ namespace pascal {
         std::vector<Scope> scopeStack;
         std::unordered_map<std::string, std::string> typeAliases;
         std::map<std::string, std::pair<std::string, std::string>> constInitialValues;
+        std::map<std::string, size_t> bufferStringVars;
         std::map<std::string, std::string> currentParamLocations;
         std::vector<std::pair<ProcDeclNode *, std::vector<std::string>>> deferredProcs;
         std::vector<std::string> allTempPtrs;
@@ -874,6 +884,7 @@ namespace pascal {
         friend class StdFunctionHandler;
         friend class SDLFunctionHandler;
         friend class StringFunctionHandler;
+        friend class FileFunctionHandler;
 
         BuiltinFunctionRegistry builtinRegistry; ///< registry of built-in function handlers
 
@@ -960,6 +971,7 @@ namespace pascal {
             builtinRegistry.registerHandler(std::make_unique<StdFunctionHandler>());
             builtinRegistry.registerHandler(std::make_unique<SDLFunctionHandler>());
             builtinRegistry.registerHandler(std::make_unique<StringFunctionHandler>());
+            builtinRegistry.registerHandler(std::make_unique<FileFunctionHandler>());
         }
 
         std::string name = "App"; ///< program name emitted in the output header
@@ -1378,6 +1390,10 @@ namespace pascal {
                     auto it = slotToType.find(i);
                     if (it != slotToType.end()) {
                         std::string varName = slotVar(i);
+                        auto bufIt = bufferStringVars.find(varName);
+                        if (bufIt != bufferStringVars.end())
+                            out << "\t\tstring " << varName << ", " << bufIt->second << "\n";
+                        else {
                         auto constIt = constInitialValues.find(varName);
                         if (constIt != constInitialValues.end())
                             out << "\t\t" << constIt->second.first << " " << varName << " = " << constIt->second.second << "\n";
@@ -1392,6 +1408,7 @@ namespace pascal {
                                 out << "\t\tfloat " << varName << " = 0.0\n";
                             else
                                 out << "\t\tint " << varName << " = 0\n";
+                        }
                         }
                     } else
                         out << "\t\tint " << slotVar(i) << " = 0\n";
@@ -1467,6 +1484,7 @@ namespace pascal {
         void visit(GotoStmtNode &node) override;
         void visit(LabelStmtNode &node) override;
         void visit(SetLiteralNode &node) override;
+        void visit(SetTypeNode &node) override;
         void visit(EnumTypeDeclNode &node) override;
         /** @} */
 
@@ -1474,6 +1492,12 @@ namespace pascal {
         std::unordered_map<std::string, int> enumConstants;
         /// Enum type name → ordered list of value names
         std::unordered_map<std::string, std::vector<std::string>> enumTypes;
+        /// Set of variable names that are set types (allocated as 256-byte bitsets)
+        std::unordered_set<std::string> setVars;
+        /// Set of variable names that are file types (pointer to FILE)
+        std::unordered_set<std::string> fileVars;
+        /// Maps file variable name to companion filename variable name
+        std::unordered_map<std::string, std::string> fileVarNames;
 
         std::string getTypeString(const VarDeclNode &node) {
             if (std::holds_alternative<std::string>(node.type))
@@ -1522,6 +1546,10 @@ namespace pascal {
             if (base == "char")
                 return VarType::CHAR;
             if (base == "pointer")
+                return VarType::PTR;
+            if (base == "file" || base == "text")
+                return VarType::PTR;
+            if (base.rfind("set of ", 0) == 0)
                 return VarType::PTR;
             if (!base.empty() && base[0] == '^')
                 return VarType::PTR;

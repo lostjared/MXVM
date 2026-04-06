@@ -254,4 +254,84 @@ extern "C" void mxvm_io_seed_random(mxvm::Program *program, std::vector<mxvm::Op
     program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
     program->vars["%rax"].var_value.int_value = 0;
+
+}
+
+extern "C" void mxvm_io_feof(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("feof requires one file pointer argument.");
+    }
+    std::string &file_var = operand[0].op;
+    if (!program->isVariable(file_var)) {
+        throw mx::Exception("feof argument must be a variable (file pointer).");
+    }
+    mxvm::Variable &file_v = program->getVariable(file_var);
+    if (file_v.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("feof argument must be a pointer variable.");
+    }
+    FILE *fp = reinterpret_cast<FILE *>(file_v.var_value.ptr_value);
+    int result = feof(fp) ? 1 : 0;
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
+}
+
+extern "C" void mxvm_io_mxvm_fgets(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 1) {
+        throw mx::Exception("mxvm_fgets requires one file pointer argument.");
+    }
+    std::string &file_var = operand[0].op;
+    if (!program->isVariable(file_var)) {
+        throw mx::Exception("fgets argument must be a variable (file pointer).");
+    }
+    mxvm::Variable &file_v = program->getVariable(file_var);
+    if (file_v.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("fgets argument must be a pointer variable.");
+    }
+    FILE *fp = reinterpret_cast<FILE *>(file_v.var_value.ptr_value);
+    char buf[4096];
+    char *res = fgets(buf, sizeof(buf), fp);
+    if (res) {
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len - 1] == '\n')
+            buf[len - 1] = '\0';
+        char *str = strdup(buf);
+        program->vars["%rax"].type = mxvm::VarType::VAR_STRING;
+        program->vars["%rax"].var_value.type = mxvm::VarType::VAR_STRING;
+        program->vars["%rax"].var_value.str_value = str;
+    } else {
+        program->vars["%rax"].type = mxvm::VarType::VAR_STRING;
+        program->vars["%rax"].var_value.type = mxvm::VarType::VAR_STRING;
+        program->vars["%rax"].var_value.str_value = strdup("");
+    }
+}
+
+extern "C" void mxvm_io_fputs(mxvm::Program *program, std::vector<mxvm::Operand> &operand) {
+    if (operand.size() != 2) {
+        throw mx::Exception("fputs requires two arguments (string, file).");
+    }
+    std::string str_val;
+    if (program->isVariable(operand[0].op)) {
+        mxvm::Variable &v = program->getVariable(operand[0].op);
+        if (v.type == mxvm::VarType::VAR_STRING) {
+            str_val = v.var_value.str_value;
+        } else {
+            throw mx::Exception("fputs first argument must be a string variable.");
+        }
+    } else {
+        throw mx::Exception("fputs first argument must be a variable.");
+    }
+    std::string &file_var = operand[1].op;
+    if (!program->isVariable(file_var)) {
+        throw mx::Exception("fputs second argument must be a variable (file pointer).");
+    }
+    mxvm::Variable &file_v = program->getVariable(file_var);
+    if (file_v.type != mxvm::VarType::VAR_POINTER) {
+        throw mx::Exception("fputs second argument must be a pointer variable.");
+    }
+    FILE *fp = reinterpret_cast<FILE *>(file_v.var_value.ptr_value);
+    int result = fputs(str_val.c_str(), fp);
+    program->vars["%rax"].type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.type = mxvm::VarType::VAR_INTEGER;
+    program->vars["%rax"].var_value.int_value = result;
 }

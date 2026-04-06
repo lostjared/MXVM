@@ -455,6 +455,10 @@ namespace pascal {
         visitor.visit(*this);
     }
 
+    void SetTypeNode::accept(ASTVisitor &visitor) {
+        visitor.visit(*this);
+    }
+
     void EnumTypeDeclNode::accept(ASTVisitor &visitor) {
         visitor.visit(*this);
     }

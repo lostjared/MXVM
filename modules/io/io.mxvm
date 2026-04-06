@@ -6,6 +6,9 @@ module io {
     extern fread
     extern fwrite
     extern fseek
+    extern feof
+    extern mxvm_fgets
+    extern fputs
     extern rand_number
     extern seed_random
 }

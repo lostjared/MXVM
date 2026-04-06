@@ -527,6 +527,8 @@ The implementation section may contain:
 | `array of T` | Dynamic array (resized at runtime with `SetLength`) |
 | `record ... end` | Named record (struct) with typed fields; variant parts supported (`case tag: type of`) |
 | `(id, id, ...)` | Enumerated type -- constants mapped to integers starting from 0 |
+| `set of T` | Set of ordinal values (0..255); supports `in`, `+`, `-`, `*`, `include`, `exclude` |
+| `file` / `file of T` | File handle for Pascal-style file I/O (`assign`, `reset`, `rewrite`, `append`, `close`, `eof`) |
 
 ### Constants
 
@@ -800,7 +802,8 @@ end.
 
 ### In Operator (Set Membership)
 
-The `in` operator tests whether a value is a member of a set literal:
+The `in` operator tests whether a value is a member of a set literal or
+a set variable:
 
 ```pascal
 if x in [1, 3, 5, 7, 9] then
@@ -808,10 +811,87 @@ if x in [1, 3, 5, 7, 9] then
 else
   writeln('even');
 
+var s: set of integer;
+s := [2, 3, 5, 7, 11, 13, 17, 19];
 for n := 1 to 20 do
-  if n in [2, 3, 5, 7, 11, 13, 17, 19] then
+  if n in s then
     writeln(n, ' is prime');
 ```
+
+### Sets
+
+Set variables hold collections of ordinal values in the range 0..255.
+Declare with `set of <type>`:
+
+```pascal
+type
+  Digits = set of integer;
+
+var
+  s, t, u: set of integer;
+begin
+  s := [1, 3, 5, 7, 9];
+  t := [2, 4, 6, 8, 10];
+
+  { Set operations }
+  u := s + t;          { union }
+  u := s * [1, 2, 3];  { intersection }
+  u := s - [1, 3];     { difference }
+
+  { Membership test }
+  if 3 in s then writeln('yes');
+
+  { Add / remove elements }
+  include(s, 4);       { add 4 to s }
+  exclude(s, 3);       { remove 3 from s }
+end.
+```
+
+| Operation | Syntax | Description |
+|-----------|--------|-------------|
+| Union | `s + t` | Elements in either set |
+| Intersection | `s * t` | Elements in both sets |
+| Difference | `s - t` | Elements in `s` but not `t` |
+| Membership | `x in s` | Test if `x` is in set `s` |
+| Include | `include(s, x)` | Add element `x` to set `s` |
+| Exclude | `exclude(s, x)` | Remove element `x` from set `s` |
+
+### File I/O
+
+Pascal-style file I/O is supported using the `file` type with standard
+procedures:
+
+```pascal
+var
+  f: file;
+  line: string;
+begin
+  assign(f, 'output.txt');
+  rewrite(f);
+  writeln(f, 'Hello, file!');
+  close(f);
+
+  assign(f, 'output.txt');
+  reset(f);
+  while not eof(f) do
+  begin
+    readln(f, line);
+    writeln(line);
+  end;
+  close(f);
+end.
+```
+
+| Procedure | Description |
+|-----------|-------------|
+| `assign(f, name)` | Associate file variable with a filename |
+| `reset(f)` | Open file for reading |
+| `rewrite(f)` | Create/truncate file for writing |
+| `append(f)` | Open file for appending |
+| `close(f)` | Close the file |
+| `eof(f)` | Returns `true` at end of file |
+| `writeln(f, ...)` | Write to the file (instead of stdout) |
+| `readln(f, var)` | Read a line from the file |
 
 ### Doubled-Quote Strings
 
@@ -960,9 +1040,7 @@ The following limitations apply:
 | Area | Limitation |
 |------|------------|
 | **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
-| **No sets** | The `set` keyword is reserved but not implemented. The `in` operator works with set literal syntax (`x in [1, 2, 3]`). |
-| **No `file` type** | File I/O is done via module functions (`fopen`, `fread`, etc.), not Pascal `file of`. |
-| **No `packed`** | Reserved but has no effect. |
+| **`packed`** | Accepted and parsed but has no effect on memory layout. |
 | **`forward`** | Parsed and validated but codegen depends on declaration order. |
 | **Operator precedence** | Follows standard Pascal precedence: `not` > `* / div mod and` > `+ - or` > relational. |
 
@@ -987,6 +1065,9 @@ File I/O, random numbers.
 | `fseek` | 3 | INTEGER | Seek within file (fh, offset, whence). |
 | `fsize` | 1 | INTEGER | Get file size in bytes. |
 | `fprintf` | >= 2 | -- | Formatted write to file (fh, fmt, ...). |
+| `feof` | 1 | INTEGER | Test end-of-file on a file handle. Returns 1 at EOF, 0 otherwise. |
+| `fgets` | 1 | STRING | Read one line from file (strips trailing newline). |
+| `fputs` | 2 | -- | Write a string to a file (str, fh). |
 | `rand_number` | 1 | INTEGER | Random integer in [0, max). |
 | `seed_random` | 0 | INTEGER | Seed RNG with current time. |
 
@@ -1394,6 +1475,166 @@ end.
 ```
 
 [Full source](https://github.com/lostjared/MXVM/blob/main/src/frontend/pas/features_demo.pas)
+
+## Pascal -- Set Operations {#example_sets}
+
+Demonstrates set literals, membership testing, union/intersection/difference,
+and the `include`/`exclude` procedures:
+
+```pascal
+program SetDemo;
+
+uses io;
+
+var
+  primes, evens, both: set of integer;
+  i: integer;
+
+begin
+  primes := [2, 3, 5, 7, 11, 13, 17, 19];
+  evens  := [2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
+
+  { Membership test }
+  for i := 1 to 20 do
+    if i in primes then
+      write(i, ' ');
+  writeln;
+
+  { Intersection: even primes }
+  both := primes * evens;
+  for i := 1 to 20 do
+    if i in both then
+      write(i, ' ');
+  writeln;
+
+  { Union }
+  both := primes + evens;
+  write('Union count: ');
+  i := 0;
+  for i := 1 to 20 do
+    if i in both then
+      write(i, ' ');
+  writeln;
+
+  { Difference: odd primes }
+  both := primes - evens;
+  for i := 1 to 20 do
+    if i in both then
+      write(i, ' ');
+  writeln;
+
+  { Include / Exclude }
+  include(primes, 23);
+  exclude(primes, 2);
+  if 23 in primes then writeln('23 is now prime');
+  if not (2 in primes) then writeln('2 removed');
+end.
+```
+
+Output:
+```
+2 3 5 7 11 13 17 19
+2
+Union count: 2 3 4 5 6 7 8 10 11 12 13 14 16 17 18 19 20
+3 5 7 11 13 17 19
+23 is now prime
+2 removed
+```
+
+## Pascal -- File I/O {#example_fileio}
+
+Demonstrates text file creation, writing, reading line-by-line, and appending:
+
+```pascal
+program FileDemo;
+
+uses io;
+
+var
+  f: file;
+  line: string;
+  count: integer;
+
+begin
+  { Write a file }
+  assign(f, 'greeting.txt');
+  rewrite(f);
+  writeln(f, 'Hello from MXVM!');
+  writeln(f, 'Line two');
+  writeln(f, 'Line three');
+  close(f);
+
+  { Read it back }
+  assign(f, 'greeting.txt');
+  reset(f);
+  count := 0;
+  while not eof(f) do
+  begin
+    readln(f, line);
+    count := count + 1;
+    writeln('[', count, '] ', line);
+  end;
+  close(f);
+
+  { Append another line }
+  assign(f, 'greeting.txt');
+  append(f);
+  writeln(f, 'Appended line');
+  close(f);
+
+  writeln('Done -- wrote ', count, ' lines, then appended one more.');
+end.
+```
+
+Output:
+```
+[1] Hello from MXVM!
+[2] Line two
+[3] Line three
+Done -- wrote 3 lines, then appended one more.
+```
+
+## Pascal -- Packed Types {#example_packed}
+
+The `packed` keyword is accepted on `array` and `record` declarations for
+source compatibility with standard Pascal. It has no effect on the internal
+memory layout:
+
+```pascal
+program PackedDemo;
+
+uses io;
+
+type
+  PackedPoint = packed record
+    x, y: integer;
+  end;
+
+var
+  points: packed array[1..5] of integer;
+  p: PackedPoint;
+  i: integer;
+
+begin
+  for i := 1 to 5 do
+    points[i] := i * 10;
+
+  write('Packed array:');
+  for i := 1 to 5 do
+    write(' ', points[i]);
+  writeln;
+
+  p.x := 42;
+  p.y := 99;
+  writeln('Packed record: x=', p.x, ' y=', p.y);
+end.
+```
+
+Output:
+```
+Packed array: 10 20 30 40 50
+Packed record: x=42 y=99
+```
 
 ## Pascal -- Units (Separate Compilation)
 

@@ -272,7 +272,8 @@ namespace pascal {
                lower == "array" || lower == "type" || lower == "record" || lower == "exit" || lower == "break" || lower == "continue" ||
                lower == "nil" || lower == "new" || lower == "dispose" || lower == "pointer" || lower == "uses" ||
                lower == "unit" || lower == "interface" || lower == "implementation" ||
-               lower == "with" || lower == "goto" || lower == "label";
+               lower == "with" || lower == "goto" || lower == "label" ||
+               lower == "packed" || lower == "set" || lower == "file";
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseProcedureDeclaration() {
@@ -617,21 +618,9 @@ namespace pascal {
         if (isRelationalOperator()) {
             if (peekIs("in")) {
                 next();
-                expectToken("[");
-                next();
-                std::vector<std::unique_ptr<ASTNode>> elements;
-                if (!peekIs("]")) {
-                    elements.push_back(parseExpression());
-                    while (peekIs(",")) {
-                        next();
-                        elements.push_back(parseExpression());
-                    }
-                }
-                expectToken("]");
-                next();
-                auto setNode = std::make_unique<SetLiteralNode>(std::move(elements));
-                setNode->setLineNumber(lineNum);
-                left = std::make_unique<BinaryOpNode>(std::move(left), BinaryOpNode::IN, std::move(setNode));
+                // Allow both set literal [1,2,3] and set variable
+                auto right = parseSimpleExpression();
+                left = std::make_unique<BinaryOpNode>(std::move(left), BinaryOpNode::IN, std::move(right));
                 left->setLineNumber(lineNum);
             } else {
                 std::string op = getRelationalOp();
@@ -755,6 +744,22 @@ namespace pascal {
             auto addrNode = std::make_unique<AddressOfNode>(std::move(operand));
             addrNode->setLineNumber(lineNum);
             return addrNode;
+        } else if (peekIs("[")) {
+            // Set constructor: [elem1, elem2, ...]
+            next(); // consume '['
+            std::vector<std::unique_ptr<ASTNode>> elements;
+            if (!peekIs("]")) {
+                elements.push_back(parseExpression());
+                while (peekIs(",")) {
+                    next();
+                    elements.push_back(parseExpression());
+                }
+            }
+            expectToken("]");
+            next();
+            auto setNode = std::make_unique<SetLiteralNode>(std::move(elements));
+            setNode->setLineNumber(lineNum);
+            return setNode;
         } else if (peekIs("(")) {
             next();
             auto expr = parseExpression();
@@ -992,6 +997,11 @@ namespace pascal {
 
             std::unique_ptr<ASTNode> typeDefinition;
 
+            bool isPacked = false;
+            if (peekIs("packed")) {
+                isPacked = true;
+                next(); // consume 'packed' modifier (accepted but has no effect)
+            }
             if (peekIs("record")) {
                 auto recordType = parseRecordType();
                 typeDefinition = std::make_unique<RecordDeclarationNode>(
@@ -1018,6 +1028,22 @@ namespace pascal {
                 typeDefinition = std::make_unique<ArrayTypeDeclarationNode>(
                     typeName,
                     std::unique_ptr<ArrayTypeNode>(static_cast<ArrayTypeNode *>(arrayType.release())));
+            } else if (peekIs("set")) {
+                next(); // consume 'set'
+                expectToken("of");
+                next();
+                expectToken(types::TokenType::TT_ID);
+                std::string baseType = token->getTokenValue();
+                next();
+                typeDefinition = std::make_unique<TypeAliasNode>(typeName, "set of " + baseType);
+            } else if (peekIs("file")) {
+                next(); // consume 'file'
+                if (peekIs("of")) {
+                    next(); // consume 'of'
+                    expectToken(types::TokenType::TT_ID);
+                    next(); // consume element type (ignored — all files are byte-stream)
+                }
+                typeDefinition = std::make_unique<TypeAliasNode>(typeName, "file");
             } else if (peekIs("^")) {
                 next();
                 expectToken(types::TokenType::TT_ID);
@@ -1165,6 +1191,26 @@ namespace pascal {
     }
 
     std::unique_ptr<ASTNode> PascalParser::parseTypeSpec() {
+        if (peekIs("packed"))
+            next(); // consume 'packed' modifier (accepted but has no effect)
+        if (peekIs("set")) {
+            next(); // consume 'set'
+            expectToken("of");
+            next();
+            expectToken(types::TokenType::TT_ID);
+            std::string baseType = token->getTokenValue();
+            next();
+            return std::make_unique<SetTypeNode>(baseType);
+        }
+        if (peekIs("file")) {
+            next(); // consume 'file'
+            if (peekIs("of")) {
+                next(); // consume 'of' (element type accepted but treated as untyped)
+                expectToken(types::TokenType::TT_ID);
+                next(); // consume element type (ignored — all files are byte-stream)
+            }
+            return std::make_unique<SimpleTypeNode>("file");
+        }
         if (peekIs("array"))
             return parseArrayType();
         if (peekIs("record"))

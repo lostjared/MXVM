@@ -691,6 +691,9 @@ namespace mxx {
     }
 
     void TPValidator::parseType(const std::string &typeName) {
+        if (isKW("packed")) {
+            next(); // consume 'packed' modifier (accepted but has no effect)
+        }
         if (isKW("array")) {
             next();
             // Dynamic array: array of <type> (no bounds)
@@ -774,6 +777,14 @@ namespace mxx {
             requireKW("of");
             next();
             parseTypeName();
+            return;
+        }
+        if (isKW("file")) {
+            next();
+            if (isKW("of")) {
+                next();
+                parseTypeName();
+            }
             return;
         }
         if (match("(")) {
@@ -1370,7 +1381,10 @@ namespace mxx {
         "div", "mod", "and", "or", "not", "in",
         "integer", "real", "boolean", "char", "byte", "word", "longint", "shortint",
         "smallint", "cardinal", "string", "text", "double", "single", "extended",
-        "comp", "currency", "ptr", "pointer", "array", "record", "set"};
+        "comp", "currency", "ptr", "pointer", "array", "record", "set",
+        "packed", "file", "text",
+        "assign", "reset", "rewrite", "append", "close", "eof", "eoln",
+        "include", "exclude"};
 
     bool TPValidator::isPascalKeyword(const std::string &s) const {
         return pascal_keywords.count(lower(s));

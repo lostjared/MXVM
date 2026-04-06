@@ -176,6 +176,39 @@ namespace pascal {
                     continue;
                 }
 
+                if (dynamic_cast<SetTypeNode *>(typeNode.get())) {
+                    setVarType(varName, VarType::PTR);
+                    int slot = newSlotFor(mangledName);
+                    setSlotType(slot, VarType::PTR);
+                    varSlot[varName] = slot;
+                    varSlot[mangledName] = slot;
+                    setVars.insert(mangledName);
+                    setVars.insert(varName);
+                    updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                    // Allocate 256 bytes (one byte per ordinal 0..255)
+                    emit3("alloc", slotVar(slot), "8", "256");
+                    // Zero-fill the set
+                    std::string loopIdx = allocReg();
+                    std::string loopStart = newLabel("SET_INIT");
+                    std::string loopEnd = newLabel("SET_INIT_END");
+                    emit2("mov", loopIdx, "0");
+                    emitLabel(loopStart);
+                    emit2("cmp", loopIdx, "256");
+                    emit1("jge", loopEnd);
+                    emit4("store", "0", slotVar(slot), loopIdx, "8");
+                    emit2("add", loopIdx, "1");
+                    emit1("jmp", loopStart);
+                    emitLabel(loopEnd);
+                    freeReg(loopIdx);
+
+                    std::string currentScope = getCurrentScopeName();
+                    if (currentScope.empty())
+                        globalArrays.push_back(slotVar(slot));
+                    else
+                        functionScopedArrays[currentScope].push_back(slotVar(slot));
+                    continue;
+                }
+
                 if (auto *simpleTypeNode = dynamic_cast<SimpleTypeNode *>(typeNode.get())) {
                     typeName = simpleTypeNode->typeName;
                 } else if (dynamic_cast<RecordTypeNode *>(typeNode.get())) {
@@ -190,6 +223,53 @@ namespace pascal {
             varSlot[mangledName] = slot;
 
             std::string normalizedTypeName = resolveTypeName(lc(typeName));
+
+            // Handle set type aliases (e.g., type MySet = set of integer; var s: MySet;)
+            if (normalizedTypeName.rfind("set of ", 0) == 0) {
+                setVarType(varName, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
+                setVars.insert(mangledName);
+                setVars.insert(varName);
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                emit3("alloc", slotVar(slot), "8", "256");
+                // Zero-fill the set
+                std::string loopIdx = allocReg();
+                std::string loopStart = newLabel("SET_INIT");
+                std::string loopEnd = newLabel("SET_INIT_END");
+                emit2("mov", loopIdx, "0");
+                emitLabel(loopStart);
+                emit2("cmp", loopIdx, "256");
+                emit1("jge", loopEnd);
+                emit4("store", "0", slotVar(slot), loopIdx, "8");
+                emit2("add", loopIdx, "1");
+                emit1("jmp", loopStart);
+                emitLabel(loopEnd);
+                freeReg(loopIdx);
+                std::string currentScope = getCurrentScopeName();
+                if (currentScope.empty())
+                    globalArrays.push_back(slotVar(slot));
+                else
+                    functionScopedArrays[currentScope].push_back(slotVar(slot));
+                continue;
+            }
+
+            // Handle file/text type variables
+            if (normalizedTypeName == "file" || normalizedTypeName == "text") {
+                setVarType(varName, VarType::PTR);
+                setSlotType(slot, VarType::PTR);
+                fileVars.insert(mangledName);
+                fileVars.insert(varName);
+                updateDataSectionInitialValue(slotVar(slot), "ptr", "null");
+                // Create companion filename variable
+                std::string fileNameVar = mangledName + "_filename";
+                int fnSlot = newSlotFor(fileNameVar);
+                setSlotType(fnSlot, VarType::PTR);
+                setVarType(fileNameVar, VarType::PTR);
+                varSlot[fileNameVar] = fnSlot;
+                fileVarNames[mangledName] = fileNameVar;
+                fileVarNames[varName] = fileNameVar;
+                continue;
+            }
 
             auto recordTypeIt = recordTypes.find(normalizedTypeName);
             if (recordTypeIt != recordTypes.end()) {
@@ -1059,33 +1139,136 @@ namespace pascal {
         VarType lt = getExpressionType(node.left.get());
         VarType rt = getExpressionType(node.right.get());
 
-        // Handle 'in' operator: expr in [val1, val2, ...]
+        // Handle 'in' operator: expr in [val1, val2, ...] or expr in setVar
         if (node.operator_ == BinaryOpNode::IN) {
             auto *setNode = dynamic_cast<SetLiteralNode *>(node.right.get());
-            if (!setNode)
-                throw std::runtime_error("'in' operator requires a set literal on the right side");
+            if (setNode) {
+                // Inline set literal: compare against each element
+                std::string val = eval(node.left.get());
+                std::string foundLabel = newLabel("IN_FOUND");
+                std::string endLabel = newLabel("IN_END");
+                std::string result = allocReg();
 
-            std::string val = eval(node.left.get());
-            std::string foundLabel = newLabel("IN_FOUND");
-            std::string endLabel = newLabel("IN_END");
-            std::string result = allocReg();
+                for (auto &elem : setNode->elements) {
+                    std::string elemVal = eval(elem.get());
+                    emit2("cmp", val, elemVal);
+                    emit1("je", foundLabel);
+                    if (isReg(elemVal) && !isParmReg(elemVal))
+                        freeReg(elemVal);
+                }
+                emit2("mov", result, "0");
+                emit1("jmp", endLabel);
+                emitLabel(foundLabel);
+                emit2("mov", result, "1");
+                emitLabel(endLabel);
 
-            for (auto &elem : setNode->elements) {
-                std::string elemVal = eval(elem.get());
-                emit2("cmp", val, elemVal);
-                emit1("je", foundLabel);
-                if (isReg(elemVal) && !isParmReg(elemVal))
-                    freeReg(elemVal);
+                if (isReg(val) && !isParmReg(val))
+                    freeReg(val);
+                pushValue(result);
+                return;
             }
-            emit2("mov", result, "0");
-            emit1("jmp", endLabel);
-            emitLabel(foundLabel);
+            // Set variable: load byte at index
+            std::string val = eval(node.left.get());
+            std::string setVal = eval(node.right.get());
+            std::string byte = allocReg();
+            std::string result = allocReg();
+            emit4("load", byte, setVal, val, "8");
+            emit2("cmp", byte, "0");
+            std::string notFoundLabel = newLabel("IN_NOT_FOUND");
+            std::string endLabel = newLabel("IN_END");
+            emit1("je", notFoundLabel);
             emit2("mov", result, "1");
+            emit1("jmp", endLabel);
+            emitLabel(notFoundLabel);
+            emit2("mov", result, "0");
             emitLabel(endLabel);
-
+            freeReg(byte);
             if (isReg(val) && !isParmReg(val))
                 freeReg(val);
+            if (isReg(setVal) && !isParmReg(setVal))
+                freeReg(setVal);
             pushValue(result);
+            return;
+        }
+
+        // Set operations: + (union), - (difference), * (intersection)
+        auto isSetExpr = [&](ASTNode *n) -> bool {
+            if (dynamic_cast<SetLiteralNode *>(n))
+                return true;
+            if (auto *v = dynamic_cast<VariableNode *>(n)) {
+                std::string mangled = findMangledName(v->name);
+                return setVars.count(mangled) || setVars.count(v->name);
+            }
+            return false;
+        };
+        if ((node.operator_ == BinaryOpNode::PLUS ||
+             node.operator_ == BinaryOpNode::MINUS ||
+             node.operator_ == BinaryOpNode::MULTIPLY) &&
+            (isSetExpr(node.left.get()) || isSetExpr(node.right.get()))) {
+
+            std::string leftSet = eval(node.left.get());
+            std::string rightSet = eval(node.right.get());
+
+            // Allocate result set
+            std::string resultSet = allocTempPtr();
+            emit3("alloc", resultSet, "8", "256");
+
+            std::string idx = allocReg();
+            std::string lb = allocReg();
+            std::string rb = allocReg();
+            std::string loopStart = newLabel("SET_OP");
+            std::string loopEnd = newLabel("SET_OP_END");
+            std::string storeBit = newLabel("SET_OP_STORE");
+            std::string storeZero = newLabel("SET_OP_ZERO");
+
+            emit2("mov", idx, "0");
+            emitLabel(loopStart);
+            emit2("cmp", idx, "256");
+            emit1("jge", loopEnd);
+            emit4("load", lb, leftSet, idx, "8");
+            emit4("load", rb, rightSet, idx, "8");
+
+            if (node.operator_ == BinaryOpNode::PLUS) {
+                // Union: result = left OR right
+                emit2("cmp", lb, "0");
+                emit1("jne", storeBit);
+                emit2("cmp", rb, "0");
+                emit1("jne", storeBit);
+                emit1("jmp", storeZero);
+            } else if (node.operator_ == BinaryOpNode::MULTIPLY) {
+                // Intersection: result = left AND right
+                emit2("cmp", lb, "0");
+                emit1("je", storeZero);
+                emit2("cmp", rb, "0");
+                emit1("je", storeZero);
+                emit1("jmp", storeBit);
+            } else {
+                // Difference: result = left AND NOT right
+                emit2("cmp", lb, "0");
+                emit1("je", storeZero);
+                emit2("cmp", rb, "0");
+                emit1("jne", storeZero);
+                emit1("jmp", storeBit);
+            }
+            emitLabel(storeBit);
+            emit4("store", "1", resultSet, idx, "8");
+            std::string nextLabel = newLabel("SET_OP_NEXT");
+            emit1("jmp", nextLabel);
+            emitLabel(storeZero);
+            emit4("store", "0", resultSet, idx, "8");
+            emitLabel(nextLabel);
+            emit2("add", idx, "1");
+            emit1("jmp", loopStart);
+            emitLabel(loopEnd);
+
+            freeReg(idx);
+            freeReg(lb);
+            freeReg(rb);
+            if (isReg(leftSet) && !isParmReg(leftSet))
+                freeReg(leftSet);
+            if (isReg(rightSet) && !isParmReg(rightSet))
+                freeReg(rightSet);
+            pushValue(resultSet);
             return;
         }
 
@@ -1862,6 +2045,40 @@ namespace pascal {
             return;
 
         std::string varName = varPtr->name;
+
+        // Set assignment: copy 256 bytes from RHS set to LHS set
+        if (setVars.count(lc(varName)) || setVars.count(lc(findMangledName(varName)))) {
+            std::string rhs = eval(node.expression.get());
+            std::string mangled = findMangledName(varName);
+            std::string destBase;
+            auto sit = varSlot.find(mangled);
+            if (sit != varSlot.end())
+                destBase = slotVar(sit->second);
+            else
+                destBase = mangled;
+
+            std::string srcBase = ensurePtrBase(rhs);
+            std::string dstBase = ensurePtrBase(destBase);
+            std::string idx = allocReg();
+            std::string byteVal = allocReg();
+            emit2("mov", idx, "0");
+            std::string loopLbl = newLabel("set_copy");
+            std::string endLbl = newLabel("set_copy_end");
+            emitLabel(loopLbl);
+            emit2("cmp", idx, "256");
+            emit1("jge", endLbl);
+            emit4("load", byteVal, srcBase, idx, "8");
+            emit4("store", byteVal, dstBase, idx, "8");
+            emit2("add", idx, "1");
+            emit1("jmp", loopLbl);
+            emitLabel(endLbl);
+            freeReg(idx);
+            freeReg(byteVal);
+            if (isReg(rhs) && !isParmReg(rhs))
+                freeReg(rhs);
+            return;
+        }
+
         std::string rhs;
         VarType varType = getVarType(varName);
         if ((varType == VarType::CHAR || varType == VarType::INT)) {
@@ -2400,9 +2617,36 @@ namespace pascal {
     }
 
     void CodeGenVisitor::visit(SetLiteralNode &node) {
-        // Set literals are only used as the RHS of the 'in' operator
-        // and handled directly in visit(BinaryOpNode) for IN.
-        throw std::runtime_error("Set literal cannot appear outside 'in' expression");
+        // Build a runtime set value: allocate 256 bytes, zero-fill, then set each element
+        std::string setPtr = allocTempPtr();
+        emit3("alloc", setPtr, "8", "256");
+
+        // Zero-fill
+        std::string loopIdx = allocReg();
+        std::string loopStart = newLabel("SET_LIT_INIT");
+        std::string loopEnd = newLabel("SET_LIT_INIT_END");
+        emit2("mov", loopIdx, "0");
+        emitLabel(loopStart);
+        emit2("cmp", loopIdx, "256");
+        emit1("jge", loopEnd);
+        emit4("store", "0", setPtr, loopIdx, "8");
+        emit2("add", loopIdx, "1");
+        emit1("jmp", loopStart);
+        emitLabel(loopEnd);
+        freeReg(loopIdx);
+
+        // Set each element
+        for (auto &elem : node.elements) {
+            std::string elemVal = eval(elem.get());
+            emit4("store", "1", setPtr, elemVal, "8");
+            if (isReg(elemVal) && !isParmReg(elemVal))
+                freeReg(elemVal);
+        }
+        pushValue(setPtr);
+    }
+
+    void CodeGenVisitor::visit(SetTypeNode &node) {
+        // Set type declarations handled via type aliases; nothing to emit here
     }
 
     void CodeGenVisitor::visit(EnumTypeDeclNode &node) {

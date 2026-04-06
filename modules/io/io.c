@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 int64_t fsize(FILE *fptr) {
@@ -25,4 +26,16 @@ int64_t seed_random() {
 
 int64_t rand_number(int64_t size) {
     return rand() % size;
+}
+
+char *mxvm_fgets(FILE *fp) {
+    static char buf[4096];
+    char *res = fgets(buf, sizeof(buf), fp);
+    if (res) {
+        size_t len = strlen(buf);
+        if (len > 0 && buf[len - 1] == '\n')
+            buf[len - 1] = '\0';
+        return strdup(buf);
+    }
+    return strdup("");
 }
