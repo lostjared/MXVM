@@ -410,7 +410,7 @@ END.
 
 ```pascal
 program HelloWorld;
-uses io, std, string;
+uses io, std, strlib;
 
 const
   MAX = 100;
@@ -456,10 +456,10 @@ It must appear immediately after the `program` (or `unit`) declaration:
 
 ```pascal
 program MyApp;
-uses std, io, string, MathUtils;
+uses std, io, strlib, MathUtils;
 ```
 
-Built-in runtime modules: `std`, `io`, `string`, `sdl`.  Any other name is
+Built-in runtime modules: `std`, `io`, `strlib`, `sdl`.  Any other name is
 treated as a reference to a separately compiled Pascal **unit** (see @ref units
 below).  If no `uses` clause is present, modules are auto-detected from
 builtin function usage.
@@ -1126,7 +1126,7 @@ The following limitations apply:
 
 | Area | Limitation |
 |------|------------|
-| **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `string`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
+| **Limited module support** | The `uses` clause imports runtime modules (`io`, `std`, `strlib`, `sdl`) and separately compiled Pascal units.  Units must be compiled individually and linked via the VM object-path mechanism.  There is no automatic dependency resolution or build ordering. |
 | **`packed`** | Accepted and parsed but has no effect on memory layout. |
 | **`forward`** | Parsed and validated but codegen depends on declaration order. |
 | **Operator precedence** | Follows standard Pascal precedence: `not` > `* / div mod and` > `+ - or` > relational. |

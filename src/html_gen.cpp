@@ -101,6 +101,11 @@ namespace mxvm {
         out << "</style></head><body><div class=\"wrap\"><pre class=\"code\"><code>";
         const std::string &s = source;
         size_t i = 0, n = s.size();
+
+        // State for suppressing "string" highlighting inside  section module { … }
+        enum class ModState { None, SawSection, SawModule, Inside };
+        ModState modState = ModState::None;
+
         while (i < n) {
             char c = s[i];
             if (c == '\r') {
@@ -183,11 +188,26 @@ namespace mxvm {
                 if (is_label) {
                     out << "<span class=\"lbl\">" << html_escape(ident) << "</span>:";
                     i = j + 1;
+                    modState = ModState::None;
                     continue;
                 }
+
+                // Advance the  section module { … }  state machine
+                if (lid == "section" && modState == ModState::None) {
+                    modState = ModState::SawSection;
+                } else if (lid == "module" && modState == ModState::SawSection) {
+                    modState = ModState::SawModule;
+                } else if (modState != ModState::Inside) {
+                    modState = ModState::None;
+                }
+
+                // Inside a module section, suppress type/keyword highlighting
+                // so that module names like "string" render as plain identifiers.
+                bool suppress = (modState == ModState::Inside);
+
                 if (kInstructions.count(lid)) {
                     out << "<span class=\"op\">" << html_escape(ident) << "</span>";
-                } else if (kTypes.count(lid) || kKeywords.count(lid)) {
+                } else if (!suppress && (kTypes.count(lid) || kKeywords.count(lid))) {
                     if (kTypes.count(lid))
                         out << "<span class=\"typ\">" << html_escape(ident) << "</span>";
                     else
@@ -200,6 +220,11 @@ namespace mxvm {
             }
 
             if (c == '{' || c == '}' || c == ',' || c == '(' || c == ')' || c == '[' || c == ']') {
+                if (c == '{' && modState == ModState::SawModule) {
+                    modState = ModState::Inside;
+                } else if (c == '}' && modState == ModState::Inside) {
+                    modState = ModState::None;
+                }
                 out << html_escape(std::string(1, c));
                 ++i;
                 continue;

@@ -17,9 +17,11 @@ namespace pascal {
     void CodeGenVisitor::visit(ProgramNode &node) {
         name = node.name;
         // Separate native modules from unit dependencies
-        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl", "strlib"};
         for (const auto &mod : node.uses) {
-            if (nativeModules.count(mod))
+            if (mod == "strlib")
+                usedModules.insert("string");
+            else if (nativeModules.count(mod))
                 usedModules.insert(mod);
             else
                 objectDeps.push_back(mod);
@@ -33,9 +35,11 @@ namespace pascal {
         name = node.name;
         isUnit = true;
         // Process uses clause
-        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl", "strlib"};
         for (const auto &mod : node.uses) {
-            if (nativeModules.count(mod))
+            if (mod == "strlib")
+                usedModules.insert("string");
+            else if (nativeModules.count(mod))
                 usedModules.insert(mod);
             else
                 objectDeps.push_back(mod);
