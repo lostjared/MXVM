@@ -38,7 +38,6 @@ target_link_libraries(mxvm_sdl PRIVATE
 )
 
 set_target_properties(mxvm_sdl PROPERTIES
-    PREFIX ""
     INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/modules/sdl"
 )
 
