@@ -19,6 +19,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+TITLE_RE = re.compile(r'<title>[^<]*</title>', re.IGNORECASE)
+
 REPO     = Path(__file__).resolve().parent.parent
 PAS_ROOT = REPO / "src" / "frontend" / "pas"
 OUT_ROOT = REPO / "docs" / "examples"
@@ -29,6 +31,13 @@ HTML     = "mxvm-html"
 
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
+
+
+def fix_title(html_path: Path, title: str):
+    """Replace whatever <title> mxvm-html emitted with a clean one."""
+    text = html_path.read_text(encoding="utf-8")
+    text = TITLE_RE.sub(f"<title>{title}</title>", text, count=1)
+    html_path.write_text(text, encoding="utf-8")
 
 
 def rel_html_path(pas_path: Path) -> Path:
@@ -43,6 +52,7 @@ def convert_pas(pas_path: Path, out_html: Path) -> bool:
     if r.returncode != 0:
         print(f"  PAS ERROR {pas_path.name}: {r.stderr.strip()}", file=sys.stderr)
         return False
+    fix_title(out_html, f"{pas_path.stem}.pas \u2014 Pascal Source \u2014 MXVM")
     return True
 
 
@@ -64,6 +74,7 @@ def compile_and_convert_mxvm(pas_path: Path, out_mxvm_html: Path) -> bool:
         if r2.returncode != 0:
             print(f"  MXVM ERROR {pas_path.name}: {r2.stderr.strip()}", file=sys.stderr)
             return False
+        fix_title(out_mxvm_html, f"{pas_path.stem}.mxvm \u2014 MXVM Bytecode \u2014 MXVM")
         return True
     finally:
         tmp_mxvm.unlink(missing_ok=True)
