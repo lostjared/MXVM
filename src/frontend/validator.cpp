@@ -353,7 +353,7 @@ namespace mxx {
         next();
 
         // Import interface declarations from used units
-        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+        static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl", "strlib"};
         std::string inputDir;
         {
             auto pos = filename.find_last_of("/\\");

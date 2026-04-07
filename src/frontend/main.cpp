@@ -115,7 +115,7 @@ static bool compileFile(const std::string &inputPath, const std::string &outputP
                 std::string inputDir = inputPath.substr(0, inputPath.find_last_of("/\\") + 1);
                 if (inputDir.empty()) inputDir = "./";
 
-                static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+                static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl", "strlib"};
                 for (const auto &dep : ast->uses) {
                     if (nativeModules.count(dep)) continue;
 
@@ -167,7 +167,7 @@ static bool compileFile(const std::string &inputPath, const std::string &outputP
 
                 for (const auto &dep : ast->uses) {
                     // Skip native modules
-                    static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl"};
+                    static const std::unordered_set<std::string> nativeModules = {"io", "std", "string", "sdl", "strlib"};
                     if (nativeModules.count(dep)) continue;
 
                     // Try to find and parse the unit's .pas file for interface declarations
